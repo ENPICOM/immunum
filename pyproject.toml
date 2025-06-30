@@ -1,0 +1,21 @@
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "antinum"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "maturin>=1.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.1",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+
+]

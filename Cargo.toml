@@ -1,0 +1,14 @@
+[package]
+name = "antinum"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.40", features = ["derive"] }
+flate2 = "1.1.2"
+pyo3 = { version = "0.25.1", features = ["extension-module"] }
+thiserror = "2.0.12"
+
+[lib]
+name = "antinum"
+crate-type = ["cdylib"]

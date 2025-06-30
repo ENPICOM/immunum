@@ -1,0 +1,6 @@
+# Antinum Output
+Input: ATCGATCGATCG
+Scheme: IMGT
+Chains: [IGH, IGK]
+
+# Processed sequences will appear here
