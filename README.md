@@ -29,7 +29,7 @@ Immunum provides both a command-line interface and Python bindings for numbering
 #### Build and Install
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/immunum.git
+git clone https://github.com/ENPICOM/immunum.git
 cd immunum
 
 # Build the CLI tool
