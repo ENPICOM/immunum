@@ -1,10 +1,10 @@
-# Antinum
+# Immunum
 
 A high-performance CLI tool and Python library for numbering antibody and T-cell receptor sequences using standard immunological numbering schemes.
 
 ## Overview
 
-Antinum provides both a command-line interface and Python bindings for numbering immunoglobulin (antibody) and T-cell receptor sequences according to established numbering schemes like IMGT and Kabat. The tool is built in Rust for performance and provides Python bindings via PyO3 for easy integration into bioinformatics workflows.
+Immunum provides both a command-line interface and Python bindings for numbering immunoglobulin (antibody) and T-cell receptor sequences according to established numbering schemes like IMGT and Kabat. The tool is built in Rust for performance and provides Python bindings via PyO3 for easy integration into bioinformatics workflows.
 
 ## Features
 
@@ -29,8 +29,8 @@ Antinum provides both a command-line interface and Python bindings for numbering
 #### Build and Install
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/antinum.git
-cd antinum
+git clone https://github.com/your-username/immunum.git
+cd immunum
 
 # Build the CLI tool
 cargo build --release
@@ -84,14 +84,14 @@ immunumber -i sequences.fastq.gz -s imgt -c tra trb
 
 ### Python Library
 
-Import and use the `antinum` module in your Python scripts:
+Import and use the `immunum` module in your Python scripts:
 
 ```python
-import antinum
+import immunum
 
 # Number a single sequence
 sequence = "QVQLVQSGAEVKKPGASVKVSCKAS"
-result = antinum.number_sequence(sequence, "imgt", ["igh"])
+result = immunum.number_sequence(sequence, "imgt", ["igh"])
 print(result)
 
 # Process multiple sequences with different parameters
@@ -102,12 +102,12 @@ sequences = [
 
 for seq in sequences:
     # Use case-insensitive scheme and chain names
-    result = antinum.number_sequence(seq, "IMGT", ["IGH", "IGK"])
+    result = immunum.number_sequence(seq, "IMGT", ["IGH", "IGK"])
     print(result)
 
 # Handle errors gracefully
 try:
-    result = antinum.number_sequence("INVALID", "invalid_scheme", ["igh"])
+    result = immunum.number_sequence("INVALID", "invalid_scheme", ["igh"])
 except ValueError as e:
     print(f"Error: {e}")
 ```

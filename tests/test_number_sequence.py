@@ -1,12 +1,12 @@
 """
-Tests for the number_sequence pyfunction in antinum.
+Tests for the number_sequence pyfunction in immunum.
 
 This module contains comprehensive tests for the number_sequence function,
 including valid inputs, edge cases, and error handling.
 """
 
 import pytest
-import antinum
+import immunum
 
 
 class TestNumberSequence:
@@ -15,14 +15,14 @@ class TestNumberSequence:
     def test_valid_imgt_scheme_with_igh_chain(self):
         """Test number_sequence with valid IMGT scheme and IGH chain."""
         sequence = "ATCGATCGATCG"
-        result = antinum.number_sequence(sequence, "imgt", ["igh"])
+        result = immunum.number_sequence(sequence, "imgt", ["igh"])
         assert isinstance(result, str)
         assert len(result) > 0
 
     def test_valid_kabat_scheme_with_igk_chain(self):
         """Test number_sequence with valid KABAT scheme and IGK chain."""
         sequence = "ATCGATCGATCG"
-        result = antinum.number_sequence(sequence, "kabat", ["igk"])
+        result = immunum.number_sequence(sequence, "kabat", ["igk"])
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -32,9 +32,9 @@ class TestNumberSequence:
         chains = ["igh"]
 
         # Test different cases for IMGT
-        result1 = antinum.number_sequence(sequence, "IMGT", chains)
-        result2 = antinum.number_sequence(sequence, "imgt", chains)
-        result3 = antinum.number_sequence(sequence, "ImGt", chains)
+        result1 = immunum.number_sequence(sequence, "IMGT", chains)
+        result2 = immunum.number_sequence(sequence, "imgt", chains)
+        result3 = immunum.number_sequence(sequence, "ImGt", chains)
 
         assert result1 == result2 == result3
 
@@ -44,13 +44,13 @@ class TestNumberSequence:
         chains = ["igh"]
 
         # Test IMGT abbreviation
-        result_imgt_full = antinum.number_sequence(sequence, "imgt", chains)
-        result_imgt_abbrev = antinum.number_sequence(sequence, "i", chains)
+        result_imgt_full = immunum.number_sequence(sequence, "imgt", chains)
+        result_imgt_abbrev = immunum.number_sequence(sequence, "i", chains)
         assert result_imgt_full == result_imgt_abbrev
 
         # Test KABAT abbreviation
-        result_kabat_full = antinum.number_sequence(sequence, "kabat", chains)
-        result_kabat_abbrev = antinum.number_sequence(sequence, "k", chains)
+        result_kabat_full = immunum.number_sequence(sequence, "kabat", chains)
+        result_kabat_abbrev = immunum.number_sequence(sequence, "k", chains)
         assert result_kabat_full == result_kabat_abbrev
 
     def test_chain_case_insensitive(self):
@@ -58,9 +58,9 @@ class TestNumberSequence:
         sequence = "ATCGATCGATCG"
         scheme = "imgt"
 
-        result1 = antinum.number_sequence(sequence, scheme, ["IGH"])
-        result2 = antinum.number_sequence(sequence, scheme, ["igh"])
-        result3 = antinum.number_sequence(sequence, scheme, ["IgH"])
+        result1 = immunum.number_sequence(sequence, scheme, ["IGH"])
+        result2 = immunum.number_sequence(sequence, scheme, ["igh"])
+        result3 = immunum.number_sequence(sequence, scheme, ["IgH"])
 
         assert result1 == result2 == result3
 
@@ -70,20 +70,20 @@ class TestNumberSequence:
         scheme = "imgt"
 
         # Test IGH abbreviation
-        result_igh_full = antinum.number_sequence(sequence, scheme, ["igh"])
-        result_igh_abbrev = antinum.number_sequence(sequence, scheme, ["h"])
+        result_igh_full = immunum.number_sequence(sequence, scheme, ["igh"])
+        result_igh_abbrev = immunum.number_sequence(sequence, scheme, ["h"])
         assert result_igh_full == result_igh_abbrev
 
         # Test IGK abbreviation
-        result_igk_full = antinum.number_sequence(sequence, scheme, ["igk"])
-        result_igk_abbrev = antinum.number_sequence(sequence, scheme, ["k"])
+        result_igk_full = immunum.number_sequence(sequence, scheme, ["igk"])
+        result_igk_abbrev = immunum.number_sequence(sequence, scheme, ["k"])
         assert result_igk_full == result_igk_abbrev
 
     def test_multiple_chains(self):
         """Test number_sequence with multiple chains."""
         sequence = "ATCGATCGATCG"
         chains = ["igh", "igk", "igl"]
-        result = antinum.number_sequence(sequence, "imgt", chains)
+        result = immunum.number_sequence(sequence, "imgt", chains)
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -95,26 +95,26 @@ class TestNumberSequence:
         valid_chains = ["igh", "igk", "igl", "tra", "trb", "trg", "trd"]
 
         for chain in valid_chains:
-            result = antinum.number_sequence(sequence, scheme, [chain])
+            result = immunum.number_sequence(sequence, scheme, [chain])
             assert isinstance(result, str)
             assert len(result) > 0
 
     def test_empty_sequence(self):
         """Test number_sequence with empty sequence."""
-        result = antinum.number_sequence("", "imgt", ["igh"])
+        result = immunum.number_sequence("", "imgt", ["igh"])
         assert isinstance(result, str)
 
     def test_long_sequence(self):
         """Test number_sequence with a long sequence."""
         long_sequence = "ATCG" * 100  # 400 characters
-        result = antinum.number_sequence(long_sequence, "imgt", ["igh"])
+        result = immunum.number_sequence(long_sequence, "imgt", ["igh"])
         assert isinstance(result, str)
         assert len(result) > 0
 
     def test_sequence_with_non_standard_bases(self):
         """Test number_sequence with sequences containing non-standard bases."""
         sequence = "ATCGNATCGN"  # Contains N bases
-        result = antinum.number_sequence(sequence, "imgt", ["igh"])
+        result = immunum.number_sequence(sequence, "imgt", ["igh"])
         assert isinstance(result, str)
 
     def test_invalid_scheme_raises_error(self):
@@ -123,7 +123,7 @@ class TestNumberSequence:
         chains = ["igh"]
 
         with pytest.raises(ValueError, match="Invalid scheme"):
-            antinum.number_sequence(sequence, "invalid_scheme", chains)
+            immunum.number_sequence(sequence, "invalid_scheme", chains)
 
     def test_invalid_chain_raises_error(self):
         """Test that invalid chain raises ValueError."""
@@ -131,7 +131,7 @@ class TestNumberSequence:
         scheme = "imgt"
 
         with pytest.raises(ValueError, match="Invalid chain"):
-            antinum.number_sequence(sequence, scheme, ["invalid_chain"])
+            immunum.number_sequence(sequence, scheme, ["invalid_chain"])
 
     def test_mixed_valid_and_invalid_chains(self):
         """Test that one invalid chain in a list raises error."""
@@ -139,18 +139,18 @@ class TestNumberSequence:
         scheme = "imgt"
 
         with pytest.raises(ValueError, match="Invalid chain"):
-            antinum.number_sequence(sequence, scheme, ["igh", "invalid_chain"])
+            immunum.number_sequence(sequence, scheme, ["igh", "invalid_chain"])
 
     def test_empty_chains_list(self):
         """Test number_sequence with empty chains list."""
         sequence = "ATCGATCGATCG"
-        result = antinum.number_sequence(sequence, "imgt", [])
+        result = immunum.number_sequence(sequence, "imgt", [])
         assert isinstance(result, str)
 
     def test_duplicate_chains(self):
         """Test number_sequence with duplicate chains."""
         sequence = "ATCGATCGATCG"
-        result = antinum.number_sequence(sequence, "imgt", ["igh", "igh", "igh"])
+        result = immunum.number_sequence(sequence, "imgt", ["igh", "igh", "igh"])
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -161,17 +161,17 @@ class TestNumberSequenceParameterTypes:
     def test_sequence_parameter_type(self):
         """Test that sequence parameter must be a string."""
         with pytest.raises(TypeError):
-            antinum.number_sequence(123, "imgt", ["igh"])
+            immunum.number_sequence(123, "imgt", ["igh"])
 
     def test_scheme_parameter_type(self):
         """Test that scheme parameter must be a string."""
         with pytest.raises(TypeError):
-            antinum.number_sequence("ATCG", 123, ["igh"])
+            immunum.number_sequence("ATCG", 123, ["igh"])
 
     def test_chains_parameter_type(self):
         """Test that chains parameter must be a list."""
         with pytest.raises(TypeError):
-            antinum.number_sequence("ATCG", "imgt", "igh")
+            immunum.number_sequence("ATCG", "imgt", "igh")
 
 
 class TestNumberSequenceIntegration:
@@ -185,7 +185,7 @@ class TestNumberSequenceIntegration:
             "RVTMTRDTSISTAYMELSRLRSDDTAVYYCARGGYDILTDYWGQGTLVTVSS"
         )
 
-        result = antinum.number_sequence(sequence, "imgt", ["igh"])
+        result = immunum.number_sequence(sequence, "imgt", ["igh"])
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -197,7 +197,7 @@ class TestNumberSequenceIntegration:
             "LLIQSSQREQTSGRLNASLDKSSGRSTLYIAASQPGDSATYLCAVRPTSGGSYIPTFGRGTSLIVHP"
         )
 
-        result = antinum.number_sequence(sequence, "kabat", ["tra"])
+        result = immunum.number_sequence(sequence, "kabat", ["tra"])
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -206,8 +206,8 @@ class TestNumberSequenceIntegration:
         sequence = "ATCGATCGATCGATCGATCG"
         chains = ["igh"]
 
-        result_imgt = antinum.number_sequence(sequence, "imgt", chains)
-        result_kabat = antinum.number_sequence(sequence, "kabat", chains)
+        result_imgt = immunum.number_sequence(sequence, "imgt", chains)
+        result_kabat = immunum.number_sequence(sequence, "kabat", chains)
 
         # Both should return strings (though content may differ)
         assert isinstance(result_imgt, str)

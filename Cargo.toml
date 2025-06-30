@@ -1,5 +1,5 @@
 [package]
-name = "antinum"
+name = "immunum"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,5 +10,5 @@ pyo3 = { version = "0.25.1", features = ["extension-module"] }
 thiserror = "2.0.12"
 
 [lib]
-name = "antinum"
+name = "immunum"
 crate-type = ["cdylib"]

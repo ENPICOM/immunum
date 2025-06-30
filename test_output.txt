@@ -1,4 +1,4 @@
-# Antinum Output
+# Immunum Output
 Input: ATCGATCGATCG
 Scheme: IMGT
 Chains: [IGH, IGK]

@@ -52,7 +52,7 @@ fn number_sequence(sequence: &str, scheme: &str, chains: Vec<String>) -> PyResul
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn antinum(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn immunum(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(number_sequence, m)?)?;
     Ok(())
 }
