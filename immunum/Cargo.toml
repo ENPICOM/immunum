@@ -1,0 +1,28 @@
+[package]
+name = "immunum"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { workspace = true }
+flate2 = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+thiserror = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+wee_alloc = { workspace = true, optional = true }
+immunum-macros = { path = "../immunum-macros" }
+
+[lib]
+name = "immunum"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "immunum-cli"
+path = "src/main.rs"
+
+[features]
+default = ["python", "wasm"]
+python = ["pyo3"]
+wasm = ["wasm-bindgen", "wee_alloc"]

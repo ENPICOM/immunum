@@ -1,19 +1,21 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use clap::ValueEnum;
+use immunum_macros::ParseFromString;
 
 /// Numbering schemes for immunoglobulin sequences
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, PartialEq, ValueEnum, ParseFromString)]
 pub enum Scheme {
     /// IMGT numbering scheme
+    #[value(alias = "I")]
     IMGT,
     /// Kabat numbering scheme
+    #[value(alias = "K")]
     KABAT,
 }
 
-
 /// Immunoglobulin and T-cell receptor chain types
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, PartialEq, ValueEnum, ParseFromString)]
 pub enum Chain {
     // IG Heavy chain variants
     #[value(alias = "Heavy", alias = "H")]

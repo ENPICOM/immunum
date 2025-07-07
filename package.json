@@ -1,0 +1,10 @@
+{
+  "type": "module",
+  "name": "immunum-wasm-test",
+  "version": "1.0.0",
+  "description": "Test script for Immunum WASM binary",
+  "main": "test-wasm-node.js",
+  "scripts": {
+    "test": "node test-wasm-node.js"
+  }
+}

@@ -1,6 +1,6 @@
 use flate2::read::GzDecoder;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use thiserror::Error;
 
@@ -10,24 +10,22 @@ pub enum FastxError {
     Io(#[from] std::io::Error),
     #[error("Invalid FASTA/FASTQ format: {0}")]
     InvalidFormat(String),
-    #[error("Unsupported file extension: {0}")]
-    UnsupportedExtension(String),
 }
 
 /// Represents a sequence record from a FASTA or FASTQ file
 #[derive(Debug, Clone)]
 pub struct FastxRecord {
-    pub name: String,
+    pub _name: String, // TODO Not used at the moment, but would be nice to print it in the output?
     pub sequence: String,
-    pub quality: Option<String>, // Only present for FASTQ files
+    pub _quality: Option<String>, // TODO Not used at the moment, should we keep it?
 }
 
 impl FastxRecord {
     pub fn new(name: String, sequence: String, quality: Option<String>) -> Self {
         Self {
-            name,
+            _name: name,
             sequence,
-            quality,
+            _quality: quality,
         }
     }
 }
@@ -213,10 +211,10 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0].name, "seq1 description");
+        assert_eq!(records[0]._name, "seq1 description");
         assert_eq!(records[0].sequence, "ATCGTGCA");
-        assert_eq!(records[0].quality, None);
-        assert_eq!(records[1].name, "seq2");
+        assert_eq!(records[0]._quality, None);
+        assert_eq!(records[1]._name, "seq2");
         assert_eq!(records[1].sequence, "GGCC");
     }
 
@@ -230,11 +228,125 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0].name, "seq1");
+        assert_eq!(records[0]._name, "seq1");
         assert_eq!(records[0].sequence, "ATCG");
-        assert_eq!(records[0].quality, Some("IIII".to_string()));
-        assert_eq!(records[1].name, "seq2");
+        assert_eq!(records[0]._quality, Some("IIII".to_string()));
+        assert_eq!(records[1]._name, "seq2");
         assert_eq!(records[1].sequence, "GGCC");
-        assert_eq!(records[1].quality, Some("!!!!".to_string()));
+        assert_eq!(records[1]._quality, Some("!!!!".to_string()));
+    }
+
+    #[test]
+    fn test_fasta_from_file() {
+        let reader = from_path("fixtures/test.fasta").unwrap();
+        let records: Result<Vec<_>, _> = reader.collect();
+        let records = records.unwrap();
+
+        assert_eq!(records.len(), 4);
+        
+        // Test first record
+        assert_eq!(records[0]._name, "heavy_chain_1 Human IgG heavy chain variable region");
+        assert!(records[0].sequence.starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+        assert_eq!(records[0]._quality, None);
+        
+        // Test second record
+        assert_eq!(records[1]._name, "light_chain_1 Human kappa light chain variable region");
+        assert!(records[1].sequence.starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+        assert_eq!(records[1]._quality, None);
+        
+        // Test third record
+        assert_eq!(records[2]._name, "heavy_chain_2 Murine IgG heavy chain variable region");
+        assert!(records[2].sequence.starts_with("EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
+        assert_eq!(records[2]._quality, None);
+        
+        // Test fourth record
+        assert_eq!(records[3]._name, "light_chain_2 Human lambda light chain variable region");
+        assert!(records[3].sequence.starts_with("QSALTQPASVSGSPGQSITISCTGTSSDVGG"));
+        assert_eq!(records[3]._quality, None);
+    }
+
+    #[test]
+    fn test_fastq_from_file() {
+        let reader = from_path("fixtures/test.fastq").unwrap();
+        let records: Result<Vec<_>, _> = reader.collect();
+        let records = records.unwrap();
+
+        assert_eq!(records.len(), 3);
+        
+        // Test first record
+        assert_eq!(records[0]._name, "heavy_chain_1 Human IgG heavy chain variable region");
+        assert!(records[0].sequence.starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+        assert!(records[0]._quality.is_some());
+        let quality = records[0]._quality.as_ref().unwrap();
+        assert!(quality.chars().all(|c| c == 'I'));
+        
+        // Test second record
+        assert_eq!(records[1]._name, "light_chain_1 Human kappa light chain variable region");
+        assert!(records[1].sequence.starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+        assert!(records[1]._quality.is_some());
+        
+        // Test third record
+        assert_eq!(records[2]._name, "heavy_chain_2 Murine IgG heavy chain variable region");
+        assert!(records[2].sequence.starts_with("EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
+        assert!(records[2]._quality.is_some());
+    }
+
+    #[test]
+    fn test_fasta_gz_from_file() {
+        let reader = from_path("fixtures/test.fasta.gz").unwrap();
+        let records: Result<Vec<_>, _> = reader.collect();
+        let records = records.unwrap();
+
+        assert_eq!(records.len(), 4);
+        
+        // Test that gzipped content matches uncompressed content
+        assert_eq!(records[0]._name, "heavy_chain_1 Human IgG heavy chain variable region");
+        assert!(records[0].sequence.starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+        assert_eq!(records[0]._quality, None);
+        
+        assert_eq!(records[1]._name, "light_chain_1 Human kappa light chain variable region");
+        assert!(records[1].sequence.starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+        assert_eq!(records[1]._quality, None);
+    }
+
+    #[test]
+    fn test_fastq_gz_from_file() {
+        let reader = from_path("fixtures/test.fastq.gz").unwrap();
+        let records: Result<Vec<_>, _> = reader.collect();
+        let records = records.unwrap();
+
+        assert_eq!(records.len(), 3);
+        
+        // Test that gzipped content matches uncompressed content
+        assert_eq!(records[0]._name, "heavy_chain_1 Human IgG heavy chain variable region");
+        assert!(records[0].sequence.starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+        assert!(records[0]._quality.is_some());
+        
+        assert_eq!(records[1]._name, "light_chain_1 Human kappa light chain variable region");
+        assert!(records[1].sequence.starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+        assert!(records[1]._quality.is_some());
+    }
+
+    #[test]
+    fn test_nonexistent_file() {
+        let result = from_path("fixtures/nonexistent.fasta");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_empty_file() {
+        use std::io::Write;
+        use std::fs::File;
+        
+        // Create a temporary empty file
+        let temp_path = "fixtures/temp_empty";
+        File::create(temp_path).unwrap().write_all(b"").unwrap();
+        
+        let result = from_path(temp_path);
+        assert!(result.is_err());
+
+        
+        // Clean up
+        std::fs::remove_file(temp_path).unwrap();
     }
 }

@@ -2,11 +2,14 @@
 requires = ["maturin>=1,<2"]
 build-backend = "maturin"
 
+[tool.maturin]
+manifest-path = "immunum/Cargo.toml"
+
 [project]
 name = "immunum"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
+readme = "PYTHON_README.md"
 requires-python = ">=3.11"
 dependencies = [
     "maturin>=1.9.0",

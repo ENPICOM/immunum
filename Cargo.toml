@@ -1,14 +1,15 @@
-[package]
-name = "immunum"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = ["immunum", "immunum-macros"]
+resolver = "2"
 
-[dependencies]
+[workspace.dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
 flate2 = "1.1.2"
 pyo3 = { version = "0.25.1", features = ["extension-module"] }
 thiserror = "2.0.12"
-
-[lib]
-name = "immunum"
-crate-type = ["cdylib"]
+wasm-bindgen = { version = "0.2" }
+js-sys = { version = "0.3" }
+wee_alloc = { version = "0.4.5" }
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"

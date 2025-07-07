@@ -122,7 +122,7 @@ class TestNumberSequence:
         sequence = "ATCGATCGATCG"
         chains = ["igh"]
 
-        with pytest.raises(ValueError, match="Invalid scheme"):
+        with pytest.raises(ValueError, match="Scheme not supported"):
             immunum.number_sequence(sequence, "invalid_scheme", chains)
 
     def test_invalid_chain_raises_error(self):
@@ -130,7 +130,7 @@ class TestNumberSequence:
         sequence = "ATCGATCGATCG"
         scheme = "imgt"
 
-        with pytest.raises(ValueError, match="Invalid chain"):
+        with pytest.raises(ValueError, match="Chain not supported"):
             immunum.number_sequence(sequence, scheme, ["invalid_chain"])
 
     def test_mixed_valid_and_invalid_chains(self):
@@ -138,7 +138,7 @@ class TestNumberSequence:
         sequence = "ATCGATCGATCG"
         scheme = "imgt"
 
-        with pytest.raises(ValueError, match="Invalid chain"):
+        with pytest.raises(ValueError, match="Chain not supported"):
             immunum.number_sequence(sequence, scheme, ["igh", "invalid_chain"])
 
     def test_empty_chains_list(self):

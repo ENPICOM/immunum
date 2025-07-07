@@ -1,8 +1,8 @@
+use crate::types::{Chain, Scheme};
 use clap::Parser;
-use crate::types::{Scheme, Chain};
 
 #[derive(Parser)]
-#[command(name = "immunumber")]  // !Tool name is up for discussion
+#[command(name = "immunumber")] // !Tool name is up for discussion
 #[command(about = "A CLI tool for numbering Antibody and T-cell receptor sequences")]
 #[command(version = "0.1.0")]
 pub struct Cli {
@@ -17,10 +17,10 @@ pub struct Cli {
     #[arg(
         short, long, value_enum, ignore_case = true, default_value_t = Scheme::IMGT, help = "Numbering scheme")]
     pub scheme: Scheme,
-    /// Chain types to process (supports multiple values)
+    /// Chain types to try numbering with (supports multiple values)
     #[arg(
-        short, long, value_enum, ignore_case = true, num_args = 1.., help = "Chain types to process (multiple values allowed)")]
-    pub chains: Vec<Chain>,
+        short, long, value_enum, ignore_case = true, num_args = 1.., help = "Chain types to number with (multiple values allowed)")]
+    pub chains: Option<Vec<Chain>>,
     /// Output file path (optional, defaults to stdout)
     #[arg(
         short,

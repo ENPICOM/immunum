@@ -1,2 +1,5 @@
 /target
 __pycache__
+
+wasm_build/*
+!wasm_build/test.js
