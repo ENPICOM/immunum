@@ -38,17 +38,17 @@ cargo build
 
 ### Command Line Interface
 
-The CLI tool is named `immunumber` and provides a simple interface for sequence numbering:
+The CLI tool is named `immunum-cli` and provides a simple interface for sequence numbering:
 
 ```bash
 # Number a sequence string using IMGT scheme for heavy chain
-immunumber -i "QVQLVQSGAEVKKPGASVKVSCKAS" -s imgt -c igh
+immunum-cli -i "QVQLVQSGAEVKKPGASVKVSCKAS" -s imgt -c igh
 
 # Process a FASTA file with multiple chain types
-immunumber -i sequences.fasta -s kabat -c igh igk igl -o results.txt
+immunum-cli -i sequences.fasta -s kabat -c igh igk igl -o results.txt
 
 # Process gzipped FASTQ file
-immunumber -i sequences.fastq.gz -s imgt -c tra trb
+immunum-cli -i sequences.fastq.gz -s imgt -c tra trb
 ```
 
 #### CLI Options
