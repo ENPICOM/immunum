@@ -31,7 +31,7 @@ Immunum provides a command-line interface, Python bindings and WebAssembly modul
 git clone https://github.com/ENPICOM/immunum.git && cd immunum
 
 # Build the CLI tool
-cargo build --release --features cli
+cargo build
 ```
 
 ## Usage
