@@ -22,7 +22,7 @@ async function testWasmInNode() {
         // Initialize the WASM module with the binary data
         await init(wasmBytes);
         
-        console.log('✅ WASM module initialized successfully!\n');
+        console.log('✅ WASM module initialized successfully!');
         
         // Test cases
         const testCases = [
@@ -49,25 +49,19 @@ async function testWasmInNode() {
         // Run test cases
         for (let i = 0; i < testCases.length; i++) {
             const test = testCases[i];
-            console.log(`🧪 Test ${i + 1}: ${test.name}`);
-            console.log(`   Sequence: ${test.sequence.substring(0, 50)}${test.sequence.length > 50 ? '...' : ''}`);
-            console.log(`   Scheme: ${test.scheme}`);
-            console.log(`   Chains: ${test.chains.join(', ')}`);
-            
             try {
-                const result = numberSequence(test.sequence, test.scheme, test.chains);
-                console.log(`   ✅ Result:\n${result}\n`);
+                numberSequence(test.sequence, test.scheme, test.chains);
+                console.log(`✅ Test ${i + 1}: ${test.name}`);
             } catch (error) {
-                console.log(`   ❌ Error: ${error.message}\n`);
+                console.log(`❌ Test ${i + 1}: ${test.name} \n    Error: ${error.message}\n`);
             }
         }
         
         // Test error handling
-        console.log('🧪 Testing error handling...');
         try {
             numberSequence("INVALID", "invalid_scheme", ["invalid_chain"]);
         } catch (error) {
-            console.log(`   ✅ Error handling works: ${error.message}\n`);
+            console.log(`✅ Error handling works: ${error.message}\n`);
         }
         
         console.log('🎉 All tests completed!');

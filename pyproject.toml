@@ -8,17 +8,13 @@ manifest-path = "immunum/Cargo.toml"
 [project]
 name = "immunum"
 version = "0.1.0"
-description = "Add your description here"
-readme = "PYTHON_README.md"
+description = "A high-performance Python library for numbering antibody and T-cell receptor sequences using standard immunological numbering schemes."
+readme = "docs/PYTHON_README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "maturin>=1.9.0",
-]
 
 [dependency-groups]
 dev = [
     "ruff>=0.12.1",
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-
+    "maturin>=1.9.0"
 ]
