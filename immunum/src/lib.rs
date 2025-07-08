@@ -4,6 +4,7 @@ pub mod sequence_stream;
 pub mod types;
 pub mod constants;
 pub mod consensus_scoring;
+pub mod needleman_wunsch;
 
 // Binding modules
 #[cfg(feature = "python")]

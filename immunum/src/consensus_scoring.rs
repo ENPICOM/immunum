@@ -4,10 +4,7 @@ use std::io;
 use std::fs;
 
 fn read_consensus_file(path: &str) -> Result<HashMap<u32, Vec<char>>, io::Error> {
-    // TODO BUFREADER instead???
-    // TODO convert to char??
     let content = fs::read_to_string(path);
-    println!("{:?}", content);
     let content = content.unwrap_or("".to_string());
     let mut consensus_aas: HashMap<u32, Vec<char>> = HashMap::new();
     // Loop over every line of content
