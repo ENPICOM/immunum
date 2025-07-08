@@ -13,6 +13,7 @@ js-sys = { workspace = true, optional = true }
 wee_alloc = { workspace = true, optional = true }
 immunum-macros = { path = "../immunum-macros" }
 wasm-bindgen-test = "0.3.50"
+phf = {version = "0.12.1" , features = ["macros"]}
 
 [lib]
 name = "immunum"

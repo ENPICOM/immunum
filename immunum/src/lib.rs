@@ -2,6 +2,8 @@ pub mod fastx;
 pub mod numbering;
 pub mod sequence_stream;
 pub mod types;
+pub mod constants;
+pub mod consensus_scoring;
 
 // Binding modules
 #[cfg(feature = "python")]
