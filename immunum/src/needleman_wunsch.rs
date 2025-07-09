@@ -37,7 +37,7 @@ pub fn needleman_wunsch_consensus(query_sequence:String, scheme: &NumberingSchem
             // NOTE: sequence index is query_position - 1
             let mut best_score: f64 = 2.0; // TODO Get scoring value
 
-            if scheme.conserved_positions.contains(&(consensus_position as i32)){
+            if scheme.conserved_positions.contains(&(consensus_position as u32)){
                 best_score *= MATCH_CP_MULTIPLIER}
 
             match_value += best_score;

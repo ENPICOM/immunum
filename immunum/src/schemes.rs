@@ -25,6 +25,7 @@ pub fn get_imgt_heavy_scheme() -> NumberingScheme{
 #[cfg(test)]
 mod tests {
     use wasm_bindgen::__rt::assert_not_null;
+    use crate::constants::{CDR1_INSERTION_POSITION_IMGT, GAP_PEN_CDR, GAP_PEN_FR, GAP_PEN_OP, GAP_PEN_OTHER};
     use super::*;
 
     #[test]
@@ -34,5 +35,10 @@ mod tests {
         assert_eq!(scheme.restricted_sites().len(), 88);
         assert_eq!(scheme.consensus_amino_acids.len(), 128);
         assert_eq!(scheme.consensus_amino_acids[&1], vec!['Q', 'E', 'D']);
+        assert_eq!(scheme.gap_penalty(25), (GAP_PEN_FR, GAP_PEN_FR));
+        assert_eq!(scheme.gap_penalty(200), (GAP_PEN_OTHER, GAP_PEN_OTHER));
+        assert_eq!(scheme.gap_penalty(CDR1_INSERTION_POSITION_IMGT), (GAP_PEN_CDR, GAP_PEN_CDR));
+        assert_eq!(scheme.gap_penalty(10), (GAP_PEN_FR, GAP_PEN_OP))
+        //TODO add more tests
     }
 }
