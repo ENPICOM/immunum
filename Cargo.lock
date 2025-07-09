@@ -176,6 +176,7 @@ dependencies = [
  "flate2",
  "immunum-macros",
  "js-sys",
+ "log",
  "phf",
  "pyo3",
  "thiserror",

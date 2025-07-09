@@ -5,6 +5,7 @@ pub mod types;
 pub mod constants;
 pub mod consensus_scoring;
 pub mod needleman_wunsch;
+pub mod schemes;
 
 // Binding modules
 #[cfg(feature = "python")]

@@ -1,9 +1,8 @@
 use crate::constants::BLOSUM62;
 use std::collections::HashMap;
-use std::io;
 use std::fs;
 
-fn read_consensus_file(path: &str) -> Result<HashMap<u32, Vec<char>>, io::Error> {
+pub(crate) fn read_consensus_file(path: &str) -> HashMap<u32, Vec<char>>{
     let content = fs::read_to_string(path);
     let content = content.unwrap_or("".to_string());
     let mut consensus_aas: HashMap<u32, Vec<char>> = HashMap::new();
@@ -19,7 +18,7 @@ fn read_consensus_file(path: &str) -> Result<HashMap<u32, Vec<char>>, io::Error>
                 .collect()
         );
     }
-    Ok(consensus_aas)
+    consensus_aas
 }
 
 fn best_score_consensus(position:u32, residue: char, consensus:&HashMap<u32, Vec<char>>) -> i32{
@@ -69,8 +68,6 @@ mod tests {
     fn finding_best_scores(){
         let consensus = read_consensus_file(
             r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_H.txt");
-        assert!(consensus.is_ok());
-        let consensus = consensus.unwrap();
 
         // correct scores
         assert_eq!(best_score_consensus(1, 'A', &consensus), -1);
@@ -87,8 +84,6 @@ mod tests {
     fn look_outside_consensus(){
         let consensus = read_consensus_file(
             r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_H.txt");
-        assert!(consensus.is_ok());
-        let consensus = consensus.unwrap();
         // test wrong positions
         best_score_consensus(200, 'A', &consensus);
     }

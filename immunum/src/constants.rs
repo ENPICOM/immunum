@@ -22,10 +22,10 @@ pub const WITHIN_IDENTITY_RANGE: f64 = 0.20;
 // Minimal chain length, minimal length for sequence to continue search for chain
 pub const MINIMAL_CHAIN_LENGTH: i32 = 60;
 
-pub const FROM_DIAG: i8 = 0;
-pub const FROM_LEFT: i8 = 1;
-pub const FROM_TOP: i8 = 2;
-pub const PERFECT_MATCH: i8 = 3;
+pub const FROM_DIAG: u8 = 0;
+pub const FROM_LEFT: u8 = 1;
+pub const FROM_TOP: u8 = 2;
+pub const PERFECT_MATCH: u8 = 3;
 
 // IMGT cdr insertion positions;
 pub const CDR1_INSERTION_POSITION_IMGT: i32 = 33;

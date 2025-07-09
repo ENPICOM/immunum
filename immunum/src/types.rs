@@ -7,8 +7,8 @@ use std::ops::Range;
 
 #[derive(Debug)]
 pub struct RegionRange {
-    start: i32,
-    end: i32
+    pub(crate) start: i32,
+    pub(crate) end: i32
 
 }
 impl RegionRange {
@@ -19,13 +19,13 @@ impl RegionRange {
 
 #[derive(Debug)]
 pub struct NumberingOutput<'a>{
-    scheme: &'a NumberingScheme,
-    sequence: String,
-    numbering: Vec<String>,
-    identity: f64,
-    score: f64,
-    start: i32,
-    end: i32,
+    pub(crate) scheme: &'a NumberingScheme,
+    pub(crate) sequence: String,
+    pub(crate) numbering: Vec<String>,
+    pub(crate) identity: f64,
+    pub(crate) score: f64,
+    pub(crate) start: i32,
+    pub(crate) end: i32,
 }
 
 #[derive(Debug)]
@@ -46,6 +46,18 @@ pub struct NumberingScheme {
     pub(crate) cdr2: RegionRange,
     pub(crate) cdr3: RegionRange,
     // TODO scoring matrix // framework_positions: //cdr_positions:
+}
+
+impl NumberingScheme {
+    pub(crate) fn restricted_sites(&self) -> Vec<u32>{
+        let mut sites = Vec::new();
+        for (&key, value) in &self.consensus_amino_acids{
+            if !value.contains(&'-'){
+                sites.push(key);
+            }
+        }
+        sites
+    }
 }
 /// Numbering schemes for immunoglobulin sequences
 #[derive(Clone, Debug, PartialEq, ValueEnum, ParseFromString)]
