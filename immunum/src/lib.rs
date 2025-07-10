@@ -1,11 +1,11 @@
+pub mod consensus_scoring;
+pub mod constants;
 pub mod fastx;
+pub mod needleman_wunsch;
 pub mod numbering;
+pub mod schemes;
 pub mod sequence_stream;
 pub mod types;
-pub mod constants;
-pub mod consensus_scoring;
-pub mod needleman_wunsch;
-pub mod schemes;
 
 // Binding modules
 #[cfg(feature = "python")]

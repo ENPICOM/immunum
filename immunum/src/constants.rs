@@ -8,12 +8,11 @@ pub const GAP_PEN_CDR: f64 = 1.2;
 pub const GAP_PEN_OTHER: f64 = 11.0;
 pub const GAP_PEN_START: f64 = 1.0;
 pub const GAP_PEN_END: f64 = 1.0;
-pub const MATCH_CP_MULTIPLIER: f64 = 5.0;  // Multiplier of match score
-pub const CDR_INCREASE: f64 = 1.0;  // increase per position away from insertion position CDR
+pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
+pub const CDR_INCREASE: f64 = 1.0; // increase per position away from insertion position CDR
 
-pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 0.8;  // better name
-pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0;  // better name
-
+pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 0.8; // better name
+pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0; // better name
 
 // Pre scan identity cutoff, minimal identity for program to assume a chain
 pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
@@ -43,6 +42,10 @@ pub const CDR3_INSERTION_POSITION_KABAT_LIGHT: u32 = 95;
 // TODO get allowed amino acids
 //pub const ALLOWED_AMINO_ACIDS: Vec<&str> = BLOSUM62.keys().collect();
 
+pub const ACCEPTED_RESIDUES: [char; 23] = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V',
+    'W', 'X', 'Y', 'Z',
+];
 pub static BLOSUM62: Map<&'static str, i32> = phf_map! {
         "BN" => 3,
         "LW" => -2,

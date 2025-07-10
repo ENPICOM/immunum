@@ -1,15 +1,24 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use std::collections::HashMap;
+use crate::constants::{
+    CDR1_INSERTION_POSITION_IMGT, CDR1_INSERTION_POSITION_KABAT_HEAVY,
+    CDR1_INSERTION_POSITION_KABAT_LIGHT, CDR2_INSERTION_POSITION_IMGT,
+    CDR2_INSERTION_POSITION_KABAT_HEAVY, CDR2_INSERTION_POSITION_KABAT_LIGHT,
+    CDR3_INSERTION_POSITION_IMGT, CDR3_INSERTION_POSITION_KABAT_HEAVY,
+    CDR3_INSERTION_POSITION_KABAT_LIGHT, CDR_INCREASE, GAP_PEN_CDR, GAP_PEN_CP, GAP_PEN_FR,
+    GAP_PEN_IP, GAP_PEN_OP, GAP_PEN_OTHER, PEN_LEAP_FROM_INSERTION_POINT_IMGT,
+    PEN_LEAP_INSERTION_POINT_KABAT,
+};
 use clap::ValueEnum;
 use immunum_macros::ParseFromString;
+use ndarray::Array2;
+use std::collections::HashMap;
 use std::ops::Range;
-use crate::constants::{CDR1_INSERTION_POSITION_IMGT, CDR1_INSERTION_POSITION_KABAT_HEAVY, CDR1_INSERTION_POSITION_KABAT_LIGHT, CDR2_INSERTION_POSITION_IMGT, CDR2_INSERTION_POSITION_KABAT_HEAVY, CDR2_INSERTION_POSITION_KABAT_LIGHT, CDR3_INSERTION_POSITION_IMGT, CDR3_INSERTION_POSITION_KABAT_HEAVY, CDR3_INSERTION_POSITION_KABAT_LIGHT, CDR_INCREASE, GAP_PEN_CDR, GAP_PEN_CP, GAP_PEN_FR, GAP_PEN_IP, GAP_PEN_OP, GAP_PEN_OTHER, PEN_LEAP_FROM_INSERTION_POINT_IMGT, PEN_LEAP_INSERTION_POINT_KABAT};
+
 #[derive(Debug)]
 pub struct RegionRange {
-    pub(crate) start: u32,
-    pub(crate) end: u32
-
+    pub start: u32,
+    pub end: u32,
 }
 impl RegionRange {
     pub fn positions(&self) -> Range<u32> {
@@ -18,63 +27,68 @@ impl RegionRange {
 }
 
 #[derive(Debug)]
-pub struct NumberingOutput<'a>{
-    pub(crate) scheme: &'a NumberingScheme,
-    pub(crate) sequence: String,
-    pub(crate) numbering: Vec<String>,
-    pub(crate) identity: f64,
-    pub(crate) score: f64,
-    pub(crate) start: i32,
-    pub(crate) end: i32,
+pub struct NumberingOutput<'a> {
+    pub scheme: &'a NumberingScheme,
+    pub sequence: String,
+    pub numbering: Vec<String>,
+    pub identity: f64,
+    pub score: f64,
+    pub start: i32,
+    pub end: i32,
 }
 
 #[derive(Debug)]
 pub struct NumberingScheme {
-    pub(crate) name: String,
-    pub(crate) description: String,
-    pub(crate) scheme_type: Scheme,
-    pub(crate) chain_type: Chain,
-    pub(crate) conserved_positions: Vec<u32>,
-    pub(crate) insertion_positions: Vec<u32>,
-    pub(crate) gap_positions: Vec<u32>,
-    pub(crate) consensus_amino_acids: HashMap<u32, Vec<char>>,
-    pub(crate) fr1: RegionRange,
-    pub(crate) fr2: RegionRange,
-    pub(crate) fr3: RegionRange,
-    pub(crate) fr4: RegionRange,
-    pub(crate) cdr1: RegionRange,
-    pub(crate) cdr2: RegionRange,
-    pub(crate) cdr3: RegionRange,
+    pub name: String,
+    pub description: String,
+    pub scheme_type: Scheme,
+    pub chain_type: Chain,
+    pub conserved_positions: Vec<u32>,
+    pub insertion_positions: Vec<u32>,
+    pub gap_positions: Vec<u32>,
+    pub consensus_amino_acids: HashMap<u32, Vec<char>>,
+    pub scoring_matrix: Array2<f64>,
+    pub fr1: RegionRange,
+    pub fr2: RegionRange,
+    pub fr3: RegionRange,
+    pub fr4: RegionRange,
+    pub cdr1: RegionRange,
+    pub cdr2: RegionRange,
+    pub cdr3: RegionRange,
     // TODO scoring matrix // framework_positions: //cdr_positions:
 }
 
 impl NumberingScheme {
-    pub(crate) fn restricted_sites(&self) -> Vec<u32>{
+    pub fn restricted_sites(&self) -> Vec<u32> {
         let mut sites = Vec::new();
-        for (&key, value) in &self.consensus_amino_acids{
-            if !value.contains(&'-'){
+        for (&key, value) in &self.consensus_amino_acids {
+            if !value.contains(&'-') {
                 sites.push(key);
             }
         }
         sites
     }
 
-    pub(crate) fn framework_positions(&self) -> Vec<u32>{
+    pub fn framework_positions(&self) -> Vec<u32> {
         // TODO
-        self.fr1.positions().chain(
-            self.fr2.positions()).chain(
-            self.fr3.positions()).chain(
-            self.fr4.positions()).collect()
+        self.fr1
+            .positions()
+            .chain(self.fr2.positions())
+            .chain(self.fr3.positions())
+            .chain(self.fr4.positions())
+            .collect()
     }
 
-    pub(crate) fn cdr_positions(&self) -> Vec<u32>{
+    pub fn cdr_positions(&self) -> Vec<u32> {
         //TODO
-        self.cdr1.positions().chain(
-            self.cdr2.positions()).chain(
-            self.cdr3.positions()).collect()
+        self.cdr1
+            .positions()
+            .chain(self.cdr2.positions())
+            .chain(self.cdr3.positions())
+            .collect()
     }
 
-    pub(crate) fn gap_penalty(&self, position: u32) -> (f64, f64) {
+    pub fn gap_penalty(&self, position: u32) -> (f64, f64) {
         // Set initial gap penalties
         let mut penalty = if self.conserved_positions.contains(&position) {
             GAP_PEN_CP
@@ -90,24 +104,48 @@ impl NumberingScheme {
         // IMGT
         if self.cdr_positions().contains(&position) {
             if self.scheme_type == Scheme::IMGT {
-                if self.cdr1.start <= position && position < self.cdr1.end
+                if self.cdr1.start <= position
+                    && position < self.cdr1.end
                     && position != CDR1_INSERTION_POSITION_IMGT
                 {
                     // cdr1
-                    penalty += PEN_LEAP_FROM_INSERTION_POINT_IMGT + CDR_INCREASE * (position as isize - CDR1_INSERTION_POSITION_IMGT as isize).abs() as f64;
-                    penalty += if position > CDR1_INSERTION_POSITION_IMGT { 0.1 } else { 0.0 };
-                } else if self.cdr2.start <= position && position < self.cdr2.end
+                    penalty += PEN_LEAP_FROM_INSERTION_POINT_IMGT
+                        + CDR_INCREASE
+                            * (position as isize - CDR1_INSERTION_POSITION_IMGT as isize).abs()
+                                as f64;
+                    penalty += if position > CDR1_INSERTION_POSITION_IMGT {
+                        0.1
+                    } else {
+                        0.0
+                    };
+                } else if self.cdr2.start <= position
+                    && position < self.cdr2.end
                     && position != CDR2_INSERTION_POSITION_IMGT
                 {
                     // cdr2
-                    penalty += PEN_LEAP_FROM_INSERTION_POINT_IMGT + CDR_INCREASE * (position as isize - CDR2_INSERTION_POSITION_IMGT as isize).abs() as f64;
-                    penalty += if position > CDR2_INSERTION_POSITION_IMGT { 0.1 } else { 0.0 };
-                } else if self.cdr3.start <= position && position < self.cdr3.end
+                    penalty += PEN_LEAP_FROM_INSERTION_POINT_IMGT
+                        + CDR_INCREASE
+                            * (position as isize - CDR2_INSERTION_POSITION_IMGT as isize).abs()
+                                as f64;
+                    penalty += if position > CDR2_INSERTION_POSITION_IMGT {
+                        0.1
+                    } else {
+                        0.0
+                    };
+                } else if self.cdr3.start <= position
+                    && position < self.cdr3.end
                     && position != CDR3_INSERTION_POSITION_IMGT
                 {
                     // cdr3
-                    penalty += PEN_LEAP_FROM_INSERTION_POINT_IMGT + CDR_INCREASE * (position as isize - CDR3_INSERTION_POSITION_IMGT as isize).abs() as f64;
-                    penalty += if position < CDR3_INSERTION_POSITION_IMGT { 0.1 } else { 0.0 };
+                    penalty += PEN_LEAP_FROM_INSERTION_POINT_IMGT
+                        + CDR_INCREASE
+                            * (position as isize - CDR3_INSERTION_POSITION_IMGT as isize).abs()
+                                as f64;
+                    penalty += if position < CDR3_INSERTION_POSITION_IMGT {
+                        0.1
+                    } else {
+                        0.0
+                    };
                 }
             }
             // KABAT
@@ -130,13 +168,16 @@ impl NumberingScheme {
                     CDR3_INSERTION_POSITION_KABAT_LIGHT
                 };
 
-                if self.cdr1.start <= position && position < self.cdr1.end
+                if self.cdr1.start <= position
+                    && position < self.cdr1.end
                     && position != cdr1_insertion_position
                 {
                     // cdr1
-                    penalty += PEN_LEAP_INSERTION_POINT_KABAT +
-                        (CDR_INCREASE * (position as isize - cdr1_insertion_position as isize).abs() as f64);
-                } else if self.cdr2.start <= position && position < self.cdr2.end
+                    penalty += PEN_LEAP_INSERTION_POINT_KABAT
+                        + (CDR_INCREASE
+                            * (position as isize - cdr1_insertion_position as isize).abs() as f64);
+                } else if self.cdr2.start <= position
+                    && position < self.cdr2.end
                     && position != cdr2_insertion_position
                 {
                     // cdr2
@@ -144,15 +185,19 @@ impl NumberingScheme {
                     if self.chain_type == Chain::IGH && position > 54 {
                         penalty = GAP_PEN_FR;
                     } else {
-                        penalty += PEN_LEAP_INSERTION_POINT_KABAT +
-                            (CDR_INCREASE * (position as isize - cdr2_insertion_position as isize).abs() as f64);
+                        penalty += PEN_LEAP_INSERTION_POINT_KABAT
+                            + (CDR_INCREASE
+                                * (position as isize - cdr2_insertion_position as isize).abs()
+                                    as f64);
                     }
-                } else if self.cdr3.start <= position && position < self.cdr3.end
+                } else if self.cdr3.start <= position
+                    && position < self.cdr3.end
                     && position != cdr3_insertion_position
                 {
                     // cdr3
-                    penalty += PEN_LEAP_INSERTION_POINT_KABAT +
-                        (CDR_INCREASE * (position as isize - cdr3_insertion_position as isize).abs() as f64);
+                    penalty += PEN_LEAP_INSERTION_POINT_KABAT
+                        + (CDR_INCREASE
+                            * (position as isize - cdr3_insertion_position as isize).abs() as f64);
                     if position > cdr3_insertion_position {
                         // higher penalty after insertion in cdr3
                         penalty += 5.0;
@@ -171,9 +216,13 @@ impl NumberingScheme {
         // Handle start penalty, same for all schemes
         if position < 18 {
             // Increase from 2 to 11, then add 0.1 until position 18
-            consensus_gap_penalty = 1.0 +
-                (if position > 10 { 10.0 } else { position as f64 }) +
-                (if position > 10 { 0.1 * (position as f64 - 10.0) } else { 0.0 });
+            consensus_gap_penalty = 1.0
+                + (if position > 10 { 10.0 } else { position as f64 })
+                + (if position > 10 {
+                    0.1 * (position as f64 - 10.0)
+                } else {
+                    0.0
+                });
         }
 
         // Adapt only query or consensus gap for insertion and gap positions
