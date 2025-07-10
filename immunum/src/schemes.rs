@@ -22,6 +22,106 @@ pub fn get_imgt_heavy_scheme() -> NumberingScheme{
     }
 }
 
+pub fn get_imgt_kappa_scheme() -> NumberingScheme{
+    NumberingScheme{
+        name: "IMGT Kappa".to_string(),
+        description:"IMGT numbering scheme for kappa chains".to_string(),
+        scheme_type:Scheme::IMGT,
+        chain_type:Chain::IGK,
+        conserved_positions:vec![23, 41, 104, 118, 119, 121],
+        insertion_positions:vec![],
+        gap_positions:vec![10, 73],
+        consensus_amino_acids:read_consensus_file(r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_K.txt"),
+        fr1:RegionRange{start:1, end:27},
+        cdr1:RegionRange{start:27, end:39},
+        fr2:RegionRange{start:39, end:56},
+        cdr2:RegionRange{start:56, end:66},
+        fr3:RegionRange{start:66, end:105},
+        cdr3:RegionRange{start:105, end:118},
+        fr4:RegionRange{start:118, end:128},
+    }
+}
+
+pub fn get_imgt_lambda_scheme() -> NumberingScheme{
+    NumberingScheme{
+        name: "IMGT Lambda".to_string(),
+        description:"IMGT numbering scheme for lambda chains".to_string(),
+        scheme_type:Scheme::IMGT,
+        chain_type:Chain::IGL,
+        conserved_positions:vec![23, 41, 104, 118, 119, 121],
+        insertion_positions:vec![],
+        gap_positions:vec![10, 73, 81, 82],
+        consensus_amino_acids:read_consensus_file(r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_L.txt"),
+        fr1:RegionRange{start:1, end:27},
+        cdr1:RegionRange{start:27, end:39},
+        fr2:RegionRange{start:39, end:56},
+        cdr2:RegionRange{start:56, end:66},
+        fr3:RegionRange{start:66, end:105},
+        cdr3:RegionRange{start:105, end:118},
+        fr4:RegionRange{start:118, end:129},
+    }
+}
+
+
+pub fn get_kabat_heavy_scheme() -> NumberingScheme{
+    NumberingScheme{
+        name: "KABAT Heavy".to_string(),
+        description:"KABAT numbering scheme for heavy chains".to_string(),
+        scheme_type:Scheme::KABAT,
+        chain_type:Chain::IGH,
+        conserved_positions:vec![22, 36, 92, 103, 104, 106],
+        insertion_positions:vec![6, 82],
+        gap_positions:vec![40, 41, 42, 43, 44, 72, 73, 74],
+        consensus_amino_acids:read_consensus_file(r"C:\Anti_Num\numbering\consensus\KABAT_CONSENSUS_H.txt"),
+        fr1:RegionRange{start:1, end:31},
+        cdr1:RegionRange{start:31, end:36},
+        fr2:RegionRange{start:36, end:50},
+        cdr2:RegionRange{start:50, end:66},
+        fr3:RegionRange{start:66, end:95},
+        cdr3:RegionRange{start:95, end:103},
+        fr4:RegionRange{start:103, end:114},
+    }
+}
+
+pub fn get_kabat_kappa_scheme() -> NumberingScheme{
+    NumberingScheme{
+        name: "KABAT Kappa".to_string(),
+        description:"KABAT numbering scheme for kappa chains".to_string(),
+        scheme_type:Scheme::KABAT,
+        chain_type:Chain::IGK,
+        conserved_positions:vec![23, 35, 88, 98, 99, 101],
+        insertion_positions:vec![27],
+        gap_positions:vec![10],
+        consensus_amino_acids:read_consensus_file(r"C:\Anti_Num\numbering\consensus\KABAT_CONSENSUS_K.txt"),
+        fr1:RegionRange{start:1, end:24},
+        cdr1:RegionRange{start:24, end:35},
+        fr2:RegionRange{start:35, end:50},
+        cdr2:RegionRange{start:50, end:57},
+        fr3:RegionRange{start:6, end:89},
+        cdr3:RegionRange{start:89, end:98},
+        fr4:RegionRange{start:98, end:108},
+    }
+}
+
+pub fn get_kabat_lambda_scheme() -> NumberingScheme{
+    NumberingScheme{
+        name: "KABAT Lambda".to_string(),
+        description:"KABAT numbering scheme for lambda chains".to_string(),
+        scheme_type:Scheme::KABAT,
+        chain_type:Chain::IGL,
+        conserved_positions:vec![23, 35, 88, 98, 99, 101],
+        insertion_positions:vec![27],
+        gap_positions:vec![10],
+        consensus_amino_acids:read_consensus_file(r"C:\Anti_Num\numbering\consensus\KABAT_CONSENSUS_L.txt"),
+        fr1:RegionRange{start:1, end:24},
+        cdr1:RegionRange{start:24, end:35},
+        fr2:RegionRange{start:35, end:50},
+        cdr2:RegionRange{start:50, end:57},
+        fr3:RegionRange{start:57, end:89},
+        cdr3:RegionRange{start:89, end:98},
+        fr4:RegionRange{start:98, end:108},
+    }
+}
 #[cfg(test)]
 mod tests {
     use wasm_bindgen::__rt::assert_not_null;
@@ -38,7 +138,11 @@ mod tests {
         assert_eq!(scheme.gap_penalty(25), (GAP_PEN_FR, GAP_PEN_FR));
         assert_eq!(scheme.gap_penalty(200), (GAP_PEN_OTHER, GAP_PEN_OTHER));
         assert_eq!(scheme.gap_penalty(CDR1_INSERTION_POSITION_IMGT), (GAP_PEN_CDR, GAP_PEN_CDR));
-        assert_eq!(scheme.gap_penalty(10), (GAP_PEN_FR, GAP_PEN_OP))
+        assert_eq!(scheme.gap_penalty(10), (GAP_PEN_FR, GAP_PEN_OP));
+
+        for i in 1..129{
+            println!("{:?},", scheme.gap_penalty(i as u32))
+        }
         //TODO add more tests
     }
 }
