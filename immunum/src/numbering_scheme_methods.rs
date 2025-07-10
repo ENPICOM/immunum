@@ -1,0 +1,184 @@
+use crate::constants::{insertion_points, scoring};
+use crate::types::{Chain, NumberingScheme, Scheme};
+
+impl NumberingScheme {
+    pub fn restricted_sites(&self) -> Vec<u32> {
+        let mut sites = Vec::new();
+        for (&key, value) in &self.consensus_amino_acids {
+            if !value.contains(&'-') {
+                sites.push(key);
+            }
+        }
+        sites
+    }
+
+    pub fn framework_positions(&self) -> Vec<u32> {
+        // TODO
+        self.fr1
+            .positions()
+            .chain(self.fr2.positions())
+            .chain(self.fr3.positions())
+            .chain(self.fr4.positions())
+            .collect()
+    }
+
+    pub fn cdr_positions(&self) -> Vec<u32> {
+        //TODO
+        self.cdr1
+            .positions()
+            .chain(self.cdr2.positions())
+            .chain(self.cdr3.positions())
+            .collect()
+    }
+
+    pub fn gap_penalty(&self, position: u32) -> (f64, f64) {
+        // Set initial gap penalties
+        let mut penalty = if self.conserved_positions.contains(&position) {
+            scoring::GAP_PEN_CP
+        } else if self.framework_positions().contains(&position) {
+            scoring::GAP_PEN_FR
+        } else if self.cdr_positions().contains(&position) {
+            scoring::GAP_PEN_CDR
+        } else {
+            scoring::GAP_PEN_OTHER
+        };
+
+        // ADAPT CDR PENALTIES, different for every scheme
+        // IMGT
+        if self.cdr_positions().contains(&position) {
+            if self.scheme_type == Scheme::IMGT {
+                if self.cdr1.start <= position
+                    && position < self.cdr1.end
+                    && position != insertion_points::CDR1_IMGT
+                {
+                    // cdr1
+                    penalty += scoring::PEN_LEAP_FROM_INSERTION_POINT_IMGT
+                        + scoring::CDR_INCREASE
+                            * (position as isize - insertion_points::CDR1_IMGT as isize).abs()
+                                as f64;
+                    penalty += if position > insertion_points::CDR1_IMGT {
+                        0.1
+                    } else {
+                        0.0
+                    };
+                } else if self.cdr2.start <= position
+                    && position < self.cdr2.end
+                    && position != insertion_points::CDR2_IMGT
+                {
+                    // cdr2
+                    penalty += scoring::PEN_LEAP_FROM_INSERTION_POINT_IMGT
+                        + scoring::CDR_INCREASE
+                            * (position as isize - insertion_points::CDR2_IMGT as isize).abs()
+                                as f64;
+                    penalty += if position > insertion_points::CDR2_IMGT {
+                        0.1
+                    } else {
+                        0.0
+                    };
+                } else if self.cdr3.start <= position
+                    && position < self.cdr3.end
+                    && position != insertion_points::CDR3_IMGT
+                {
+                    // cdr3
+                    penalty += scoring::PEN_LEAP_FROM_INSERTION_POINT_IMGT
+                        + scoring::CDR_INCREASE
+                            * (position as isize - insertion_points::CDR3_IMGT as isize).abs()
+                                as f64;
+                    penalty += if position < insertion_points::CDR3_IMGT {
+                        0.1
+                    } else {
+                        0.0
+                    };
+                }
+            }
+            // KABAT
+            else if self.scheme_type == Scheme::KABAT {
+                let cdr1_insertion_position = if self.chain_type == Chain::IGH {
+                    insertion_points::CDR1_KABAT_HEAVY
+                } else {
+                    insertion_points::CDR1_KABAT_LIGHT
+                };
+
+                let cdr2_insertion_position = if self.chain_type == Chain::IGH {
+                    insertion_points::CDR2_KABAT_HEAVY
+                } else {
+                    insertion_points::CDR2_KABAT_LIGHT
+                };
+
+                let cdr3_insertion_position = if self.chain_type == Chain::IGH {
+                    insertion_points::CDR3_KABAT_HEAVY
+                } else {
+                    insertion_points::CDR3_KABAT_LIGHT
+                };
+
+                if self.cdr1.start <= position
+                    && position < self.cdr1.end
+                    && position != cdr1_insertion_position
+                {
+                    // cdr1
+                    penalty += scoring::PEN_LEAP_INSERTION_POINT_KABAT
+                        + (scoring::CDR_INCREASE
+                            * (position as isize - cdr1_insertion_position as isize).abs() as f64);
+                } else if self.cdr2.start <= position
+                    && position < self.cdr2.end
+                    && position != cdr2_insertion_position
+                {
+                    // cdr2
+                    // Exception in heavy scheme:
+                    if self.chain_type == Chain::IGH && position > 54 {
+                        penalty = scoring::GAP_PEN_FR;
+                    } else {
+                        penalty += scoring::PEN_LEAP_INSERTION_POINT_KABAT
+                            + (scoring::CDR_INCREASE
+                                * (position as isize - cdr2_insertion_position as isize).abs()
+                                    as f64);
+                    }
+                } else if self.cdr3.start <= position
+                    && position < self.cdr3.end
+                    && position != cdr3_insertion_position
+                {
+                    // cdr3
+                    penalty += scoring::PEN_LEAP_INSERTION_POINT_KABAT
+                        + (scoring::CDR_INCREASE
+                            * (position as isize - cdr3_insertion_position as isize).abs() as f64);
+                    if position > cdr3_insertion_position {
+                        // higher penalty after insertion in cdr3
+                        penalty += 5.0;
+                    }
+                }
+
+                if self.chain_type != Chain::IGH && position == cdr1_insertion_position {
+                    penalty = scoring::GAP_PEN_OTHER; // 5, 11 in antpack, here set to 11
+                }
+            }
+        }
+
+        let mut query_gap_penalty = penalty;
+        let mut consensus_gap_penalty = penalty;
+
+        // Handle start penalty, same for all schemes
+        if position < 18 {
+            // Increase from 2 to 11, then add 0.1 until position 18
+            consensus_gap_penalty = 1.0
+                + (if position > 10 { 10.0 } else { position as f64 })
+                + (if position > 10 {
+                    0.1 * (position as f64 - 10.0)
+                } else {
+                    0.0
+                });
+        }
+
+        // Adapt only query or consensus gap for insertion and gap positions
+        if self.insertion_positions.contains(&position) {
+            query_gap_penalty = scoring::GAP_PEN_IP;
+        }
+
+        if self.gap_positions.contains(&position) {
+            consensus_gap_penalty = scoring::GAP_PEN_OP;
+            // TODO set gap penalty to other?
+            // query_gap_penalty = GAP_PEN_OTHER;
+        }
+
+        (query_gap_penalty, consensus_gap_penalty)
+    }
+}

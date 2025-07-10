@@ -1,7 +1,5 @@
-use crate::constants::{
-    FROM_DIAG, FROM_LEFT, FROM_TOP, GAP_PEN_START, MATCH_CP_MULTIPLIER, PERFECT_MATCH,
-};
-use crate::schemes::get_imgt_heavy_scheme;
+use crate::constants::{traceback_directions, scoring};
+use crate::schemes::*;
 use crate::types::{NumberingOutput, NumberingScheme};
 
 pub fn needleman_wunsch_consensus(
@@ -17,12 +15,12 @@ pub fn needleman_wunsch_consensus(
         vec![vec![0; len_query_sequence + 1]; num_positions_consensus + 1];
 
     for i in 0..len_query_sequence + 1 {
-        dynamic_matrix[0][i] = 0.0 - (GAP_PEN_START * i as f64); // Formula: 2 times the index
-        traceback_matrix[0][i] = FROM_LEFT;
+        dynamic_matrix[0][i] = 0.0 - (scoring::GAP_PEN_START * i as f64); // Formula: 2 times the index
+        traceback_matrix[0][i] = traceback_directions::FROM_LEFT;
     }
     for i in 0..num_positions_consensus + 1 {
-        dynamic_matrix[i][0] = 0.0 - (GAP_PEN_START * i as f64); // Formula: 2 times the index
-        traceback_matrix[i][0] = FROM_TOP;
+        dynamic_matrix[i][0] = 0.0 - (scoring::GAP_PEN_START * i as f64); // Formula: 2 times the index
+        traceback_matrix[i][0] = traceback_directions::FROM_TOP;
     }
 
     for consensus_position in 1..num_positions_consensus {
@@ -43,33 +41,33 @@ pub fn needleman_wunsch_consensus(
                 .conserved_positions
                 .contains(&(consensus_position as u32))
             {
-                best_score *= MATCH_CP_MULTIPLIER
+                best_score *= scoring::MATCH_CP_MULTIPLIER
             }
 
             match_value += best_score;
 
             let mut max_score = match_value;
-            let mut transfer = FROM_DIAG;
+            let mut transfer = traceback_directions::FROM_DIAG;
             if top_value > max_score {
                 max_score = top_value;
-                transfer = FROM_TOP;
+                transfer = traceback_directions::FROM_TOP;
             }
             if left_value > max_score {
                 max_score = left_value;
-                transfer = FROM_LEFT
+                transfer = traceback_directions::FROM_LEFT
             }
 
             dynamic_matrix[consensus_position][query_position] = max_score;
             traceback_matrix[consensus_position][query_position] = transfer;
 
             let seq_char = query_sequence.chars().nth(query_position - 1).unwrap();
-            if transfer == FROM_DIAG
+            if transfer == traceback_directions::FROM_DIAG
                 && scheme.consensus_amino_acids[&(consensus_position as u32)].contains(&seq_char)
                 && scheme
                     .restricted_sites()
                     .contains(&(consensus_position as u32))
             {
-                traceback_matrix[consensus_position][query_position] = PERFECT_MATCH;
+                traceback_matrix[consensus_position][query_position] = traceback_directions::PERFECT_MATCH;
             }
         }
     }
@@ -97,15 +95,15 @@ fn traceback_alignment(
 
     while i != 0 || j != 0 {
         // Figure out if it was top, left or top left
-        if traceback_matrix[i][j] == FROM_LEFT {
+        if traceback_matrix[i][j] == traceback_directions::FROM_LEFT {
             numbering.insert(0, "-".to_string());
             j -= 1;
-        } else if traceback_matrix[i][j] == FROM_TOP {
+        } else if traceback_matrix[i][j] == traceback_directions::FROM_TOP {
             i -= 1;
         } else {
             // FROM_DIAG or PERFECT_MATCH
             numbering.insert(0, i.to_string());
-            if traceback_matrix[i][j] == PERFECT_MATCH {
+            if traceback_matrix[i][j] == traceback_directions::PERFECT_MATCH {
                 matches += 1; // Used to calculate identity
             }
             i -= 1;

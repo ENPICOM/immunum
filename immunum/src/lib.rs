@@ -12,6 +12,7 @@ pub mod types;
 pub mod python_bindings;
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
+mod numbering_scheme_methods;
 
 // Import the procedural macro from the separate crate
 pub use immunum_macros::ParseFromString;

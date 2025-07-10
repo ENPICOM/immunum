@@ -14,9 +14,6 @@ wee_alloc = { workspace = true, optional = true }
 immunum-macros = { path = "../immunum-macros" }
 wasm-bindgen-test = "0.3.50"
 phf = {version = "0.12.1" , features = ["macros"]}
-log = "0.4.27"
-csv = "1.3.1"
-bincode = "2.0.1"
 ndarray = "0.16.0"
 ndarray-npy = "0.9.1"
 
