@@ -178,7 +178,7 @@ impl NumberingScheme {
 
         (query_gap_penalty, consensus_gap_penalty)
     }
-    fn number_sequence(&self, query_sequence: String) -> NumberingOutput {
+    pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a String) -> NumberingOutput<'a> {
         let (mut numbering, identity) = needleman_wunsch_consensus(&query_sequence, self);
 
         numbering = name_insertions(numbering, &self.scheme_type);

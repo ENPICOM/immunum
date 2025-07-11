@@ -16,10 +16,10 @@ impl RegionRange {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NumberingOutput<'a> {
     pub scheme: &'a NumberingScheme,
-    pub sequence: String,
+    pub sequence: &'a String,
     pub numbering: Vec<String>,
     pub identity: f64,
     pub start: u32,
