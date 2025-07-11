@@ -6,6 +6,7 @@ pub mod numbering;
 pub mod schemes;
 pub mod sequence_stream;
 pub mod types;
+pub mod insertion_numbering;
 
 // Binding modules
 mod numbering_scheme_methods;

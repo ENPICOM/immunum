@@ -46,6 +46,8 @@ pub mod insertion_points {
     pub const CDR3_KABAT_HEAVY: u32 = 100;
     pub const CDR3_KABAT_LIGHT: u32 = 95;
 }
+// ALPHABET for numbering
+pub const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 // TODO get allowed amino acids
 //pub const ALLOWED_AMINO_ACIDS: Vec<&str> = BLOSUM62.keys().collect();
