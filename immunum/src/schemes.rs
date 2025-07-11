@@ -1,5 +1,4 @@
 use crate::consensus_scoring::{read_consensus_file, read_scoring_matrix};
-use crate::constants::scoring;
 use crate::types::{Chain, NumberingScheme, RegionRange, Scheme};
 
 pub fn get_imgt_heavy_scheme() -> NumberingScheme {
@@ -169,7 +168,7 @@ pub fn get_kabat_lambda_scheme() -> NumberingScheme {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wasm_bindgen::__rt::assert_not_null;
+    use crate::constants::scoring;
 
     #[test]
     fn scheme_creation() {

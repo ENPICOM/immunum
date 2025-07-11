@@ -179,7 +179,7 @@ impl NumberingScheme {
         (query_gap_penalty, consensus_gap_penalty)
     }
     pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a String) -> NumberingOutput<'a> {
-        let (mut numbering, identity) = needleman_wunsch_consensus(&query_sequence, self);
+        let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
         numbering = name_insertions(numbering, &self.scheme_type);
 
@@ -197,10 +197,10 @@ impl NumberingScheme {
             .expect("No positions numbered");
 
         NumberingOutput {
-            scheme: &self,
+            scheme: self,
             sequence: query_sequence,
-            numbering: numbering,
-            identity: identity,
+            numbering,
+            identity,
             start: start as u32,
             end: end as u32,
         }

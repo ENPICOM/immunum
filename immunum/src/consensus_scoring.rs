@@ -1,14 +1,13 @@
+#[allow(dead_code)]
 use crate::constants::{ACCEPTED_RESIDUES, BLOSUM62};
 use crate::schemes::{
     get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme,
     get_kabat_kappa_scheme, get_kabat_lambda_scheme,
 };
 use crate::types::NumberingScheme;
-use clap::error::ContextValue::Number;
 use ndarray::Array2;
 use ndarray_npy::{read_npy, write_npy};
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs;
 
 pub(crate) fn read_consensus_file(path: &str) -> HashMap<u32, Vec<char>> {
@@ -82,10 +81,10 @@ fn write_scoring_matrix(path: &str, scheme: NumberingScheme) {
         matrix[[consensus_position, number_accepted_residues + 1]] = consensus_gap;
     }
     // WRITE MATRIX TO FILE
-    write_npy(path, &mut matrix).expect("Writing scoring matrix failed");
+    write_npy(path, &matrix).expect("Writing scoring matrix failed");
 }
 
-pub(crate) fn encode_sequence(input: &String) -> Vec<u8> {
+pub(crate) fn encode_sequence(input: &str) -> Vec<u8> {
     // Create a lookup table (once, could be static)
     let mut lookup = [255u8; 128]; // Assuming ASCII characters
                                    //const ACCEPTED_RESIDUES: &str = "ACDEFGHIKLMNPQRSTVWY";
@@ -137,7 +136,6 @@ fn write_all_scoring_matrices() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schemes::get_imgt_heavy_scheme;
     //TODO tests for this part
 
     #[test]
@@ -187,7 +185,7 @@ mod tests {
     #[test]
     fn amino_acid_encoding() {
         assert_eq!(
-            encode_sequence(&"ABCDEFGHIKLMNPQRSTVWXYZ".to_string()),
+            encode_sequence("ABCDEFGHIKLMNPQRSTVWXYZ"),
             (0..23).collect::<Vec<u8>>()
         )
     }

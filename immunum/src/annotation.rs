@@ -1,9 +1,7 @@
 use crate::fastx::from_path;
-use crate::numbering::number_sequence;
 use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
 use crate::types::{NumberingOutput, NumberingScheme, Scheme};
 use std::fs;
-
 fn find_highest_identity_chain<'a>(
     query_sequence: &'a String,
     numbering_schemes: &'a Vec<NumberingScheme>,
@@ -11,7 +9,7 @@ fn find_highest_identity_chain<'a>(
     let mut results: Vec<NumberingOutput> = Vec::with_capacity(numbering_schemes.len());
 
     for scheme in numbering_schemes {
-        results.push(scheme.number_sequence(&query_sequence));
+        results.push(scheme.number_sequence(query_sequence));
     }
     //Determine highest scoring model
     results
@@ -51,20 +49,20 @@ pub fn number_sequences_and_write_output(fasta_file: &str, scheme: Scheme, outpu
         println!("{}", r._name);
         let output = find_highest_identity_chain(&r.sequence, &schemes);
 
-        // create string output
-        // output_str.push_str(&*r._name);
-        // output_str.push_str(&"\t");
-        // output_str.push_str(&output.sequence);
-        // output_str.push_str(&"\t");
-        // output_str.push_str(&output.numbering.join(","));
-        // output_str.push_str(&"\t");
-        // output_str.push_str(&format!("{}", output.identity));
-        // output_str.push_str(&"\n");
+        //create string output
+        output_str.push_str(&r._name);
+        output_str.push('\t');
+        output_str.push_str(output.sequence);
+        output_str.push('\t');
+        output_str.push_str(&output.numbering.join(","));
+        output_str.push('\t');
+        output_str.push_str(&format!("{}", output.identity));
+        output_str.push('\n');
         // TODO add regions
 
         // fill in value
     }
-    //fs::write(&output_file, output_str).expect("Should be able to write to `/foo/tmp`")
+    fs::write(output_file, output_str).expect("Should be able to write to `/foo/tmp`")
 }
 
 #[cfg(test)]
@@ -76,11 +74,10 @@ mod tests {
     #[test]
     fn number_fasta_file() {
         // r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-        number_sequences_and_write_output(
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\test_bigger.fasta",
-            Scheme::IMGT,
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt",
-        )
+        // number_sequences_and_write_output(
+        //     r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
+        //     Scheme::IMGT,
+        //     r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt"),
     }
 
     #[test]

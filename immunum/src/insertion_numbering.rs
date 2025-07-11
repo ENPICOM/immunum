@@ -18,22 +18,19 @@ pub(crate) fn name_insertions(mut numbering: Vec<String>, scheme: &Scheme) -> Ve
         std::collections::HashMap::new();
 
     // find first and last numbered position, also all gaps
-    for i in 0..numbering.len() {
-        if numbering[i] != "-" {
+    for (i, item) in numbering.iter().enumerate() {
+        if item != "-" {
             // number
             if first_number.is_none() {
-                first_number = Some(numbering[i].clone());
+                first_number = Some(item.clone());
             }
-            latest_number = Some(numbering[i].clone()); // set to latest
-        } else if numbering[i] == "-" {
+            latest_number = Some(item.clone()); // set to latest
+        } else if item == "-" {
             // gap
             if first_number.is_some() && latest_number.is_some() {
                 // inside antibody
                 let latest = latest_number.as_ref().unwrap();
-                gaps_dict
-                    .entry(latest.clone())
-                    .or_insert_with(Vec::new)
-                    .push(i); // add i
+                gaps_dict.entry(latest.clone()).or_default().push(i); // add i
             }
         }
     }
@@ -138,7 +135,6 @@ fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Scheme::IMGT;
 
     #[test]
     fn normal_insertion_numbering() {

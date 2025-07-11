@@ -1,14 +1,13 @@
 use crate::consensus_scoring::encode_sequence;
 use crate::constants::scoring::GAP_PEN_END;
 use crate::constants::{scoring, traceback_directions, CONSENSUS_GAP_COLUMN, QUERY_GAP_COLUMN};
-use crate::schemes::*;
-use crate::types::{NumberingOutput, NumberingScheme};
+use crate::types::NumberingScheme;
 
 pub fn needleman_wunsch_consensus(
-    query_sequence: &String,
+    query_sequence: &str,
     scheme: &NumberingScheme,
 ) -> (Vec<String>, f64) {
-    let encoded_query = encode_sequence(&query_sequence);
+    let encoded_query = encode_sequence(query_sequence);
     let num_positions_consensus: usize = scheme.consensus_amino_acids.len();
     let len_query_sequence: usize = query_sequence.len();
 
@@ -99,7 +98,7 @@ pub fn needleman_wunsch_consensus(
 fn traceback_alignment(
     sequence_length: usize,
     consensus_length: usize,
-    traceback_matrix: &Vec<Vec<u8>>,
+    traceback_matrix: &[Vec<u8>],
 ) -> (Vec<String>, u32) {
     let mut matches: u32 = 0;
     let mut numbering = Vec::new();
@@ -131,6 +130,7 @@ fn traceback_alignment(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schemes::get_imgt_heavy_scheme;
 
     #[test]
     fn test_needleman_wunsch_consensus() {
