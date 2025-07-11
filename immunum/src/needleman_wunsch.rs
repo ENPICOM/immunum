@@ -5,7 +5,7 @@ use crate::schemes::*;
 use crate::types::{NumberingOutput, NumberingScheme};
 
 pub fn needleman_wunsch_consensus(
-    query_sequence: String,
+    query_sequence: &String,
     scheme: &NumberingScheme,
 ) -> (Vec<String>, f64) {
     let encoded_query = encode_sequence(&query_sequence);
@@ -140,7 +140,7 @@ mod tests {
         PVTVTWNSGSLSSGVHTFPAVLQSDLYTLSSSVTVPSSTWPSETVTCNVAHPASSTKVDKKIVPRD"
                 .to_string();
         let scheme = get_imgt_heavy_scheme();
-        let output = needleman_wunsch_consensus(heavy_chain, &scheme);
+        let output = needleman_wunsch_consensus(&heavy_chain, &scheme);
         println!("{:?}", output);
     }
 

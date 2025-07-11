@@ -1,7 +1,7 @@
 use crate::constants::{insertion_points, ALPHABET};
 use crate::types::Scheme;
 
-fn name_insertions(mut numbering: Vec<String>, scheme: Scheme) -> Vec<String> {
+pub(crate) fn name_insertions(mut numbering: Vec<String>, scheme: &Scheme) -> Vec<String> {
     // Function that assigns correct labels to insertions
     let original_numbering_length = numbering.len();
 
@@ -14,21 +14,26 @@ fn name_insertions(mut numbering: Vec<String>, scheme: Scheme) -> Vec<String> {
 
     let mut latest_number: Option<String> = None;
     let mut first_number: Option<String> = None;
-    let mut gaps_dict: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
+    let mut gaps_dict: std::collections::HashMap<String, Vec<usize>> =
+        std::collections::HashMap::new();
 
     // find first and last numbered position, also all gaps
     for i in 0..numbering.len() {
-        if numbering[i] != "-" {  // number
+        if numbering[i] != "-" {
+            // number
             if first_number.is_none() {
                 first_number = Some(numbering[i].clone());
             }
-            latest_number = Some(numbering[i].clone());  // set to latest
-        } else if numbering[i] == "-" {  // gap
-            if first_number.is_some() && latest_number.is_some() {  // inside antibody
+            latest_number = Some(numbering[i].clone()); // set to latest
+        } else if numbering[i] == "-" {
+            // gap
+            if first_number.is_some() && latest_number.is_some() {
+                // inside antibody
                 let latest = latest_number.as_ref().unwrap();
-                gaps_dict.entry(latest.clone())
+                gaps_dict
+                    .entry(latest.clone())
                     .or_insert_with(Vec::new)
-                    .push(i);  // add i
+                    .push(i); // add i
             }
         }
     }
@@ -42,7 +47,9 @@ fn name_insertions(mut numbering: Vec<String>, scheme: Scheme) -> Vec<String> {
     for (gap_position, gaps) in gaps_dict.iter() {
         let mut numbered_gap: Vec<String> = Vec::new();
 
-        if scheme != Scheme::IMGT || !reverse_numbering_positions.contains(&gap_position.parse::<u32>().unwrap_or(0)) {
+        if *scheme != Scheme::IMGT
+            || !reverse_numbering_positions.contains(&gap_position.parse::<u32>().unwrap_or(0))
+        {
             // create list of correct named gap positions
             let mut alphabet_index: usize = 0;
             let mut base: String = String::new();
@@ -54,18 +61,17 @@ fn name_insertions(mut numbering: Vec<String>, scheme: Scheme) -> Vec<String> {
                 numbered_gap.push(insertion_name);
                 alphabet_index += 1;
 
-                if alphabet_index == 26 {  // add extra letter if gap longer than 26
+                if alphabet_index == 26 {
+                    // add extra letter if gap longer than 26
                     base = ALPHABET.chars().nth(base_index).unwrap().to_string();
                     base_index += 1;
                     alphabet_index = 0;
                 }
             }
-        } else {  // special reverse numbering
-            numbered_gap = imgt_reverse_numbering(
-                gap_position.parse::<u32>().unwrap(),
-                gaps.len(),
-                true
-            );
+        } else {
+            // special reverse numbering
+            numbered_gap =
+                imgt_reverse_numbering(gap_position.parse::<u32>().unwrap(), gaps.len(), true);
         }
 
         // insert this list in place of gap
@@ -84,9 +90,10 @@ fn name_insertions(mut numbering: Vec<String>, scheme: Scheme) -> Vec<String> {
 
 fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool) -> Vec<String> {
     // Function to get a list of insertion names according to imgt scheme
-    if position != insertion_points::CDR1_IMGT &&
-        position != insertion_points::CDR2_IMGT &&
-        position != insertion_points::CDR3_IMGT {
+    if position != insertion_points::CDR1_IMGT
+        && position != insertion_points::CDR2_IMGT
+        && position != insertion_points::CDR3_IMGT
+    {
         panic!("Trying to reverse number a wrong position {}", position);
     }
 
@@ -100,18 +107,25 @@ fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool)
         let insertion_name = if letters {
             let addition = format!("{}{}", base, ALPHABET.chars().nth(alphabet_index).unwrap());
             format!("{}{}", position + if plus_one { 1 } else { 0 }, addition)
-        } else {  // use original .x format instead
-            format!("{}.{}", position + if plus_one { 1 } else { 0 }, alphabet_index + 1)
+        } else {
+            // use original .x format instead
+            format!(
+                "{}.{}",
+                position + if plus_one { 1 } else { 0 },
+                alphabet_index + 1
+            )
         };
 
         numbered_gap.insert(numbered_gap.len() / 2, insertion_name);
-        plus_one = !plus_one;  // goes from e.g. 111 to 112 and back
+        plus_one = !plus_one; // goes from e.g. 111 to 112 and back
 
-        if i % 2 == 1 {  // every 2 insertions go to next alphabet character
+        if i % 2 == 1 {
+            // every 2 insertions go to next alphabet character
             alphabet_index += 1;
         }
 
-        if alphabet_index == 26 {  // handle very long insertions
+        if alphabet_index == 26 {
+            // handle very long insertions
             base = ALPHABET.chars().nth(base_index).unwrap().to_string();
             base_index += 1;
             alphabet_index = 0;
@@ -121,82 +135,180 @@ fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool)
     numbered_gap
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::types::Scheme::IMGT;
     use super::*;
+    use crate::types::Scheme::IMGT;
 
     #[test]
-    fn normal_insertion_numbering(){
-        let numbering = vec!['-'.to_string(), '-'.to_string(),
-        '1'.to_string(), '2'.to_string(),'-'.to_string(),'-'.to_string(),'-'.to_string(),
-                                 '3'.to_string(), '4'.to_string(), '-'.to_string(),
-                                 '-'.to_string()];
-        let  correct_numbering = vec!['-'.to_string(), '-'.to_string(),
-                                 '1'.to_string(), '2'.to_string(),"2A".to_string(),"2B".to_string(),
-                                      "2C".to_string(),
-                                 '3'.to_string(), '4'.to_string(), '-'.to_string(),
-                                 '-'.to_string()];
+    fn normal_insertion_numbering() {
+        let numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            '2'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '3'.to_string(),
+            '4'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        let correct_numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            '2'.to_string(),
+            "2A".to_string(),
+            "2B".to_string(),
+            "2C".to_string(),
+            '3'.to_string(),
+            '4'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
         let scheme = Scheme::IMGT;
-        assert_eq!(name_insertions(numbering, scheme), correct_numbering);
-        let numbering = vec!['-'.to_string(), '-'.to_string(),
-                                 '1'.to_string(), '2'.to_string(),'-'.to_string(),'-'.to_string(),'-'.to_string(),
-                                 '3'.to_string(), '4'.to_string(), '-'.to_string(),
-                                 '-'.to_string()];
+        assert_eq!(name_insertions(numbering, &scheme), correct_numbering);
+        let numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            '2'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '3'.to_string(),
+            '4'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
         let scheme = Scheme::KABAT;
-        assert_eq!(name_insertions(numbering, scheme), correct_numbering);
+        assert_eq!(name_insertions(numbering, &scheme), correct_numbering);
     }
 
     #[test]
-    fn test_reverse_numbering(){
-        let numbering = vec!['-'.to_string(), '-'.to_string(),
-                                                                                               '1'.to_string(), "33".to_string(),'-'.to_string(),'-'.to_string(),'-'.to_string(),
-                                                                                               '-'.to_string(), "34".to_string(), '-'.to_string(),
-                                                                                               '-'.to_string()];
-        let correct_numbering = vec!['-'.to_string(), '-'.to_string(),
-                                     '1'.to_string(), "33".to_string(),"33A".to_string(),"33B".to_string(),"34B".to_string(),
-                                     "34A".to_string(), "34".to_string(), '-'.to_string(),
-                                     '-'.to_string()];
-        assert_eq!(name_insertions(numbering, Scheme::IMGT), correct_numbering);
+    fn test_reverse_numbering() {
+        let numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "33".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            "34".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        let correct_numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "33".to_string(),
+            "33A".to_string(),
+            "33B".to_string(),
+            "34B".to_string(),
+            "34A".to_string(),
+            "34".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        assert_eq!(name_insertions(numbering, &Scheme::IMGT), correct_numbering);
 
-        let numbering = vec!['-'.to_string(), '-'.to_string(),
-                             '1'.to_string(), "61".to_string(),'-'.to_string(),'-'.to_string(),'-'.to_string(),
-                             '-'.to_string(), "70".to_string(), '-'.to_string(),
-                             '-'.to_string()];
-        let correct_numbering = vec!['-'.to_string(), '-'.to_string(),
-                                     '1'.to_string(), "61".to_string(),"61A".to_string(),"61B".to_string(),
-                                     "62B".to_string(),
-                                     "62A".to_string(), "70".to_string(), '-'.to_string(),
-                                     '-'.to_string()];
-        assert_eq!(name_insertions(numbering, Scheme::IMGT), correct_numbering);
+        let numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "61".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            "70".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        let correct_numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "61".to_string(),
+            "61A".to_string(),
+            "61B".to_string(),
+            "62B".to_string(),
+            "62A".to_string(),
+            "70".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        assert_eq!(name_insertions(numbering, &Scheme::IMGT), correct_numbering);
 
-        let numbering = vec!['-'.to_string(), '-'.to_string(),
-                             '1'.to_string(), "111".to_string(),'-'.to_string(),'-'.to_string(),'-'.to_string(),
-                             '-'.to_string(), "114".to_string(), '-'.to_string(),
-                             '-'.to_string()];
-        let correct_numbering = vec!['-'.to_string(), '-'.to_string(),
-                                     '1'.to_string(), "111".to_string(),"111A".to_string(),
-                                     "111B".to_string(),"112B".to_string(),
-                                     "112A".to_string(), "114".to_string(), '-'.to_string(),
-                                     '-'.to_string()];
-        assert_eq!(name_insertions(numbering, Scheme::IMGT), correct_numbering);
+        let numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "111".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            "114".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        let correct_numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "111".to_string(),
+            "111A".to_string(),
+            "111B".to_string(),
+            "112B".to_string(),
+            "112A".to_string(),
+            "114".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        assert_eq!(name_insertions(numbering, &Scheme::IMGT), correct_numbering);
 
-        let numbering = vec!['-'.to_string(), '-'.to_string(),
-                             '1'.to_string(), "33".to_string(),'-'.to_string(),'-'.to_string(),'-'.to_string(),
-                             '-'.to_string(), "34".to_string(), '-'.to_string(),
-                             '-'.to_string()];
-        let correct_numbering = vec!['-'.to_string(), '-'.to_string(),
-                                     '1'.to_string(), "33".to_string(),"33A".to_string(),"33B".to_string(),"33C".to_string(),
-                                     "33D".to_string(), "34".to_string(), '-'.to_string(),
-                                     '-'.to_string()];
-        assert_eq!(name_insertions(numbering, Scheme::KABAT), correct_numbering);
+        let numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "33".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            "34".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        let correct_numbering = vec![
+            '-'.to_string(),
+            '-'.to_string(),
+            '1'.to_string(),
+            "33".to_string(),
+            "33A".to_string(),
+            "33B".to_string(),
+            "33C".to_string(),
+            "33D".to_string(),
+            "34".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+        ];
+        assert_eq!(
+            name_insertions(numbering, &Scheme::KABAT),
+            correct_numbering
+        );
     }
 
     #[test]
-    fn test_long_reverse_insertion(){
-        let mut test_vec: Vec<String> = vec!["-".to_string(); 33];  // 10 dashes
-        // Add numbers 1 to 10
+    fn test_long_reverse_insertion() {
+        let mut test_vec: Vec<String> = vec!["-".to_string(); 33]; // 10 dashes
+                                                                   // Add numbers 1 to 10
         for i in 10..=33 {
             test_vec.push(i.to_string());
         }
@@ -208,16 +320,16 @@ mod tests {
         }
         // Add more dashes
         test_vec.extend(vec!["-".to_string(); 10]);
-        let result = name_insertions(test_vec, Scheme::IMGT);
+        let result = name_insertions(test_vec, &Scheme::IMGT);
         // check reversal point to see if numbering goes well
         assert!(result.contains(&String::from("33AX")));
         assert!(result.contains(&String::from("34AX")));
     }
 
     #[test]
-    fn test_long_insertion(){
-        let mut test_vec: Vec<String> = vec!["-".to_string(); 33];  // 10 dashes
-        // Add numbers 1 to 10
+    fn test_long_insertion() {
+        let mut test_vec: Vec<String> = vec!["-".to_string(); 33]; // 10 dashes
+                                                                   // Add numbers 1 to 10
         for i in 1..=10 {
             test_vec.push(i.to_string());
         }
@@ -229,7 +341,6 @@ mod tests {
         }
         // Add more dashes
         test_vec.extend(vec!["-".to_string(); 20]);
-        assert!(name_insertions(test_vec, Scheme::IMGT).contains(&String::from("10CV")));
+        assert!(name_insertions(test_vec, &Scheme::IMGT).contains(&String::from("10CV")));
     }
-
 }

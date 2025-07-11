@@ -1,12 +1,12 @@
 pub mod consensus_scoring;
 pub mod constants;
 pub mod fastx;
+pub mod insertion_numbering;
 pub mod needleman_wunsch;
 pub mod numbering;
 pub mod schemes;
 pub mod sequence_stream;
 pub mod types;
-pub mod insertion_numbering;
 
 // Binding modules
 mod numbering_scheme_methods;

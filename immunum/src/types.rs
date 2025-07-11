@@ -22,9 +22,8 @@ pub struct NumberingOutput<'a> {
     pub sequence: String,
     pub numbering: Vec<String>,
     pub identity: f64,
-    pub score: f64,
-    pub start: i32,
-    pub end: i32,
+    pub start: u32,
+    pub end: u32,
 }
 
 #[derive(Debug)]

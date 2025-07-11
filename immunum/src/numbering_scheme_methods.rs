@@ -1,5 +1,7 @@
 use crate::constants::{insertion_points, scoring};
-use crate::types::{Chain, NumberingScheme, Scheme};
+use crate::insertion_numbering::name_insertions;
+use crate::needleman_wunsch::needleman_wunsch_consensus;
+use crate::types::{Chain, NumberingOutput, NumberingScheme, Scheme};
 
 impl NumberingScheme {
     pub fn restricted_sites(&self) -> Vec<u32> {
@@ -175,5 +177,32 @@ impl NumberingScheme {
         }
 
         (query_gap_penalty, consensus_gap_penalty)
+    }
+    fn number_sequence(&self, query_sequence: String) -> NumberingOutput {
+        let (mut numbering, identity) = needleman_wunsch_consensus(&query_sequence, self);
+
+        numbering = name_insertions(numbering, &self.scheme_type);
+
+        // find start and end index
+        // TODO handle numberings with no positions (only '-')
+        let start = numbering
+            .iter()
+            .position(|s| s != "-")
+            .expect("No positions numbered");
+
+        // Find the last non-dash element (searching from the end)
+        let end = numbering
+            .iter()
+            .rposition(|s| s != "-")
+            .expect("No positions numbered");
+
+        NumberingOutput {
+            scheme: &self,
+            sequence: query_sequence,
+            numbering: numbering,
+            identity: identity,
+            start: start as u32,
+            end: end as u32,
+        }
     }
 }
