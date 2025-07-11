@@ -1,19 +1,19 @@
 use phf::{phf_map, Map};
 
 pub mod scoring {
-        pub const GAP_PEN_CP: f64 = 55.0;
-        pub const GAP_PEN_FR: f64 = 26.0;
-        pub const GAP_PEN_IP: f64 = 1.0;
-        pub const GAP_PEN_OP: f64 = 1.0;
-        pub const GAP_PEN_CDR: f64 = 1.2;
-        pub const GAP_PEN_OTHER: f64 = 11.0;
-        pub const GAP_PEN_START: f64 = 1.0;
-        pub const GAP_PEN_END: f64 = 1.0;
-        pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
-        pub const CDR_INCREASE: f64 = 1.0; // increase per position away from insertion position CDR
+    pub const GAP_PEN_CP: f64 = 55.0;
+    pub const GAP_PEN_FR: f64 = 26.0;
+    pub const GAP_PEN_IP: f64 = 1.0;
+    pub const GAP_PEN_OP: f64 = 1.0;
+    pub const GAP_PEN_CDR: f64 = 1.2;
+    pub const GAP_PEN_OTHER: f64 = 11.0;
+    pub const GAP_PEN_START: f64 = 1.0;
+    pub const GAP_PEN_END: f64 = 1.0;
+    pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
+    pub const CDR_INCREASE: f64 = 1.0; // increase per position away from insertion position CDR
 
-        pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 0.8; // better name
-        pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0; // better name
+    pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 0.8; // better name
+    pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0; // better name
 }
 // Pre scan identity cutoff, minimal identity for program to assume a chain
 pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
@@ -22,27 +22,29 @@ pub const WITHIN_IDENTITY_RANGE: f64 = 0.20;
 // Minimal chain length, minimal length for sequence to continue search for chain
 pub const MINIMAL_CHAIN_LENGTH: i32 = 60;
 
-
-pub mod traceback_directions{
-        pub const FROM_DIAG: u8 = 0;
-        pub const FROM_LEFT: u8 = 1;
-        pub const FROM_TOP: u8 = 2;
-        pub const PERFECT_MATCH: u8 = 3;
+// Indexes for query and consensus gap columns in scoring matrix
+pub const QUERY_GAP_COLUMN: usize = 23;
+pub const CONSENSUS_GAP_COLUMN: usize = 24;
+pub mod traceback_directions {
+    pub const FROM_DIAG: u8 = 0;
+    pub const FROM_LEFT: u8 = 1;
+    pub const FROM_TOP: u8 = 2;
+    pub const PERFECT_MATCH: u8 = 3;
 }
 
 // IMGT cdr insertion positions;
-pub mod insertion_points{
-        pub const CDR1_IMGT: u32 = 33;
-        pub const CDR2_IMGT: u32 = 61;
-        pub const CDR3_IMGT: u32 = 111;
+pub mod insertion_points {
+    pub const CDR1_IMGT: u32 = 33;
+    pub const CDR2_IMGT: u32 = 61;
+    pub const CDR3_IMGT: u32 = 111;
 
-        // KABAT cdr insertion positions
-        pub const CDR1_KABAT_HEAVY: u32 = 35;
-        pub const CDR1_KABAT_LIGHT: u32 = 28;
-        pub const CDR2_KABAT_HEAVY: u32 = 52;
-        pub const CDR2_KABAT_LIGHT: u32 = 52;
-        pub const CDR3_KABAT_HEAVY: u32 = 100;
-        pub const CDR3_KABAT_LIGHT: u32 = 95;
+    // KABAT cdr insertion positions
+    pub const CDR1_KABAT_HEAVY: u32 = 35;
+    pub const CDR1_KABAT_LIGHT: u32 = 28;
+    pub const CDR2_KABAT_HEAVY: u32 = 52;
+    pub const CDR2_KABAT_LIGHT: u32 = 52;
+    pub const CDR3_KABAT_HEAVY: u32 = 100;
+    pub const CDR3_KABAT_LIGHT: u32 = 95;
 }
 
 // TODO get allowed amino acids

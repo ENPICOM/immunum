@@ -85,7 +85,7 @@ fn write_scoring_matrix(path: &str, scheme: NumberingScheme) {
     write_npy(path, &mut matrix).expect("Writing scoring matrix failed");
 }
 
-fn encode_residues_lookup_table(input: &[char]) -> Vec<u8> {
+pub(crate) fn encode_sequence(input: &String) -> Vec<u8> {
     // Create a lookup table (once, could be static)
     let mut lookup = [255u8; 128]; // Assuming ASCII characters
                                    //const ACCEPTED_RESIDUES: &str = "ACDEFGHIKLMNPQRSTVWY";
@@ -95,7 +95,7 @@ fn encode_residues_lookup_table(input: &[char]) -> Vec<u8> {
     }
 
     // Use the lookup table for conversion
-    input.iter().map(|&c| lookup[c as usize]).collect()
+    input.chars().map(|c| lookup[c as usize]).collect()
 }
 
 pub fn read_scoring_matrix(path: &str) -> Array2<f64> {
@@ -158,6 +158,7 @@ mod tests {
         // correct scores
         assert_eq!(best_score_consensus(1, 'A', &consensus), -1);
         assert_eq!(best_score_consensus(1, 'B', &consensus), 4);
+        assert_eq!(best_score_consensus(111, 'Y', &consensus), 7);
         assert_eq!(best_score_consensus(1, 'C', &consensus), -3);
 
         assert_eq!(best_score_consensus(128, 'X', &consensus), 0);
@@ -186,8 +187,8 @@ mod tests {
     #[test]
     fn amino_acid_encoding() {
         assert_eq!(
-            encode_residues_lookup_table(&['A', 'B', 'C', 'Z']),
-            [0, 1, 2, 22]
+            encode_sequence(&"ABCDEFGHIKLMNPQRSTVWXYZ".to_string()),
+            (0..23).collect::<Vec<u8>>()
         )
     }
 }

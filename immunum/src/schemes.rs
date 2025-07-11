@@ -1,6 +1,6 @@
 use crate::consensus_scoring::{read_consensus_file, read_scoring_matrix};
+use crate::constants::scoring;
 use crate::types::{Chain, NumberingScheme, RegionRange, Scheme};
-use crate::constants::{scoring};
 
 pub fn get_imgt_heavy_scheme() -> NumberingScheme {
     NumberingScheme {
@@ -178,9 +178,18 @@ mod tests {
         assert_eq!(scheme.restricted_sites().len(), 88);
         assert_eq!(scheme.consensus_amino_acids.len(), 128);
         assert_eq!(scheme.consensus_amino_acids[&1], vec!['Q', 'E', 'D']);
-        assert_eq!(scheme.gap_penalty(25), (scoring::GAP_PEN_FR, scoring::GAP_PEN_FR));
-        assert_eq!(scheme.gap_penalty(200), (scoring::GAP_PEN_OTHER, scoring::GAP_PEN_OTHER));
-        assert_eq!(scheme.gap_penalty(10), (scoring::GAP_PEN_FR, scoring::GAP_PEN_OP));
+        assert_eq!(
+            scheme.gap_penalty(25),
+            (scoring::GAP_PEN_FR, scoring::GAP_PEN_FR)
+        );
+        assert_eq!(
+            scheme.gap_penalty(200),
+            (scoring::GAP_PEN_OTHER, scoring::GAP_PEN_OTHER)
+        );
+        assert_eq!(
+            scheme.gap_penalty(10),
+            (scoring::GAP_PEN_FR, scoring::GAP_PEN_OP)
+        );
 
         for i in 1..129 {
             println!("{:?},", scheme.gap_penalty(i as u32))

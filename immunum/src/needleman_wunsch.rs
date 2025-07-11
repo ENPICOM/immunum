@@ -1,11 +1,14 @@
-use crate::constants::{traceback_directions, scoring};
+use crate::consensus_scoring::encode_sequence;
+use crate::constants::scoring::GAP_PEN_END;
+use crate::constants::{scoring, traceback_directions, CONSENSUS_GAP_COLUMN, QUERY_GAP_COLUMN};
 use crate::schemes::*;
 use crate::types::{NumberingOutput, NumberingScheme};
 
 pub fn needleman_wunsch_consensus(
     query_sequence: String,
     scheme: &NumberingScheme,
-) -> (Vec<String>, u32) {
+) -> (Vec<String>, f64) {
+    let encoded_query = encode_sequence(&query_sequence);
     let num_positions_consensus: usize = scheme.consensus_amino_acids.len();
     let len_query_sequence: usize = query_sequence.len();
 
@@ -15,18 +18,26 @@ pub fn needleman_wunsch_consensus(
         vec![vec![0; len_query_sequence + 1]; num_positions_consensus + 1];
 
     for i in 0..len_query_sequence + 1 {
-        dynamic_matrix[0][i] = 0.0 - (scoring::GAP_PEN_START * i as f64); // Formula: 2 times the index
+        dynamic_matrix[0][i] = 0.0 - (scoring::GAP_PEN_START * i as f64);
         traceback_matrix[0][i] = traceback_directions::FROM_LEFT;
     }
     for i in 0..num_positions_consensus + 1 {
-        dynamic_matrix[i][0] = 0.0 - (scoring::GAP_PEN_START * i as f64); // Formula: 2 times the index
+        dynamic_matrix[i][0] = 0.0 - (scoring::GAP_PEN_START * i as f64);
         traceback_matrix[i][0] = traceback_directions::FROM_TOP;
     }
 
-    for consensus_position in 1..num_positions_consensus {
-        for query_position in 1..len_query_sequence {
-            let query_gap_penalty: f64 = 20.0; // TODO get real values
-            let consensus_gap_penalty: f64 = 20.0; // TODO get real values
+    for consensus_position in 1..num_positions_consensus + 1 {
+        for query_position in 1..len_query_sequence + 1 {
+            let gap_penalties = match (consensus_position, query_position) {
+                (pos, pos2) if pos == num_positions_consensus || pos2 == len_query_sequence => {
+                    (GAP_PEN_END, GAP_PEN_END)
+                }
+                _ => (
+                    scheme.scoring_matrix[[consensus_position - 1, QUERY_GAP_COLUMN]],
+                    scheme.scoring_matrix[[consensus_position - 1, CONSENSUS_GAP_COLUMN]],
+                ),
+            };
+            let (query_gap_penalty, consensus_gap_penalty) = gap_penalties;
 
             let top_value: f64 =
                 dynamic_matrix[consensus_position - 1][query_position] - consensus_gap_penalty;
@@ -34,8 +45,10 @@ pub fn needleman_wunsch_consensus(
                 dynamic_matrix[consensus_position][query_position - 1] - query_gap_penalty;
             let mut match_value: f64 = dynamic_matrix[consensus_position - 1][query_position - 1];
 
-            // NOTE: sequence index is query_position - 1
-            let mut best_score: f64 = 2.0; // TODO Get scoring value
+            let mut best_score: f64 = scheme.scoring_matrix[[
+                consensus_position - 1,
+                encoded_query[query_position - 1] as usize,
+            ]];
 
             if scheme
                 .conserved_positions
@@ -67,7 +80,8 @@ pub fn needleman_wunsch_consensus(
                     .restricted_sites()
                     .contains(&(consensus_position as u32))
             {
-                traceback_matrix[consensus_position][query_position] = traceback_directions::PERFECT_MATCH;
+                traceback_matrix[consensus_position][query_position] =
+                    traceback_directions::PERFECT_MATCH;
             }
         }
     }
@@ -78,7 +92,7 @@ pub fn needleman_wunsch_consensus(
         &traceback_matrix,
     );
 
-    let identity = matches / (scheme.restricted_sites().len() as u32);
+    let identity: f64 = matches as f64 / (scheme.restricted_sites().len() as f64);
     (numbering, identity)
 }
 

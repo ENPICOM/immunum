@@ -8,11 +8,11 @@ pub mod sequence_stream;
 pub mod types;
 
 // Binding modules
+mod numbering_scheme_methods;
 #[cfg(feature = "python")]
 pub mod python_bindings;
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
-mod numbering_scheme_methods;
 
 // Import the procedural macro from the separate crate
 pub use immunum_macros::ParseFromString;

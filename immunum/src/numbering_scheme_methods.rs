@@ -13,7 +13,6 @@ impl NumberingScheme {
     }
 
     pub fn framework_positions(&self) -> Vec<u32> {
-        // TODO
         self.fr1
             .positions()
             .chain(self.fr2.positions())
@@ -23,7 +22,6 @@ impl NumberingScheme {
     }
 
     pub fn cdr_positions(&self) -> Vec<u32> {
-        //TODO
         self.cdr1
             .positions()
             .chain(self.cdr2.positions())
@@ -33,14 +31,11 @@ impl NumberingScheme {
 
     pub fn gap_penalty(&self, position: u32) -> (f64, f64) {
         // Set initial gap penalties
-        let mut penalty = if self.conserved_positions.contains(&position) {
-            scoring::GAP_PEN_CP
-        } else if self.framework_positions().contains(&position) {
-            scoring::GAP_PEN_FR
-        } else if self.cdr_positions().contains(&position) {
-            scoring::GAP_PEN_CDR
-        } else {
-            scoring::GAP_PEN_OTHER
+        let mut penalty = match () {
+            _ if self.conserved_positions.contains(&position) => scoring::GAP_PEN_CP,
+            _ if self.framework_positions().contains(&position) => scoring::GAP_PEN_FR,
+            _ if self.cdr_positions().contains(&position) => scoring::GAP_PEN_CDR,
+            _ => scoring::GAP_PEN_OTHER,
         };
 
         // ADAPT CDR PENALTIES, different for every scheme
@@ -148,7 +143,7 @@ impl NumberingScheme {
                 }
 
                 if self.chain_type != Chain::IGH && position == cdr1_insertion_position {
-                    penalty = scoring::GAP_PEN_OTHER; // 5, 11 in antpack, here set to 11
+                    penalty = scoring::GAP_PEN_OTHER;
                 }
             }
         }
