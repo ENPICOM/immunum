@@ -30,3 +30,10 @@ path = "src/main.rs"
 default = ["python", "wasm"]
 python = ["pyo3"]
 wasm = ["wasm-bindgen", "wee_alloc"]
+
+[dev-dependencies]
+criterion = "0.6.0"
+
+[[bench]]
+name = "benchmark"
+harness = false
