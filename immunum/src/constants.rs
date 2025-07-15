@@ -52,10 +52,36 @@ pub const ALPHABET: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 // TODO get allowed amino acids
 //pub const ALLOWED_AMINO_ACIDS: Vec<&str> = BLOSUM62.keys().collect();
 
-pub const ACCEPTED_RESIDUES: [char; 23] = [
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V',
-    'W', 'X', 'Y', 'Z',
+pub const ACCEPTED_RESIDUES: [u8; 23] = [
+    b'A', b'B', b'C', b'D', b'E', b'F', b'G', b'H', b'I', b'K', b'L', b'M', b'N', b'P', b'Q', b'R',
+        b'S', b'T', b'V', b'W', b'X', b'Y', b'Z',
 ];
+
+pub static ENCODED_RESIDUES_MAP: Map<u8, u8> = phf_map!{
+        b'A'=> 0,
+        b'B'=> 1,
+        b'C'=> 2,
+        b'D'=> 3,
+        b'E'=> 4,
+        b'F'=> 5,
+        b'G'=> 6,
+        b'H'=> 7,
+        b'I'=> 8,
+        b'K'=> 9,
+        b'L'=> 10,
+        b'M'=> 11,
+        b'N'=> 12,
+        b'P'=> 13,
+        b'Q'=> 14,
+        b'R'=> 15,
+        b'S'=> 16,
+        b'T'=> 17,
+        b'V'=> 18,
+        b'W'=> 19,
+        b'X'=> 20,
+        b'Y'=> 21,
+        b'Z'=> 22,
+};
 pub static BLOSUM62: Map<&'static str, i32> = phf_map! {
         "BN" => 3,
         "LW" => -2,

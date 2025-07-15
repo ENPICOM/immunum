@@ -7,7 +7,7 @@ impl NumberingScheme {
     pub fn restricted_sites(&self) -> Vec<u32> {
         let mut sites = Vec::new();
         for (&key, value) in &self.consensus_amino_acids {
-            if !value.contains(&'-') {
+            if !value.contains(&b'-') {
                 sites.push(key);
             }
         }
@@ -178,7 +178,7 @@ impl NumberingScheme {
 
         (query_gap_penalty, consensus_gap_penalty)
     }
-    pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a String) -> NumberingOutput<'a> {
+    pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a [u8]) -> NumberingOutput<'a> {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
         numbering = name_insertions(numbering, &self.scheme_type);

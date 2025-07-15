@@ -1,9 +1,9 @@
-use crate::fastx::from_path;
+use crate::fastx::{from_path, FastxRecord};
 use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
 use crate::types::{NumberingOutput, NumberingScheme, Scheme};
 use std::fs;
 fn find_highest_identity_chain<'a>(
-    query_sequence: &'a String,
+    query_sequence: &'a [u8],
     numbering_schemes: &'a Vec<NumberingScheme>,
 ) -> NumberingOutput<'a> {
     let mut results: Vec<NumberingOutput> = Vec::with_capacity(numbering_schemes.len());
@@ -13,21 +13,18 @@ fn find_highest_identity_chain<'a>(
     }
     //Determine highest scoring model
     results
-        .iter()
+        .into_iter()
         .max_by(|a, b| {
             a.identity
                 .partial_cmp(&b.identity)
                 .unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .unwrap()
-        .clone()
+        }).expect("No numbering scheme selected")
 }
 
 pub fn number_sequences_and_write_output(fasta_file: &str, scheme: Scheme, output_file: &str) {
     // Read in fasta
     let reader = from_path(fasta_file).unwrap();
-    let records: Result<Vec<_>, _> = reader.collect();
-    let records = records.unwrap();
+    let records: Vec<FastxRecord> = reader.collect::<Result<Vec<FastxRecord>, _>>().unwrap();
 
     // get schemes dependent on selected numbering method
     let schemes = match scheme {
@@ -47,12 +44,14 @@ pub fn number_sequences_and_write_output(fasta_file: &str, scheme: Scheme, outpu
     // run annotation for all sequences
     for r in records {
         println!("{}", r._name);
-        let output = find_highest_identity_chain(&r.sequence, &schemes);
+        let converted_sequence = r.sequence.into_bytes();
+        let output = find_highest_identity_chain(&converted_sequence, &schemes);
 
         //create string output
         output_str.push_str(&r._name);
         output_str.push('\t');
-        output_str.push_str(output.sequence);
+        output_str.push_str(std::str::from_utf8(output.sequence).expect(
+            "Non-UTF8 character in sequence"));
         output_str.push('\t');
         output_str.push_str(&output.numbering.join(","));
         output_str.push('\t');
@@ -73,30 +72,30 @@ mod tests {
 
     #[test]
     fn number_fasta_file() {
-        // r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-        // number_sequences_and_write_output(
-        //     r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-        //     Scheme::IMGT,
-        //     r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt"),
+        //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
+        number_sequences_and_write_output(
+            r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
+            Scheme::IMGT,
+            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt");
     }
 
     #[test]
     fn test_correct_chain_identification() {
-        let heavy_chain: String =
+        let heavy_chain: &[u8] =
             "QVQLVQSGAVIKTPGSSVKISCRASGYNFRDYSIHWVRLIPDKGFEWIGWIKPLWGAVSYARQL\
         QGRVSMTRQLSQDPDDPDWGVAYMEFSGLTPADTAEYFCVRRGSCDYCGDFPWQYWCQGTVVVVSSASTKGPSVFPLAPSSGGTAALGCLV\
         KDYFPEPVTVSWNSGALTSGVHTFPAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
-                .to_string();
-        let lambda_chain: String =
+                .as_bytes();
+        let lambda_chain: &[u8] =
             "SALTQPPSASGSLGQSVTISCTGTSSDVGGYNYVSWYQQHAGKAPKVIIYEVNKRPSGVPDRF\
         SGSKSGNTASLTVSGLQAEDEADYYCSSYEGSDNFVFGTGTKVTVLGQPKANPTVTLFPPSSEELQANKATLVCLISDFYPGAVTVAWK\
         ADGSPVKAGVETTKPSKQSNNKYAASSYLSLTPEQWKSHRSYSCQVTHEGSTVEKTVAPTECS"
-                .to_string();
-        let kappa_chain: String =
+                .as_bytes();
+        let kappa_chain: &[u8] =
             "DIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTG\
         SGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELKRADAAPTVSIFPPSSEQLTSGGASVVCFLNNFYPKDINVKWKIDGSE\
         RQNGVLNSATDQDSKDSTYSMSSTLTLTKDEYERHNSYTCEATHKTSTSPIVKSFNRNEC"
-                .to_string();
+                .as_bytes();
         let schemes = vec![
             get_imgt_lambda_scheme(),
             get_kabat_kappa_scheme(),

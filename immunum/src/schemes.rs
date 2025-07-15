@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(scheme.gap_positions, vec![10, 73]);
         assert_eq!(scheme.restricted_sites().len(), 88);
         assert_eq!(scheme.consensus_amino_acids.len(), 128);
-        assert_eq!(scheme.consensus_amino_acids[&1], vec!['Q', 'E', 'D']);
+        assert_eq!(scheme.consensus_amino_acids[&1], vec![b'Q', b'E', b'D']);
         assert_eq!(
             scheme.gap_penalty(25),
             (scoring::GAP_PEN_FR, scoring::GAP_PEN_FR)

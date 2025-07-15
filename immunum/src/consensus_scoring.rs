@@ -9,11 +9,12 @@ use ndarray::Array2;
 use ndarray_npy::{read_npy, write_npy};
 use std::collections::HashMap;
 use std::fs;
+use crate::constants::ENCODED_RESIDUES_MAP;
 
-pub(crate) fn read_consensus_file(path: &str) -> HashMap<u32, Vec<char>> {
+pub(crate) fn read_consensus_file(path: &str) -> HashMap<u32, Vec<u8>> {
     let content = fs::read_to_string(path);
     let content = content.unwrap_or("".to_string());
-    let mut consensus_aas: HashMap<u32, Vec<char>> = HashMap::new();
+    let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
     // Loop over every line of content
     let total_lines = content.lines().count();
     // Skip first and last line
@@ -21,20 +22,20 @@ pub(crate) fn read_consensus_file(path: &str) -> HashMap<u32, Vec<char>> {
         let split_line: Vec<&str> = line.split(',').collect();
         consensus_aas.insert(
             split_line[0].parse::<u32>().unwrap(),
-            split_line[1..].iter().flat_map(|s| s.chars()).collect(),
+            split_line[1..].join("").into_bytes()
         );
     }
     consensus_aas
 }
 
-fn best_score_consensus(position: u32, residue: char, consensus: &HashMap<u32, Vec<char>>) -> i32 {
+fn best_score_consensus(position: u32, residue: u8, consensus: &HashMap<u32, Vec<u8>>) -> i32 {
     // Initialize to minimal score
-    let to_check_residues: &Vec<char> = consensus
+    let to_check_residues: &Vec<u8> = consensus
         .get(&position)
         .expect("Position outside of consensus");
 
     // when any is allowed, best score is perfect match
-    if to_check_residues.iter().all(|&c| c == '-') {
+    if to_check_residues.iter().all(|&c| c == b'-') {
         return blosum_lookup(&residue, &residue);
     }
     // iterate over residues to get max score
@@ -47,7 +48,7 @@ fn best_score_consensus(position: u32, residue: char, consensus: &HashMap<u32, V
     )
 }
 
-fn blosum_lookup(residue1: &char, residue2: &char) -> i32 {
+fn blosum_lookup(residue1: &u8, residue2: &u8) -> i32 {
     if residue1 < residue2 {
         let lookup: String = format!("{}{}", residue1, residue2);
         *BLOSUM62.get(&lookup).unwrap()
@@ -66,7 +67,7 @@ fn write_scoring_matrix(path: &str, scheme: NumberingScheme) {
     // fill in scores
     for consensus_position in 0..consensus_length {
         for residue_index in 0..number_accepted_residues {
-            let residue: char = ACCEPTED_RESIDUES[residue_index];
+            let residue: u8 = ACCEPTED_RESIDUES[residue_index];
             matrix[[consensus_position, residue_index]] = best_score_consensus(
                 (consensus_position + 1) as u32,
                 residue,
@@ -84,17 +85,15 @@ fn write_scoring_matrix(path: &str, scheme: NumberingScheme) {
     write_npy(path, &matrix).expect("Writing scoring matrix failed");
 }
 
-pub(crate) fn encode_sequence(input: &str) -> Vec<u8> {
+pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
     // Create a lookup table (once, could be static)
     let mut lookup = [255u8; 128]; // Assuming ASCII characters
                                    //const ACCEPTED_RESIDUES: &str = "ACDEFGHIKLMNPQRSTVWY";
 
-    for (i, c) in ACCEPTED_RESIDUES.iter().enumerate() {
-        lookup[*c as usize] = i as u8;
-    }
-
-    // Use the lookup table for conversion
-    input.chars().map(|c| lookup[c as usize]).collect()
+    input
+        .iter()
+        .map(|&residue| *ENCODED_RESIDUES_MAP.get(&residue).unwrap_or(&128))
+        .collect()
 }
 
 pub fn read_scoring_matrix(path: &str) -> Array2<f64> {
@@ -141,11 +140,11 @@ mod tests {
     #[test]
     fn test_lookup() {
         // working
-        assert_eq!(blosum_lookup(&'B', &'N'), 3);
-        assert_eq!(blosum_lookup(&'W', &'Y'), 2);
-        assert_eq!(blosum_lookup(&'X', &'E'), -1);
+        assert_eq!(blosum_lookup(&b'B', &b'N'), 3);
+        assert_eq!(blosum_lookup(&b'W', &b'Y'), 2);
+        assert_eq!(blosum_lookup(&b'X', &b'E'), -1);
         // same either way of inputting arguments
-        assert_eq!(blosum_lookup(&'C', &'S'), blosum_lookup(&'S', &'C'));
+        assert_eq!(blosum_lookup(&b'C', &b'S'), blosum_lookup(&b'S', &b'C'));
     }
 
     #[test]
@@ -154,14 +153,14 @@ mod tests {
             read_consensus_file(r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_H.txt");
 
         // correct scores
-        assert_eq!(best_score_consensus(1, 'A', &consensus), -1);
-        assert_eq!(best_score_consensus(1, 'B', &consensus), 4);
-        assert_eq!(best_score_consensus(111, 'Y', &consensus), 7);
-        assert_eq!(best_score_consensus(1, 'C', &consensus), -3);
+        assert_eq!(best_score_consensus(1, b'A', &consensus), -1);
+        assert_eq!(best_score_consensus(1, b'B', &consensus), 4);
+        assert_eq!(best_score_consensus(111, b'Y', &consensus), 7);
+        assert_eq!(best_score_consensus(1, b'C', &consensus), -3);
 
-        assert_eq!(best_score_consensus(128, 'X', &consensus), 0);
-        assert_eq!(best_score_consensus(128, 'Y', &consensus), -2);
-        assert_eq!(best_score_consensus(128, 'Z', &consensus), 0);
+        assert_eq!(best_score_consensus(128, b'X', &consensus), 0);
+        assert_eq!(best_score_consensus(128, b'Y', &consensus), -2);
+        assert_eq!(best_score_consensus(128, b'Z', &consensus), 0);
     }
     #[test]
     #[should_panic(expected = "Position outside of consensus")]
@@ -169,7 +168,7 @@ mod tests {
         let consensus =
             read_consensus_file(r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_H.txt");
         // test wrong positions
-        best_score_consensus(200, 'A', &consensus);
+        best_score_consensus(200, b'A', &consensus);
     }
 
     #[test]
@@ -185,7 +184,7 @@ mod tests {
     #[test]
     fn amino_acid_encoding() {
         assert_eq!(
-            encode_sequence("ABCDEFGHIKLMNPQRSTVWXYZ"),
+            encode_sequence("ABCDEFGHIKLMNPQRSTVWXYZ".as_bytes()),
             (0..23).collect::<Vec<u8>>()
         )
     }

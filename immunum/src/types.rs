@@ -19,7 +19,7 @@ impl RegionRange {
 #[derive(Debug, Clone)]
 pub struct NumberingOutput<'a> {
     pub scheme: &'a NumberingScheme,
-    pub sequence: &'a String,
+    pub sequence: &'a [u8],
     pub numbering: Vec<String>,
     pub identity: f64,
     pub start: u32,
@@ -35,7 +35,7 @@ pub struct NumberingScheme {
     pub conserved_positions: Vec<u32>,
     pub insertion_positions: Vec<u32>,
     pub gap_positions: Vec<u32>,
-    pub consensus_amino_acids: HashMap<u32, Vec<char>>,
+    pub consensus_amino_acids: HashMap<u32, Vec<u8>>,
     pub scoring_matrix: Array2<f64>,
     pub fr1: RegionRange,
     pub fr2: RegionRange,
