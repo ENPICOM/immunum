@@ -54,7 +54,7 @@ pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme) {
 
             for _ in 0..gaps.len() {
                 let addition = format!("{}{}", base, ALPHABET[alphabet_index]);
-                let insertion_name = format!("{}{}", gap_position, addition);
+                let insertion_name = format!("{gap_position}{addition}");
                 numbered_gap.push(insertion_name);
                 alphabet_index += 1;
 
@@ -89,7 +89,7 @@ fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool)
         && position != insertion_points::CDR2_IMGT
         && position != insertion_points::CDR3_IMGT
     {
-        panic!("Trying to reverse number a wrong position {}", position);
+        panic!("Trying to reverse number a wrong position {position}");
     }
 
     let mut numbered_gap: Vec<String> = Vec::new();

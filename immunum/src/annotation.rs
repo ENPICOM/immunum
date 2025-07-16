@@ -4,7 +4,7 @@ use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
 use crate::types::Scheme;
 use std::fs;
 
-fn find_highest_identity_chain<'a>(
+pub(crate) fn find_highest_identity_chain<'a>(
     query_sequence: &'a [u8],
     numbering_schemes: &'a Vec<NumberingScheme>,
 ) -> NumberingOutput<'a> {

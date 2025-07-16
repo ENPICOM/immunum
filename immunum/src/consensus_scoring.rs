@@ -13,13 +13,11 @@ use std::fs;
 use std::path::PathBuf;
 
 pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
-    println!("{}", path.to_str().unwrap());
     let content = fs::read_to_string(path).expect("Error in reading consensus file");
     let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
     // Loop over every line of content
     let total_lines = content.lines().count();
     // Skip first and last line
-    println!("{}", total_lines);
     for line in content.lines().skip(1).take(total_lines - 2) {
         let split_line: Vec<&str> = line.split(',').collect();
         consensus_aas.insert(

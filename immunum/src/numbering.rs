@@ -1,41 +1,29 @@
+use crate::annotation::find_highest_identity_chain;
+use crate::numbering_scheme_type::NumberingScheme;
+use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
 use crate::types::{Chain, Scheme};
 
 /// Mock function for numbering sequences
 /// This is a placeholder that returns mock numbering results
 pub fn number_sequence(sequence: &str, scheme: &Scheme, chains: &[Chain]) -> String {
-    let mut result = String::new();
+    let schemes: Vec<NumberingScheme> = match scheme {
+        Scheme::IMGT => vec![
+            get_imgt_heavy_scheme(),
+            get_imgt_heavy_scheme(),
+            get_imgt_lambda_scheme(),
+        ],
+        Scheme::KABAT => vec![
+            get_imgt_heavy_scheme(),
+            get_imgt_heavy_scheme(),
+            get_imgt_lambda_scheme(),
+        ],
+    };
 
-    result.push_str(&format!("Sequence: {}\n", sequence));
-    result.push_str(&format!("Scheme: {:?}\n", scheme));
-    result.push_str(&format!("Chains: {:?}\n", chains));
-    result.push('\n');
+    let schemes: Vec<NumberingScheme> = schemes
+        .into_iter()
+        .filter(|scheme| chains.contains(&scheme.chain_type))
+        .collect();
 
-    // Mock numbering output
-    result.push_str("Mock Numbering Results:\n");
-    result.push_str("Position | Residue | IMGT Position\n");
-    result.push_str("---------|---------|---------------\n");
-
-    for (i, residue) in sequence.chars().enumerate() {
-        let mock_position = match scheme {
-            Scheme::IMGT => format!("{}", i + 1),
-            Scheme::KABAT => format!("{}K", i + 1),
-        };
-        result.push_str(&format!(
-            "{:8} | {:7} | {}\n",
-            i + 1,
-            residue,
-            mock_position
-        ));
-    }
-
-    result.push('\n');
-    result.push_str("Chain-specific annotations:\n");
-    for chain in chains {
-        result.push_str(&format!(
-            "- {:?}: Mock annotation for this chain type\n",
-            chain
-        ));
-    }
-
-    result
+    let numbering_output = find_highest_identity_chain(sequence.as_bytes(), &schemes);
+    format!("Numbering output: {:?}", numbering_output.numbering)
 }
