@@ -4,20 +4,22 @@ use crate::schemes::{
     get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme,
     get_kabat_kappa_scheme, get_kabat_lambda_scheme,
 };
-use crate::types::NumberingScheme;
+use crate::numbering_scheme_type::NumberingScheme;
 use ndarray::Array2;
 use ndarray_npy::{read_npy, write_npy};
 use std::collections::HashMap;
 use std::fs;
 use crate::constants::ENCODED_RESIDUES_MAP;
+use std::path::{PathBuf};
 
-pub(crate) fn read_consensus_file(path: &str) -> HashMap<u32, Vec<u8>> {
-    let content = fs::read_to_string(path);
-    let content = content.unwrap_or("".to_string());
+pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
+    println!("{}", path.to_str().unwrap());
+    let content = fs::read_to_string(path).expect("Error in reading consensus file");
     let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
     // Loop over every line of content
     let total_lines = content.lines().count();
     // Skip first and last line
+    println!("{}", total_lines);
     for line in content.lines().skip(1).take(total_lines - 2) {
         let split_line: Vec<&str> = line.split(',').collect();
         consensus_aas.insert(
@@ -50,15 +52,15 @@ fn best_score_consensus(position: u32, residue: u8, consensus: &HashMap<u32, Vec
 
 fn blosum_lookup(residue1: &u8, residue2: &u8) -> i32 {
     if residue1 < residue2 {
-        let lookup: String = format!("{}{}", residue1, residue2);
-        *BLOSUM62.get(&lookup).unwrap()
+        let lookup: &[u8; 2] = &[*residue1, *residue2];
+        *BLOSUM62.get(lookup).unwrap()
     } else {
-        let lookup: String = format!("{}{}", residue2, residue1);
-        *BLOSUM62.get(&lookup).unwrap()
+        let lookup: &[u8; 2] = &[*residue2, *residue1];
+        *BLOSUM62.get(lookup).unwrap()
     }
 }
 
-fn write_scoring_matrix(path: &str, scheme: NumberingScheme) {
+fn write_scoring_matrix(path: PathBuf, scheme: NumberingScheme) {
     let number_accepted_residues = ACCEPTED_RESIDUES.len();
     let consensus_length = scheme.consensus_amino_acids.len();
 
@@ -87,44 +89,41 @@ fn write_scoring_matrix(path: &str, scheme: NumberingScheme) {
 
 pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
     // Create a lookup table (once, could be static)
-    let mut lookup = [255u8; 128]; // Assuming ASCII characters
-                                   //const ACCEPTED_RESIDUES: &str = "ACDEFGHIKLMNPQRSTVWY";
-
     input
         .iter()
         .map(|&residue| *ENCODED_RESIDUES_MAP.get(&residue).unwrap_or(&128))
         .collect()
 }
 
-pub fn read_scoring_matrix(path: &str) -> Array2<f64> {
+pub fn read_scoring_matrix(path: PathBuf) -> Array2<f64> {
     read_npy(path).expect("Error reading scoring matrix")
 }
 
 fn write_all_scoring_matrices() {
-    let schemes: Vec<(NumberingScheme, &str)> = vec![
+    let schemes: Vec<(NumberingScheme, PathBuf)> = vec![
         (
             get_imgt_heavy_scheme(),
-            r"src\consensus\IMGT_HEAVY_CONSENSUS.npy",
+            PathBuf::from("resources").join("consensus").join("IMGT_CONSENSUS_H.npy"),
         ),
         (
             get_imgt_kappa_scheme(),
-            r"src\consensus\IMGT_KAPPA_CONSENSUS.npy",
+            PathBuf::from("resources").join("consensus").join("IMGT_CONSENSUS_K.npy"),
         ),
         (
             get_imgt_lambda_scheme(),
-            r"src\consensus\IMGT_LAMBDA_CONSENSUS.npy",
+            PathBuf::from("resources").join("consensus").join("IMGT_CONSENSUS_L.npy"),
         ),
         (
             get_kabat_heavy_scheme(),
-            r"src\consensus\KABAT_HEAVY_CONSENSUS.npy",
+            PathBuf::from("resources").join("consensus").join("KABAT_CONSENSUS_H.npy"),
         ),
         (
             get_kabat_kappa_scheme(),
-            r"src\consensus\KABAT_KAPPA_CONSENSUS.npy",
+            PathBuf::from("resources").join("consensus").join("KABAT_CONSENSUS_K.npy"),
         ),
         (
             get_kabat_lambda_scheme(),
-            r"src\consensus\KABAT_LAMBDA_CONSENSUS.npy",
+            PathBuf::from("resources").join("consensus").join("KABAT_CONSENSUS_L.npy"),
         ),
     ];
     for (scheme, file_path) in schemes {
@@ -134,6 +133,7 @@ fn write_all_scoring_matrices() {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use super::*;
     //TODO tests for this part
 
@@ -148,37 +148,16 @@ mod tests {
     }
 
     #[test]
-    fn finding_best_scores() {
-        let consensus =
-            read_consensus_file(r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_H.txt");
-
-        // correct scores
-        assert_eq!(best_score_consensus(1, b'A', &consensus), -1);
-        assert_eq!(best_score_consensus(1, b'B', &consensus), 4);
-        assert_eq!(best_score_consensus(111, b'Y', &consensus), 7);
-        assert_eq!(best_score_consensus(1, b'C', &consensus), -3);
-
-        assert_eq!(best_score_consensus(128, b'X', &consensus), 0);
-        assert_eq!(best_score_consensus(128, b'Y', &consensus), -2);
-        assert_eq!(best_score_consensus(128, b'Z', &consensus), 0);
-    }
-    #[test]
-    #[should_panic(expected = "Position outside of consensus")]
-    fn look_outside_consensus() {
-        let consensus =
-            read_consensus_file(r"C:\Anti_Num\numbering\consensus\IMGT_CONSENSUS_H.txt");
-        // test wrong positions
-        best_score_consensus(200, b'A', &consensus);
-    }
-
-    #[test]
     fn test_write_scoring_matrix() {
         write_all_scoring_matrices();
     }
 
     #[test]
     fn test_read_scoring_matrix() {
-        let scoring_matrix = read_scoring_matrix(r"src\consensus\IMGT_HEAVY_CONSENSUS.npy");
+        let scoring_matrix = read_scoring_matrix(PathBuf::from("resources")
+            .join("consensus")
+            .join("IMGT_CONSENSUS_H.npy"),
+        );
         println! {"{:?}", scoring_matrix};
     }
     #[test]

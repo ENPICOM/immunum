@@ -1,5 +1,7 @@
 use crate::consensus_scoring::{read_consensus_file, read_scoring_matrix};
-use crate::types::{Chain, NumberingScheme, RegionRange, Scheme};
+use crate::numbering_scheme_type::NumberingScheme;
+use crate::types::{Chain, RegionRange, Scheme};
+use std::path::{PathBuf};
 
 pub fn get_imgt_heavy_scheme() -> NumberingScheme {
     NumberingScheme {
@@ -10,8 +12,15 @@ pub fn get_imgt_heavy_scheme() -> NumberingScheme {
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
         insertion_positions: vec![],
         gap_positions: vec![10, 73],
-        consensus_amino_acids: read_consensus_file(r"src\consensus\IMGT_CONSENSUS_H.txt"),
-        scoring_matrix: read_scoring_matrix(r"src\consensus\IMGT_CONSENSUS_H.npy"),
+        consensus_amino_acids: read_consensus_file(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_H.txt"),
+        ),
+        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
+                                                 .join("consensus")
+                                                 .join("IMGT_CONSENSUS_H.npy"),
+        ),
         fr1: RegionRange { start: 1, end: 27 },
         cdr1: RegionRange { start: 27, end: 39 },
         fr2: RegionRange { start: 39, end: 56 },
@@ -40,8 +49,15 @@ pub fn get_imgt_kappa_scheme() -> NumberingScheme {
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
         insertion_positions: vec![],
         gap_positions: vec![10, 73],
-        consensus_amino_acids: read_consensus_file(r"src\consensus\IMGT_CONSENSUS_K.txt"),
-        scoring_matrix: read_scoring_matrix(r"src\consensus\IMGT_CONSENSUS_K.npy"),
+        consensus_amino_acids: read_consensus_file(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_K.txt"),
+        ),
+        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
+                                                .join("consensus")
+                                                .join("IMGT_CONSENSUS_K.npy"),
+        ),
         fr1: RegionRange { start: 1, end: 27 },
         cdr1: RegionRange { start: 27, end: 39 },
         fr2: RegionRange { start: 39, end: 56 },
@@ -70,8 +86,15 @@ pub fn get_imgt_lambda_scheme() -> NumberingScheme {
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
         insertion_positions: vec![],
         gap_positions: vec![10, 73, 81, 82],
-        consensus_amino_acids: read_consensus_file(r"src\consensus\IMGT_CONSENSUS_L.txt"),
-        scoring_matrix: read_scoring_matrix(r"src\consensus\IMGT_CONSENSUS_L.npy"),
+        consensus_amino_acids: read_consensus_file(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_L.txt"),
+        ),
+        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
+                                                .join("consensus")
+                                                .join("IMGT_CONSENSUS_L.npy"),
+        ),
         fr1: RegionRange { start: 1, end: 27 },
         cdr1: RegionRange { start: 27, end: 39 },
         fr2: RegionRange { start: 39, end: 56 },
@@ -100,8 +123,15 @@ pub fn get_kabat_heavy_scheme() -> NumberingScheme {
         conserved_positions: vec![22, 36, 92, 103, 104, 106],
         insertion_positions: vec![6, 82],
         gap_positions: vec![40, 41, 42, 43, 44, 72, 73, 74],
-        consensus_amino_acids: read_consensus_file(r"src\consensus\KABAT_CONSENSUS_H.txt"),
-        scoring_matrix: read_scoring_matrix(r"src\consensus\KABAT_CONSENSUS_H.npy"),
+        consensus_amino_acids: read_consensus_file(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_H.txt"),
+        ),
+        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
+                                                .join("consensus")
+                                                .join("KABAT_CONSENSUS_H.npy"),
+        ),
         fr1: RegionRange { start: 1, end: 31 },
         cdr1: RegionRange { start: 31, end: 36 },
         fr2: RegionRange { start: 36, end: 50 },
@@ -127,8 +157,15 @@ pub fn get_kabat_kappa_scheme() -> NumberingScheme {
         conserved_positions: vec![23, 35, 88, 98, 99, 101],
         insertion_positions: vec![27],
         gap_positions: vec![10],
-        consensus_amino_acids: read_consensus_file(r"src\consensus\KABAT_CONSENSUS_K.txt"),
-        scoring_matrix: read_scoring_matrix(r"src\consensus\KABAT_CONSENSUS_K.npy"),
+        consensus_amino_acids: read_consensus_file(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_K.txt"),
+        ),
+        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
+                                                .join("consensus")
+                                                .join("KABAT_CONSENSUS_K.npy"),
+        ),
         fr1: RegionRange { start: 1, end: 24 },
         cdr1: RegionRange { start: 24, end: 35 },
         fr2: RegionRange { start: 35, end: 50 },
@@ -151,8 +188,15 @@ pub fn get_kabat_lambda_scheme() -> NumberingScheme {
         conserved_positions: vec![23, 35, 88, 98, 99, 101],
         insertion_positions: vec![27],
         gap_positions: vec![10],
-        consensus_amino_acids: read_consensus_file(r"src\consensus\KABAT_CONSENSUS_L.txt"),
-        scoring_matrix: read_scoring_matrix(r"src\consensus\KABAT_CONSENSUS_L.npy"),
+        consensus_amino_acids: read_consensus_file(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_L.txt"),
+        ),
+        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
+                                                .join("consensus")
+                                                .join("KABAT_CONSENSUS_L.npy"),
+        ),
         fr1: RegionRange { start: 1, end: 24 },
         cdr1: RegionRange { start: 24, end: 35 },
         fr2: RegionRange { start: 35, end: 50 },

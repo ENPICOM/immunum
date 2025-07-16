@@ -2,9 +2,8 @@
 
 use clap::ValueEnum;
 use immunum_macros::ParseFromString;
-use ndarray::Array2;
-use std::collections::HashMap;
 use std::ops::Range;
+
 #[derive(Debug)]
 pub struct RegionRange {
     pub start: u32,
@@ -14,37 +13,6 @@ impl RegionRange {
     pub fn positions(&self) -> Range<u32> {
         self.start..self.end
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct NumberingOutput<'a> {
-    pub scheme: &'a NumberingScheme,
-    pub sequence: &'a [u8],
-    pub numbering: Vec<String>,
-    pub identity: f64,
-    pub start: u32,
-    pub end: u32,
-}
-
-#[derive(Debug)]
-pub struct NumberingScheme {
-    pub name: String,
-    pub description: String,
-    pub scheme_type: Scheme,
-    pub chain_type: Chain,
-    pub conserved_positions: Vec<u32>,
-    pub insertion_positions: Vec<u32>,
-    pub gap_positions: Vec<u32>,
-    pub consensus_amino_acids: HashMap<u32, Vec<u8>>,
-    pub scoring_matrix: Array2<f64>,
-    pub fr1: RegionRange,
-    pub fr2: RegionRange,
-    pub fr3: RegionRange,
-    pub fr4: RegionRange,
-    pub cdr1: RegionRange,
-    pub cdr2: RegionRange,
-    pub cdr3: RegionRange,
-    // TODO scoring matrix // framework_positions: //cdr_positions:
 }
 
 /// Numbering schemes for immunoglobulin sequences

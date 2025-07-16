@@ -1,7 +1,7 @@
 use crate::constants::{insertion_points, ALPHABET};
 use crate::types::Scheme;
 
-pub(crate) fn name_insertions(mut numbering: Vec<String>, scheme: &Scheme) -> Vec<String> {
+pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme){
     // Function that assigns correct labels to insertions
     let original_numbering_length = numbering.len();
 
@@ -22,15 +22,15 @@ pub(crate) fn name_insertions(mut numbering: Vec<String>, scheme: &Scheme) -> Ve
         if item != "-" {
             // number
             if first_number.is_none() {
-                first_number = Some(item.clone());
+                first_number = Some(item.to_string());
             }
-            latest_number = Some(item.clone()); // set to latest
+            latest_number = Some(item.to_string()); // set to latest
         } else if item == "-" {
             // gap
             if first_number.is_some() && latest_number.is_some() {
                 // inside antibody
                 let latest = latest_number.as_ref().unwrap();
-                gaps_dict.entry(latest.clone()).or_default().push(i); // add i
+                gaps_dict.entry(latest.to_string()).or_default().push(i); // add i
             }
         }
     }
@@ -53,14 +53,14 @@ pub(crate) fn name_insertions(mut numbering: Vec<String>, scheme: &Scheme) -> Ve
             let mut base_index: usize = 0;
 
             for _ in 0..gaps.len() {
-                let addition = format!("{}{}", base, ALPHABET.chars().nth(alphabet_index).unwrap());
+                let addition = format!("{}{}", base, ALPHABET[alphabet_index]);
                 let insertion_name = format!("{}{}", gap_position, addition);
                 numbered_gap.push(insertion_name);
                 alphabet_index += 1;
 
                 if alphabet_index == 26 {
                     // add extra letter if gap longer than 26
-                    base = ALPHABET.chars().nth(base_index).unwrap().to_string();
+                    base = ALPHABET[base_index].to_string();
                     base_index += 1;
                     alphabet_index = 0;
                 }
@@ -82,7 +82,6 @@ pub(crate) fn name_insertions(mut numbering: Vec<String>, scheme: &Scheme) -> Ve
         panic!("Placing insertions caused numbering length to change");
     }
 
-    numbering
 }
 
 fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool) -> Vec<String> {
@@ -102,7 +101,7 @@ fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool)
 
     for i in 0..insertion_length {
         let insertion_name = if letters {
-            let addition = format!("{}{}", base, ALPHABET.chars().nth(alphabet_index).unwrap());
+            let addition = format!("{}{}", base, ALPHABET[alphabet_index]);
             format!("{}{}", position + if plus_one { 1 } else { 0 }, addition)
         } else {
             // use original .x format instead
@@ -123,7 +122,7 @@ fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool)
 
         if alphabet_index == 26 {
             // handle very long insertions
-            base = ALPHABET.chars().nth(base_index).unwrap().to_string();
+            base = ALPHABET[base_index].to_string();
             base_index += 1;
             alphabet_index = 0;
         }
@@ -138,7 +137,7 @@ mod tests {
 
     #[test]
     fn normal_insertion_numbering() {
-        let numbering = vec![
+        let mut numbering = vec![
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
@@ -165,8 +164,9 @@ mod tests {
             '-'.to_string(),
         ];
         let scheme = Scheme::IMGT;
-        assert_eq!(name_insertions(numbering, &scheme), correct_numbering);
-        let numbering = vec![
+        name_insertions(&mut numbering, &scheme);
+        assert_eq!(numbering, correct_numbering);
+        let mut numbering = vec![
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
@@ -180,12 +180,13 @@ mod tests {
             '-'.to_string(),
         ];
         let scheme = Scheme::KABAT;
-        assert_eq!(name_insertions(numbering, &scheme), correct_numbering);
+        name_insertions(&mut numbering, &scheme);
+        assert_eq!(numbering, correct_numbering);
     }
 
     #[test]
     fn test_reverse_numbering() {
-        let numbering = vec![
+        let mut numbering = vec![
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
@@ -211,9 +212,10 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
         ];
-        assert_eq!(name_insertions(numbering, &Scheme::IMGT), correct_numbering);
+        name_insertions(&mut numbering, &Scheme::IMGT);
+        assert_eq!(numbering, correct_numbering);
 
-        let numbering = vec![
+        let mut numbering = vec![
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
@@ -239,9 +241,10 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
         ];
-        assert_eq!(name_insertions(numbering, &Scheme::IMGT), correct_numbering);
+        name_insertions(&mut numbering, &Scheme::IMGT);
+        assert_eq!(numbering, correct_numbering);
 
-        let numbering = vec![
+        let mut numbering = vec![
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
@@ -267,9 +270,10 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
         ];
-        assert_eq!(name_insertions(numbering, &Scheme::IMGT), correct_numbering);
+        name_insertions(&mut numbering, &Scheme::IMGT);
+        assert_eq!(numbering, correct_numbering);
 
-        let numbering = vec![
+        let mut numbering = vec![
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
@@ -295,10 +299,8 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
         ];
-        assert_eq!(
-            name_insertions(numbering, &Scheme::KABAT),
-            correct_numbering
-        );
+        name_insertions(&mut numbering, &Scheme::KABAT);
+        assert_eq!(numbering, correct_numbering);
     }
 
     #[test]
@@ -316,10 +318,10 @@ mod tests {
         }
         // Add more dashes
         test_vec.extend(vec!["-".to_string(); 10]);
-        let result = name_insertions(test_vec, &Scheme::IMGT);
+        name_insertions(&mut test_vec, &Scheme::IMGT);
         // check reversal point to see if numbering goes well
-        assert!(result.contains(&String::from("33AX")));
-        assert!(result.contains(&String::from("34AX")));
+        assert!(test_vec.contains(&String::from("33AX")));
+        assert!(test_vec.contains(&String::from("34AX")));
     }
 
     #[test]
@@ -337,6 +339,7 @@ mod tests {
         }
         // Add more dashes
         test_vec.extend(vec!["-".to_string(); 20]);
-        assert!(name_insertions(test_vec, &Scheme::IMGT).contains(&String::from("10CV")));
+        name_insertions(&mut test_vec, &Scheme::IMGT);
+        assert!(test_vec.contains(&String::from("10CV")));
     }
 }

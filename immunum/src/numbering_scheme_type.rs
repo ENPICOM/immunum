@@ -1,7 +1,39 @@
+use std::collections::HashMap;
+use ndarray::Array2;
 use crate::constants::{insertion_points, scoring};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
-use crate::types::{Chain, NumberingOutput, NumberingScheme, Scheme};
+use crate::types::{Chain, RegionRange, Scheme};
+
+#[derive(Debug)]
+pub struct NumberingScheme {
+    pub name: String,
+    pub description: String,
+    pub scheme_type: Scheme,
+    pub chain_type: Chain,
+    pub conserved_positions: Vec<u32>,
+    pub insertion_positions: Vec<u32>,
+    pub gap_positions: Vec<u32>,
+    pub consensus_amino_acids: HashMap<u32, Vec<u8>>,
+    pub scoring_matrix: Array2<f64>,
+    pub fr1: RegionRange,
+    pub fr2: RegionRange,
+    pub fr3: RegionRange,
+    pub fr4: RegionRange,
+    pub cdr1: RegionRange,
+    pub cdr2: RegionRange,
+    pub cdr3: RegionRange,
+}
+
+#[derive(Debug, Clone)]
+pub struct NumberingOutput<'a> {
+    pub scheme: &'a NumberingScheme,
+    pub sequence: &'a [u8],
+    pub numbering: Vec<String>,
+    pub identity: f64,
+    pub start: u32,
+    pub end: u32,
+}
 
 impl NumberingScheme {
     pub fn restricted_sites(&self) -> Vec<u32> {
@@ -181,7 +213,7 @@ impl NumberingScheme {
     pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a [u8]) -> NumberingOutput<'a> {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
-        numbering = name_insertions(numbering, &self.scheme_type);
+        name_insertions(&mut numbering, &self.scheme_type);
 
         // find start and end index
         // TODO handle numberings with no positions (only '-')

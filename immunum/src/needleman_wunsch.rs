@@ -1,7 +1,7 @@
 use crate::consensus_scoring::encode_sequence;
 use crate::constants::scoring::GAP_PEN_END;
 use crate::constants::{scoring, traceback_directions, CONSENSUS_GAP_COLUMN, QUERY_GAP_COLUMN};
-use crate::types::NumberingScheme;
+use crate::numbering_scheme_type::NumberingScheme;
 
 pub fn needleman_wunsch_consensus(
     query_sequence: &[u8],

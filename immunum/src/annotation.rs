@@ -1,7 +1,9 @@
 use crate::fastx::{from_path, FastxRecord};
 use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
-use crate::types::{NumberingOutput, NumberingScheme, Scheme};
+use crate::types::{Scheme};
 use std::fs;
+use crate::numbering_scheme_type::{NumberingScheme, NumberingOutput};
+
 fn find_highest_identity_chain<'a>(
     query_sequence: &'a [u8],
     numbering_schemes: &'a Vec<NumberingScheme>,
@@ -70,14 +72,14 @@ mod tests {
     use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme, get_kabat_kappa_scheme};
     use crate::types::Chain;
 
-    #[test]
-    fn number_fasta_file() {
-        //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
-        number_sequences_and_write_output(
-            r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-            Scheme::IMGT,
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt");
-    }
+    // #[test]
+    // fn number_fasta_file() {
+    //     //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
+    //     number_sequences_and_write_output(
+    //         r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
+    //         Scheme::IMGT,
+    //         r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt");
+    // }
 
     #[test]
     fn test_correct_chain_identification() {

@@ -9,9 +9,8 @@ pub mod sequence_stream;
 pub mod types;
 
 pub mod annotation;
-
+mod numbering_scheme_type;
 // Binding modules
-mod numbering_scheme_methods;
 #[cfg(feature = "python")]
 pub mod python_bindings;
 #[cfg(feature = "wasm")]
