@@ -140,7 +140,7 @@ mod tests {
             .as_bytes();
         let scheme = get_imgt_heavy_scheme();
         let output = needleman_wunsch_consensus(heavy_chain, &scheme);
-        println!("{:?}", output);
+        println!("{output:?}");
     }
 
     #[test]

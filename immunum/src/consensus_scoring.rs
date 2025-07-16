@@ -1,5 +1,4 @@
 use crate::constants::ENCODED_RESIDUES_MAP;
-#[allow(dead_code)]
 use crate::constants::{ACCEPTED_RESIDUES, BLOSUM62};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::schemes::{
@@ -97,7 +96,7 @@ pub fn read_scoring_matrix(path: PathBuf) -> Array2<f64> {
     read_npy(path).expect("Error reading scoring matrix")
 }
 
-fn write_all_scoring_matrices() {
+pub fn write_all_scoring_matrices() {
     let schemes: Vec<(NumberingScheme, PathBuf)> = vec![
         (
             get_imgt_heavy_scheme(),
@@ -169,7 +168,7 @@ mod tests {
                 .join("consensus")
                 .join("IMGT_CONSENSUS_H.npy"),
         );
-        println! {"{:?}", scoring_matrix};
+        println! {"{scoring_matrix:?}"};
     }
     #[test]
     fn amino_acid_encoding() {

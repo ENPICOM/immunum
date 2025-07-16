@@ -1,3 +1,4 @@
+use crate::consensus_scoring::write_all_scoring_matrices;
 use crate::fastx::{from_path, FastxRecord};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
 use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
@@ -24,7 +25,17 @@ pub(crate) fn find_highest_identity_chain<'a>(
         .expect("No numbering scheme selected")
 }
 
-pub fn number_sequences_and_write_output(fasta_file: &str, scheme: Scheme, output_file: &str) {
+pub fn number_sequences_and_write_output(
+    fasta_file: &str,
+    scheme: Scheme,
+    output_file: &str,
+    update_scoring_matrices: bool,
+) {
+    // Update scoring matrices
+    if update_scoring_matrices {
+        write_all_scoring_matrices()
+    }
+
     // Read in fasta
     let reader = from_path(fasta_file).unwrap();
     let records: Vec<FastxRecord> = reader.collect::<Result<Vec<FastxRecord>, _>>().unwrap();
