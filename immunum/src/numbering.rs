@@ -8,7 +8,7 @@ use crate::types::{Chain, Scheme};
 
 /// Mock function for numbering sequences
 /// This is a placeholder that returns mock numbering results
-pub fn number_sequence(sequence: &str, _scheme: &Scheme, _chains: &[Chain]) -> String {
+pub fn number_sequence(_sequence: &str, _scheme: &Scheme, _chains: &[Chain]) -> String {
     // let schemes: Vec<NumberingScheme> = match scheme {
     //     Scheme::IMGT => vec![
     //         get_imgt_heavy_scheme(),
