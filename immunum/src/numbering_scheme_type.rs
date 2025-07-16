@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use ndarray::Array2;
 use crate::constants::{insertion_points, scoring};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
 use crate::types::{Chain, RegionRange, Scheme};
+use ndarray::Array2;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct NumberingScheme {

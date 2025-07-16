@@ -1,7 +1,7 @@
 use crate::constants::{insertion_points, ALPHABET};
 use crate::types::Scheme;
 
-pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme){
+pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme) {
     // Function that assigns correct labels to insertions
     let original_numbering_length = numbering.len();
 
@@ -81,7 +81,6 @@ pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme){
     if numbering.len() != original_numbering_length {
         panic!("Placing insertions caused numbering length to change");
     }
-
 }
 
 fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool) -> Vec<String> {

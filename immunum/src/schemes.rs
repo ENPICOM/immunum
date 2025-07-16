@@ -1,7 +1,7 @@
 use crate::consensus_scoring::{read_consensus_file, read_scoring_matrix};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::types::{Chain, RegionRange, Scheme};
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 pub fn get_imgt_heavy_scheme() -> NumberingScheme {
     NumberingScheme {
@@ -17,9 +17,10 @@ pub fn get_imgt_heavy_scheme() -> NumberingScheme {
                 .join("consensus")
                 .join("IMGT_CONSENSUS_H.txt"),
         ),
-        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
-                                                 .join("consensus")
-                                                 .join("IMGT_CONSENSUS_H.npy"),
+        scoring_matrix: read_scoring_matrix(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_H.npy"),
         ),
         fr1: RegionRange { start: 1, end: 27 },
         cdr1: RegionRange { start: 27, end: 39 },
@@ -54,9 +55,10 @@ pub fn get_imgt_kappa_scheme() -> NumberingScheme {
                 .join("consensus")
                 .join("IMGT_CONSENSUS_K.txt"),
         ),
-        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
-                                                .join("consensus")
-                                                .join("IMGT_CONSENSUS_K.npy"),
+        scoring_matrix: read_scoring_matrix(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_K.npy"),
         ),
         fr1: RegionRange { start: 1, end: 27 },
         cdr1: RegionRange { start: 27, end: 39 },
@@ -91,9 +93,10 @@ pub fn get_imgt_lambda_scheme() -> NumberingScheme {
                 .join("consensus")
                 .join("IMGT_CONSENSUS_L.txt"),
         ),
-        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
-                                                .join("consensus")
-                                                .join("IMGT_CONSENSUS_L.npy"),
+        scoring_matrix: read_scoring_matrix(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_L.npy"),
         ),
         fr1: RegionRange { start: 1, end: 27 },
         cdr1: RegionRange { start: 27, end: 39 },
@@ -128,9 +131,10 @@ pub fn get_kabat_heavy_scheme() -> NumberingScheme {
                 .join("consensus")
                 .join("KABAT_CONSENSUS_H.txt"),
         ),
-        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
-                                                .join("consensus")
-                                                .join("KABAT_CONSENSUS_H.npy"),
+        scoring_matrix: read_scoring_matrix(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_H.npy"),
         ),
         fr1: RegionRange { start: 1, end: 31 },
         cdr1: RegionRange { start: 31, end: 36 },
@@ -162,9 +166,10 @@ pub fn get_kabat_kappa_scheme() -> NumberingScheme {
                 .join("consensus")
                 .join("KABAT_CONSENSUS_K.txt"),
         ),
-        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
-                                                .join("consensus")
-                                                .join("KABAT_CONSENSUS_K.npy"),
+        scoring_matrix: read_scoring_matrix(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_K.npy"),
         ),
         fr1: RegionRange { start: 1, end: 24 },
         cdr1: RegionRange { start: 24, end: 35 },
@@ -193,9 +198,10 @@ pub fn get_kabat_lambda_scheme() -> NumberingScheme {
                 .join("consensus")
                 .join("KABAT_CONSENSUS_L.txt"),
         ),
-        scoring_matrix: read_scoring_matrix(PathBuf::from("resources")
-                                                .join("consensus")
-                                                .join("KABAT_CONSENSUS_L.npy"),
+        scoring_matrix: read_scoring_matrix(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_L.npy"),
         ),
         fr1: RegionRange { start: 1, end: 24 },
         cdr1: RegionRange { start: 24, end: 35 },

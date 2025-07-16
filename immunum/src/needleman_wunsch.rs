@@ -72,7 +72,7 @@ pub fn needleman_wunsch_consensus(
             dynamic_matrix[consensus_position][query_position] = max_score;
             traceback_matrix[consensus_position][query_position] = transfer;
 
-            let seq_char = query_sequence[query_position-1];
+            let seq_char = query_sequence[query_position - 1];
             if transfer == traceback_directions::FROM_DIAG
                 && scheme.consensus_amino_acids[&(consensus_position as u32)].contains(&seq_char)
                 && scheme
@@ -134,13 +134,12 @@ mod tests {
 
     #[test]
     fn test_needleman_wunsch_consensus() {
-        let heavy_chain: &[u8] =
-            "EVQLQQSGAEVVRSGASVKLSCTASGFNIKDYYIHWVKQRPEKGLEWIGWIDPEIGDTEYVPKF\
+        let heavy_chain: &[u8] = "EVQLQQSGAEVVRSGASVKLSCTASGFNIKDYYIHWVKQRPEKGLEWIGWIDPEIGDTEYVPKF\
         QGKATMTADTSSNTAYLQLSSLTSEDTAVYYCNAGHDYDRGRFPYWGQGTLVTVSAAKTTPPSVYPLAPGSAAQTNSMVTLGCLVKGYFPE\
         PVTVTWNSGSLSSGVHTFPAVLQSDLYTLSSSVTVPSSTWPSETVTCNVAHPASSTKVDKKIVPRD"
-                .as_bytes();
+            .as_bytes();
         let scheme = get_imgt_heavy_scheme();
-        let output = needleman_wunsch_consensus(&heavy_chain, &scheme);
+        let output = needleman_wunsch_consensus(heavy_chain, &scheme);
         println!("{:?}", output);
     }
 

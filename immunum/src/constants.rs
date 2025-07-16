@@ -47,18 +47,20 @@ pub mod insertion_points {
     pub const CDR3_KABAT_LIGHT: u32 = 95;
 }
 // ALPHABET for numbering
-pub const ALPHABET: [char; 26] = ['A',  'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
-        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+pub const ALPHABET: [char; 26] = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+    'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+];
 
 // TODO get allowed amino acids
 //pub const ALLOWED_AMINO_ACIDS: Vec<&str> = BLOSUM62.keys().collect();
 
 pub const ACCEPTED_RESIDUES: [u8; 23] = [
     b'A', b'B', b'C', b'D', b'E', b'F', b'G', b'H', b'I', b'K', b'L', b'M', b'N', b'P', b'Q', b'R',
-        b'S', b'T', b'V', b'W', b'X', b'Y', b'Z',
+    b'S', b'T', b'V', b'W', b'X', b'Y', b'Z',
 ];
 
-pub static ENCODED_RESIDUES_MAP: Map<u8, u8> = phf_map!{
+pub static ENCODED_RESIDUES_MAP: Map<u8, u8> = phf_map! {
         b'A'=> 0,
         b'B'=> 1,
         b'C'=> 2,

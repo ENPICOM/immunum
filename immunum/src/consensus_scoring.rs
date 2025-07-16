@@ -1,16 +1,16 @@
+use crate::constants::ENCODED_RESIDUES_MAP;
 #[allow(dead_code)]
 use crate::constants::{ACCEPTED_RESIDUES, BLOSUM62};
+use crate::numbering_scheme_type::NumberingScheme;
 use crate::schemes::{
     get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme,
     get_kabat_kappa_scheme, get_kabat_lambda_scheme,
 };
-use crate::numbering_scheme_type::NumberingScheme;
 use ndarray::Array2;
 use ndarray_npy::{read_npy, write_npy};
 use std::collections::HashMap;
 use std::fs;
-use crate::constants::ENCODED_RESIDUES_MAP;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
     println!("{}", path.to_str().unwrap());
@@ -24,7 +24,7 @@ pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
         let split_line: Vec<&str> = line.split(',').collect();
         consensus_aas.insert(
             split_line[0].parse::<u32>().unwrap(),
-            split_line[1..].join("").into_bytes()
+            split_line[1..].join("").into_bytes(),
         );
     }
     consensus_aas
@@ -103,27 +103,39 @@ fn write_all_scoring_matrices() {
     let schemes: Vec<(NumberingScheme, PathBuf)> = vec![
         (
             get_imgt_heavy_scheme(),
-            PathBuf::from("resources").join("consensus").join("IMGT_CONSENSUS_H.npy"),
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_H.npy"),
         ),
         (
             get_imgt_kappa_scheme(),
-            PathBuf::from("resources").join("consensus").join("IMGT_CONSENSUS_K.npy"),
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_K.npy"),
         ),
         (
             get_imgt_lambda_scheme(),
-            PathBuf::from("resources").join("consensus").join("IMGT_CONSENSUS_L.npy"),
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_L.npy"),
         ),
         (
             get_kabat_heavy_scheme(),
-            PathBuf::from("resources").join("consensus").join("KABAT_CONSENSUS_H.npy"),
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_H.npy"),
         ),
         (
             get_kabat_kappa_scheme(),
-            PathBuf::from("resources").join("consensus").join("KABAT_CONSENSUS_K.npy"),
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_K.npy"),
         ),
         (
             get_kabat_lambda_scheme(),
-            PathBuf::from("resources").join("consensus").join("KABAT_CONSENSUS_L.npy"),
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("KABAT_CONSENSUS_L.npy"),
         ),
     ];
     for (scheme, file_path) in schemes {
@@ -133,8 +145,8 @@ fn write_all_scoring_matrices() {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use super::*;
+    use std::path::PathBuf;
     //TODO tests for this part
 
     #[test]
@@ -154,9 +166,10 @@ mod tests {
 
     #[test]
     fn test_read_scoring_matrix() {
-        let scoring_matrix = read_scoring_matrix(PathBuf::from("resources")
-            .join("consensus")
-            .join("IMGT_CONSENSUS_H.npy"),
+        let scoring_matrix = read_scoring_matrix(
+            PathBuf::from("resources")
+                .join("consensus")
+                .join("IMGT_CONSENSUS_H.npy"),
         );
         println! {"{:?}", scoring_matrix};
     }
