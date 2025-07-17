@@ -97,17 +97,17 @@ mod tests {
     use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme, get_kabat_kappa_scheme};
     use crate::types::Chain;
 
-    #[test]
-    fn number_fasta_file() {
-        //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
-        number_sequences_and_write_output(
-            r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-            Scheme::IMGT,
-            &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt",
-            false,
-        );
-    }
+    // #[test]
+    // fn number_fasta_file() {
+    //     //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
+    //     number_sequences_and_write_output(
+    //         r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
+    //         Scheme::IMGT,
+    //         &[Chain::IGH, Chain::IGK, Chain::IGL],
+    //         r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt",
+    //         false,
+    //     );
+    // }
 
     #[test]
     fn test_correct_chain_identification() {
