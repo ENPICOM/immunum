@@ -16,11 +16,11 @@ pub mod scoring {
     pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0; // better name
 }
 // Pre scan identity cutoff, minimal identity for program to assume a chain
-pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
-pub const WITHIN_IDENTITY_RANGE: f64 = 0.20;
+//pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
+//pub const WITHIN_IDENTITY_RANGE: f64 = 0.20;
 
 // Minimal chain length, minimal length for sequence to continue search for chain
-pub const MINIMAL_CHAIN_LENGTH: i32 = 60;
+//pub const MINIMAL_CHAIN_LENGTH: i32 = 60;
 
 // Indexes for query and consensus gap columns in scoring matrix
 pub const QUERY_GAP_COLUMN: usize = 23;

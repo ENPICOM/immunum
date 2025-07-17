@@ -2,7 +2,7 @@ use crate::consensus_scoring::write_all_scoring_matrices;
 use crate::fastx::{from_path, FastxRecord};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
 use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
-use crate::types::Scheme;
+use crate::types::{Chain, Scheme};
 use std::fs;
 
 pub(crate) fn find_highest_identity_chain<'a>(
@@ -28,6 +28,7 @@ pub(crate) fn find_highest_identity_chain<'a>(
 pub fn number_sequences_and_write_output(
     fasta_file: &str,
     scheme: Scheme,
+    chains: &[Chain],
     output_file: &str,
     update_scoring_matrices: bool,
 ) {
@@ -54,6 +55,12 @@ pub fn number_sequences_and_write_output(
         ],
     };
 
+    // filter only chains selected
+    let schemes: Vec<NumberingScheme> = schemes
+        .into_iter()
+        .filter(|scheme| chains.contains(&scheme.chain_type))
+        .collect();
+
     let mut output_str = "".to_string();
     // run annotation for all sequences
     for r in records {
@@ -74,6 +81,10 @@ pub fn number_sequences_and_write_output(
         output_str.push('\n');
         // TODO add regions
 
+
+        // TODO remove this temporary print statement using unused variables
+        println!("Found {0}{1} from {2} to {3}", output.scheme.name,
+                 output.scheme.description, output.start, output.end);
         // fill in value
     }
     fs::write(output_file, output_str).expect("Should be able to write to `/foo/tmp`")
@@ -85,14 +96,16 @@ mod tests {
     use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme, get_kabat_kappa_scheme};
     use crate::types::Chain;
 
-    // #[test]
-    // fn number_fasta_file() {
-    //     //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
-    //     number_sequences_and_write_output(
-    //         r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-    //         Scheme::IMGT,
-    //         r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt");
-    // }
+    #[test]
+    fn number_fasta_file() {
+        //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
+        number_sequences_and_write_output(
+            r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
+            Scheme::IMGT,
+            &[Chain::IGH, Chain::IGK, Chain::IGL],
+            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt",
+        false);
+    }
 
     #[test]
     fn test_correct_chain_identification() {

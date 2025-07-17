@@ -3,6 +3,14 @@ mod fastx;
 mod numbering;
 mod sequence_stream;
 mod types;
+mod annotation;
+mod numbering_scheme_type;
+mod schemes;
+mod consensus_scoring;
+mod constants;
+mod insertion_numbering;
+mod needleman_wunsch;
+
 
 use clap::Parser;
 use cli::Cli;
