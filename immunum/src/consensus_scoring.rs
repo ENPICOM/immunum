@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+/// Utility to read chain consensus file
 pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
     let content = fs::read_to_string(path).expect("Error in reading consensus file");
     let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
@@ -27,6 +28,7 @@ pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
     consensus_aas
 }
 
+/// Finds highest score according to blosum62
 fn best_score_consensus(position: u32, residue: u8, consensus: &HashMap<u32, Vec<u8>>) -> i32 {
     // Initialize to minimal score
     let to_check_residues: &Vec<u8> = consensus
@@ -47,6 +49,7 @@ fn best_score_consensus(position: u32, residue: u8, consensus: &HashMap<u32, Vec
     )
 }
 
+/// Utility to easily find blosum62 score for two residues
 fn blosum_lookup(residue1: &u8, residue2: &u8) -> i32 {
     if residue1 < residue2 {
         let lookup: &[u8; 2] = &[*residue1, *residue2];
@@ -57,6 +60,7 @@ fn blosum_lookup(residue1: &u8, residue2: &u8) -> i32 {
     }
 }
 
+/// Calculates and writes scoring matrix for consensus sequence
 fn write_scoring_matrix(path: PathBuf, scheme: NumberingScheme) {
     let number_accepted_residues = ACCEPTED_RESIDUES.len();
     let consensus_length = scheme.consensus_amino_acids.len();
@@ -84,6 +88,7 @@ fn write_scoring_matrix(path: PathBuf, scheme: NumberingScheme) {
     write_npy(path, &matrix).expect("Writing scoring matrix failed");
 }
 
+/// encodes sequence to indexes for the scoring matrix
 pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
     // Create a lookup table (once, could be static)
     input
@@ -92,10 +97,12 @@ pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
         .collect()
 }
 
+/// Utility to read scoring matrix
 pub fn read_scoring_matrix(path: PathBuf) -> Array2<f64> {
     read_npy(path).expect("Error reading scoring matrix")
 }
 
+/// Recalculates and writes all scoring matrices (IMGT and KABAT for now)
 pub fn write_all_scoring_matrices() {
     let schemes: Vec<(NumberingScheme, PathBuf)> = vec![
         (

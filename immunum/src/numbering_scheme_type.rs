@@ -36,6 +36,7 @@ pub struct NumberingOutput<'a> {
 }
 
 impl NumberingScheme {
+    /// Return restricted sites according to Antpack definition (non '-' positions)
     pub fn restricted_sites(&self) -> Vec<u32> {
         let mut sites = Vec::new();
         for (&key, value) in &self.consensus_amino_acids {
@@ -45,7 +46,7 @@ impl NumberingScheme {
         }
         sites
     }
-
+    /// All framework positions
     pub fn framework_positions(&self) -> Vec<u32> {
         self.fr1
             .positions()
@@ -54,7 +55,7 @@ impl NumberingScheme {
             .chain(self.fr4.positions())
             .collect()
     }
-
+    /// All cdr positions
     pub fn cdr_positions(&self) -> Vec<u32> {
         self.cdr1
             .positions()
@@ -62,7 +63,7 @@ impl NumberingScheme {
             .chain(self.cdr3.positions())
             .collect()
     }
-
+    /// Calculates gap penalty according to position and scheme
     pub fn gap_penalty(&self, position: u32) -> (f64, f64) {
         // Set initial gap penalties
         let mut penalty = match () {
@@ -210,6 +211,7 @@ impl NumberingScheme {
 
         (query_gap_penalty, consensus_gap_penalty)
     }
+    /// numbers sequence, returns NumberingOutput
     pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a [u8]) -> NumberingOutput<'a> {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 

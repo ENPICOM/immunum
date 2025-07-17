@@ -1,8 +1,8 @@
 use crate::constants::{insertion_points, ALPHABET};
 use crate::types::Scheme;
 
+/// Function that assigns correct labels to insertions
 pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme) {
-    // Function that assigns correct labels to insertions
     let original_numbering_length = numbering.len();
 
     // For IMGT reverse numbering
@@ -83,6 +83,7 @@ pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme) {
     }
 }
 
+/// Function that assigns correct IMGT labels for reverse numbering positions
 fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool) -> Vec<String> {
     // Function to get a list of insertion names according to imgt scheme
     if position != insertion_points::CDR1_IMGT

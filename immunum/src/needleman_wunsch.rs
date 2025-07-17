@@ -3,6 +3,7 @@ use crate::constants::scoring::GAP_PEN_END;
 use crate::constants::{scoring, traceback_directions, CONSENSUS_GAP_COLUMN, QUERY_GAP_COLUMN};
 use crate::numbering_scheme_type::NumberingScheme;
 
+/// Classic needleman wunch alignment for sequence against consensus sequence
 pub fn needleman_wunsch_consensus(
     query_sequence: &[u8],
     scheme: &NumberingScheme,
@@ -95,6 +96,7 @@ pub fn needleman_wunsch_consensus(
     (numbering, identity)
 }
 
+/// Traceback for needleman-wunsch algorithm, also counts perfect matches (for identity)
 fn traceback_alignment(
     sequence_length: usize,
     consensus_length: usize,

@@ -5,6 +5,7 @@ use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
 use crate::types::{Chain, Scheme};
 use std::fs;
 
+/// Runs alignment of given schemes on sequence and selects one with highest identity
 pub(crate) fn find_highest_identity_chain<'a>(
     query_sequence: &'a [u8],
     numbering_schemes: &'a Vec<NumberingScheme>,
@@ -24,7 +25,7 @@ pub(crate) fn find_highest_identity_chain<'a>(
         })
         .expect("No numbering scheme selected")
 }
-
+/// Runs alignement on all sequences in fastx file, and writes output to .txt file
 pub fn number_sequences_and_write_output(
     fasta_file: &str,
     scheme: Scheme,
