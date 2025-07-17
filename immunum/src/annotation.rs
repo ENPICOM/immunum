@@ -81,10 +81,11 @@ pub fn number_sequences_and_write_output(
         output_str.push('\n');
         // TODO add regions
 
-
         // TODO remove this temporary print statement using unused variables
-        println!("Found {0}{1} from {2} to {3}", output.scheme.name,
-                 output.scheme.description, output.start, output.end);
+        println!(
+            "Found {0}{1} from {2} to {3}",
+            output.scheme.name, output.scheme.description, output.start, output.end
+        );
         // fill in value
     }
     fs::write(output_file, output_str).expect("Should be able to write to `/foo/tmp`")
@@ -104,7 +105,8 @@ mod tests {
             Scheme::IMGT,
             &[Chain::IGH, Chain::IGK, Chain::IGL],
             r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output.txt",
-        false);
+            false,
+        );
     }
 
     #[test]
