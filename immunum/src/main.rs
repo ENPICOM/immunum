@@ -44,7 +44,7 @@ fn main() {
     let sequence_stream = match SequenceStream::new(&cli.input) {
         Ok(stream) => stream,
         Err(e) => {
-            eprintln!("Error creating sequence stream: {}", e);
+            eprintln!("Error creating sequence stream: {e}");
             std::process::exit(1);
         }
     };
@@ -61,10 +61,10 @@ fn main() {
             Ok(record) => {
                 let numbered_sequence =
                     numbering::number_sequence(&record.sequence, &cli.scheme, chains);
-                writeln!(output_writer, "{}", numbered_sequence).unwrap();
+                writeln!(output_writer, "{numbered_sequence}").unwrap();
             }
             Err(e) => {
-                eprintln!("Error processing sequence: {}", e);
+                eprintln!("Error processing sequence: {e}");
                 std::process::exit(1);
             }
         }
