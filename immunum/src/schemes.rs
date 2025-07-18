@@ -7,6 +7,7 @@ pub fn get_imgt_heavy_scheme() -> NumberingScheme {
     NumberingScheme {
         name: "IMGT Heavy".to_string(),
         description: "IMGT numbering scheme for heavy chains".to_string(),
+        file_name: "IMGT_CONSENSUS_H".to_string(),
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGH,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -45,6 +46,7 @@ pub fn get_imgt_kappa_scheme() -> NumberingScheme {
     NumberingScheme {
         name: "IMGT Kappa".to_string(),
         description: "IMGT numbering scheme for kappa chains".to_string(),
+        file_name: "IMGT_CONSENSUS_K".to_string(),
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGK,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -83,6 +85,7 @@ pub fn get_imgt_lambda_scheme() -> NumberingScheme {
     NumberingScheme {
         name: "IMGT Lambda".to_string(),
         description: "IMGT numbering scheme for lambda chains".to_string(),
+        file_name: "IMGT_CONSENSUS_L".to_string(),
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGL,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -121,6 +124,7 @@ pub fn get_kabat_heavy_scheme() -> NumberingScheme {
     NumberingScheme {
         name: "KABAT Heavy".to_string(),
         description: "KABAT numbering scheme for heavy chains".to_string(),
+        file_name: "KABAT_CONSENSUS_H".to_string(),
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGH,
         conserved_positions: vec![22, 36, 92, 103, 104, 106],
@@ -156,6 +160,7 @@ pub fn get_kabat_kappa_scheme() -> NumberingScheme {
     NumberingScheme {
         name: "KABAT Kappa".to_string(),
         description: "KABAT numbering scheme for kappa chains".to_string(),
+        file_name: "KABAT_CONSENSUS_K".to_string(),
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGK,
         conserved_positions: vec![23, 35, 88, 98, 99, 101],
@@ -188,6 +193,7 @@ pub fn get_kabat_lambda_scheme() -> NumberingScheme {
     NumberingScheme {
         name: "KABAT Lambda".to_string(),
         description: "KABAT numbering scheme for lambda chains".to_string(),
+        file_name: "KABAT_CONSENSUS_L".to_string(),
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGL,
         conserved_positions: vec![23, 35, 88, 98, 99, 101],

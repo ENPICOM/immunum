@@ -5,7 +5,7 @@ use crate::schemes::{
     get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme,
     get_kabat_kappa_scheme, get_kabat_lambda_scheme,
 };
-use ndarray::Array2;
+use ndarray::{s, Array2};
 use ndarray_npy::{read_npy, write_npy};
 use std::collections::HashMap;
 use std::fs;
@@ -24,6 +24,30 @@ pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
             split_line[0].parse::<u32>().unwrap(),
             split_line[1..].join("").into_bytes(),
         );
+    }
+    consensus_aas
+}
+
+/// Reads part of consensus file, with inclusive start and end position (used for c- and n-terminal)
+pub(crate) fn read_partial_consensus_file(
+    path: PathBuf,
+    start_position: usize,
+    end_position: usize,
+) -> HashMap<u32, Vec<u8>> {
+    let content = fs::read_to_string(path).expect("Error in reading consensus file");
+    let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
+
+    let mut current_position: u32 = 1;
+    // Read only from start position until end position
+    for line in content
+        .lines()
+        .skip(start_position)
+        .take(end_position - start_position + 1)
+    {
+        let split_line: Vec<&str> = line.split(',').collect();
+        consensus_aas.insert(current_position, split_line[1..].join("").into_bytes());
+        // Move on to next position
+        current_position += 1;
     }
     consensus_aas
 }
@@ -100,6 +124,20 @@ pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
 /// Utility to read scoring matrix
 pub fn read_scoring_matrix(path: PathBuf) -> Array2<f64> {
     read_npy(path).expect("Error reading scoring matrix")
+}
+
+pub fn read_partial_scoring_matrix(path: PathBuf, start_row: usize, end_row: usize) -> Array2<f64> {
+    let full_array = read_scoring_matrix(path);
+
+    assert!(
+        start_row <= end_row,
+        "Start row must be less than or equal to end row"
+    );
+    assert!(end_row - 1 < full_array.nrows(), "End row out of bounds");
+
+    full_array
+        .slice(s![start_row - 1..=end_row - 1, ..])
+        .to_owned()
 }
 
 /// Recalculates and writes all scoring matrices (IMGT and KABAT for now)
@@ -183,5 +221,42 @@ mod tests {
             encode_sequence("ABCDEFGHIKLMNPQRSTVWXYZ".as_bytes()),
             (0..23).collect::<Vec<u8>>()
         )
+    }
+
+    #[test]
+    fn read_part_consensus() {
+        let consensus_path = PathBuf::from("resources")
+            .join("consensus")
+            .join("IMGT_CONSENSUS_H.txt");
+        let full_consensus = read_consensus_file(consensus_path.clone());
+
+        let n_terminal = read_partial_consensus_file(consensus_path.clone(), 1, 10);
+        let c_terminal = read_partial_consensus_file(consensus_path.clone(), 118, 128);
+        assert_eq!(full_consensus[&1], n_terminal[&1]);
+        assert_eq!(full_consensus[&7], n_terminal[&7]);
+        assert_eq!(full_consensus[&10], n_terminal[&10]);
+
+        assert_eq!(full_consensus[&118], c_terminal[&1]);
+        assert_eq!(full_consensus[&121], c_terminal[&4]);
+        assert_eq!(full_consensus[&128], c_terminal[&11]);
+
+        assert_eq!(
+            read_partial_consensus_file(consensus_path.clone(), 1, 128),
+            full_consensus
+        );
+    }
+
+    #[test]
+    fn reading_consensus_partial_() {
+        let consensus_path = PathBuf::from("resources")
+            .join("consensus")
+            .join("IMGT_CONSENSUS_H.npy");
+        let full_scoring_matrix = read_scoring_matrix(consensus_path.clone());
+
+        let partial_scoring_matrix = read_partial_scoring_matrix(consensus_path.clone(), 20, 50);
+
+        assert_eq!(full_scoring_matrix.row(20), partial_scoring_matrix.row(0));
+        assert_eq!(full_scoring_matrix.row(25), partial_scoring_matrix.row(5));
+        assert_eq!(full_scoring_matrix.row(50), partial_scoring_matrix.row(30));
     }
 }

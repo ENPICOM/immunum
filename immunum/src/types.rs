@@ -4,7 +4,7 @@ use clap::ValueEnum;
 use immunum_macros::ParseFromString;
 use std::ops::Range;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RegionRange {
     pub start: u32,
     pub end: u32,

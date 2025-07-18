@@ -7,6 +7,7 @@ mod insertion_numbering;
 mod needleman_wunsch;
 mod numbering;
 mod numbering_scheme_type;
+mod prefiltering;
 mod schemes;
 mod sequence_stream;
 mod types;

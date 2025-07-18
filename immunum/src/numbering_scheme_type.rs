@@ -5,10 +5,11 @@ use crate::types::{Chain, RegionRange, Scheme};
 use ndarray::Array2;
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NumberingScheme {
     pub name: String,
     pub description: String,
+    pub file_name: String,
     pub scheme_type: Scheme,
     pub chain_type: Chain,
     pub conserved_positions: Vec<u32>,
