@@ -27,7 +27,7 @@ pub enum Scheme {
 }
 
 /// Immunoglobulin and T-cell receptor chain types
-#[derive(Clone, Debug, PartialEq, ValueEnum, ParseFromString)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq, ValueEnum, ParseFromString)]
 pub enum Chain {
     // IG Heavy chain variants
     #[value(alias = "Heavy", alias = "H")]

@@ -1,7 +1,9 @@
 use crate::consensus_scoring::{read_partial_consensus_file, read_partial_scoring_matrix};
-use crate::numbering_scheme_type::NumberingScheme;
+use crate::constants::WITHIN_IDENTITY_RANGE;
+use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
 use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme};
 use crate::types::Chain;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Create c-terminal NumberingScheme from a full length scheme (based on IMGT consensus)
@@ -13,7 +15,7 @@ pub fn get_terminal_schemes(
         Chain::IGH => get_imgt_heavy_scheme(),
         Chain::IGK => get_imgt_kappa_scheme(),
         Chain::IGL => get_imgt_lambda_scheme(),
-        other => !panic!("No scheme implemented for chain {:?} yet", other),
+        chain => panic!("No scheme implemented for chain {:?} yet", chain), // TODO convert to something else
     };
     let file_name = original_scheme.file_name.clone();
 
@@ -69,11 +71,90 @@ pub fn get_terminal_schemes(
     (n_terminal_scheme, c_terminal_scheme)
 }
 
+///Run pre scan to find likely chains present using c and n terminal identity
+pub fn run_pre_scan(
+    query_sequence: &[u8],
+    all_terminal_schemes: &Vec<(NumberingScheme, NumberingScheme)>,
+) -> (HashMap<Chain, (f64, u32, u32)>, f64) {
+    let mut chain_identity_map: HashMap<Chain, (f64, u32, u32)> = HashMap::new();
+
+    let mut highest_identity: f64 = 0.0;
+
+    for terminal_schemes in all_terminal_schemes {
+        let (n_terminal, c_terminal) = terminal_schemes;
+        // run alignment for n and c terminal
+        let n_terminal_output: NumberingOutput = n_terminal.number_sequence(query_sequence);
+        let c_terminal_output: NumberingOutput = c_terminal.number_sequence(query_sequence);
+
+        // calculate combined identity
+
+        let combined_identity: f64 =
+            (n_terminal_output.identity + c_terminal_output.identity) / 2.0;
+
+        // Store if best match
+        if combined_identity > highest_identity {
+            highest_identity = combined_identity;
+            let best_chain = &n_terminal.chain_type;
+        }
+
+        // Store score and predicted end and start positions
+        chain_identity_map.insert(
+            n_terminal.chain_type.clone(),
+            (
+                combined_identity,
+                n_terminal_output.start,
+                c_terminal_output.end,
+            ),
+        );
+    }
+    (chain_identity_map, highest_identity)
+}
+
+pub fn select_chains_from_pre_scan(
+    pre_scan_output: &HashMap<Chain, (f64, u32, u32)>,
+    highest_score: f64,
+) -> Vec<Chain> {
+    pre_scan_output
+        .iter()
+        .filter(|(_, (score, _, _))| *score >= highest_score - WITHIN_IDENTITY_RANGE)
+        .map(|(chain, _)| chain.clone())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme};
     use ndarray::Ix;
+
+    #[test]
+    fn heavy_chain_pre_scan() {
+        let sequence_h = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".as_bytes();
+        let sequence_l = "QSALTQPASVSGSPGQSITISCTGTSSDVGGYNYVSWYQQHPGKAPKLMIYDVSNRPSGVSNRFSGSKSGNTASLTISGLQAEDEADYYCSSYTSSSTRVFGTGTKVTVL".as_bytes();
+        let sequence_k = "DIQMTQSPSSLSASVGDRVTITCRASQSISSWLAWYQQKPGKAPKLLIYKASSLESGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYNSYPFTFGQGTKVEIK".as_bytes();
+        let mut terminal_schemes = Vec::new();
+        terminal_schemes.insert(0, get_terminal_schemes(Chain::IGH, 10));
+        terminal_schemes.insert(0, get_terminal_schemes(Chain::IGK, 10));
+        terminal_schemes.insert(0, get_terminal_schemes(Chain::IGL, 10));
+
+        let (pre_scan_output_h, highest_score_h) = run_pre_scan(sequence_h, &terminal_schemes);
+        let (pre_scan_output_l, highest_score_l) = run_pre_scan(sequence_l, &terminal_schemes);
+        let (pre_scan_output_k, highest_score_k) = run_pre_scan(sequence_k, &terminal_schemes);
+
+        // check if correct chain has highest identity
+        assert!(
+            (pre_scan_output_h[&Chain::IGH] > pre_scan_output_h[&Chain::IGK])
+                & (pre_scan_output_h[&Chain::IGH] > pre_scan_output_h[&Chain::IGL])
+        );
+        assert!(
+            (pre_scan_output_l[&Chain::IGL] > pre_scan_output_l[&Chain::IGK])
+                & (pre_scan_output_l[&Chain::IGL] > pre_scan_output_l[&Chain::IGH])
+        );
+        assert!(
+            (pre_scan_output_k[&Chain::IGK] > pre_scan_output_k[&Chain::IGH])
+                & (pre_scan_output_k[&Chain::IGK] > pre_scan_output_k[&Chain::IGL])
+        );
+    }
 
     #[test]
     fn terminal_schemes_heavy() {
