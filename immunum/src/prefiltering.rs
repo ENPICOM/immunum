@@ -1,74 +1,17 @@
-use crate::consensus_scoring::{read_partial_consensus_file, read_partial_scoring_matrix};
-use crate::constants::WITHIN_IDENTITY_RANGE;
+use crate::constants::{PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
-use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme};
 use crate::types::Chain;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 /// Create c-terminal NumberingScheme from a full length scheme (based on IMGT consensus)
 pub fn get_terminal_schemes(
-    chain: Chain,
-    terminal_length: u8,
-) -> (NumberingScheme, NumberingScheme) {
-    let original_scheme = match chain {
-        Chain::IGH => get_imgt_heavy_scheme(),
-        Chain::IGK => get_imgt_kappa_scheme(),
-        Chain::IGL => get_imgt_lambda_scheme(),
-        chain => panic!("No scheme implemented for chain {:?} yet", chain), // TODO convert to something else
-    };
-    let file_name = original_scheme.file_name.clone();
-
-    // Create N-terminal scheme
-    let n_terminal_scheme = NumberingScheme {
-        conserved_positions: vec![], // No conserved positions at N-terminal
-        insertion_positions: vec![],
-        gap_positions: vec![10], // IMGT Position 10
-        consensus_amino_acids: read_partial_consensus_file(
-            PathBuf::from("resources")
-                .join("consensus")
-                .join(file_name.clone() + ".txt"),
-            1,
-            (terminal_length) as usize,
-        ),
-        scoring_matrix: read_partial_scoring_matrix(
-            PathBuf::from("resources")
-                .join("consensus")
-                .join(file_name.clone() + ".npy"),
-            1,
-            terminal_length as usize,
-        ),
-        ..original_scheme.clone() // Use the remaining fields from the original
-    };
-
-    // Calculate C-terminal positions
-    let c_term_start = 118; // skip first line, start at position 118
-    let c_term_end = c_term_start + terminal_length as usize - 1;
-
-    // Create C-terminal scheme
-    let c_terminal_scheme = NumberingScheme {
-        conserved_positions: vec![1, 2, 4], // IMGT position 118, 119 and 121
-        insertion_positions: vec![],
-        gap_positions: vec![], // No gap positions at c-terminal
-        consensus_amino_acids: read_partial_consensus_file(
-            PathBuf::from("resources")
-                .join("consensus")
-                .join(file_name.clone() + ".txt"),
-            c_term_start,
-            c_term_end,
-        ),
-        scoring_matrix: read_partial_scoring_matrix(
-            PathBuf::from("resources")
-                .join("consensus")
-                .join(file_name.clone() + ".npy"),
-            c_term_start,
-            c_term_end,
-        ),
-        ..original_scheme // Use the remaining fields from the original
-    };
-
-    // Return the two new schemes
-    (n_terminal_scheme, c_terminal_scheme)
+    schemes: &Vec<NumberingScheme>,
+) -> Vec<(NumberingScheme, NumberingScheme)> {
+    let mut terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = Vec::new();
+    for scheme in schemes {
+        terminal_schemes.push(scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH));
+    }
+    terminal_schemes
 }
 
 ///Run pre scan to find likely chains present using c and n terminal identity
@@ -94,7 +37,6 @@ pub fn run_pre_scan(
         // Store if best match
         if combined_identity > highest_identity {
             highest_identity = combined_identity;
-            let best_chain = &n_terminal.chain_type;
         }
 
         // Store score and predicted end and start positions
@@ -124,7 +66,7 @@ pub fn select_chains_from_pre_scan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme};
+    use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme};
     use ndarray::Ix;
 
     #[test]
@@ -132,14 +74,16 @@ mod tests {
         let sequence_h = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".as_bytes();
         let sequence_l = "QSALTQPASVSGSPGQSITISCTGTSSDVGGYNYVSWYQQHPGKAPKLMIYDVSNRPSGVSNRFSGSKSGNTASLTISGLQAEDEADYYCSSYTSSSTRVFGTGTKVTVL".as_bytes();
         let sequence_k = "DIQMTQSPSSLSASVGDRVTITCRASQSISSWLAWYQQKPGKAPKLLIYKASSLESGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYNSYPFTFGQGTKVEIK".as_bytes();
-        let mut terminal_schemes = Vec::new();
-        terminal_schemes.insert(0, get_terminal_schemes(Chain::IGH, 10));
-        terminal_schemes.insert(0, get_terminal_schemes(Chain::IGK, 10));
-        terminal_schemes.insert(0, get_terminal_schemes(Chain::IGL, 10));
 
-        let (pre_scan_output_h, highest_score_h) = run_pre_scan(sequence_h, &terminal_schemes);
-        let (pre_scan_output_l, highest_score_l) = run_pre_scan(sequence_l, &terminal_schemes);
-        let (pre_scan_output_k, highest_score_k) = run_pre_scan(sequence_k, &terminal_schemes);
+        let terminal_schemes = get_terminal_schemes(&vec![
+            get_imgt_heavy_scheme(),
+            get_imgt_lambda_scheme(),
+            get_imgt_kappa_scheme(),
+        ]);
+
+        let (pre_scan_output_h, _highest_score_h) = run_pre_scan(sequence_h, &terminal_schemes);
+        let (pre_scan_output_l, _highest_score_l) = run_pre_scan(sequence_l, &terminal_schemes);
+        let (pre_scan_output_k, _highest_score_k) = run_pre_scan(sequence_k, &terminal_schemes);
 
         // check if correct chain has highest identity
         assert!(
@@ -160,7 +104,8 @@ mod tests {
     fn terminal_schemes_heavy() {
         let terminal_length = 10;
         let original_scheme = get_imgt_heavy_scheme();
-        let (n_term_scheme, c_term_scheme) = get_terminal_schemes(Chain::IGH, terminal_length);
+        let (n_term_scheme, c_term_scheme) =
+            &get_terminal_schemes(&vec![get_imgt_heavy_scheme()])[0];
         for i in 0..terminal_length {
             assert_eq!(
                 n_term_scheme.scoring_matrix.row(i as Ix),
@@ -189,8 +134,8 @@ mod tests {
     fn terminal_schemes_kappa() {
         let terminal_length = 10;
         let original_scheme = get_imgt_kappa_scheme();
-        let (n_term_scheme, c_term_scheme) = get_terminal_schemes(Chain::IGK, terminal_length);
-
+        let (n_term_scheme, c_term_scheme) =
+            &get_terminal_schemes(&vec![get_imgt_kappa_scheme()])[0];
         for i in 0..terminal_length {
             assert_eq!(
                 n_term_scheme.scoring_matrix.row(i as Ix),
@@ -219,8 +164,8 @@ mod tests {
     fn terminal_schemes_lambda() {
         let terminal_length = 10;
         let original_scheme = get_imgt_lambda_scheme();
-        let (n_term_scheme, c_term_scheme) = get_terminal_schemes(Chain::IGL, terminal_length);
-
+        let (n_term_scheme, c_term_scheme) =
+            &get_terminal_schemes(&vec![get_imgt_lambda_scheme()])[0];
         for i in 0..terminal_length {
             assert_eq!(
                 n_term_scheme.scoring_matrix.row(i as Ix),

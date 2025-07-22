@@ -1,10 +1,12 @@
 use crate::consensus_scoring::write_all_scoring_matrices;
-use crate::constants::{MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH, PRE_FILTER_TERMINAL_LENGTH};
+use crate::constants::{MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
 use crate::fastx::{from_path, FastxRecord};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
-use crate::prefiltering;
 use crate::prefiltering::{get_terminal_schemes, run_pre_scan, select_chains_from_pre_scan};
-use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme, get_kabat_kappa_scheme, get_kabat_lambda_scheme};
+use crate::schemes::{
+    get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme,
+    get_kabat_kappa_scheme, get_kabat_lambda_scheme,
+};
 use crate::types::{Chain, Scheme};
 use std::fs;
 
@@ -63,27 +65,22 @@ pub fn number_sequences_and_write_output(
         .collect();
 
     // get pre-filter schemes
-    let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = chains
-        .iter()
-        .map(|chain| get_terminal_schemes(chain.clone(), PRE_FILTER_TERMINAL_LENGTH))
-        .collect();
+    let terminal_schemes = get_terminal_schemes(&schemes);
 
     let mut output_str = "".to_string();
-    // run annotation for all sequences
+    output_str.push_str("Name\tSequence\tNumbering\tScore\tChain\n"); // TODO add regions
+                                                                      // run annotation for all sequences
     for r in records {
         let converted_sequence = r.sequence.into_bytes();
 
         // Select models to run using pre-scan
         let (pre_scan_output, highest_score) = run_pre_scan(&converted_sequence, &terminal_schemes);
         let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
-        println!("{:?}", pre_filter_chains);
-        println!("{}", schemes.len());
         let filtered_schemes: Vec<&NumberingScheme> = schemes
             .iter()
             .filter(|scheme| pre_filter_chains.contains(&scheme.chain_type))
             .collect();
-        println!("{}", filtered_schemes.len());
-        let mut output_results: Vec<Result<NumberingOutput, &str>> =
+        let output_results: Vec<Result<NumberingOutput, &str>> =
             find_all_chains(&converted_sequence, filtered_schemes);
 
         for output_result in output_results {
@@ -113,14 +110,15 @@ pub fn number_sequences_and_write_output(
 
                     // TODO add regions
                     output_str.push('\n');
-
                 }
                 Err(e) => {
                     println!("Failed numbering {e}");
                     output_str.push_str(&r._name);
                     output_str.push('\t');
-                    output_str.push_str(std::str::from_utf8(&converted_sequence)
-                                            .expect("Non-UTF8 character in sequence"),);
+                    output_str.push_str(
+                        std::str::from_utf8(&converted_sequence)
+                            .expect("Non-UTF8 character in sequence"),
+                    );
                     output_str.push('\t');
                     output_str.push_str(&format!("Failed numbering {e}"));
                     output_str.push('\t');
@@ -130,7 +128,7 @@ pub fn number_sequences_and_write_output(
             }
         }
     }
-    fs::write(output_file, output_str).expect("Should be able to write to `/foo/tmp`")
+    fs::write(output_file, output_str).expect("Something went wrong writing to data file")
 }
 
 /// Attempts to find all antibody chains in a sequence
@@ -147,8 +145,8 @@ fn find_all_chains<'a>(
     while let Some(item) = sequence_list.pop() {
         let (current_sequence, current_start, current_end) = item;
 
-        let mut numbering_result: Result<NumberingOutput, &str> =
-            find_highest_identity_chain(&current_sequence, &numbering_schemes);
+        let numbering_result: Result<NumberingOutput, &str> =
+            find_highest_identity_chain(current_sequence, &numbering_schemes);
 
         match numbering_result {
             Ok(mut best_chain) => {
@@ -158,20 +156,16 @@ fn find_all_chains<'a>(
                     let end_sequence: &[u8] = &best_chain.sequence[(best_chain.end as usize + 1)..];
 
                     if front_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
-                        sequence_list.push((
-                            front_sequence,
-                            current_start,
-                            (best_chain.start - 1) as u32,
-                        ))
+                        sequence_list.push((front_sequence, current_start, (best_chain.start - 1)))
                     }
                     if end_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
-                        sequence_list.push((end_sequence, (best_chain.end + 1) as u32, current_end))
+                        sequence_list.push((end_sequence, (best_chain.end + 1), current_end))
                     }
 
                     // set sequence to full original sequence
                     best_chain.sequence = query_sequence;
-                    best_chain.start = best_chain.start + current_start;
-                    best_chain.end = best_chain.end + current_start;
+                    best_chain.start += current_start;
+                    best_chain.end += current_start;
 
                     //add gaps to front and end to match with length of original sequence
                     let mut start_addition = vec![String::from("-"); current_start as usize];
@@ -196,20 +190,21 @@ mod tests {
     use super::*;
     use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme, get_kabat_kappa_scheme};
     use crate::types::Chain;
+    use std::env;
 
     #[test]
     fn number_fasta_file() {
+        env::set_var("RUST_BACKTRACE", "1");
         //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
         number_sequences_and_write_output(
             r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
             //r"C:\Users/Siemen/immunum-rs/immunum/fixtures/test.fasta",
-            Scheme::KABAT,
+            Scheme::IMGT,
             &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_find_all_kabat.txt",
-            false,
+            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_find_all_imgt_new_terminal.txt",
+            true,
         );
     }
-
 
     #[test]
     fn test_correct_chain_identification() {

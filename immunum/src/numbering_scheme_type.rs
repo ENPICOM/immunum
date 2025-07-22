@@ -9,7 +9,6 @@ use std::collections::HashMap;
 pub struct NumberingScheme {
     pub name: String,
     pub description: String,
-    pub file_name: String,
     pub scheme_type: Scheme,
     pub chain_type: Chain,
     pub conserved_positions: Vec<u32>,
@@ -216,6 +215,7 @@ impl NumberingScheme {
     pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a [u8]) -> NumberingOutput<'a> {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
+        // give gap positions correct names as defined by the numbering scheme
         name_insertions(&mut numbering, &self.scheme_type);
 
         // find start and end index
@@ -239,5 +239,58 @@ impl NumberingScheme {
             start: start as u32,
             end: end as u32,
         }
+    }
+    pub fn to_terminal_schemes(&self, terminal_length: u8) -> (NumberingScheme, NumberingScheme) {
+        use ndarray::s;
+        use std::collections::HashMap;
+
+        // Create N-terminal scheme (positions 1 to terminal_length)
+        let mut n_terminal_consensus = HashMap::new();
+        for i in 1..=terminal_length as u32 {
+            if let Some(amino_acids) = self.consensus_amino_acids.get(&i) {
+                n_terminal_consensus.insert(i, amino_acids.clone());
+            }
+        }
+
+        let n_terminal_scheme = NumberingScheme {
+            conserved_positions: vec![], // No conserved positions at N-terminal
+            insertion_positions: vec![],
+            gap_positions: vec![10], // IMGT Position 10
+            consensus_amino_acids: n_terminal_consensus,
+            scoring_matrix: self
+                .scoring_matrix
+                .slice(s![0..terminal_length as usize, ..])
+                .to_owned(), // TODO wrong
+            ..self.clone() // Use the remaining fields from the original
+        };
+
+        // Create C-terminal scheme
+        let c_term_start: u32 = self.fr4.start;
+        let mut c_terminal_consensus = HashMap::new();
+        for i in 0..terminal_length as u32 {
+            let original_position = c_term_start + i;
+            if let Some(amino_acids) = self.consensus_amino_acids.get(&original_position) {
+                c_terminal_consensus.insert(i + 1, amino_acids.clone());
+            }
+        }
+
+        let fmwk4_start = self.fr4.start - 1;
+
+        let c_terminal_scheme = NumberingScheme {
+            conserved_positions: vec![1, 2, 4], // IMGT position 118, 119 and 121 (mapped to 1, 2, 4)
+            insertion_positions: vec![],
+            gap_positions: vec![], // No gap positions at c-terminal
+            consensus_amino_acids: c_terminal_consensus,
+            scoring_matrix: self
+                .scoring_matrix
+                .slice(s![
+                    fmwk4_start as usize..(fmwk4_start + terminal_length as u32) as usize,
+                    ..
+                ])
+                .to_owned(),
+            ..self.clone() // Use the remaining fields from the original
+        };
+
+        (n_terminal_scheme, c_terminal_scheme)
     }
 }
