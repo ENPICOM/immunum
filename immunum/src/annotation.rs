@@ -4,7 +4,7 @@ use crate::fastx::{from_path, FastxRecord};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
 use crate::prefiltering;
 use crate::prefiltering::{get_terminal_schemes, run_pre_scan, select_chains_from_pre_scan};
-use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme};
+use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme, get_kabat_kappa_scheme, get_kabat_lambda_scheme};
 use crate::types::{Chain, Scheme};
 use std::fs;
 
@@ -13,7 +13,7 @@ pub(crate) fn find_highest_identity_chain<'a>(
     query_sequence: &'a [u8],
     numbering_schemes: &Vec<&'a NumberingScheme>,
 ) -> Result<NumberingOutput<'a>, &'static str> {
-    let mut highest_identity: f64 = 0.0;
+    let mut highest_identity: f64 = -0.1;
     let mut best_output: Result<NumberingOutput, &'static str> = Err("No numbering schemes passed");
 
     for scheme in numbering_schemes {
@@ -46,13 +46,13 @@ pub fn number_sequences_and_write_output(
     let schemes = match scheme {
         Scheme::IMGT => vec![
             get_imgt_heavy_scheme(),
-            get_imgt_heavy_scheme(),
+            get_imgt_kappa_scheme(),
             get_imgt_lambda_scheme(),
         ],
         Scheme::KABAT => vec![
-            get_imgt_heavy_scheme(),
-            get_imgt_heavy_scheme(),
-            get_imgt_lambda_scheme(),
+            get_kabat_heavy_scheme(),
+            get_kabat_kappa_scheme(),
+            get_kabat_lambda_scheme(),
         ],
     };
 
@@ -76,17 +76,18 @@ pub fn number_sequences_and_write_output(
         // Select models to run using pre-scan
         let (pre_scan_output, highest_score) = run_pre_scan(&converted_sequence, &terminal_schemes);
         let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
-
+        println!("{:?}", pre_filter_chains);
+        println!("{}", schemes.len());
         let filtered_schemes: Vec<&NumberingScheme> = schemes
             .iter()
             .filter(|scheme| pre_filter_chains.contains(&scheme.chain_type))
             .collect();
+        println!("{}", filtered_schemes.len());
+        let mut output_results: Vec<Result<NumberingOutput, &str>> =
+            find_all_chains(&converted_sequence, filtered_schemes);
 
-        let mut output_results: Result<NumberingOutput, &str> =
-            find_highest_identity_chain(&converted_sequence, &filtered_schemes);
-
-        //for output_result in output_results {
-            match output_results {
+        for output_result in output_results {
+            match output_result {
                 Ok(output) => {
                     //create string output
                     output_str.push_str(&r._name);
@@ -99,19 +100,35 @@ pub fn number_sequences_and_write_output(
                     output_str.push_str(&output.numbering.join(","));
                     output_str.push('\t');
                     output_str.push_str(&format!("{}", output.identity));
-                    output_str.push('\n');
-                    // TODO add regions
+                    output_str.push('\t');
+                    output_str.push_str(match output.scheme.chain_type {
+                        Chain::IGH => "H",
+                        Chain::IGK => "K",
+                        Chain::IGL => "L",
+                        Chain::TRA => "A",
+                        Chain::TRB => "B",
+                        Chain::TRD => "D",
+                        Chain::TRG => "G",
+                    });
 
-                    // TODO remove this temporary print statement using unused variables
-                    // println!(
-                    //     "Found {0}{1} from {2} to {3}",
-                    //     output.scheme.name, output.scheme.description, output.start, output.end
-                    // );
-                    // fill in value
+                    // TODO add regions
+                    output_str.push('\n');
+
                 }
-                Err(e) => println!("Failed numbering {e}"),
+                Err(e) => {
+                    println!("Failed numbering {e}");
+                    output_str.push_str(&r._name);
+                    output_str.push('\t');
+                    output_str.push_str(std::str::from_utf8(&converted_sequence)
+                                            .expect("Non-UTF8 character in sequence"),);
+                    output_str.push('\t');
+                    output_str.push_str(&format!("Failed numbering {e}"));
+                    output_str.push('\t');
+                    output_str.push_str(&format!("{}", 0));
+                    output_str.push('\n');
+                }
             }
-        //}
+        }
     }
     fs::write(output_file, output_str).expect("Should be able to write to `/foo/tmp`")
 }
@@ -186,12 +203,13 @@ mod tests {
         number_sequences_and_write_output(
             r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
             //r"C:\Users/Siemen/immunum-rs/immunum/fixtures/test.fasta",
-            Scheme::IMGT,
+            Scheme::KABAT,
             &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_find_highest.txt",
+            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_find_all_kabat.txt",
             false,
         );
     }
+
 
     #[test]
     fn test_correct_chain_identification() {

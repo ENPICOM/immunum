@@ -5,14 +5,14 @@ pub mod scoring {
     pub const GAP_PEN_FR: f64 = 26.0;
     pub const GAP_PEN_IP: f64 = 1.0;
     pub const GAP_PEN_OP: f64 = 1.0;
-    pub const GAP_PEN_CDR: f64 = 1.2;
+    pub const GAP_PEN_CDR: f64 = 1.8;
     pub const GAP_PEN_OTHER: f64 = 11.0;
     pub const GAP_PEN_START: f64 = 1.0;
     pub const GAP_PEN_END: f64 = 1.0;
     pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
     pub const CDR_INCREASE: f64 = 1.0; // increase per position away from insertion position CDR
 
-    pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 0.8; // better name
+    pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 2.0; // better name
     pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0; // better name
 }
 // Pre scan identity cutoff, minimal identity for program to assume a chain
