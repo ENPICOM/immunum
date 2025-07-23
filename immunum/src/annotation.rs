@@ -194,16 +194,33 @@ mod tests {
 
     #[test]
     fn number_fasta_file() {
-        env::set_var("RUST_BACKTRACE", "1");
         //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
         number_sequences_and_write_output(
             r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
             //r"C:\Users/Siemen/immunum-rs/immunum/fixtures/test.fasta",
-            Scheme::IMGT,
+            Scheme::KABAT,
             &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_find_all_imgt_new_terminal.txt",
+            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_find_all_kabat_new_terminal.txt",
             true,
         );
+    }
+
+    #[test]
+    fn single_sequence_find_all(){
+        let seq = "VLTQSPGTLSLSPGETAIISCRTSQYGSLAWYQQRPGQAPRLVIYSGSTRAAGIPDRFSGSRWGPDYNLTISNLESGDFGVYYCQQYEFFGQGTKVQVDIKRTVAAPSVFIFPPSDEQLKSGTASVVCLLNNFYPREAKVQWKVDNALQSGNSQESVTEQDSKDSTYSLSSTLTLSKADYEKHKVYACEVTHQGLRSPVTKSFNRGEC".as_bytes();
+        let mut schemes: Vec<&NumberingScheme> = Vec::new();
+        let lambda_scheme = get_imgt_lambda_scheme();
+        let kappa_scheme = get_kabat_kappa_scheme();
+        let heavy_scheme = get_imgt_heavy_scheme();
+
+        schemes.push(&lambda_scheme);
+        schemes.push(&kappa_scheme);
+        schemes.push(&heavy_scheme);
+
+        let output = find_all_chains(seq, schemes);
+        for o in output {
+            println!("{:?}", o);
+        }
     }
 
     #[test]

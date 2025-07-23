@@ -49,7 +49,7 @@ pub fn get_imgt_kappa_scheme() -> NumberingScheme {
         chain_type: Chain::IGK,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
         insertion_positions: vec![],
-        gap_positions: vec![10, 73],
+        gap_positions: vec![10, 73, 81, 82],
         consensus_amino_acids: read_consensus_file(
             PathBuf::from("resources")
                 .join("consensus")
@@ -175,7 +175,7 @@ pub fn get_kabat_kappa_scheme() -> NumberingScheme {
         cdr1: RegionRange { start: 24, end: 35 },
         fr2: RegionRange { start: 35, end: 50 },
         cdr2: RegionRange { start: 50, end: 57 },
-        fr3: RegionRange { start: 6, end: 89 },
+        fr3: RegionRange { start: 57, end: 89 },
         cdr3: RegionRange { start: 89, end: 98 },
         fr4: RegionRange {
             start: 98,
