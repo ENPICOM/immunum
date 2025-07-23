@@ -68,8 +68,10 @@ pub fn number_sequences_and_write_output(
     let terminal_schemes = get_terminal_schemes(&schemes);
 
     let mut output_str = "".to_string();
-    output_str.push_str("Name\tSequence\tNumbering\tScore\tChain\n"); // TODO add regions
-                                                                      // run annotation for all sequences
+    output_str.push_str(
+        "Name\tSequence\tNumbering\tScore\tChain\tcdr1\tcdr2\tcdr3\tfmwk1\tfmwk2\tfmwk3\tfmwk4\n",
+    );
+    // run annotation for all sequences
     for r in records {
         let converted_sequence = r.sequence.into_bytes();
 
@@ -107,12 +109,26 @@ pub fn number_sequences_and_write_output(
                         Chain::TRD => "D",
                         Chain::TRG => "G",
                     });
+                    output_str.push('\t');
 
                     // TODO add regions
+                    output_str.push_str(output.get_query_region(&output.scheme.cdr1));
+                    output_str.push('\t');
+                    output_str.push_str(output.get_query_region(&output.scheme.cdr2));
+                    output_str.push('\t');
+                    output_str.push_str(output.get_query_region(&output.scheme.cdr3));
+                    output_str.push('\t');
+                    output_str.push_str(output.get_query_region(&output.scheme.fr1));
+                    output_str.push('\t');
+                    output_str.push_str(output.get_query_region(&output.scheme.fr2));
+                    output_str.push('\t');
+                    output_str.push_str(output.get_query_region(&output.scheme.fr3));
+                    output_str.push('\t');
+                    output_str.push_str(output.get_query_region(&output.scheme.fr4));
+
                     output_str.push('\n');
                 }
                 Err(e) => {
-                    println!("Failed numbering {e}");
                     output_str.push_str(&r._name);
                     output_str.push('\t');
                     output_str.push_str(
@@ -123,6 +139,11 @@ pub fn number_sequences_and_write_output(
                     output_str.push_str(&format!("Failed numbering {e}"));
                     output_str.push('\t');
                     output_str.push_str(&format!("{}", 0));
+                    output_str.push('\t');
+                    output_str.push('X');
+                    for _ in 0..8 {
+                        output_str.push('\t')
+                    } // no regions
                     output_str.push('\n');
                 }
             }
@@ -190,23 +211,22 @@ mod tests {
     use super::*;
     use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme, get_kabat_kappa_scheme};
     use crate::types::Chain;
-    use std::env;
+
+    //#[test]
+    // fn number_fasta_file() {
+    //     //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
+    //     number_sequences_and_write_output(
+    //         r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
+    //         //r"C:\Users/Siemen/immunum-rs/immunum/fixtures/test.fasta",
+    //         Scheme::IMGT,
+    //         &[Chain::IGH, Chain::IGK, Chain::IGL],
+    //         r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_imgt_regions.txt",
+    //         true,
+    //     );
+    // }
 
     #[test]
-    fn number_fasta_file() {
-        //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
-        number_sequences_and_write_output(
-            r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-            //r"C:\Users/Siemen/immunum-rs/immunum/fixtures/test.fasta",
-            Scheme::KABAT,
-            &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_find_all_kabat_new_terminal.txt",
-            true,
-        );
-    }
-
-    #[test]
-    fn single_sequence_find_all(){
+    fn single_sequence_find_all() {
         let seq = "VLTQSPGTLSLSPGETAIISCRTSQYGSLAWYQQRPGQAPRLVIYSGSTRAAGIPDRFSGSRWGPDYNLTISNLESGDFGVYYCQQYEFFGQGTKVQVDIKRTVAAPSVFIFPPSDEQLKSGTASVVCLLNNFYPREAKVQWKVDNALQSGNSQESVTEQDSKDSTYSLSSTLTLSKADYEKHKVYACEVTHQGLRSPVTKSFNRGEC".as_bytes();
         let mut schemes: Vec<&NumberingScheme> = Vec::new();
         let lambda_scheme = get_imgt_lambda_scheme();

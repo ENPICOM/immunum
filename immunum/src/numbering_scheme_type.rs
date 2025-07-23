@@ -7,8 +7,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct NumberingScheme {
-    pub name: String,
-    pub description: String,
+    //pub name: String,
+    //pub description: String,
     pub scheme_type: Scheme,
     pub chain_type: Chain,
     pub conserved_positions: Vec<u32>,
@@ -33,6 +33,68 @@ pub struct NumberingOutput<'a> {
     pub identity: f64,
     pub start: u32,
     pub end: u32,
+}
+
+impl NumberingOutput<'_> {
+    /// Get slice of sequence corresponding to a framework or cdr region
+    pub fn get_query_region(&self, region: &RegionRange) -> &str {
+        let mut start_position = region.start;
+        let mut end_position = region.end - 1;
+
+        // get final position
+        let mut final_position: usize = 0;
+        for p in 0..self.numbering.len() {
+            if self.numbering[p] != "-" {
+                final_position = p
+            }
+        }
+
+        let mut start_sequence: Option<usize> = None;
+        let mut end_sequence: Option<usize> = None;
+
+        // find start position in sequence
+        while start_position <= end_position {
+            let pos_option: Option<usize> = self
+                .numbering
+                .iter()
+                .position(|num| num == &start_position.to_string());
+            match pos_option {
+                Some(i) => {
+                    start_sequence = Some(i);
+                    break;
+                }
+                None => {
+                    start_position += 1;
+                }
+            }
+        }
+        // check if start is found, if not, region is not present
+        let start_index = match start_sequence {
+            Some(i) => i,
+            None => return "",
+        };
+
+        // find end position
+        while end_position < self.scheme.consensus_amino_acids.len() as u32 {
+            let pos_option: Option<usize> = self
+                .numbering
+                .iter()
+                .position(|num| num == &end_position.to_string());
+            match pos_option {
+                Some(i) => {
+                    end_sequence = Some(i);
+                    break;
+                }
+                None => {
+                    end_position += 1;
+                }
+            }
+        }
+        let end_index = end_sequence.unwrap_or(final_position);
+
+        std::str::from_utf8(&self.sequence[start_index..=end_index])
+            .expect("Non-UTF8 character in sequence")
+    }
 }
 
 impl NumberingScheme {
