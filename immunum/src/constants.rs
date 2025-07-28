@@ -1,19 +1,44 @@
 use phf::{phf_map, Map};
 
-pub mod scoring {
-    pub const GAP_PEN_CP: f64 = 55.0;
-    pub const GAP_PEN_FR: f64 = 26.0;
-    pub const GAP_PEN_IP: f64 = 1.0;
-    pub const GAP_PEN_OP: f64 = 1.0;
-    pub const GAP_PEN_CDR: f64 = 1.8;
-    pub const GAP_PEN_OTHER: f64 = 11.0;
-    pub const GAP_PEN_START: f64 = 1.0;
-    pub const GAP_PEN_END: f64 = 1.0;
-    pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
-    pub const CDR_INCREASE: f64 = 1.0; // increase per position away from insertion position CDR
 
-    pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 2.0; // better name
-    pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0; // better name
+pub const GAP_PEN_START: f64 = 1.0;
+pub const GAP_PEN_END: f64 = 1.0;
+pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
+
+pub struct ScoringParams {
+        pub gap_pen_cp: f64,
+        pub gap_pen_fr: f64,
+        pub gap_pen_ip: f64,
+        pub gap_pen_op: f64,
+        pub gap_pen_cdr: f64,
+        pub gap_pen_other: f64,
+        pub cdr_increase: f64, // increase per position away from insertion position CDR
+
+        pub pen_leap_insertion_point_imgt: f64, // better name
+        pub pen_leap_insertion_point_kabat: f64 // better name
+}
+
+pub fn get_scoring_params() -> ScoringParams{
+        ScoringParams::default()
+        // use below if you want to chance params
+        // ScoringParams {gap_pen_start: 10.0, ..Default::default()
+        }
+
+impl Default for ScoringParams {
+        fn default() -> ScoringParams{
+                ScoringParams {
+                        gap_pen_cp: 55.0,
+                        gap_pen_fr: 26.0,
+                        gap_pen_ip: 1.0,
+                        gap_pen_op: 1.0,
+                        gap_pen_cdr: 1.8,
+                        gap_pen_other: 11.0,
+                        cdr_increase: 1.0, // increase per position away from insertion position CDR
+
+                        pen_leap_insertion_point_imgt: 2.0, // better name
+                        pen_leap_insertion_point_kabat: 10.0,// better name
+                }
+        }
 }
 // Pre scan identity cutoff, minimal identity for program to assume a chain
 //pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;

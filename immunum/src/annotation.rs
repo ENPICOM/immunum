@@ -1,5 +1,5 @@
 use crate::consensus_scoring::write_all_scoring_matrices;
-use crate::constants::{MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
+use crate::constants::{ScoringParams, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
 use crate::fastx::{from_path, FastxRecord};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
 use crate::prefiltering::{get_terminal_schemes, run_pre_scan, select_chains_from_pre_scan};
@@ -34,10 +34,11 @@ pub fn number_sequences_and_write_output(
     chains: &[Chain],
     output_file: &str,
     update_scoring_matrices: bool,
+    scoring_params: &ScoringParams
 ) {
     // Update scoring matrices
     if update_scoring_matrices {
-        write_all_scoring_matrices()
+        write_all_scoring_matrices(scoring_params);
     }
 
     // Read in fasta
@@ -69,7 +70,7 @@ pub fn number_sequences_and_write_output(
 
     let mut output_str = "".to_string();
     output_str.push_str(
-        "Name\tSequence\tNumbering\tScore\tChain\tcdr1\tcdr2\tcdr3\tfmwk1\tfmwk2\tfmwk3\tfmwk4\n",
+        "Name\tSequence\tNumbering\tScore\tChain\tcdr1\tcdr2\tcdr3\tfmwk1\tfmwk2\tfmwk3\tfmwk4\tStart\tEnd\n",
     );
     // run annotation for all sequences
     for r in records {
@@ -91,42 +92,8 @@ pub fn number_sequences_and_write_output(
                     //create string output
                     output_str.push_str(&r._name);
                     output_str.push('\t');
-                    output_str.push_str(
-                        std::str::from_utf8(output.sequence)
-                            .expect("Non-UTF8 character in sequence"),
-                    );
-                    output_str.push('\t');
-                    output_str.push_str(&output.numbering.join(","));
-                    output_str.push('\t');
-                    output_str.push_str(&format!("{}", output.identity));
-                    output_str.push('\t');
-                    output_str.push_str(match output.scheme.chain_type {
-                        Chain::IGH => "H",
-                        Chain::IGK => "K",
-                        Chain::IGL => "L",
-                        Chain::TRA => "A",
-                        Chain::TRB => "B",
-                        Chain::TRD => "D",
-                        Chain::TRG => "G",
-                    });
-                    output_str.push('\t');
 
-                    // TODO add regions
-                    output_str.push_str(output.get_query_region(&output.scheme.cdr1));
-                    output_str.push('\t');
-                    output_str.push_str(output.get_query_region(&output.scheme.cdr2));
-                    output_str.push('\t');
-                    output_str.push_str(output.get_query_region(&output.scheme.cdr3));
-                    output_str.push('\t');
-                    output_str.push_str(output.get_query_region(&output.scheme.fr1));
-                    output_str.push('\t');
-                    output_str.push_str(output.get_query_region(&output.scheme.fr2));
-                    output_str.push('\t');
-                    output_str.push_str(output.get_query_region(&output.scheme.fr3));
-                    output_str.push('\t');
-                    output_str.push_str(output.get_query_region(&output.scheme.fr4));
-
-                    output_str.push('\n');
+                    output_str.push_str(&output.get_output_string());
                 }
                 Err(e) => {
                     output_str.push_str(&r._name);
@@ -142,8 +109,15 @@ pub fn number_sequences_and_write_output(
                     output_str.push('\t');
                     output_str.push('X');
                     for _ in 0..8 {
+                        // no regions
                         output_str.push('\t')
-                    } // no regions
+                    }
+                    output_str.push('\t');
+                    output_str.push('0');
+
+                    output_str.push('\t');
+                    output_str.push('0');
+
                     output_str.push('\n');
                 }
             }
@@ -208,22 +182,29 @@ fn find_all_chains<'a>(
 
 #[cfg(test)]
 mod tests {
+    use crate::constants::get_scoring_params;
     use super::*;
     use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme, get_kabat_kappa_scheme};
     use crate::types::Chain;
 
-    //#[test]
-    // fn number_fasta_file() {
-    //     //r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta"
-    //     number_sequences_and_write_output(
-    //         r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta",
-    //         //r"C:\Users/Siemen/immunum-rs/immunum/fixtures/test.fasta",
-    //         Scheme::IMGT,
-    //         &[Chain::IGH, Chain::IGK, Chain::IGL],
-    //         r"C:\Users\Siemen\immunum-rs\immunum\fixtures\rust_output_imgt_regions.txt",
-    //         true,
-    //     );
-    // }
+    #[test]
+    fn number_fasta_file() {
+        let fasta_file = r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta";
+        let scoring_params = get_scoring_params();
+        number_sequences_and_write_output(fasta_file,
+            Scheme::KABAT,
+            &[Chain::IGH, Chain::IGK, Chain::IGL],
+                                          r"C:\Anti_Num\output\rust_output_2\numbering_kabat.txt",
+
+            true, &scoring_params
+        );
+        number_sequences_and_write_output(fasta_file,
+                                          Scheme::IMGT,
+                                          &[Chain::IGH, Chain::IGK, Chain::IGL],
+                                          r"C:\Anti_Num\output\rust_output_2\numbering_imgt.txt",
+        false, &scoring_params
+        );
+    }
 
     #[test]
     fn single_sequence_find_all() {

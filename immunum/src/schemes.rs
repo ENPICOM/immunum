@@ -5,8 +5,6 @@ use std::path::PathBuf;
 
 pub fn get_imgt_heavy_scheme() -> NumberingScheme {
     NumberingScheme {
-        // name: "IMGT Heavy".to_string(),
-        // description: "IMGT numbering scheme for heavy chains".to_string(),
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGH,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -43,8 +41,6 @@ pub fn get_imgt_heavy_scheme() -> NumberingScheme {
 
 pub fn get_imgt_kappa_scheme() -> NumberingScheme {
     NumberingScheme {
-        // name: "IMGT Kappa".to_string(),
-        // description: "IMGT numbering scheme for kappa chains".to_string(),
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGK,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -81,8 +77,6 @@ pub fn get_imgt_kappa_scheme() -> NumberingScheme {
 
 pub fn get_imgt_lambda_scheme() -> NumberingScheme {
     NumberingScheme {
-        // name: "IMGT Lambda".to_string(),
-        // description: "IMGT numbering scheme for lambda chains".to_string(),
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGL,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -154,8 +148,6 @@ pub fn get_kabat_heavy_scheme() -> NumberingScheme {
 
 pub fn get_kabat_kappa_scheme() -> NumberingScheme {
     NumberingScheme {
-        // name: "KABAT Kappa".to_string(),
-        // description: "KABAT numbering scheme for kappa chains".to_string(),
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGK,
         conserved_positions: vec![23, 35, 88, 98, 99, 101],
@@ -186,8 +178,6 @@ pub fn get_kabat_kappa_scheme() -> NumberingScheme {
 
 pub fn get_kabat_lambda_scheme() -> NumberingScheme {
     NumberingScheme {
-        // name: "KABAT Lambda".to_string(),
-        // description: "KABAT numbering scheme for lambda chains".to_string(),
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGL,
         conserved_positions: vec![23, 35, 88, 98, 99, 101],
@@ -218,30 +208,31 @@ pub fn get_kabat_lambda_scheme() -> NumberingScheme {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::scoring;
+    use crate::constants::{get_scoring_params};
 
     #[test]
     fn scheme_creation() {
         let scheme = get_imgt_heavy_scheme();
+        let scoring_params = get_scoring_params();
         assert_eq!(scheme.gap_positions, vec![10, 73]);
         assert_eq!(scheme.restricted_sites().len(), 88);
         assert_eq!(scheme.consensus_amino_acids.len(), 128);
         assert_eq!(scheme.consensus_amino_acids[&1], vec![b'Q', b'E', b'D']);
         assert_eq!(
-            scheme.gap_penalty(25),
-            (scoring::GAP_PEN_FR, scoring::GAP_PEN_FR)
+            scheme.gap_penalty(25, &scoring_params),
+            (scoring_params.gap_pen_fr, scoring_params.gap_pen_fr)
         );
         assert_eq!(
-            scheme.gap_penalty(200),
-            (scoring::GAP_PEN_OTHER, scoring::GAP_PEN_OTHER)
+            scheme.gap_penalty(200, &scoring_params),
+            (scoring_params.gap_pen_other, scoring_params.gap_pen_other)
         );
         assert_eq!(
-            scheme.gap_penalty(10),
-            (scoring::GAP_PEN_FR, scoring::GAP_PEN_OP)
+            scheme.gap_penalty(10, &scoring_params),
+            (scoring_params.gap_pen_fr, scoring_params.gap_pen_op)
         );
 
         for i in 1..129 {
-            println!("{:?},", scheme.gap_penalty(i as u32))
+            println!("{:?},", scheme.gap_penalty(i as u32, &scoring_params))
         }
         //TODO add more tests
     }

@@ -15,6 +15,13 @@ impl RegionRange {
     }
 }
 
+/// Struct for output of prefiltering, containing identity of terminals, start and end
+pub struct PrefilterOutput {
+    pub identity: f64,
+    pub predicted_start: u32,
+    pub predicted_end: u32,
+}
+
 /// Numbering schemes for immunoglobulin sequences
 #[derive(Clone, Debug, PartialEq, ValueEnum, ParseFromString)]
 pub enum Scheme {
@@ -27,7 +34,7 @@ pub enum Scheme {
 }
 
 /// Immunoglobulin and T-cell receptor chain types
-#[derive(Clone, Debug, PartialEq, Hash, Eq, ValueEnum, ParseFromString)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum, ParseFromString)]
 pub enum Chain {
     // IG Heavy chain variants
     #[value(alias = "Heavy", alias = "H")]

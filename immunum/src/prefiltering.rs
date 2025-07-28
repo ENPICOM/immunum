@@ -1,6 +1,6 @@
 use crate::constants::{PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
-use crate::types::Chain;
+use crate::types::{Chain, PrefilterOutput};
 use std::collections::HashMap;
 
 /// Create c-terminal NumberingScheme from a full length scheme (based on IMGT consensus)
@@ -18,8 +18,8 @@ pub fn get_terminal_schemes(
 pub fn run_pre_scan(
     query_sequence: &[u8],
     all_terminal_schemes: &Vec<(NumberingScheme, NumberingScheme)>,
-) -> (HashMap<Chain, (f64, u32, u32)>, f64) {
-    let mut chain_identity_map: HashMap<Chain, (f64, u32, u32)> = HashMap::new();
+) -> (HashMap<Chain, PrefilterOutput>, f64) {
+    let mut chain_identity_map: HashMap<Chain, PrefilterOutput> = HashMap::new();
 
     let mut highest_identity: f64 = 0.0;
 
@@ -41,25 +41,25 @@ pub fn run_pre_scan(
 
         // Store score and predicted end and start positions
         chain_identity_map.insert(
-            n_terminal.chain_type.clone(),
-            (
-                combined_identity,
-                n_terminal_output.start,
-                c_terminal_output.end,
-            ),
+            n_terminal.chain_type,
+            PrefilterOutput {
+                identity: combined_identity,
+                predicted_start: n_terminal_output.start,
+                predicted_end: c_terminal_output.end,
+            },
         );
     }
     (chain_identity_map, highest_identity)
 }
 
 pub fn select_chains_from_pre_scan(
-    pre_scan_output: &HashMap<Chain, (f64, u32, u32)>,
+    pre_scan_output: &HashMap<Chain, PrefilterOutput>,
     highest_score: f64,
 ) -> Vec<Chain> {
     pre_scan_output
         .iter()
-        .filter(|(_, (score, _, _))| *score >= highest_score - WITHIN_IDENTITY_RANGE)
-        .map(|(chain, _)| chain.clone())
+        .filter(|(_, output)| output.identity >= highest_score - WITHIN_IDENTITY_RANGE)
+        .map(|(chain, _)| *chain)
         .collect()
 }
 
@@ -87,16 +87,19 @@ mod tests {
 
         // check if correct chain has highest identity
         assert!(
-            (pre_scan_output_h[&Chain::IGH] > pre_scan_output_h[&Chain::IGK])
-                & (pre_scan_output_h[&Chain::IGH] > pre_scan_output_h[&Chain::IGL])
+            (pre_scan_output_h[&Chain::IGH].identity > pre_scan_output_h[&Chain::IGK].identity)
+                & (pre_scan_output_h[&Chain::IGH].identity
+                    > pre_scan_output_h[&Chain::IGL].identity)
         );
         assert!(
-            (pre_scan_output_l[&Chain::IGL] > pre_scan_output_l[&Chain::IGK])
-                & (pre_scan_output_l[&Chain::IGL] > pre_scan_output_l[&Chain::IGH])
+            (pre_scan_output_l[&Chain::IGL].identity > pre_scan_output_l[&Chain::IGK].identity)
+                & (pre_scan_output_l[&Chain::IGL].identity
+                    > pre_scan_output_l[&Chain::IGH].identity)
         );
         assert!(
-            (pre_scan_output_k[&Chain::IGK] > pre_scan_output_k[&Chain::IGH])
-                & (pre_scan_output_k[&Chain::IGK] > pre_scan_output_k[&Chain::IGL])
+            (pre_scan_output_k[&Chain::IGK].identity > pre_scan_output_k[&Chain::IGH].identity)
+                & (pre_scan_output_k[&Chain::IGK].identity
+                    > pre_scan_output_k[&Chain::IGL].identity)
         );
     }
 
