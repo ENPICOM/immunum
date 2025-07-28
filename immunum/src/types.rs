@@ -2,6 +2,18 @@
 
 use clap::ValueEnum;
 use immunum_macros::ParseFromString;
+use std::ops::Range;
+
+#[derive(Debug)]
+pub struct RegionRange {
+    pub start: u32,
+    pub end: u32,
+}
+impl RegionRange {
+    pub fn positions(&self) -> Range<u32> {
+        self.start..self.end
+    }
+}
 
 /// Numbering schemes for immunoglobulin sequences
 #[derive(Clone, Debug, PartialEq, ValueEnum, ParseFromString)]

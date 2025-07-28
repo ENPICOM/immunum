@@ -1,8 +1,14 @@
+pub mod annotation;
+pub mod consensus_scoring;
+pub mod constants;
 pub mod fastx;
+pub mod insertion_numbering;
+pub mod needleman_wunsch;
 pub mod numbering;
+pub mod numbering_scheme_type;
+pub mod schemes;
 pub mod sequence_stream;
 pub mod types;
-
 // Binding modules
 #[cfg(feature = "python")]
 pub mod python_bindings;

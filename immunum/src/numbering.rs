@@ -1,41 +1,15 @@
+use crate::annotation::number_sequences_and_write_output;
 use crate::types::{Chain, Scheme};
 
-/// Mock function for numbering sequences
-/// This is a placeholder that returns mock numbering results
-pub fn number_sequence(sequence: &str, scheme: &Scheme, chains: &[Chain]) -> String {
-    let mut result = String::new();
-
-    result.push_str(&format!("Sequence: {}\n", sequence));
-    result.push_str(&format!("Scheme: {:?}\n", scheme));
-    result.push_str(&format!("Chains: {:?}\n", chains));
-    result.push('\n');
-
-    // Mock numbering output
-    result.push_str("Mock Numbering Results:\n");
-    result.push_str("Position | Residue | IMGT Position\n");
-    result.push_str("---------|---------|---------------\n");
-
-    for (i, residue) in sequence.chars().enumerate() {
-        let mock_position = match scheme {
-            Scheme::IMGT => format!("{}", i + 1),
-            Scheme::KABAT => format!("{}K", i + 1),
-        };
-        result.push_str(&format!(
-            "{:8} | {:7} | {}\n",
-            i + 1,
-            residue,
-            mock_position
-        ));
-    }
-
-    result.push('\n');
-    result.push_str("Chain-specific annotations:\n");
-    for chain in chains {
-        result.push_str(&format!(
-            "- {:?}: Mock annotation for this chain type\n",
-            chain
-        ));
-    }
-
-    result
+/// Temporary number function TODO To be changed, think about entry point for user
+pub fn number_sequence(fasta_file: &str, scheme: &Scheme, chains: &[Chain]) -> String {
+    // TODO Temporary code, prevents any unused variable warnings by clippy
+    number_sequences_and_write_output(
+        fasta_file,
+        scheme.clone(),
+        chains,
+        "numbering_output.txt",
+        true,
+    );
+    "Numbered sequences and stored in numbering_output.txt".to_string()
 }

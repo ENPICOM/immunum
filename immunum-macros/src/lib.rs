@@ -100,7 +100,7 @@ pub fn derive_parse_from_string(input: TokenStream) -> TokenStream {
                     fn from_str(s: &str) -> Result<Self, Self::Err> {
                         match s.to_lowercase().as_str() {
                             #(#match_arms)*
-                            _ => Err(format!("{} not supported: '{}', use any of: {}", 
+                            _ => Err(format!("{} not supported: '{}', use any of: {}",
                                 #type_name, s, #valid_values_str)),
                         }
                     }
