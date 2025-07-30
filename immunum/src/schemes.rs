@@ -8,7 +8,7 @@ pub fn get_imgt_heavy_scheme() -> NumberingScheme {
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGH,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
-        insertion_positions: vec![],
+        insertion_positions: vec![32, 60, 111],
         gap_positions: vec![10, 73],
         consensus_amino_acids: read_consensus_file(
             PathBuf::from("resources")
@@ -44,7 +44,7 @@ pub fn get_imgt_kappa_scheme() -> NumberingScheme {
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGK,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
-        insertion_positions: vec![],
+        insertion_positions: vec![32, 60, 111],
         gap_positions: vec![10, 73, 81, 82],
         consensus_amino_acids: read_consensus_file(
             PathBuf::from("resources")
@@ -80,7 +80,7 @@ pub fn get_imgt_lambda_scheme() -> NumberingScheme {
         scheme_type: Scheme::IMGT,
         chain_type: Chain::IGL,
         conserved_positions: vec![23, 41, 104, 118, 119, 121],
-        insertion_positions: vec![],
+        insertion_positions: vec![32, 60, 111],
         gap_positions: vec![10, 73, 81, 82],
         consensus_amino_acids: read_consensus_file(
             PathBuf::from("resources")

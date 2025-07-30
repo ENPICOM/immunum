@@ -3,7 +3,7 @@ use phf::{phf_map, Map};
 
 pub const GAP_PEN_START: f64 = 1.0;
 pub const GAP_PEN_END: f64 = 1.0;
-pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
+pub const MATCH_CP_MULTIPLIER: f64 = 8.0; // Multiplier of match score
 
 pub struct ScoringParams {
         pub gap_pen_cp: f64,
@@ -29,20 +29,20 @@ impl Default for ScoringParams {
                 ScoringParams {
                         gap_pen_cp: 55.0,
                         gap_pen_fr: 26.0,
-                        gap_pen_ip: 1.0,
+                        gap_pen_ip: 1.5,
                         gap_pen_op: 1.0,
-                        gap_pen_cdr: 1.8,
+                        gap_pen_cdr: 2.5,
                         gap_pen_other: 11.0,
-                        cdr_increase: 1.0, // increase per position away from insertion position CDR
+                        cdr_increase: 0.5, // increase per position away from insertion position CDR
 
-                        pen_leap_insertion_point_imgt: 2.0, // better name
+                        pen_leap_insertion_point_imgt: 1.0, // better name 6 best until now
                         pen_leap_insertion_point_kabat: 10.0,// better name
                 }
         }
 }
 // Pre scan identity cutoff, minimal identity for program to assume a chain
 //pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
-pub const WITHIN_IDENTITY_RANGE: f64 = 0.20;
+pub const WITHIN_IDENTITY_RANGE: f64 = 1.0; // TODO test how low
 
 pub const MINIMAL_CHAIN_IDENTITY: f64 = 0.7;
 

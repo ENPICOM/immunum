@@ -181,7 +181,8 @@ impl NumberingScheme {
 
         // ADAPT CDR PENALTIES, different for every scheme
         // IMGT
-        if self.cdr_positions().contains(&position) {
+        let (mut query_gap_penalty, mut consensus_gap_penalty) =
+            if self.cdr_positions().contains(&position) {
             if self.scheme_type == Scheme::IMGT {
                 if self.cdr1.start <= position
                     && position < self.cdr1.end
@@ -279,7 +280,7 @@ impl NumberingScheme {
                             * (position as isize - cdr3_insertion_position as isize).abs() as f64);
                     if position > cdr3_insertion_position {
                         // higher penalty after insertion in cdr3
-                        penalty += 5.0;
+                        penalty += 5.0 * scoring.cdr_increase;
                     }
                 }
 
@@ -287,10 +288,9 @@ impl NumberingScheme {
                     penalty = scoring.gap_pen_other;
                 }
             }
-        }
+            (scoring.gap_pen_cp, penalty) //TODO maybe make seperate variable, for now just high
+        }else {(penalty,penalty)};
 
-        let mut query_gap_penalty = penalty;
-        let mut consensus_gap_penalty = penalty;
 
         // Handle start penalty, same for all schemes
         if position < 18 {
