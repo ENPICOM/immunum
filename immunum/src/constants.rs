@@ -1,4 +1,5 @@
 use phf::{phf_map, Map};
+use std::collections::HashMap;
 
 
 pub const GAP_PEN_START: f64 = 1.0;
@@ -392,3 +393,57 @@ pub static BLOSUM62: Map<&[u8; 2], i32> = phf_map! {
         b"AL" => -1,
         b"IM" => 1
 };
+
+// Embedded consensus data at compile time
+const IMGT_CONSENSUS_H_DATA: &str = include_str!("../resources/consensus/IMGT_CONSENSUS_H.txt");
+const IMGT_CONSENSUS_K_DATA: &str = include_str!("../resources/consensus/IMGT_CONSENSUS_K.txt");
+const IMGT_CONSENSUS_L_DATA: &str = include_str!("../resources/consensus/IMGT_CONSENSUS_L.txt");
+const KABAT_CONSENSUS_H_DATA: &str = include_str!("../resources/consensus/KABAT_CONSENSUS_H.txt");
+const KABAT_CONSENSUS_K_DATA: &str = include_str!("../resources/consensus/KABAT_CONSENSUS_K.txt");
+const KABAT_CONSENSUS_L_DATA: &str = include_str!("../resources/consensus/KABAT_CONSENSUS_L.txt");
+
+/// Parse consensus data from embedded string at compile time
+pub fn parse_consensus_data(data: &str) -> HashMap<u32, Vec<u8>> {
+    let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
+    let total_lines = data.lines().count();
+    
+    // Skip first and last line
+    for line in data.lines().skip(1).take(total_lines - 2) {
+        let split_line: Vec<&str> = line.split(',').collect();
+        if let Ok(position) = split_line[0].parse::<u32>() {
+            let amino_acids = split_line[1..].join("").into_bytes();
+            consensus_aas.insert(position, amino_acids);
+        }
+    }
+    consensus_aas
+}
+
+/// Get IMGT Heavy consensus data
+pub fn get_imgt_heavy_consensus() -> HashMap<u32, Vec<u8>> {
+    parse_consensus_data(IMGT_CONSENSUS_H_DATA)
+}
+
+/// Get IMGT Kappa consensus data
+pub fn get_imgt_kappa_consensus() -> HashMap<u32, Vec<u8>> {
+    parse_consensus_data(IMGT_CONSENSUS_K_DATA)
+}
+
+/// Get IMGT Lambda consensus data
+pub fn get_imgt_lambda_consensus() -> HashMap<u32, Vec<u8>> {
+    parse_consensus_data(IMGT_CONSENSUS_L_DATA)
+}
+
+/// Get KABAT Heavy consensus data
+pub fn get_kabat_heavy_consensus() -> HashMap<u32, Vec<u8>> {
+    parse_consensus_data(KABAT_CONSENSUS_H_DATA)
+}
+
+/// Get KABAT Kappa consensus data
+pub fn get_kabat_kappa_consensus() -> HashMap<u32, Vec<u8>> {
+    parse_consensus_data(KABAT_CONSENSUS_K_DATA)
+}
+
+/// Get KABAT Lambda consensus data
+pub fn get_kabat_lambda_consensus() -> HashMap<u32, Vec<u8>> {
+    parse_consensus_data(KABAT_CONSENSUS_L_DATA)
+}

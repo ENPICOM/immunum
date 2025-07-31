@@ -8,6 +8,7 @@ pub mod numbering;
 pub mod numbering_scheme_type;
 pub mod prefiltering;
 pub mod schemes;
+pub mod scoring_matrix;
 pub mod sequence_stream;
 pub mod types;
 // Binding modules
