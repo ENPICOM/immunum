@@ -6,6 +6,7 @@ pub const GAP_PEN_START: f64 = 1.0;
 pub const GAP_PEN_END: f64 = 1.0;
 pub const MATCH_CP_MULTIPLIER: f64 = 8.0; // Multiplier of match score
 
+#[derive(Clone)]
 pub struct ScoringParams {
         pub gap_pen_cp: f64,
         pub gap_pen_fr: f64,

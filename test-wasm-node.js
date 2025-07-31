@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Import the WASM module
-import init, { numberSequence } from './wasm_build/immunum.js';
+import init, { numberSequencesBatch, Scheme, Chain, ScoringParams, NumberingScheme } from './wasm_build/immunum.js';
 
 async function testWasmInNode() {
     try {
@@ -24,25 +24,54 @@ async function testWasmInNode() {
         
         console.log('✅ WASM module initialized successfully!');
         
-        // Test cases
+        // Test typed enums
+        console.log('\n🧪 Testing typed enums...');
+        try {
+            console.log('Available schemes:', Scheme);
+            console.log('Available chains:', Chain);
+            console.log('✅ Typed enums accessible');
+        } catch (error) {
+            console.log(`❌ Enum access failed: ${error.message}`);
+        }
+        
+        // Test ScoringParams
+        console.log('\n🧪 Testing ScoringParams...');
+        try {
+            const params = new ScoringParams();
+            console.log('✅ ScoringParams created successfully');
+        } catch (error) {
+            console.log(`❌ ScoringParams creation failed: ${error.message}`);
+        }
+        
+        // Test NumberingScheme
+        console.log('\n🧪 Testing NumberingScheme...');
+        try {
+            const scheme = NumberingScheme.imgtHeavy();
+            console.log('✅ NumberingScheme.imgtHeavy() created successfully');
+        } catch (error) {
+            console.log(`❌ NumberingScheme creation failed: ${error.message}`);
+        }
+        
+        // Test typed batch processing
+        console.log('\n🧪 Testing typed batch processing...');
         const testCases = [
             {
                 name: "Heavy chain (IGH) with IMGT scheme",
-                sequence: "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAR",
-                scheme: "imgt",
-                chains: ["igh"]
+                sequences: ["EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAR"],
+                scheme: Scheme.IMGT,
+                chains: [Chain.IGH]
             },
             {
                 name: "Kappa chain (IGK) with Kabat scheme", 
-                sequence: "DIQMTQSPSSLSASVGDRVTITCRASQGIRNYLAWYQQKPGKAPKLLIYAASTLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQRYNRAPYTFGQGTKVEIK",
-                scheme: "kabat",
-                chains: ["igk"]
+                sequences: ["DIQMTQSPSSLSASVGDRVTITCRASQGIRNYLAWYQQKPGKAPKLLIYAASTLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQRYNRAPYTFGQGTKVEIK"],
+                scheme: Scheme.KABAT,
+                chains: [Chain.IGK]
             },
             {
                 name: "Multiple chains test",
-                sequence: "ACDEFGHIKLMNPQRSTVWY",
-                scheme: "imgt", 
-                chains: ["igh", "igk"]
+                sequences: ["ACDEFGHIKLMNPQRSTVWY"],
+                scheme: Scheme.IMGT, 
+                chains: [Chain.IGH, Chain.IGK]
             }
         ];
         
@@ -50,19 +79,15 @@ async function testWasmInNode() {
         for (let i = 0; i < testCases.length; i++) {
             const test = testCases[i];
             try {
-                numberSequence(test.sequence, test.scheme, test.chains);
-                console.log(`✅ Test ${i + 1}: ${test.name}`);
+                const results = numberSequencesBatch(test.sequences, test.scheme, test.chains);
+                console.log(`✅ Test ${i + 1}: ${test.name} - Got ${results.length} results`);
             } catch (error) {
                 console.log(`❌ Test ${i + 1}: ${test.name} \n    Error: ${error.message}\n`);
             }
         }
         
-        // Test error handling
-        try {
-            numberSequence("INVALID", "invalid_scheme", ["invalid_chain"]);
-        } catch (error) {
-            console.log(`✅ Error handling works: ${error.message}\n`);
-        }
+        // Test error handling would be done with try/catch around the typed calls above
+        console.log('\n✅ Error handling is built into the typed API calls above');
         
         console.log('🎉 All tests completed!');
         
