@@ -67,8 +67,9 @@ pub fn select_chains_from_pre_scan(
 mod tests {
     use super::*;
     use crate::{
-        schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme},
+        schemes::get_scheme,
         scoring_matrix::ScoringMatrix,
+        types::{Chain, Scheme},
     };
 
     impl ScoringMatrix {
@@ -89,9 +90,9 @@ mod tests {
         let sequence_k = "DIQMTQSPSSLSASVGDRVTITCRASQSISSWLAWYQQKPGKAPKLLIYKASSLESGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYNSYPFTFGQGTKVEIK".as_bytes();
 
         let terminal_schemes = get_terminal_schemes(&vec![
-            get_imgt_heavy_scheme(),
-            get_imgt_lambda_scheme(),
-            get_imgt_kappa_scheme(),
+            get_scheme(Scheme::IMGT, Chain::IGH, None),
+            get_scheme(Scheme::IMGT, Chain::IGL, None),
+            get_scheme(Scheme::IMGT, Chain::IGK, None),
         ]);
 
         let (pre_scan_output_h, _highest_score_h) = run_pre_scan(sequence_h, &terminal_schemes);
@@ -119,9 +120,9 @@ mod tests {
     #[test]
     fn terminal_schemes_heavy() {
         let terminal_length = 10;
-        let original_scheme = get_imgt_heavy_scheme();
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
         let (n_term_scheme, c_term_scheme) =
-            &get_terminal_schemes(&vec![get_imgt_heavy_scheme()])[0];
+            &get_terminal_schemes(&vec![get_scheme(Scheme::IMGT, Chain::IGH, None)])[0];
         for i in 0..terminal_length {
             assert_eq!(
                 n_term_scheme.scoring_matrix.row(i),
@@ -149,9 +150,9 @@ mod tests {
     #[test]
     fn terminal_schemes_kappa() {
         let terminal_length = 10;
-        let original_scheme = get_imgt_kappa_scheme();
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGK, None);
         let (n_term_scheme, c_term_scheme) =
-            &get_terminal_schemes(&vec![get_imgt_kappa_scheme()])[0];
+            &get_terminal_schemes(&vec![get_scheme(Scheme::IMGT, Chain::IGK, None)])[0];
         for i in 0..terminal_length {
             assert_eq!(
                 n_term_scheme.scoring_matrix.row(i),
@@ -179,9 +180,9 @@ mod tests {
     #[test]
     fn terminal_schemes_lambda() {
         let terminal_length = 10;
-        let original_scheme = get_imgt_lambda_scheme();
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGL, None);
         let (n_term_scheme, c_term_scheme) =
-            &get_terminal_schemes(&vec![get_imgt_lambda_scheme()])[0];
+            &get_terminal_schemes(&vec![get_scheme(Scheme::IMGT, Chain::IGL, None)])[0];
         for i in 0..terminal_length {
             assert_eq!(
                 n_term_scheme.scoring_matrix.row(i),
