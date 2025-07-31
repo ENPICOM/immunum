@@ -1,4 +1,3 @@
-use crate::consensus_scoring::write_all_scoring_matrices;
 use crate::constants::{ScoringParams, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
 use crate::fastx::{from_path, FastxRecord};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
@@ -36,11 +35,6 @@ pub fn number_sequences_and_write_output(
     update_scoring_matrices: bool,
     scoring_params: &ScoringParams,
 ) {
-    // Update scoring matrices
-    if update_scoring_matrices {
-        write_all_scoring_matrices(scoring_params);
-    }
-
     // Read in fasta
     let reader = from_path(fasta_file).unwrap();
     let records: Vec<FastxRecord> = reader.collect::<Result<Vec<FastxRecord>, _>>().unwrap();

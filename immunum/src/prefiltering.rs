@@ -66,8 +66,21 @@ pub fn select_chains_from_pre_scan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme};
-    use ndarray::Ix;
+    use crate::{
+        schemes::{get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme},
+        scoring_matrix::ScoringMatrix,
+    };
+
+    impl ScoringMatrix {
+        /// Get a slice of a specific row
+        pub fn row(&self, row: usize) -> Vec<f64> {
+            let mut row_data = Vec::with_capacity(self.ncols());
+            for col in 0..self.ncols() {
+                row_data.push(self.get(row, col));
+            }
+            row_data
+        }
+    }
 
     #[test]
     fn heavy_chain_pre_scan() {
@@ -111,13 +124,13 @@ mod tests {
             &get_terminal_schemes(&vec![get_imgt_heavy_scheme()])[0];
         for i in 0..terminal_length {
             assert_eq!(
-                n_term_scheme.scoring_matrix.row(i as Ix),
-                original_scheme.scoring_matrix.row(i as Ix)
+                n_term_scheme.scoring_matrix.row(i),
+                original_scheme.scoring_matrix.row(i)
             );
 
             assert_eq!(
-                c_term_scheme.scoring_matrix.row(i as Ix),
-                original_scheme.scoring_matrix.row(117 + i as Ix)
+                c_term_scheme.scoring_matrix.row(i),
+                original_scheme.scoring_matrix.row(117 + i)
             );
         }
 
@@ -141,13 +154,13 @@ mod tests {
             &get_terminal_schemes(&vec![get_imgt_kappa_scheme()])[0];
         for i in 0..terminal_length {
             assert_eq!(
-                n_term_scheme.scoring_matrix.row(i as Ix),
-                original_scheme.scoring_matrix.row(i as Ix)
+                n_term_scheme.scoring_matrix.row(i),
+                original_scheme.scoring_matrix.row(i)
             );
 
             assert_eq!(
-                c_term_scheme.scoring_matrix.row(i as Ix),
-                original_scheme.scoring_matrix.row(117 + i as Ix)
+                c_term_scheme.scoring_matrix.row(i),
+                original_scheme.scoring_matrix.row(117 + i)
             );
         }
 
@@ -171,13 +184,13 @@ mod tests {
             &get_terminal_schemes(&vec![get_imgt_lambda_scheme()])[0];
         for i in 0..terminal_length {
             assert_eq!(
-                n_term_scheme.scoring_matrix.row(i as Ix),
-                original_scheme.scoring_matrix.row(i as Ix)
+                n_term_scheme.scoring_matrix.row(i),
+                original_scheme.scoring_matrix.row(i)
             );
 
             assert_eq!(
-                c_term_scheme.scoring_matrix.row(i as Ix),
-                original_scheme.scoring_matrix.row(117 + i as Ix)
+                c_term_scheme.scoring_matrix.row(i),
+                original_scheme.scoring_matrix.row(117 + i)
             );
         }
 

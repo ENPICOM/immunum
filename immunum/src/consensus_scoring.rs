@@ -1,31 +1,42 @@
 use crate::constants::{ScoringParams, ENCODED_RESIDUES_MAP};
 use crate::constants::{ACCEPTED_RESIDUES, BLOSUM62};
-use crate::numbering_scheme_type::NumberingScheme;
-use crate::schemes::{
-    get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme,
-    get_kabat_kappa_scheme, get_kabat_lambda_scheme,
-};
-use ndarray::Array2;
-use ndarray_npy::{read_npy, write_npy};
+use crate::scoring_matrix::ScoringMatrix;
 use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
 
-/// Utility to read chain consensus file
-pub(crate) fn read_consensus_file(path: PathBuf) -> HashMap<u32, Vec<u8>> {
-    let content = fs::read_to_string(path).expect("Error in reading consensus file");
-    let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
-    // Loop over every line of content
-    let total_lines = content.lines().count();
-    // Skip first and last line
-    for line in content.lines().skip(1).take(total_lines - 2) {
-        let split_line: Vec<&str> = line.split(',').collect();
-        consensus_aas.insert(
-            split_line[0].parse::<u32>().unwrap(),
-            split_line[1..].join("").into_bytes(),
-        );
+/// Calculate scoring matrix from consensus data and scoring parameters
+pub fn calculate_scoring_matrix(
+    consensus: &HashMap<u32, Vec<u8>>,
+    scoring_params: &ScoringParams,
+    scheme_gap_penalty_fn: impl Fn(u32, &ScoringParams) -> (f64, f64),
+) -> ScoringMatrix {
+    let number_accepted_residues = ACCEPTED_RESIDUES.len();
+    let consensus_length = consensus.len();
+
+    let mut matrix = ScoringMatrix::zeros(consensus_length, number_accepted_residues + 2);
+
+    // Fill in scores
+    for consensus_position in 0..consensus_length {
+        for residue_index in 0..number_accepted_residues {
+            let residue: u8 = ACCEPTED_RESIDUES[residue_index];
+            let score = best_score_consensus(
+                (consensus_position + 1) as u32,
+                residue,
+                consensus,
+            ) as f64;
+            matrix.set(consensus_position, residue_index, score);
+        }
+        
+        // Fill in gap penalties
+        let (query_gap, consensus_gap) =
+            scheme_gap_penalty_fn((consensus_position + 1) as u32, scoring_params);
+        
+        // Query gap
+        matrix.set(consensus_position, number_accepted_residues, query_gap);
+        // Consensus gap
+        matrix.set(consensus_position, number_accepted_residues + 1, consensus_gap);
     }
-    consensus_aas
+
+    matrix
 }
 
 /// Finds highest score according to blosum62
@@ -60,36 +71,7 @@ fn blosum_lookup(residue1: &u8, residue2: &u8) -> i32 {
     }
 }
 
-/// Calculates and writes scoring matrix for consensus sequence
-fn write_scoring_matrix(path: PathBuf, scheme: NumberingScheme, scoring_params: &ScoringParams) {
-    let number_accepted_residues = ACCEPTED_RESIDUES.len();
-    let consensus_length = scheme.consensus_amino_acids.len();
-
-    let mut matrix = Array2::<f64>::zeros((consensus_length, number_accepted_residues + 2));
-
-    // fill in scores
-    for consensus_position in 0..consensus_length {
-        for residue_index in 0..number_accepted_residues {
-            let residue: u8 = ACCEPTED_RESIDUES[residue_index];
-            matrix[[consensus_position, residue_index]] = best_score_consensus(
-                (consensus_position + 1) as u32,
-                residue,
-                &scheme.consensus_amino_acids,
-            ) as f64
-        }
-        // fill in gap penalties
-        let (query_gap, consensus_gap) =
-            scheme.gap_penalty((consensus_position + 1) as u32, scoring_params);
-        // Query gap
-        matrix[[consensus_position, number_accepted_residues]] = query_gap;
-        // Consensus gap
-        matrix[[consensus_position, number_accepted_residues + 1]] = consensus_gap;
-    }
-    // WRITE MATRIX TO FILE
-    write_npy(path, &matrix).expect("Writing scoring matrix failed");
-}
-
-/// encodes sequence to indexes for the scoring matrix
+/// Encodes sequence to indexes for the scoring matrix
 pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
     // Create a lookup table (once, could be static)
     input
@@ -98,62 +80,10 @@ pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
         .collect()
 }
 
-/// Utility to read scoring matrix
-pub fn read_scoring_matrix(path: PathBuf) -> Array2<f64> {
-    read_npy(path).expect("Error reading scoring matrix")
-}
-
-/// Recalculates and writes all scoring matrices (IMGT and KABAT for now)
-pub fn write_all_scoring_matrices(scoring_params: &ScoringParams) {
-    let schemes: Vec<(NumberingScheme, PathBuf)> = vec![
-        (
-            get_imgt_heavy_scheme(),
-            PathBuf::from("resources")
-                .join("consensus")
-                .join("IMGT_CONSENSUS_H.npy"),
-        ),
-        (
-            get_imgt_kappa_scheme(),
-            PathBuf::from("resources")
-                .join("consensus")
-                .join("IMGT_CONSENSUS_K.npy"),
-        ),
-        (
-            get_imgt_lambda_scheme(),
-            PathBuf::from("resources")
-                .join("consensus")
-                .join("IMGT_CONSENSUS_L.npy"),
-        ),
-        (
-            get_kabat_heavy_scheme(),
-            PathBuf::from("resources")
-                .join("consensus")
-                .join("KABAT_CONSENSUS_H.npy"),
-        ),
-        (
-            get_kabat_kappa_scheme(),
-            PathBuf::from("resources")
-                .join("consensus")
-                .join("KABAT_CONSENSUS_K.npy"),
-        ),
-        (
-            get_kabat_lambda_scheme(),
-            PathBuf::from("resources")
-                .join("consensus")
-                .join("KABAT_CONSENSUS_L.npy"),
-        ),
-    ];
-    for (scheme, file_path) in schemes {
-        write_scoring_matrix(file_path, scheme, scoring_params);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::constants::get_scoring_params;
-    use std::path::PathBuf;
-    //TODO tests for this part
 
     #[test]
     fn test_lookup() {
@@ -165,20 +95,6 @@ mod tests {
         assert_eq!(blosum_lookup(&b'C', &b'S'), blosum_lookup(&b'S', &b'C'));
     }
 
-    #[test]
-    fn test_write_scoring_matrix() {
-        write_all_scoring_matrices(&get_scoring_params());
-    }
-
-    #[test]
-    fn test_read_scoring_matrix() {
-        let scoring_matrix = read_scoring_matrix(
-            PathBuf::from("resources")
-                .join("consensus")
-                .join("IMGT_CONSENSUS_H.npy"),
-        );
-        println! {"{scoring_matrix:?}"};
-    }
     #[test]
     fn amino_acid_encoding() {
         assert_eq!(

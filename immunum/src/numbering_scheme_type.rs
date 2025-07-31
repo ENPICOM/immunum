@@ -1,8 +1,8 @@
 use crate::constants::{insertion_points, ScoringParams};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
+use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{Chain, RegionRange, Scheme};
-use ndarray::{s, Array2};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub struct NumberingScheme {
     pub insertion_positions: Vec<u32>,
     pub gap_positions: Vec<u32>,
     pub consensus_amino_acids: HashMap<u32, Vec<u8>>,
-    pub scoring_matrix: Array2<f64>,
+    pub scoring_matrix: ScoringMatrix,
     pub fr1: RegionRange,
     pub fr2: RegionRange,
     pub fr3: RegionRange,
@@ -383,8 +383,7 @@ impl NumberingScheme {
             consensus_amino_acids: n_terminal_consensus,
             scoring_matrix: self
                 .scoring_matrix
-                .slice(s![0..terminal_length as usize, ..])
-                .to_owned(), // TODO wrong
+                .slice(0..terminal_length as usize, 0..self.scoring_matrix.ncols()),
             ..self.clone() // Use the remaining fields from the original
         };
 
@@ -407,11 +406,10 @@ impl NumberingScheme {
             consensus_amino_acids: c_terminal_consensus,
             scoring_matrix: self
                 .scoring_matrix
-                .slice(s![
+                .slice(
                     fmwk4_start as usize..(fmwk4_start + terminal_length as u32) as usize,
-                    ..
-                ])
-                .to_owned(),
+                    0..self.scoring_matrix.ncols()
+                ),
             ..self.clone() // Use the remaining fields from the original
         };
 

@@ -10,6 +10,7 @@ mod numbering_scheme_type;
 mod prefiltering;
 mod schemes;
 mod sequence_stream;
+mod scoring_matrix;
 mod types;
 
 use clap::Parser;
