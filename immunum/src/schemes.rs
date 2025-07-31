@@ -113,12 +113,10 @@ pub fn get_imgt_lambda_scheme() -> NumberingScheme {
 
 pub fn get_kabat_heavy_scheme() -> NumberingScheme {
     NumberingScheme {
-        // name: "KABAT Heavy".to_string(),
-        // description: "KABAT numbering scheme for heavy chains".to_string(),
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGH,
         conserved_positions: vec![22, 36, 92, 103, 104, 106],
-        insertion_positions: vec![6, 82],
+        insertion_positions: vec![6, 35, 52, 82, 100],
         gap_positions: vec![40, 41, 42, 43, 44, 72, 73, 74],
         consensus_amino_acids: read_consensus_file(
             PathBuf::from("resources")
@@ -151,7 +149,7 @@ pub fn get_kabat_kappa_scheme() -> NumberingScheme {
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGK,
         conserved_positions: vec![23, 35, 88, 98, 99, 101],
-        insertion_positions: vec![27],
+        insertion_positions: vec![27, 52, 95],
         gap_positions: vec![10],
         consensus_amino_acids: read_consensus_file(
             PathBuf::from("resources")
@@ -181,7 +179,7 @@ pub fn get_kabat_lambda_scheme() -> NumberingScheme {
         scheme_type: Scheme::KABAT,
         chain_type: Chain::IGL,
         conserved_positions: vec![23, 35, 88, 98, 99, 101],
-        insertion_positions: vec![27],
+        insertion_positions: vec![27, 52, 95],
         gap_positions: vec![10],
         consensus_amino_acids: read_consensus_file(
             PathBuf::from("resources")

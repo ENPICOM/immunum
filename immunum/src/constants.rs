@@ -42,7 +42,7 @@ impl Default for ScoringParams {
 }
 // Pre scan identity cutoff, minimal identity for program to assume a chain
 //pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
-pub const WITHIN_IDENTITY_RANGE: f64 = 1.0; // TODO test how low
+pub const WITHIN_IDENTITY_RANGE: f64 = 0.2; // TODO test how low
 
 pub const MINIMAL_CHAIN_IDENTITY: f64 = 0.7;
 
