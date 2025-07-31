@@ -20,14 +20,7 @@ pub mod wasm_bindings;
 // Removed proc-macro dependency - now using manual FromStr implementations
 
 // Re-export public API functions for convenience
-pub use schemes::{
-    get_imgt_heavy_scheme, get_imgt_heavy_scheme_with_params,
-    get_imgt_kappa_scheme, get_imgt_kappa_scheme_with_params,
-    get_imgt_lambda_scheme, get_imgt_lambda_scheme_with_params,
-    get_kabat_heavy_scheme, get_kabat_heavy_scheme_with_params,
-    get_kabat_kappa_scheme, get_kabat_kappa_scheme_with_params,
-    get_kabat_lambda_scheme, get_kabat_lambda_scheme_with_params,
-};
+pub use schemes::get_scheme;
 
 pub use constants::{ScoringParams, get_scoring_params};
 pub use numbering_scheme_type::{NumberingScheme, NumberingOutput};

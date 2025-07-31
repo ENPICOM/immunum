@@ -2,10 +2,7 @@ use crate::constants::{ScoringParams, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENG
 use crate::fastx::{from_path, FastxRecord};
 use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
 use crate::prefiltering::{get_terminal_schemes, run_pre_scan, select_chains_from_pre_scan};
-use crate::schemes::{
-    get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme, get_kabat_heavy_scheme,
-    get_kabat_kappa_scheme, get_kabat_lambda_scheme,
-};
+use crate::schemes::get_scheme;
 use crate::types::{Chain, Scheme};
 use std::fs;
 
@@ -39,24 +36,10 @@ pub fn number_sequences_and_write_output(
     let reader = from_path(fasta_file).unwrap();
     let records: Vec<FastxRecord> = reader.collect::<Result<Vec<FastxRecord>, _>>().unwrap();
 
-    // get schemes dependent on selected numbering method
-    let schemes = match scheme {
-        Scheme::IMGT => vec![
-            get_imgt_heavy_scheme(),
-            get_imgt_kappa_scheme(),
-            get_imgt_lambda_scheme(),
-        ],
-        Scheme::KABAT => vec![
-            get_kabat_heavy_scheme(),
-            get_kabat_kappa_scheme(),
-            get_kabat_lambda_scheme(),
-        ],
-    };
-
-    // only include schemes for selected chains
-    let schemes: Vec<NumberingScheme> = schemes
-        .into_iter()
-        .filter(|scheme| chains.contains(&scheme.chain_type))
+    // get schemes dependent on selected numbering method and chains
+    let schemes: Vec<NumberingScheme> = chains
+        .iter()
+        .map(|chain| get_scheme(scheme.clone(), *chain, None))
         .collect();
 
     // get pre-filter schemes
@@ -178,7 +161,7 @@ fn find_all_chains<'a>(
 mod tests {
     use crate::constants::get_scoring_params;
     use super::*;
-    use crate::schemes::{get_imgt_heavy_scheme, get_imgt_lambda_scheme, get_kabat_kappa_scheme};
+    use crate::schemes::get_scheme;
     use crate::types::Chain;
 
     #[test]
@@ -249,9 +232,9 @@ mod tests {
     fn single_sequence_find_all() {
         let seq = "VLTQSPGTLSLSPGETAIISCRTSQYGSLAWYQQRPGQAPRLVIYSGSTRAAGIPDRFSGSRWGPDYNLTISNLESGDFGVYYCQQYEFFGQGTKVQVDIKRTVAAPSVFIFPPSDEQLKSGTASVVCLLNNFYPREAKVQWKVDNALQSGNSQESVTEQDSKDSTYSLSSTLTLSKADYEKHKVYACEVTHQGLRSPVTKSFNRGEC".as_bytes();
         let mut schemes: Vec<&NumberingScheme> = Vec::new();
-        let lambda_scheme = get_imgt_lambda_scheme();
-        let kappa_scheme = get_kabat_kappa_scheme();
-        let heavy_scheme = get_imgt_heavy_scheme();
+        let lambda_scheme = get_scheme(Scheme::IMGT, Chain::IGL, None);
+        let kappa_scheme = get_scheme(Scheme::KABAT, Chain::IGK, None);
+        let heavy_scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
 
         schemes.push(&lambda_scheme);
         schemes.push(&kappa_scheme);
@@ -278,9 +261,9 @@ mod tests {
         RQNGVLNSATDQDSKDSTYSMSSTLTLTKDEYERHNSYTCEATHKTSTSPIVKSFNRNEC"
             .as_bytes();
         let mut schemes: Vec<&NumberingScheme> = Vec::new();
-        let lambda_scheme = get_imgt_lambda_scheme();
-        let kappa_scheme = get_kabat_kappa_scheme();
-        let heavy_scheme = get_imgt_heavy_scheme();
+        let lambda_scheme = get_scheme(Scheme::IMGT, Chain::IGL, None);
+        let kappa_scheme = get_scheme(Scheme::KABAT, Chain::IGK, None);
+        let heavy_scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
 
         schemes.push(&lambda_scheme);
         schemes.push(&kappa_scheme);

@@ -4,13 +4,7 @@ use pyo3::prelude::*;
 use crate::constants::ScoringParams;
 use crate::numbering;
 use crate::numbering_scheme_type::NumberingScheme;
-use crate::schemes::{
-    get_imgt_heavy_scheme, get_imgt_heavy_scheme_with_params, get_imgt_kappa_scheme,
-    get_imgt_kappa_scheme_with_params, get_imgt_lambda_scheme, get_imgt_lambda_scheme_with_params,
-    get_kabat_heavy_scheme, get_kabat_heavy_scheme_with_params, get_kabat_kappa_scheme,
-    get_kabat_kappa_scheme_with_params, get_kabat_lambda_scheme,
-    get_kabat_lambda_scheme_with_params,
-};
+use crate::schemes::get_scheme;
 use crate::types::{Chain, Scheme};
 
 /// Python enum for numbering schemes
@@ -29,15 +23,6 @@ impl From<PyScheme> for Scheme {
         match py_scheme {
             PyScheme::IMGT => Scheme::IMGT,
             PyScheme::KABAT => Scheme::KABAT,
-        }
-    }
-}
-
-impl From<Scheme> for PyScheme {
-    fn from(scheme: Scheme) -> Self {
-        match scheme {
-            Scheme::IMGT => PyScheme::IMGT,
-            Scheme::KABAT => PyScheme::KABAT,
         }
     }
 }
@@ -73,20 +58,6 @@ impl From<PyChain> for Chain {
             PyChain::TRB => Chain::TRB,
             PyChain::TRG => Chain::TRG,
             PyChain::TRD => Chain::TRD,
-        }
-    }
-}
-
-impl From<Chain> for PyChain {
-    fn from(chain: Chain) -> Self {
-        match chain {
-            Chain::IGH => PyChain::IGH,
-            Chain::IGK => PyChain::IGK,
-            Chain::IGL => PyChain::IGL,
-            Chain::TRA => PyChain::TRA,
-            Chain::TRB => PyChain::TRB,
-            Chain::TRG => PyChain::TRG,
-            Chain::TRD => PyChain::TRD,
         }
     }
 }
@@ -132,26 +103,6 @@ impl PyScoringParams {
             },
         }
     }
-
-    #[getter]
-    pub fn gap_pen_cp(&self) -> f64 {
-        self.inner.gap_pen_cp
-    }
-
-    #[setter]
-    pub fn set_gap_pen_cp(&mut self, value: f64) {
-        self.inner.gap_pen_cp = value;
-    }
-
-    #[getter]
-    pub fn gap_pen_fr(&self) -> f64 {
-        self.inner.gap_pen_fr
-    }
-
-    #[setter]
-    pub fn set_gap_pen_fr(&mut self, value: f64) {
-        self.inner.gap_pen_fr = value;
-    }
 }
 
 /// Python wrapper for NumberingScheme
@@ -165,63 +116,20 @@ pub struct PyNumberingScheme {
 #[pymethods]
 impl PyNumberingScheme {
     #[staticmethod]
-    #[pyo3(signature = (params=None))]
-    pub fn imgt_heavy(params: Option<PyScoringParams>) -> PyResult<Self> {
-        let scheme = match params {
-            Some(py_params) => get_imgt_heavy_scheme_with_params(Some(py_params.inner)),
-            None => get_imgt_heavy_scheme(),
-        };
-        Ok(PyNumberingScheme { inner: scheme })
-    }
+    #[pyo3(signature = (scheme, chain, params=None))]
+    pub fn get_scheme(
+        scheme: PyScheme,
+        chain: PyChain,
+        params: Option<PyScoringParams>,
+    ) -> PyResult<Self> {
+        let rust_scheme: Scheme = scheme.into();
+        let rust_chain: Chain = chain.into();
+        let scoring_params = params.map(|p| p.inner);
 
-    #[staticmethod]
-    #[pyo3(signature = (params=None))]
-    pub fn imgt_kappa(params: Option<PyScoringParams>) -> PyResult<Self> {
-        let scheme = match params {
-            Some(py_params) => get_imgt_kappa_scheme_with_params(Some(py_params.inner)),
-            None => get_imgt_kappa_scheme(),
-        };
-        Ok(PyNumberingScheme { inner: scheme })
-    }
-
-    #[staticmethod]
-    #[pyo3(signature = (params=None))]
-    pub fn imgt_lambda(params: Option<PyScoringParams>) -> PyResult<Self> {
-        let scheme = match params {
-            Some(py_params) => get_imgt_lambda_scheme_with_params(Some(py_params.inner)),
-            None => get_imgt_lambda_scheme(),
-        };
-        Ok(PyNumberingScheme { inner: scheme })
-    }
-
-    #[staticmethod]
-    #[pyo3(signature = (params=None))]
-    pub fn kabat_heavy(params: Option<PyScoringParams>) -> PyResult<Self> {
-        let scheme = match params {
-            Some(py_params) => get_kabat_heavy_scheme_with_params(Some(py_params.inner)),
-            None => get_kabat_heavy_scheme(),
-        };
-        Ok(PyNumberingScheme { inner: scheme })
-    }
-
-    #[staticmethod]
-    #[pyo3(signature = (params=None))]
-    pub fn kabat_kappa(params: Option<PyScoringParams>) -> PyResult<Self> {
-        let scheme = match params {
-            Some(py_params) => get_kabat_kappa_scheme_with_params(Some(py_params.inner)),
-            None => get_kabat_kappa_scheme(),
-        };
-        Ok(PyNumberingScheme { inner: scheme })
-    }
-
-    #[staticmethod]
-    #[pyo3(signature = (params=None))]
-    pub fn kabat_lambda(params: Option<PyScoringParams>) -> PyResult<Self> {
-        let scheme = match params {
-            Some(py_params) => get_kabat_lambda_scheme_with_params(Some(py_params.inner)),
-            None => get_kabat_lambda_scheme(),
-        };
-        Ok(PyNumberingScheme { inner: scheme })
+        let numbering_scheme = get_scheme(rust_scheme, rust_chain, scoring_params);
+        Ok(PyNumberingScheme {
+            inner: numbering_scheme,
+        })
     }
 
     pub fn number_sequence(&self, sequence: &str) -> PyResult<String> {
@@ -237,7 +145,11 @@ impl PyNumberingScheme {
 /// Batch processing function for multiple sequences
 #[cfg(feature = "python")]
 #[pyfunction]
-pub fn number_sequences_batch(sequences: Vec<String>, scheme: PyScheme, chains: Vec<PyChain>) -> PyResult<Vec<String>> {
+pub fn number_sequences_batch(
+    sequences: Vec<String>,
+    scheme: PyScheme,
+    chains: Vec<PyChain>,
+) -> PyResult<Vec<String>> {
     let rust_scheme: Scheme = scheme.into();
     let rust_chains: Vec<Chain> = chains.into_iter().map(|c| c.into()).collect();
 
@@ -249,16 +161,14 @@ pub fn number_sequences_batch(sequences: Vec<String>, scheme: PyScheme, chains: 
     Ok(results)
 }
 
-
-
 /// Immunum Python module
 #[cfg(feature = "python")]
 #[pymodule]
 pub fn immunum(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(number_sequences_batch, m)?)?;
-    m.add_class::<PyScoringParams>()?;  // Exported as "ScoringParams"
-    m.add_class::<PyNumberingScheme>()?;  // Exported as "NumberingScheme"
-    m.add_class::<PyScheme>()?;  // Exported as "Scheme"
-    m.add_class::<PyChain>()?;  // Exported as "Chain"
+    m.add_class::<PyScoringParams>()?; // Exported as "ScoringParams"
+    m.add_class::<PyNumberingScheme>()?; // Exported as "NumberingScheme"
+    m.add_class::<PyScheme>()?; // Exported as "Scheme"
+    m.add_class::<PyChain>()?; // Exported as "Chain"
     Ok(())
 }

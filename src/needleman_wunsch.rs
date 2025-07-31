@@ -131,7 +131,8 @@ fn traceback_alignment(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schemes::get_imgt_heavy_scheme;
+    use crate::schemes::get_scheme;
+    use crate::types::{Chain, Scheme};
 
     #[test]
     fn test_needleman_wunsch_consensus() {
@@ -139,7 +140,7 @@ mod tests {
         QGKATMTADTSSNTAYLQLSSLTSEDTAVYYCNAGHDYDRGRFPYWGQGTLVTVSAAKTTPPSVYPLAPGSAAQTNSMVTLGCLVKGYFPE\
         PVTVTWNSGSLSSGVHTFPAVLQSDLYTLSSSVTVPSSTWPSETVTCNVAHPASSTKVDKKIVPRD"
             .as_bytes();
-        let scheme = get_imgt_heavy_scheme();
+        let scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
         let output = needleman_wunsch_consensus(heavy_chain, &scheme);
         println!("{output:?}");
     }

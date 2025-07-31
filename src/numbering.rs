@@ -1,8 +1,5 @@
 use crate::annotation::find_highest_identity_chain;
-use crate::schemes::{
-    get_imgt_heavy_scheme, get_imgt_kappa_scheme, get_imgt_lambda_scheme,
-    get_kabat_heavy_scheme, get_kabat_kappa_scheme, get_kabat_lambda_scheme,
-};
+use crate::schemes::get_scheme;
 use crate::types::{Chain, Scheme};
 
 /// Process a single sequence and return the numbering result
@@ -30,17 +27,7 @@ fn get_schemes_for_numbering(scheme: &Scheme, chains: &[Chain]) -> Vec<crate::nu
     let mut schemes = Vec::new();
     
     for chain in chains {
-        let numbering_scheme = match (scheme, chain) {
-            (Scheme::IMGT, Chain::IGH) => get_imgt_heavy_scheme(),
-            (Scheme::IMGT, Chain::IGK) => get_imgt_kappa_scheme(),
-            (Scheme::IMGT, Chain::IGL) => get_imgt_lambda_scheme(),
-            (Scheme::KABAT, Chain::IGH) => get_kabat_heavy_scheme(),
-            (Scheme::KABAT, Chain::IGK) => get_kabat_kappa_scheme(),
-            (Scheme::KABAT, Chain::IGL) => get_kabat_lambda_scheme(),
-            // For other chains, default to heavy chain schemes for now
-            (Scheme::IMGT, _) => get_imgt_heavy_scheme(),
-            (Scheme::KABAT, _) => get_kabat_heavy_scheme(),
-        };
+        let numbering_scheme = get_scheme(scheme.clone(), *chain, None);
         schemes.push(numbering_scheme);
     }
     
