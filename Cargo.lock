@@ -174,7 +174,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "flate2",
- "immunum-macros",
  "js-sys",
  "phf",
  "pyo3",
@@ -182,15 +181,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wee_alloc",
-]
-
-[[package]]
-name = "immunum-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

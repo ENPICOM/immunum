@@ -1,15 +1,29 @@
-[workspace]
-members = ["immunum", "immunum-macros"]
-resolver = "2"
+[package]
+name = "immunum"
+version = "0.1.0"
+edition = "2021"
 
-[workspace.dependencies]
+[dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
 flate2 = "1.1.2"
-pyo3 = { version = "0.25.1", features = ["extension-module"] }
+pyo3 = { version = "0.25.1", features = ["extension-module"], optional = true }
 thiserror = "2.0.12"
-wasm-bindgen = { version = "0.2.1" }
-js-sys = { version = "0.3" }
-wee_alloc = { version = "0.4.5" }
-syn = { version = "2.0", features = ["full"] }
-quote = "1.0"
-proc-macro2 = "1.0"
+wasm-bindgen = { version = "0.2.1", optional = true }
+js-sys = { version = "0.3", optional = true }
+wee_alloc = { version = "0.4.5", optional = true }
+wasm-bindgen-test = "0.3.50"
+phf = {version = "0.12.1" , features = ["macros"]}
+
+[lib]
+name = "immunum"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "immunum-cli"
+path = "src/main.rs"
+
+[features]
+default = ["python", "wasm"]
+python = ["pyo3"]
+wasm = ["wasm-bindgen", "wee_alloc"]
