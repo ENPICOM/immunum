@@ -2,7 +2,6 @@
 
 use clap::ValueEnum;
 use std::ops::Range;
-use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct RegionRange {
@@ -32,22 +31,6 @@ pub enum Scheme {
     #[value(alias = "K")]
     KABAT,
 }
-
-impl FromStr for Scheme {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "imgt" | "i" => Ok(Scheme::IMGT),
-            "kabat" | "k" => Ok(Scheme::KABAT),
-            _ => Err(format!(
-                "Scheme not supported: '{}', use any of: IMGT (I), KABAT (K)",
-                s
-            )),
-        }
-    }
-}
-
 
 /// Immunoglobulin and T-cell receptor chain types
 #[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum)]
@@ -79,25 +62,5 @@ pub enum Chain {
     // T-cell receptor Delta chain variants
     #[value(alias = "Delta", alias = "D")]
     TRD,
-}
-
-impl FromStr for Chain {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "igh" | "heavy" | "h" => Ok(Chain::IGH),
-            "igk" | "kappa" | "k" => Ok(Chain::IGK),
-            "igl" | "lambda" | "l" => Ok(Chain::IGL),
-            "tra" | "alpha" | "a" => Ok(Chain::TRA),
-            "trb" | "beta" | "b" => Ok(Chain::TRB),
-            "trg" | "gamma" | "g" => Ok(Chain::TRG),
-            "trd" | "delta" | "d" => Ok(Chain::TRD),
-            _ => Err(format!(
-                "Chain not supported: '{}', use any of: IGH (Heavy, H), IGK (Kappa, K), IGL (Lambda, L), TRA (Alpha, A), TRB (Beta, B), TRG (Gamma, G), TRD (Delta, D)",
-                s
-            )),
-        }
-    }
 }
 
