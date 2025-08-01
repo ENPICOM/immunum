@@ -206,7 +206,7 @@ pub fn get_kabat_lambda_scheme() -> NumberingScheme {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::{get_scoring_params};
+    use crate::constants::get_scoring_params;
 
     #[test]
     fn scheme_creation() {

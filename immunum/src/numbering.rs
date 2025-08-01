@@ -11,7 +11,7 @@ pub fn number_sequence(fasta_file: &str, scheme: &Scheme, chains: &[Chain]) -> S
         chains,
         "numbering_output.txt",
         true,
-        &get_scoring_params()
+        &get_scoring_params(),
     );
     "Numbered sequences and stored in numbering_output.txt".to_string()
 }

@@ -151,8 +151,8 @@ pub fn write_all_scoring_matrices(scoring_params: &ScoringParams) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::constants::get_scoring_params;
+    use std::path::PathBuf;
     //TODO tests for this part
 
     #[test]

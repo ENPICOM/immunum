@@ -1,48 +1,46 @@
 use phf::{phf_map, Map};
 
-
 pub const GAP_PEN_START: f64 = 1.0;
 pub const GAP_PEN_END: f64 = 1.0;
 pub const MATCH_CP_MULTIPLIER: f64 = 8.0; // Multiplier of match score
 
 pub struct ScoringParams {
-        pub gap_pen_cp: f64,
-        pub gap_pen_fr: f64,
-        pub gap_pen_ip: f64,
-        pub gap_pen_op: f64,
-        pub gap_pen_cdr: f64,
-        pub gap_pen_other: f64,
-        pub cdr_increase: f64, // increase per position away from insertion position CDR
+    pub gap_pen_cp: f64,
+    pub gap_pen_fr: f64,
+    pub gap_pen_ip: f64,
+    pub gap_pen_op: f64,
+    pub gap_pen_cdr: f64,
+    pub gap_pen_other: f64,
+    pub cdr_increase: f64, // increase per position away from insertion position CDR
 
-        pub pen_leap_insertion_point_imgt: f64, // better name
-        pub pen_leap_insertion_point_kabat: f64 // better name
+    pub pen_leap_insertion_point_imgt: f64,  // better name
+    pub pen_leap_insertion_point_kabat: f64, // better name
 }
 
-pub fn get_scoring_params() -> ScoringParams{
-        ScoringParams::default()
-        // use below if you want to chance params
-        // ScoringParams {gap_pen_start: 10.0, ..Default::default()
-        }
+pub fn get_scoring_params() -> ScoringParams {
+    ScoringParams::default()
+    // use below if you want to chance params
+    // ScoringParams {gap_pen_start: 10.0, ..Default::default()
+}
 
 impl Default for ScoringParams {
-        fn default() -> ScoringParams{
-                ScoringParams {
-                        gap_pen_cp: 55.0,
-                        gap_pen_fr: 26.0,
-                        gap_pen_ip: 1.5,
-                        gap_pen_op: 1.0,
-                        gap_pen_cdr: 2.5,
-                        gap_pen_other: 11.0,
-                        cdr_increase: 0.5, // increase per position away from insertion position CDR
+    fn default() -> ScoringParams {
+        ScoringParams {
+            gap_pen_cp: 55.0,
+            gap_pen_fr: 26.0,
+            gap_pen_ip: 1.5,
+            gap_pen_op: 1.0,
+            gap_pen_cdr: 2.5,
+            gap_pen_other: 11.0,
+            cdr_increase: 0.5, // increase per position away from insertion position CDR
 
-                        pen_leap_insertion_point_imgt: 1.0, // better name 6 best until now
-                        pen_leap_insertion_point_kabat: 10.0,// better name
-                }
+            pen_leap_insertion_point_imgt: 1.0, // better name 6 best until now
+            pen_leap_insertion_point_kabat: 10.0, // better name
         }
+    }
 }
-// Pre scan identity cutoff, minimal identity for program to assume a chain
-//pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
-pub const WITHIN_IDENTITY_RANGE: f64 = 0.2; // TODO test how low
+// For prefiltering, how close the identity must be to the highest found in order to run the scheme
+pub const WITHIN_IDENTITY_RANGE: f64 = 0.25;
 
 pub const MINIMAL_CHAIN_IDENTITY: f64 = 0.7;
 

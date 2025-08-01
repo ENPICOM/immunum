@@ -88,7 +88,10 @@ impl NumberingOutput<'_> {
                 }
             }
         }
-        let end_index = end_sequence.unwrap_or(final_position);
+        let mut end_index = end_sequence.unwrap_or(final_position);
+        if region.end == self.scheme.fr4.end {
+            end_index += 1
+        };
 
         std::str::from_utf8(&self.sequence[start_index..end_index])
             .expect("Non-UTF8 character in sequence")
@@ -96,10 +99,8 @@ impl NumberingOutput<'_> {
 
     pub fn get_output_string(&self) -> String {
         let mut output_str = String::new();
-        output_str.push_str(
-            std::str::from_utf8(self.sequence)
-                .expect("Non-UTF8 character in sequence"),
-        );
+        output_str
+            .push_str(std::str::from_utf8(self.sequence).expect("Non-UTF8 character in sequence"));
         output_str.push('\t');
         output_str.push_str(&self.numbering.join(","));
         output_str.push('\t');
@@ -170,7 +171,7 @@ impl NumberingScheme {
             .collect()
     }
     /// Calculates gap penalty according to position and scheme
-    pub fn gap_penalty(&self, position: u32, scoring:&ScoringParams) -> (f64, f64) {
+    pub fn gap_penalty(&self, position: u32, scoring: &ScoringParams) -> (f64, f64) {
         // Set initial gap penalties
         let penalty = match () {
             _ if self.conserved_positions.contains(&position) => scoring.gap_pen_cp,
@@ -193,8 +194,8 @@ impl NumberingScheme {
                     // cdr1
                     consensus_gap_penalty += scoring.pen_leap_insertion_point_imgt
                         + scoring.cdr_increase
-                        * (position as isize - insertion_points::CDR1_IMGT as isize).abs()
-                        as f64;
+                            * (position as isize - insertion_points::CDR1_IMGT as isize).abs()
+                                as f64;
                     consensus_gap_penalty += if position > insertion_points::CDR1_IMGT {
                         0.1
                     } else {
@@ -207,8 +208,8 @@ impl NumberingScheme {
                     // cdr2
                     consensus_gap_penalty += scoring.pen_leap_insertion_point_imgt
                         + scoring.cdr_increase
-                        * (position as isize - insertion_points::CDR2_IMGT as isize).abs()
-                        as f64;
+                            * (position as isize - insertion_points::CDR2_IMGT as isize).abs()
+                                as f64;
                     consensus_gap_penalty += if position > insertion_points::CDR2_IMGT {
                         0.1
                     } else {
@@ -221,8 +222,8 @@ impl NumberingScheme {
                     // cdr3
                     consensus_gap_penalty += scoring.pen_leap_insertion_point_imgt
                         + scoring.cdr_increase
-                        * (position as isize - insertion_points::CDR3_IMGT as isize).abs()
-                        as f64;
+                            * (position as isize - insertion_points::CDR3_IMGT as isize).abs()
+                                as f64;
                     consensus_gap_penalty += if position < insertion_points::CDR3_IMGT {
                         0.1
                     } else {
@@ -232,47 +233,55 @@ impl NumberingScheme {
             }
             // KABAT
             else if self.scheme_type == Scheme::KABAT {
-                let (cdr1_insertion_position,
-                    cdr2_insertion_position,
-                    cdr3_insertion_position)= match self.chain_type{
-                    Chain::IGH => {(insertion_points::CDR1_KABAT_HEAVY,
-                                    insertion_points::CDR2_KABAT_HEAVY,
-                                    insertion_points::CDR3_KABAT_HEAVY)},
-                    Chain::IGL | Chain::IGK => {(insertion_points::CDR1_KABAT_LIGHT,
-                                    insertion_points::CDR2_KABAT_LIGHT,
-                                    insertion_points::CDR3_KABAT_LIGHT)},
-                    _ => panic!("This scheme is not implemented yet (calculating gap penalty)")
-                };
-
+                let (cdr1_insertion_position, cdr2_insertion_position, cdr3_insertion_position) =
+                    match self.chain_type {
+                        Chain::IGH => (
+                            insertion_points::CDR1_KABAT_HEAVY,
+                            insertion_points::CDR2_KABAT_HEAVY,
+                            insertion_points::CDR3_KABAT_HEAVY,
+                        ),
+                        Chain::IGL | Chain::IGK => (
+                            insertion_points::CDR1_KABAT_LIGHT,
+                            insertion_points::CDR2_KABAT_LIGHT,
+                            insertion_points::CDR3_KABAT_LIGHT,
+                        ),
+                        _ => panic!("This scheme is not implemented yet (calculating gap penalty)"),
+                    };
 
                 if self.cdr1.start <= position
                     && position < self.cdr1.end
                     && position != cdr1_insertion_position
                 {
                     if self.chain_type == Chain::IGH {
-                    // cdr1
-                    consensus_gap_penalty += scoring.pen_leap_insertion_point_kabat
-                        + (scoring.cdr_increase
-                        * (position as isize - cdr1_insertion_position as isize).abs() as f64);
-                }else { // Exception in cdr 1 of kabat light schemes to ensure correct placement
-                    let relative_position:i32 = position as i32 - cdr1_insertion_position as i32;
-                    let penalty_addition: f64 = if relative_position < 0 {
-                    scoring.pen_leap_insertion_point_kabat
-                        + (scoring.cdr_increase
-                        * (position as isize - cdr1_insertion_position as isize).abs() as f64)
-                    } else if relative_position < 3 {  // positions 29 and 30 have lower penalty
-                        scoring.gap_pen_cdr + (0.1 * relative_position as f64)
-                    }
-                    else { // positions 31-34
-                        // -1 times cdr_increase to line up penalties of 26 and 31
-                        scoring.pen_leap_insertion_point_kabat
+                        // cdr1
+                        consensus_gap_penalty += scoring.pen_leap_insertion_point_kabat
                             + (scoring.cdr_increase
-                            * (((position as isize - cdr1_insertion_position as isize)
-                            .abs() as f64) - 1.0))
-                    };
-                    consensus_gap_penalty += penalty_addition
-                }
-            } else if self.cdr2.start <= position
+                                * (position as isize - cdr1_insertion_position as isize).abs()
+                                    as f64);
+                    } else {
+                        // Exception in cdr 1 of kabat light schemes to ensure correct placement
+                        let relative_position: i32 =
+                            position as i32 - cdr1_insertion_position as i32;
+                        let penalty_addition: f64 = if relative_position < 0 {
+                            scoring.pen_leap_insertion_point_kabat
+                                + (scoring.cdr_increase
+                                    * (position as isize - cdr1_insertion_position as isize).abs()
+                                        as f64)
+                        } else if relative_position < 3 {
+                            // positions 29 and 30 have lower penalty
+                            scoring.gap_pen_cdr + (0.1 * relative_position as f64)
+                        } else {
+                            // positions 31-34
+                            // -1 times cdr_increase to line up penalties of 26 and 31
+                            scoring.pen_leap_insertion_point_kabat
+                                + (scoring.cdr_increase
+                                    * (((position as isize - cdr1_insertion_position as isize).abs()
+                                        as f64)
+                                        - 1.0))
+                        };
+                        consensus_gap_penalty += penalty_addition
+                    }
+                } else if self.cdr2.start <= position
                     && position < self.cdr2.end
                     && position != cdr2_insertion_position
                 {
@@ -283,8 +292,8 @@ impl NumberingScheme {
                     } else {
                         consensus_gap_penalty += scoring.pen_leap_insertion_point_kabat
                             + (scoring.cdr_increase
-                            * (position as isize - cdr2_insertion_position as isize).abs()
-                            as f64);
+                                * (position as isize - cdr2_insertion_position as isize).abs()
+                                    as f64);
                     }
                 } else if self.cdr3.start <= position
                     && position < self.cdr3.end
@@ -293,7 +302,7 @@ impl NumberingScheme {
                     // cdr3
                     consensus_gap_penalty += scoring.pen_leap_insertion_point_kabat
                         + (scoring.cdr_increase
-                        * (position as isize - cdr3_insertion_position as isize).abs() as f64);
+                            * (position as isize - cdr3_insertion_position as isize).abs() as f64);
                     if position > cdr3_insertion_position {
                         // higher penalty after insertion in cdr3
                         consensus_gap_penalty += 4.0 * scoring.cdr_increase;
@@ -304,41 +313,34 @@ impl NumberingScheme {
                 // }
             }
             query_gap_penalty = scoring.gap_pen_cp // TODO Maybe change to different variable
-            }
+        }
 
-            // Handle start penalty, same for all schemes
-            if position < 18 {
-                // Increase from 2 to 11, then add 0.1 until position 18
-                // TODO does not have effect yet, because these are restriced sites
-                consensus_gap_penalty = 1.0
-                    + (if position > 10 { 10.0 } else { position as f64 })
-                    + (if position > 10 {
+        // Handle start penalty, same for all schemes
+        if position < 18 {
+            // Increase from 2 to 11, then add 0.1 until position 18
+            // TODO does not have effect yet, because these are restriced sites
+            consensus_gap_penalty = 1.0
+                + (if position > 10 { 10.0 } else { position as f64 })
+                + (if position > 10 {
                     0.1 * (position as f64 - 10.0)
                 } else {
                     0.0
                 });
-            }
+        }
 
-            // Adapt only query or consensus gap for insertion and gap positions
-            if self.insertion_positions.contains(&position) {
-                query_gap_penalty = scoring.gap_pen_ip
-            }
+        // Adapt only query or consensus gap for insertion and gap positions
+        if self.insertion_positions.contains(&position) {
+            query_gap_penalty = scoring.gap_pen_ip
+        }
 
-            if self.gap_positions.contains(&position) {
-                consensus_gap_penalty = scoring.gap_pen_op;
-                // KABAT heavy scheme has exception for gap positions 40-44, to fill in correct order
-                if self.scheme_type == Scheme::KABAT &&
-                    self.chain_type == Chain::IGH &&
-                    (position >= 40) && (position <= 44){
-                    consensus_gap_penalty += 0.1 * ((position - 40) as f64)
-                }
-            }
+        if self.gap_positions.contains(&position) {
+            consensus_gap_penalty = scoring.gap_pen_op;
+        }
         (query_gap_penalty, consensus_gap_penalty)
     }
     /// numbers sequence, returns NumberingOutput
     pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a [u8]) -> NumberingOutput<'a> {
-        let (mut numbering, identity) = 
-            needleman_wunsch_consensus(query_sequence, self);
+        let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
         // give gap positions correct names as defined by the numbering scheme
         name_insertions(&mut numbering, &self.scheme_type);
