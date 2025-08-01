@@ -144,6 +144,11 @@ cargo test
 
 We also have integration tests for the python and WASM bindings, these are intended to be small and only test the bindings themselves. You can run the tests using the following command:
 
+Run this command once in your environment to activate the automatic rebuilding of the python bindings
+```bash
+python -m maturin_import_hook site install
+```
+
 ```bash
 uv run pytest
 node test-wasm-node.js
