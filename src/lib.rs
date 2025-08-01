@@ -17,8 +17,6 @@ pub mod python_bindings;
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
 
-// Removed proc-macro dependency - now using manual FromStr implementations
-
 // Re-export public API functions for convenience
 pub use schemes::get_scheme;
 
