@@ -1,10 +1,10 @@
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use crate::constants::ScoringParams;
-use crate::numbering;
-use crate::numbering_scheme_type::NumberingScheme;
-use crate::schemes::get_scheme;
+use crate::annotator::Annotator;
+use crate::constants::{ScoringParams, get_scoring_params};
+use crate::result::AnnotationResult;
 use crate::types::{Chain, Scheme};
 
 /// Python enum for numbering schemes
@@ -103,72 +103,191 @@ impl PyScoringParams {
             },
         }
     }
+
+    #[getter]
+    pub fn gap_pen_cp(&self) -> f64 {
+        self.inner.gap_pen_cp
+    }
+
+    #[setter]
+    pub fn set_gap_pen_cp(&mut self, value: f64) {
+        self.inner.gap_pen_cp = value;
+    }
+
+    #[getter]
+    pub fn gap_pen_op(&self) -> f64 {
+        self.inner.gap_pen_op
+    }
+
+    #[setter]
+    pub fn set_gap_pen_op(&mut self, value: f64) {
+        self.inner.gap_pen_op = value;
+    }
 }
 
-/// Python wrapper for NumberingScheme
+/// Python wrapper for AnnotationResult
 #[cfg(feature = "python")]
-#[pyclass(name = "NumberingScheme")]
-pub struct PyNumberingScheme {
-    inner: NumberingScheme,
+#[pyclass(name = "AnnotationResult")]
+pub struct PyAnnotationResult {
+    inner: AnnotationResult,
 }
 
 #[cfg(feature = "python")]
 #[pymethods]
-impl PyNumberingScheme {
-    #[staticmethod]
-    #[pyo3(signature = (scheme, chain, params=None))]
-    pub fn get_scheme(
+impl PyAnnotationResult {
+    #[getter]
+    pub fn sequence(&self) -> String {
+        self.inner.sequence.clone()
+    }
+
+    #[getter]
+    pub fn numbers(&self) -> Vec<String> {
+        self.inner.numbers.clone()
+    }
+
+    #[getter]
+    pub fn scheme(&self) -> PyScheme {
+        match self.inner.scheme {
+            Scheme::IMGT => PyScheme::IMGT,
+            Scheme::KABAT => PyScheme::KABAT,
+        }
+    }
+
+    #[getter]
+    pub fn chain(&self) -> PyChain {
+        match self.inner.chain {
+            Chain::IGH => PyChain::IGH,
+            Chain::IGK => PyChain::IGK,
+            Chain::IGL => PyChain::IGL,
+            Chain::TRA => PyChain::TRA,
+            Chain::TRB => PyChain::TRB,
+            Chain::TRG => PyChain::TRG,
+            Chain::TRD => PyChain::TRD,
+        }
+    }
+
+    #[getter]
+    pub fn identity(&self) -> f64 {
+        self.inner.identity
+    }
+
+    #[getter]
+    pub fn regions(&self, py: Python) -> PyResult<PyObject> {
+        let dict = PyDict::new(py);
+        for (key, (start, end)) in &self.inner.regions {
+            dict.set_item(key, (start, end))?;
+        }
+        Ok(dict.into())
+    }
+
+    pub fn summary(&self) -> String {
+        self.inner.summary()
+    }
+}
+
+/// Python wrapper for Annotator - the main entry point
+#[cfg(feature = "python")]
+#[pyclass(name = "Annotator")]
+pub struct PyAnnotator {
+    inner: Annotator,
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl PyAnnotator {
+    #[new]
+    #[pyo3(signature = (scheme, chains, scoring_params=None))]
+    pub fn new(
         scheme: PyScheme,
-        chain: PyChain,
-        params: Option<PyScoringParams>,
+        chains: PyObject,
+        scoring_params: Option<PyScoringParams>,
+        py: Python,
     ) -> PyResult<Self> {
         let rust_scheme: Scheme = scheme.into();
-        let rust_chain: Chain = chain.into();
-        let scoring_params = params.map(|p| p.inner);
+        
+        // Handle both single chain and list of chains
+        let rust_chains: Vec<Chain> = if let Ok(chain_list) = chains.extract::<Vec<PyChain>>(py) {
+            chain_list.into_iter().map(|c| c.into()).collect()
+        } else if let Ok(single_chain) = chains.extract::<PyChain>(py) {
+            vec![single_chain.into()]
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "chains must be a Chain or list of Chains"
+            ));
+        };
 
-        let numbering_scheme = get_scheme(rust_scheme, rust_chain, scoring_params);
-        Ok(PyNumberingScheme {
-            inner: numbering_scheme,
-        })
+        let scoring_params_inner = scoring_params.map(|p| p.inner);
+
+        match Annotator::new(rust_scheme, rust_chains, scoring_params_inner, None) {
+            Ok(annotator) => Ok(PyAnnotator { inner: annotator }),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
+        }
     }
 
-    pub fn number_sequence(&self, sequence: &str) -> PyResult<String> {
-        let output = self.inner.number_sequence(sequence.as_bytes());
-        Ok(format!(
-            "Identity: {:.2}%, Numbering: {:?}",
-            output.identity * 100.0,
-            output.numbering
-        ))
+    pub fn number_sequence(&self, sequence: &str) -> PyResult<PyAnnotationResult> {
+        match self.inner.number_sequence(sequence) {
+            Ok(result) => Ok(PyAnnotationResult { inner: result }),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
+        }
+    }
+
+    #[pyo3(signature = (sequences, parallel=false))]
+    pub fn number_sequences(
+        &self,
+        sequences: Vec<String>,
+        parallel: bool,
+    ) -> PyResult<Vec<PyAnnotationResult>> {
+        let results = self.inner.number_sequences(&sequences, parallel);
+        let mut py_results = Vec::new();
+        
+        for result in results {
+            match result {
+                Ok(annotation_result) => {
+                    py_results.push(PyAnnotationResult { inner: annotation_result });
+                }
+                Err(e) => {
+                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e));
+                }
+            }
+        }
+        
+        Ok(py_results)
+    }
+
+    #[pyo3(signature = (file_path, output_path=None))]
+    pub fn number_file(
+        &self,
+        file_path: &str,
+        output_path: Option<&str>,
+    ) -> PyResult<String> {
+        match self.inner.number_file(file_path, output_path) {
+            Ok(output_file) => Ok(output_file),
+            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
+        }
     }
 }
 
-/// Batch processing function for multiple sequences
+/// Get default scoring parameters
 #[cfg(feature = "python")]
 #[pyfunction]
-pub fn number_sequences_batch(
-    sequences: Vec<String>,
-    scheme: PyScheme,
-    chains: Vec<PyChain>,
-) -> PyResult<Vec<String>> {
-    let rust_scheme: Scheme = scheme.into();
-    let rust_chains: Vec<Chain> = chains.into_iter().map(|c| c.into()).collect();
-
-    let results: Vec<String> = sequences
-        .iter()
-        .map(|seq| numbering::number_sequence(seq, &rust_scheme, &rust_chains))
-        .collect();
-
-    Ok(results)
+pub fn default_scoring_params() -> PyScoringParams {
+    PyScoringParams {
+        inner: get_scoring_params(),
+    }
 }
 
-/// Immunum Python module
+/// Immunum Python module configuration
 #[cfg(feature = "python")]
-#[pymodule]
 pub fn immunum(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(number_sequences_batch, m)?)?;
+    // Main API classes
+    m.add_class::<PyAnnotator>()?; // Exported as "Annotator"
+    m.add_class::<PyAnnotationResult>()?; // Exported as "AnnotationResult"
     m.add_class::<PyScoringParams>()?; // Exported as "ScoringParams"
-    m.add_class::<PyNumberingScheme>()?; // Exported as "NumberingScheme"
     m.add_class::<PyScheme>()?; // Exported as "Scheme"
     m.add_class::<PyChain>()?; // Exported as "Chain"
+    
+    // Utility functions
+    m.add_function(wrap_pyfunction!(default_scoring_params, m)?)?;
+    
     Ok(())
 }
