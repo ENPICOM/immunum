@@ -42,9 +42,6 @@ pub fn number_sequences_and_write_output(
         .map(|chain| get_scheme(scheme.clone(), *chain, None))
         .collect();
 
-    // get pre-filter schemes
-    let terminal_schemes = get_terminal_schemes(&schemes);
-
     let mut output_str = "".to_string();
     output_str.push_str(
         "Name\tSequence\tNumbering\tScore\tChain\tcdr1\tcdr2\tcdr3\tfmwk1\tfmwk2\tfmwk3\tfmwk4\tStart\tEnd\n",
@@ -53,13 +50,8 @@ pub fn number_sequences_and_write_output(
     for r in records {
         let converted_sequence = r.sequence.into_bytes();
 
-        // Select models to run using pre-scan
-        let (pre_scan_output, highest_score) = run_pre_scan(&converted_sequence, &terminal_schemes);
-        let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
-        let filtered_schemes: Vec<&NumberingScheme> = schemes
-            .iter()
-            .filter(|scheme| pre_filter_chains.contains(&scheme.chain_type))
-            .collect();
+        // Apply prefiltering to select promising chains
+        let filtered_schemes = apply_prefiltering(&converted_sequence, &schemes);
         let output_results: Vec<Result<NumberingOutput, &str>> =
             find_all_chains(&converted_sequence, filtered_schemes);
 
@@ -101,6 +93,29 @@ pub fn number_sequences_and_write_output(
         }
     }
     fs::write(output_file, output_str).expect("Something went wrong writing to data file")
+}
+
+/// Apply prefiltering to select only promising chains based on terminal identity
+pub fn apply_prefiltering<'a>(
+    sequence: &'a [u8],
+    schemes: &'a [NumberingScheme],
+) -> Vec<&'a NumberingScheme> {
+    if schemes.is_empty() {
+        return vec![];
+    }
+    
+    // get pre-filter schemes
+    let terminal_schemes = get_terminal_schemes(&schemes.to_vec());
+    
+    // Select models to run using pre-scan
+    let (pre_scan_output, highest_score) = run_pre_scan(sequence, &terminal_schemes);
+    let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
+    
+    // Filter schemes based on prefiltering results
+    schemes
+        .iter()
+        .filter(|scheme| pre_filter_chains.contains(&scheme.chain_type))
+        .collect()
 }
 
 /// Attempts to find all antibody chains in a sequence
@@ -244,6 +259,36 @@ mod tests {
         for o in output {
             println!("{:?}", o);
         }
+    }
+
+    #[test]
+    fn test_apply_prefiltering() {
+        let heavy_chain: &[u8] = "QVQLVQSGAVIKTPGSSVKISCRASGYNFRDYSIHWVRLIPDKGFEWIGWIKPLWGAVSYARQL\
+        QGRVSMTRQLSQDPDDPDWGVAYMEFSGLTPADTAEYFCVRRGSCDYCGDFPWQYWCQGTVVVVSSASTKGPSVFPLAPSSGGTAALGCLV\
+        KDYFPEPVTVSWNSGALTSGVHTFPAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
+            .as_bytes();
+        
+        let schemes = vec![
+            get_scheme(Scheme::IMGT, Chain::IGH, None),
+            get_scheme(Scheme::IMGT, Chain::IGK, None),
+            get_scheme(Scheme::IMGT, Chain::IGL, None),
+        ];
+        
+        let filtered_schemes = apply_prefiltering(heavy_chain, &schemes);
+        
+        // Should return at least one scheme (preferably the heavy chain one)
+        assert!(!filtered_schemes.is_empty());
+        // Heavy chain should be among the filtered schemes since it's the best match
+        assert!(filtered_schemes.iter().any(|s| s.chain_type == Chain::IGH));
+    }
+    
+    #[test]
+    fn test_apply_prefiltering_empty_schemes() {
+        let sequence: &[u8] = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".as_bytes();
+        let schemes: Vec<NumberingScheme> = vec![];
+        
+        let filtered_schemes = apply_prefiltering(sequence, &schemes);
+        assert!(filtered_schemes.is_empty());
     }
 
     #[test]
