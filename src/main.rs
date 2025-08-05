@@ -137,7 +137,6 @@ fn main() {
                     for (chain_index, result) in results.into_iter().enumerate() {
                         match result {
                             Ok(mut annotation_result) => {
-                                annotation_result.populate_regions();
                                 // Add chain index to sequence name for multiple results
                                 let chain_name = if chain_index > 0 {
                                     format!("{}_chain_{}", record._name, chain_index + 1)
@@ -166,7 +165,6 @@ fn main() {
                     // Use single sequence numbering (original behavior)
                     match annotator.number_sequence(&record.sequence) {
                         Ok(mut result) => {
-                            result.populate_regions();
                             writeln!(output_writer, "{}", result.to_string(cli.format.clone()))
                                 .unwrap();
                         }

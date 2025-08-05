@@ -1,6 +1,5 @@
 use crate::types::{Chain, RegionRange, Scheme};
 use clap::ValueEnum;
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -22,8 +21,8 @@ pub enum OutputFormat {
 /// Result of numbering a sequence, containing all relevant information
 #[derive(Debug)]
 pub struct AnnotationResult {
-    /// The original sequence that was numbered
-    pub sequence: String,
+    /// The original sequence that was numbered (as bytes for performance)
+    pub sequence: Vec<u8>,
     /// The numbering for each position in the sequence
     pub numbers: Vec<String>,
     /// The numbering scheme used
@@ -32,8 +31,6 @@ pub struct AnnotationResult {
     pub chain: Chain,
     /// The identity/confidence score (0.0 to 1.0)
     pub identity: f64,
-    /// Regions mapped to their start and end positions in the sequence
-    pub regions: HashMap<String, (usize, usize)>,
     /// Start position of the numbered region in the original sequence
     pub start: u32,
     /// End position of the numbered region in the original sequence
@@ -49,10 +46,15 @@ pub struct AnnotationResult {
 }
 
 impl AnnotationResult {
+    /// Get the sequence as a string (UTF-8 conversion)
+    pub fn sequence_string(&self) -> String {
+        String::from_utf8_lossy(&self.sequence).to_string()
+    }
+
     /// Get slice of sequence corresponding to a framework or cdr region
-    pub fn get_query_region(&self, region: &RegionRange) -> &str {
+    pub fn get_query_region(&self, region: &RegionRange) -> String {
         let mut start_position = region.start;
-        let mut end_position = region.end - 1;
+        let mut end_position = region.end;
 
         // get final position
         let mut final_position: usize = 0;
@@ -84,12 +86,11 @@ impl AnnotationResult {
         // check if start is found, if not, region is not present
         let start_index = match start_sequence {
             Some(i) => i,
-            None => return "",
+            None => return String::new(),
         };
 
         // find end position
-        while end_position < u32::MAX {
-            // Replace with reasonable upper bound
+        while end_position < self.fr4.end {
             let pos_option: Option<usize> = self
                 .numbers
                 .iter()
@@ -104,87 +105,32 @@ impl AnnotationResult {
                 }
             }
         }
-        let end_index = end_sequence.unwrap_or(final_position);
+        let mut end_index = end_sequence.unwrap_or(final_position);
+        if region.end == self.fr4.end {
+            end_index += 1
+        };
 
-        &self.sequence[start_index..=end_index]
-    }
-
-    /// Populate the regions HashMap with calculated positions
-    pub fn populate_regions(&mut self) {
-        let regions_to_calc = [
-            ("cdr1", &self.cdr1),
-            ("cdr2", &self.cdr2),
-            ("cdr3", &self.cdr3),
-            ("fr1", &self.fr1),
-            ("fr2", &self.fr2),
-            ("fr3", &self.fr3),
-            ("fr4", &self.fr4),
-        ];
-
-        for (name, region) in regions_to_calc {
-            let region_seq = self.get_query_region(region);
-            if !region_seq.is_empty() {
-                if let Some(pos) = self.sequence.find(region_seq) {
-                    self.regions
-                        .insert(name.to_string(), (pos, pos + region_seq.len()));
-                }
-            }
-        }
+        String::from_utf8_lossy(&self.sequence[start_index..end_index]).to_string()
     }
 
     /// Get the sequence for a specific region
     pub fn get_region_sequence(&self, region_name: &str) -> Option<String> {
-        if let Some((start, end)) = self.regions.get(region_name) {
-            if *end <= self.sequence.len() {
-                Some(self.sequence[*start..*end].to_string())
-            } else {
-                None
-            }
+        let region = match region_name {
+            "cdr1" => Some(&self.cdr1),
+            "cdr2" => Some(&self.cdr2),
+            "cdr3" => Some(&self.cdr3),
+            "fr1" => Some(&self.fr1),
+            "fr2" => Some(&self.fr2),
+            "fr3" => Some(&self.fr3),
+            "fr4" => Some(&self.fr4),
+            _ => None,
+        };
+
+        if let Some(region_range) = region {
+            Some(self.get_query_region(region_range))
         } else {
             None
         }
-    }
-
-    /// Get all CDR sequences as a map
-    pub fn get_cdr_sequences(&self) -> HashMap<String, String> {
-        let mut cdrs = HashMap::new();
-
-        for region in ["cdr1", "cdr2", "cdr3"] {
-            if let Some(seq) = self.get_region_sequence(region) {
-                cdrs.insert(region.to_string(), seq);
-            }
-        }
-
-        cdrs
-    }
-
-    /// Get all framework sequences as a map
-    pub fn get_framework_sequences(&self) -> HashMap<String, String> {
-        let mut frameworks = HashMap::new();
-
-        for region in ["fr1", "fr2", "fr3", "fr4"] {
-            if let Some(seq) = self.get_region_sequence(region) {
-                frameworks.insert(region.to_string(), seq);
-            }
-        }
-
-        frameworks
-    }
-
-    /// Check if the annotation result meets a minimum identity threshold
-    pub fn is_high_confidence(&self, threshold: f64) -> bool {
-        self.identity >= threshold
-    }
-
-    /// Get a summary string of the annotation
-    pub fn summary(&self) -> String {
-        format!(
-            "Chain: {:?}, Scheme: {:?}, Identity: {:.1}%, Regions: {}",
-            self.chain,
-            self.scheme,
-            self.identity * 100.0,
-            self.regions.len()
-        )
     }
 
     /// Convert the result to a string in the specified format
@@ -212,7 +158,7 @@ impl AnnotationResult {
     fn to_tsv(&self) -> String {
         format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-            self.sequence,
+            self.sequence_string(),
             self.numbers.join(","),
             self.identity,
             self.chain_code(),
@@ -241,7 +187,7 @@ impl AnnotationResult {
     fn to_json(&self) -> String {
         format!(
             r#"{{"sequence": "{}", "numbers": {:?}, "scheme": "{:?}", "chain": "{:?}", "identity": {:.3}, "regions": {{"cdr1": "{}", "cdr2": "{}", "cdr3": "{}", "fr1": "{}", "fr2": "{}", "fr3": "{}", "fr4": "{}"}}, "start": {}, "end": {}}}"#,
-            self.sequence,
+            self.sequence_string(),
             self.numbers,
             self.scheme,
             self.chain,
@@ -262,7 +208,7 @@ impl AnnotationResult {
     fn to_csv(&self) -> String {
         format!(
             "\"{}\",\"{}\",{:.3},\"{:?}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{}\n",
-            self.sequence,
+            self.sequence_string(),
             self.numbers.join(","),
             self.identity,
             self.chain,
@@ -377,7 +323,7 @@ mod tests {
         regions.insert("cdr2".to_string(), (40, 50));
 
         let result = AnnotationResult {
-            sequence: "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG".to_string(),
+            sequence: b"ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG".to_vec(),
             numbers: vec!["1".to_string(), "2".to_string(), "3".to_string()],
             scheme: Scheme::IMGT,
             chain: Chain::IGH,
@@ -405,8 +351,6 @@ mod tests {
 
         assert_eq!(result.identity, 0.95);
         assert_eq!(result.chain, Chain::IGH);
-        assert!(result.is_high_confidence(0.9));
-        assert!(!result.is_high_confidence(0.99));
     }
 
     #[test]
@@ -415,7 +359,7 @@ mod tests {
         regions.insert("cdr1".to_string(), (0, 5));
 
         let result = AnnotationResult {
-            sequence: "ATCGATCG".to_string(),
+            sequence: b"ATCGATCG".to_vec(),
             numbers: vec!["1".to_string(), "2".to_string()],
             scheme: Scheme::IMGT,
             chain: Chain::IGH,
@@ -494,7 +438,7 @@ mod tests {
         regions.insert("cdr1".to_string(), (10, 20));
 
         AnnotationResult {
-            sequence: "ATCGATCG".to_string(),
+            sequence: b"ATCGATCG".to_vec(),
             numbers: vec!["1".to_string(), "2".to_string(), "3".to_string()],
             scheme: Scheme::IMGT,
             chain: Chain::IGH,

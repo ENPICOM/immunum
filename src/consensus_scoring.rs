@@ -84,7 +84,6 @@ pub(crate) fn encode_sequence(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::get_scoring_params;
 
     #[test]
     fn test_lookup() {

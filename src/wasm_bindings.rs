@@ -83,7 +83,7 @@ pub struct WasmAnnotationResult {
 impl WasmAnnotationResult {
     #[wasm_bindgen(getter)]
     pub fn sequence(&self) -> String {
-        self.inner.sequence.clone()
+        self.inner.sequence_string()
     }
 
     #[wasm_bindgen(getter)]
@@ -119,16 +119,6 @@ impl WasmAnnotationResult {
     #[wasm_bindgen(js_name = getRegionSequence)]
     pub fn get_region_sequence(&self, region_name: &str) -> Option<String> {
         self.inner.get_region_sequence(region_name)
-    }
-
-    #[wasm_bindgen(js_name = isHighConfidence)]
-    pub fn is_high_confidence(&self, threshold: f64) -> bool {
-        self.inner.is_high_confidence(threshold)
-    }
-
-    #[wasm_bindgen(js_name = summary)]
-    pub fn summary(&self) -> String {
-        self.inner.summary()
     }
 }
 

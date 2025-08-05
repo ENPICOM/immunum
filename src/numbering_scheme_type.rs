@@ -67,10 +67,7 @@ impl NumberingScheme {
 
         // ADAPT CDR PENALTIES, different for every scheme
         // IMGT
-        let (mut query_gap_penalty, mut consensus_gap_penalty) = if self
-            .cdr_positions()
-            .contains(&position)
-        {
+        if self.cdr_positions().contains(&position) {
             if self.scheme_type == Scheme::IMGT {
                 if self.cdr1.start <= position
                     && position < self.cdr1.end
@@ -197,10 +194,8 @@ impl NumberingScheme {
                 //     consensus_gap_penalty = scoring.gap_pen_other;
                 // }
             }
-            (scoring.gap_pen_cp, penalty) //TODO maybe make seperate variable, for now just high
-        } else {
-            (penalty, penalty)
-        };
+            query_gap_penalty = scoring.gap_pen_cp // TODO Maybe change to different variable
+        }
 
         // Handle start penalty, same for all schemes
         if position < 18 {
@@ -245,19 +240,13 @@ impl NumberingScheme {
             .rposition(|s| s != "-")
             .expect("No positions numbered");
 
-        // Convert sequence to String
-        let sequence_str = std::str::from_utf8(query_sequence)
-            .expect("Non-UTF8 character in sequence")
-            .to_string();
-
         // Create result with region definitions
-        let mut result = AnnotationResult {
-            sequence: sequence_str,
+        AnnotationResult {
+            sequence: query_sequence.to_vec(),
             numbers: numbering,
             scheme: self.scheme_type.clone(),
             chain: self.chain_type,
             identity,
-            regions: HashMap::new(),
             start: start as u32,
             end: end as u32,
             cdr1: self.cdr1.clone(),
@@ -267,12 +256,7 @@ impl NumberingScheme {
             fr2: self.fr2.clone(),
             fr3: self.fr3.clone(),
             fr4: self.fr4.clone(),
-        };
-
-        // Calculate region positions
-        result.populate_regions();
-
-        result
+        }
     }
     pub fn to_terminal_schemes(&self, terminal_length: u8) -> (NumberingScheme, NumberingScheme) {
         // Create N-terminal scheme (positions 1 to terminal_length)

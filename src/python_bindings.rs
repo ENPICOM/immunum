@@ -77,7 +77,7 @@ pub struct PyAnnotationResult {
 impl PyAnnotationResult {
     #[getter]
     pub fn sequence(&self) -> String {
-        self.inner.sequence.clone()
+        self.inner.sequence_string()
     }
 
     #[getter]
@@ -103,14 +103,21 @@ impl PyAnnotationResult {
     #[getter]
     pub fn regions(&self, py: Python) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
-        for (key, (start, end)) in &self.inner.regions {
-            dict.set_item(key, (start, end))?;
+        let region_names = ["cdr1", "cdr2", "cdr3", "fr1", "fr2", "fr3", "fr4"];
+        let region_ranges = [
+            &self.inner.cdr1,
+            &self.inner.cdr2,
+            &self.inner.cdr3,
+            &self.inner.fr1,
+            &self.inner.fr2,
+            &self.inner.fr3,
+            &self.inner.fr4,
+        ];
+
+        for (name, range) in region_names.iter().zip(region_ranges.iter()) {
+            dict.set_item(*name, (range.start, range.end))?;
         }
         Ok(dict.into())
-    }
-
-    pub fn summary(&self) -> String {
-        self.inner.summary()
     }
 
     #[getter]
@@ -125,28 +132,6 @@ impl PyAnnotationResult {
 
     pub fn get_region_sequence(&self, region_name: &str) -> Option<String> {
         self.inner.get_region_sequence(region_name)
-    }
-
-    pub fn get_cdr_sequences(&self, py: Python) -> PyResult<PyObject> {
-        let dict = PyDict::new(py);
-        let cdrs = self.inner.get_cdr_sequences();
-        for (key, value) in cdrs {
-            dict.set_item(key, value)?;
-        }
-        Ok(dict.into())
-    }
-
-    pub fn get_framework_sequences(&self, py: Python) -> PyResult<PyObject> {
-        let dict = PyDict::new(py);
-        let frameworks = self.inner.get_framework_sequences();
-        for (key, value) in frameworks {
-            dict.set_item(key, value)?;
-        }
-        Ok(dict.into())
-    }
-
-    pub fn is_high_confidence(&self, threshold: f64) -> bool {
-        self.inner.is_high_confidence(threshold)
     }
 }
 

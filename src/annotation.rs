@@ -125,16 +125,12 @@ pub fn find_all_chains(
                         sequence_list.push((end_sequence, (best_chain.end + 1), current_end))
                     }
 
-                    // Update positions to match original sequence
+                    // set sequence to full original sequence
+                    best_chain.sequence = query_sequence.to_vec();
                     best_chain.start += current_start;
                     best_chain.end += current_start;
 
-                    // Update sequence to full original sequence
-                    best_chain.sequence = std::str::from_utf8(query_sequence)
-                        .expect("Non-UTF8 character in sequence")
-                        .to_string();
-
-                    //add gaps to front and end to match with length of original sequence
+                    // add gaps to front and end to match with length of original sequence
                     let mut start_addition = vec![String::from("-"); current_start as usize];
                     let end_addition =
                         vec![String::from("-"); (full_query_length - current_end - 1) as usize];
@@ -155,7 +151,6 @@ pub fn find_all_chains(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::get_scoring_params;
     use crate::schemes::get_scheme;
     use crate::types::{Chain, Scheme};
 
