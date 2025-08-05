@@ -1,6 +1,7 @@
 use crate::constants::{insertion_points, ScoringParams};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
+use crate::result::AnnotationResult;
 use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{Chain, RegionRange, Scheme};
 use std::collections::HashMap;
@@ -21,125 +22,6 @@ pub struct NumberingScheme {
     pub cdr1: RegionRange,
     pub cdr2: RegionRange,
     pub cdr3: RegionRange,
-}
-
-#[derive(Debug, Clone)]
-pub struct NumberingOutput<'a> {
-    pub scheme: &'a NumberingScheme,
-    pub sequence: &'a [u8],
-    pub numbering: Vec<String>,
-    pub identity: f64,
-    pub start: u32,
-    pub end: u32,
-}
-
-impl NumberingOutput<'_> {
-    /// Get slice of sequence corresponding to a framework or cdr region
-    pub fn get_query_region(&self, region: &RegionRange) -> &str {
-        let mut start_position = region.start;
-        let mut end_position = region.end;
-
-        // get final position
-        let mut final_position: usize = 0;
-        for p in 0..self.numbering.len() {
-            if self.numbering[p] != "-" {
-                final_position = p
-            }
-        }
-
-        let mut start_sequence: Option<usize> = None;
-        let mut end_sequence: Option<usize> = None;
-
-        // find start position in sequence
-        while start_position <= end_position {
-            let pos_option: Option<usize> = self
-                .numbering
-                .iter()
-                .position(|num| num == &start_position.to_string());
-            match pos_option {
-                Some(i) => {
-                    start_sequence = Some(i);
-                    break;
-                }
-                None => {
-                    start_position += 1;
-                }
-            }
-        }
-        // check if start is found, if not, region is not present
-        let start_index = match start_sequence {
-            Some(i) => i,
-            None => return "",
-        };
-
-        // find end position
-        while end_position < self.scheme.consensus_amino_acids.len() as u32 {
-            let pos_option: Option<usize> = self
-                .numbering
-                .iter()
-                .position(|num| num == &end_position.to_string());
-            match pos_option {
-                Some(i) => {
-                    end_sequence = Some(i);
-                    break;
-                }
-                None => {
-                    end_position += 1;
-                }
-            }
-        }
-        let mut end_index = end_sequence.unwrap_or(final_position);
-        if region.end == self.scheme.fr4.end {
-            end_index += 1
-        };
-
-        std::str::from_utf8(&self.sequence[start_index..end_index])
-            .expect("Non-UTF8 character in sequence")
-    }
-
-    pub fn get_output_string(&self) -> String {
-        let mut output_str = String::new();
-        output_str
-            .push_str(std::str::from_utf8(self.sequence).expect("Non-UTF8 character in sequence"));
-        output_str.push('\t');
-        output_str.push_str(&self.numbering.join(","));
-        output_str.push('\t');
-        output_str.push_str(&format!("{}", self.identity));
-        output_str.push('\t');
-        output_str.push_str(match self.scheme.chain_type {
-            Chain::IGH => "H",
-            Chain::IGK => "K",
-            Chain::IGL => "L",
-            Chain::TRA => "A",
-            Chain::TRB => "B",
-            Chain::TRD => "D",
-            Chain::TRG => "G",
-        });
-        output_str.push('\t');
-
-        output_str.push_str(self.get_query_region(&self.scheme.cdr1));
-        output_str.push('\t');
-        output_str.push_str(self.get_query_region(&self.scheme.cdr2));
-        output_str.push('\t');
-        output_str.push_str(self.get_query_region(&self.scheme.cdr3));
-        output_str.push('\t');
-        output_str.push_str(self.get_query_region(&self.scheme.fr1));
-        output_str.push('\t');
-        output_str.push_str(self.get_query_region(&self.scheme.fr2));
-        output_str.push('\t');
-        output_str.push_str(self.get_query_region(&self.scheme.fr3));
-        output_str.push('\t');
-        output_str.push_str(self.get_query_region(&self.scheme.fr4));
-
-        output_str.push('\t');
-        output_str.push_str(&format!("{}", self.start));
-
-        output_str.push('\t');
-        output_str.push_str(&format!("{}", self.end));
-
-        output_str.push('\n');
-        output_str
-    }
 }
 
 impl NumberingScheme {
@@ -185,7 +67,10 @@ impl NumberingScheme {
 
         // ADAPT CDR PENALTIES, different for every scheme
         // IMGT
-        if self.cdr_positions().contains(&position) {
+        let (mut query_gap_penalty, mut consensus_gap_penalty) = if self
+            .cdr_positions()
+            .contains(&position)
+        {
             if self.scheme_type == Scheme::IMGT {
                 if self.cdr1.start <= position
                     && position < self.cdr1.end
@@ -312,8 +197,10 @@ impl NumberingScheme {
                 //     consensus_gap_penalty = scoring.gap_pen_other;
                 // }
             }
-            query_gap_penalty = scoring.gap_pen_cp // TODO Maybe change to different variable
-        }
+            (scoring.gap_pen_cp, penalty) //TODO maybe make seperate variable, for now just high
+        } else {
+            (penalty, penalty)
+        };
 
         // Handle start penalty, same for all schemes
         if position < 18 {
@@ -338,8 +225,8 @@ impl NumberingScheme {
         }
         (query_gap_penalty, consensus_gap_penalty)
     }
-    /// numbers sequence, returns NumberingOutput
-    pub(crate) fn number_sequence<'a>(&'a self, query_sequence: &'a [u8]) -> NumberingOutput<'a> {
+    /// numbers sequence, returns AnnotationResult
+    pub(crate) fn number_sequence(&self, query_sequence: &[u8]) -> AnnotationResult {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
         // give gap positions correct names as defined by the numbering scheme
@@ -358,14 +245,34 @@ impl NumberingScheme {
             .rposition(|s| s != "-")
             .expect("No positions numbered");
 
-        NumberingOutput {
-            scheme: self,
-            sequence: query_sequence,
-            numbering,
+        // Convert sequence to String
+        let sequence_str = std::str::from_utf8(query_sequence)
+            .expect("Non-UTF8 character in sequence")
+            .to_string();
+
+        // Create result with region definitions
+        let mut result = AnnotationResult {
+            sequence: sequence_str,
+            numbers: numbering,
+            scheme: self.scheme_type.clone(),
+            chain: self.chain_type,
             identity,
+            regions: HashMap::new(),
             start: start as u32,
             end: end as u32,
-        }
+            cdr1: self.cdr1.clone(),
+            cdr2: self.cdr2.clone(),
+            cdr3: self.cdr3.clone(),
+            fr1: self.fr1.clone(),
+            fr2: self.fr2.clone(),
+            fr3: self.fr3.clone(),
+            fr4: self.fr4.clone(),
+        };
+
+        // Calculate region positions
+        result.populate_regions();
+
+        result
     }
     pub fn to_terminal_schemes(&self, terminal_length: u8) -> (NumberingScheme, NumberingScheme) {
         // Create N-terminal scheme (positions 1 to terminal_length)
@@ -404,15 +311,123 @@ impl NumberingScheme {
             insertion_positions: vec![],
             gap_positions: vec![], // No gap positions at c-terminal
             consensus_amino_acids: c_terminal_consensus,
-            scoring_matrix: self
-                .scoring_matrix
-                .slice(
-                    fmwk4_start as usize..(fmwk4_start + terminal_length as u32) as usize,
-                    0..self.scoring_matrix.ncols()
-                ),
+            scoring_matrix: self.scoring_matrix.slice(
+                fmwk4_start as usize..(fmwk4_start + terminal_length as u32) as usize,
+                0..self.scoring_matrix.ncols(),
+            ),
             ..self.clone() // Use the remaining fields from the original
         };
 
         (n_terminal_scheme, c_terminal_scheme)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        schemes::get_scheme,
+        scoring_matrix::ScoringMatrix,
+        types::{Chain, Scheme},
+    };
+
+    impl ScoringMatrix {
+        /// Get a slice of a specific row
+        pub fn row(&self, row: usize) -> Vec<f64> {
+            let mut row_data = Vec::with_capacity(self.ncols());
+            for col in 0..self.ncols() {
+                row_data.push(self.get(row, col));
+            }
+            row_data
+        }
+    }
+
+    #[test]
+    fn terminal_schemes_heavy() {
+        let terminal_length = 10;
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
+        let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
+
+        for i in 0..terminal_length {
+            assert_eq!(
+                n_term_scheme.scoring_matrix.row(i as usize),
+                original_scheme.scoring_matrix.row(i as usize)
+            );
+
+            assert_eq!(
+                c_term_scheme.scoring_matrix.row(i as usize),
+                original_scheme.scoring_matrix.row(117 + i as usize)
+            );
+        }
+
+        for i in 1..terminal_length {
+            assert_eq!(
+                n_term_scheme.consensus_amino_acids[&(i as u32)],
+                original_scheme.consensus_amino_acids[&(i as u32)]
+            );
+            assert_eq!(
+                c_term_scheme.consensus_amino_acids[&(i as u32)],
+                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
+            );
+        }
+    }
+
+    #[test]
+    fn terminal_schemes_kappa() {
+        let terminal_length = 10;
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGK, None);
+        let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
+
+        for i in 0..terminal_length {
+            assert_eq!(
+                n_term_scheme.scoring_matrix.row(i as usize),
+                original_scheme.scoring_matrix.row(i as usize)
+            );
+
+            assert_eq!(
+                c_term_scheme.scoring_matrix.row(i as usize),
+                original_scheme.scoring_matrix.row(117 + i as usize)
+            );
+        }
+
+        for i in 1..terminal_length {
+            assert_eq!(
+                n_term_scheme.consensus_amino_acids[&(i as u32)],
+                original_scheme.consensus_amino_acids[&(i as u32)]
+            );
+            assert_eq!(
+                c_term_scheme.consensus_amino_acids[&(i as u32)],
+                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
+            );
+        }
+    }
+
+    #[test]
+    fn terminal_schemes_lambda() {
+        let terminal_length = 10;
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGL, None);
+        let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
+
+        for i in 0..terminal_length {
+            assert_eq!(
+                n_term_scheme.scoring_matrix.row(i as usize),
+                original_scheme.scoring_matrix.row(i as usize)
+            );
+
+            assert_eq!(
+                c_term_scheme.scoring_matrix.row(i as usize),
+                original_scheme.scoring_matrix.row(117 + i as usize)
+            );
+        }
+
+        for i in 1..terminal_length {
+            assert_eq!(
+                n_term_scheme.consensus_amino_acids[&(i as u32)],
+                original_scheme.consensus_amino_acids[&(i as u32)]
+            );
+            assert_eq!(
+                c_term_scheme.consensus_amino_acids[&(i as u32)],
+                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
+            );
+        }
     }
 }

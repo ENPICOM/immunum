@@ -18,22 +18,23 @@ pub fn calculate_scoring_matrix(
     for consensus_position in 0..consensus_length {
         for residue_index in 0..number_accepted_residues {
             let residue: u8 = ACCEPTED_RESIDUES[residue_index];
-            let score = best_score_consensus(
-                (consensus_position + 1) as u32,
-                residue,
-                consensus,
-            ) as f64;
+            let score =
+                best_score_consensus((consensus_position + 1) as u32, residue, consensus) as f64;
             matrix.set(consensus_position, residue_index, score);
         }
-        
+
         // Fill in gap penalties
         let (query_gap, consensus_gap) =
             scheme_gap_penalty_fn((consensus_position + 1) as u32, scoring_params);
-        
+
         // Query gap
         matrix.set(consensus_position, number_accepted_residues, query_gap);
         // Consensus gap
-        matrix.set(consensus_position, number_accepted_residues + 1, consensus_gap);
+        matrix.set(
+            consensus_position,
+            number_accepted_residues + 1,
+            consensus_gap,
+        );
     }
 
     matrix

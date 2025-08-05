@@ -1,21 +1,18 @@
-use crate::constants::{ScoringParams, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
-use crate::fastx::{from_path, FastxRecord};
-use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
-use crate::prefiltering::{get_terminal_schemes, run_pre_scan, select_chains_from_pre_scan};
-use crate::schemes::get_scheme;
-use crate::types::{Chain, Scheme};
-use std::fs;
+use crate::constants::{MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
+use crate::numbering_scheme_type::NumberingScheme;
+use crate::result::AnnotationResult;
 
 /// Runs alignment of given schemes on sequence and selects one with highest identity
-pub(crate) fn find_highest_identity_chain<'a>(
-    query_sequence: &'a [u8],
-    numbering_schemes: &Vec<&'a NumberingScheme>,
-) -> Result<NumberingOutput<'a>, &'static str> {
+pub(crate) fn find_highest_identity_chain(
+    query_sequence: &[u8],
+    numbering_schemes: &Vec<&NumberingScheme>,
+) -> Result<AnnotationResult, &'static str> {
     let mut highest_identity: f64 = -0.1;
-    let mut best_output: Result<NumberingOutput, &'static str> = Err("No numbering schemes passed");
+    let mut best_output: Result<AnnotationResult, &'static str> =
+        Err("No numbering schemes passed");
 
     for scheme in numbering_schemes {
-        let output: NumberingOutput = scheme.number_sequence(query_sequence);
+        let output: AnnotationResult = scheme.number_sequence(query_sequence);
         if output.identity > highest_identity {
             highest_identity = output.identity;
             best_output = Ok(output);
@@ -23,107 +20,86 @@ pub(crate) fn find_highest_identity_chain<'a>(
     }
     best_output
 }
-/// Runs alignement on all sequences in fastx file, and writes output to .txt file
-pub fn number_sequences_and_write_output(
-    fasta_file: &str,
-    scheme: Scheme,
-    chains: &[Chain],
-    output_file: &str,
-    update_scoring_matrices: bool,
-    scoring_params: &ScoringParams,
-) {
-    // Read in fasta
-    let reader = from_path(fasta_file).unwrap();
-    let records: Vec<FastxRecord> = reader.collect::<Result<Vec<FastxRecord>, _>>().unwrap();
 
-    // get schemes dependent on selected numbering method and chains
-    let schemes: Vec<NumberingScheme> = chains
-        .iter()
-        .map(|chain| get_scheme(scheme.clone(), *chain, None))
-        .collect();
+// TODO I think we can remove this, we should use the cli or python api to run tests
+// /// Runs alignement on all sequences in fastx file, and writes output to .txt file
+// pub fn number_sequences_and_write_output(
+//     fasta_file: &str,
+//     scheme: Scheme,
+//     chains: &[Chain],
+//     output_file: &str,
+//     update_scoring_matrices: bool,
+//     scoring_params: &ScoringParams
+// ) {
+//     // Read in fasta
+//     let reader = from_path(fasta_file).unwrap();
+//     let records: Vec<FastxRecord> = reader.collect::<Result<Vec<FastxRecord>, _>>().unwrap();
 
-    let mut output_str = "".to_string();
-    output_str.push_str(
-        "Name\tSequence\tNumbering\tScore\tChain\tcdr1\tcdr2\tcdr3\tfmwk1\tfmwk2\tfmwk3\tfmwk4\tStart\tEnd\n",
-    );
-    // run annotation for all sequences
-    for r in records {
-        let converted_sequence = r.sequence.into_bytes();
+//     // get schemes dependent on selected numbering method and chains
+//     let schemes: Vec<NumberingScheme> = chains
+//         .iter()
+//         .map(|chain| get_scheme(scheme.clone(), *chain, None))
+//         .collect();
 
-        // Apply prefiltering to select promising chains
-        let filtered_schemes = apply_prefiltering(&converted_sequence, &schemes);
-        let output_results: Vec<Result<NumberingOutput, &str>> =
-            find_all_chains(&converted_sequence, filtered_schemes);
+//     let mut output_str = "".to_string();
+//     output_str.push_str(
+//         "Name\tSequence\tNumbering\tScore\tChain\tcdr1\tcdr2\tcdr3\tfmwk1\tfmwk2\tfmwk3\tfmwk4\tStart\tEnd\n",
+//     );
+//     // run annotation for all sequences
+//     for r in records {
+//         let converted_sequence = r.sequence.into_bytes();
 
-        for output_result in output_results {
-            match output_result {
-                Ok(output) => {
-                    //create string output
-                    output_str.push_str(&r._name);
-                    output_str.push('\t');
+//         // Apply prefiltering to select promising chains
+//         let filtered_schemes = apply_prefiltering(&converted_sequence, &schemes);
+//         let output_results: Vec<Result<AnnotationResult, &str>> =
+//             find_all_chains(&converted_sequence, filtered_schemes);
 
-                    output_str.push_str(&output.get_output_string());
-                }
-                Err(e) => {
-                    output_str.push_str(&r._name);
-                    output_str.push('\t');
-                    output_str.push_str(
-                        std::str::from_utf8(&converted_sequence)
-                            .expect("Non-UTF8 character in sequence"),
-                    );
-                    output_str.push('\t');
-                    output_str.push_str(&format!("Failed numbering {e}"));
-                    output_str.push('\t');
-                    output_str.push_str(&format!("{}", 0));
-                    output_str.push('\t');
-                    output_str.push('X');
-                    for _ in 0..8 {
-                        // no regions
-                        output_str.push('\t')
-                    }
-                    output_str.push('\t');
-                    output_str.push('0');
+//         for output_result in output_results {
+//             match output_result {
+//                 Ok(output) => {
+//                     //create string output
+//                     output_str.push_str(&r._name);
+//                     output_str.push('\t');
 
-                    output_str.push('\t');
-                    output_str.push('0');
+//                     output_str.push_str(&output.get_output_string());
+//                 }
+//                 Err(e) => {
+//                     output_str.push_str(&r._name);
+//                     output_str.push('\t');
+//                     output_str.push_str(
+//                         std::str::from_utf8(&converted_sequence)
+//                             .expect("Non-UTF8 character in sequence"),
+//                     );
+//                     output_str.push('\t');
+//                     output_str.push_str(&format!("Failed numbering {e}"));
+//                     output_str.push('\t');
+//                     output_str.push_str(&format!("{}", 0));
+//                     output_str.push('\t');
+//                     output_str.push('X');
+//                     for _ in 0..8 {
+//                         // no regions
+//                         output_str.push('\t')
+//                     }
+//                     output_str.push('\t');
+//                     output_str.push('0');
 
-                    output_str.push('\n');
-                }
-            }
-        }
-    }
-    fs::write(output_file, output_str).expect("Something went wrong writing to data file")
-}
+//                     output_str.push('\t');
+//                     output_str.push('0');
 
-/// Apply prefiltering to select only promising chains based on terminal identity
-pub fn apply_prefiltering<'a>(
-    sequence: &'a [u8],
-    schemes: &'a [NumberingScheme],
-) -> Vec<&'a NumberingScheme> {
-    if schemes.is_empty() {
-        return vec![];
-    }
-    
-    // get pre-filter schemes
-    let terminal_schemes = get_terminal_schemes(&schemes.to_vec());
-    
-    // Select models to run using pre-scan
-    let (pre_scan_output, highest_score) = run_pre_scan(sequence, &terminal_schemes);
-    let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
-    
-    // Filter schemes based on prefiltering results
-    schemes
-        .iter()
-        .filter(|scheme| pre_filter_chains.contains(&scheme.chain_type))
-        .collect()
-}
+//                     output_str.push('\n');
+//                 }
+//             }
+//         }
+//     }
+//     fs::write(output_file, output_str).expect("Something went wrong writing to data file")
+// }
 
 /// Attempts to find all antibody chains in a sequence
-fn find_all_chains<'a>(
-    query_sequence: &'a [u8],
-    numbering_schemes: Vec<&'a NumberingScheme>,
-) -> Vec<Result<NumberingOutput<'a>, &'static str>> {
-    let mut chains_found: Vec<Result<NumberingOutput, &str>> = Vec::new();
+pub fn find_all_chains(
+    query_sequence: &[u8],
+    numbering_schemes: Vec<&NumberingScheme>,
+) -> Vec<Result<AnnotationResult, &'static str>> {
+    let mut chains_found: Vec<Result<AnnotationResult, &str>> = Vec::new();
 
     let full_query_length: u32 = query_sequence.len() as u32;
     let mut sequence_list: Vec<(&[u8], u32, u32)> = Vec::new();
@@ -132,15 +108,15 @@ fn find_all_chains<'a>(
     while let Some(item) = sequence_list.pop() {
         let (current_sequence, current_start, current_end) = item;
 
-        let numbering_result: Result<NumberingOutput, &str> =
+        let numbering_result: Result<AnnotationResult, &str> =
             find_highest_identity_chain(current_sequence, &numbering_schemes);
 
         match numbering_result {
             Ok(mut best_chain) => {
                 if best_chain.identity > MINIMAL_CHAIN_IDENTITY {
                     // split the remaining sequence, add sequences that are long enough to the list
-                    let front_sequence: &[u8] = &best_chain.sequence[0..best_chain.start as usize];
-                    let end_sequence: &[u8] = &best_chain.sequence[(best_chain.end as usize + 1)..];
+                    let front_sequence: &[u8] = &current_sequence[0..best_chain.start as usize];
+                    let end_sequence: &[u8] = &current_sequence[(best_chain.end as usize + 1)..];
 
                     if front_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
                         sequence_list.push((front_sequence, current_start, (best_chain.start - 1)))
@@ -149,23 +125,27 @@ fn find_all_chains<'a>(
                         sequence_list.push((end_sequence, (best_chain.end + 1), current_end))
                     }
 
-                    // set sequence to full original sequence
-                    best_chain.sequence = query_sequence;
+                    // Update positions to match original sequence
                     best_chain.start += current_start;
                     best_chain.end += current_start;
+
+                    // Update sequence to full original sequence
+                    best_chain.sequence = std::str::from_utf8(query_sequence)
+                        .expect("Non-UTF8 character in sequence")
+                        .to_string();
 
                     //add gaps to front and end to match with length of original sequence
                     let mut start_addition = vec![String::from("-"); current_start as usize];
                     let end_addition =
                         vec![String::from("-"); (full_query_length - current_end - 1) as usize];
-                    start_addition.extend(best_chain.numbering);
+                    start_addition.extend(best_chain.numbers);
                     start_addition.extend(end_addition);
 
-                    best_chain.numbering = start_addition;
+                    best_chain.numbers = start_addition;
                     chains_found.push(Ok(best_chain));
                 }
             }
-            Err(e) => chains_found.push(Err::<NumberingOutput, &str>(e)),
+            Err(e) => chains_found.push(Err::<AnnotationResult, &str>(e)),
         }
     }
 
@@ -177,29 +157,70 @@ mod tests {
     use super::*;
     use crate::constants::get_scoring_params;
     use crate::schemes::get_scheme;
-    use crate::types::Chain;
+    use crate::types::{Chain, Scheme};
 
-    #[test]
-    fn number_fasta_file() {
-        let fasta_file = r"C:\Anti_Num\benchmark\test_sequences\Paired_chains\paired_chain_linker_.fasta";
-        let scoring_params = get_scoring_params();
-        number_sequences_and_write_output(
-            fasta_file,
-            Scheme::KABAT,
-            &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Anti_Num\output\test_linked\numbering_kabat.txt",
-            true,
-            &scoring_params,
-        );
-        number_sequences_and_write_output(
-            fasta_file,
-            Scheme::IMGT,
-            &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Anti_Num\output\test_linked\numbering_imgt.txt",
-            false,
-            &scoring_params,
-        );
-    }
+    // #[test]
+    // fn number_fasta_file() {
+    //     let fasta_file = r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta";
+    //     let scoring_params = get_scoring_params();
+    //     number_sequences_and_write_output(fasta_file,
+    //                                       Scheme::KABAT,
+    //                                       &[Chain::IGH, Chain::IGK, Chain::IGL],
+    //                                       r"C:\Anti_Num\output\rust_output_2\numbering_kabat.txt",
+    //                                       true, &scoring_params
+    //     );
+    //     number_sequences_and_write_output(fasta_file,
+    //                                       Scheme::IMGT,
+    //                                       &[Chain::IGH, Chain::IGK, Chain::IGL],
+    //                                       r"C:\Anti_Num\output\rust_output_2\numbering_imgt.txt",
+    //                                       false, &scoring_params
+    //     );
+    // }
+
+    // #[test]
+    // fn parameter_sweep() {
+    //     let fasta_file = r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta";
+    //     let mut i = 90;
+    //     // loop here for different param settings
+    //     for cdr_pen in [2.7] {
+    //         for cdr_incr in [0.5] {
+    //             for leaps in [(10.0, 6.0)] {
+    //                 let (leap_kabat, leap_imgt) = leaps;
+
+    //                 fs::create_dir(
+    //                     format!(r"C:\Anti_Num\output\{i}"))
+    //                     .expect("TODO: panic message");
+
+    //                 // create adapted scoring params
+    //                 let scoring_params = ScoringParams {gap_pen_cdr: cdr_pen,
+    //                     cdr_increase: cdr_incr, pen_leap_insertion_point_kabat: leap_kabat,
+    //                     pen_leap_insertion_point_imgt: leap_imgt,
+    //                     ..Default::default()};
+    //                 number_sequences_and_write_output(fasta_file,
+    //                                                   Scheme::KABAT,
+    //                                                   &[Chain::IGH, Chain::IGK, Chain::IGL],
+    //                                                   &format!(r"C:\Anti_Num\output\{i}\numbering_kabat.txt"),
+    //                                                   true, &scoring_params
+    //                 );
+    //                 number_sequences_and_write_output(fasta_file,
+    //                                                   Scheme::IMGT,
+    //                                                   &[Chain::IGH, Chain::IGK, Chain::IGL],
+    //                                                   &format!(r"C:\Anti_Num\output\{i}\numbering_imgt.txt"),
+    //                                                   false, &scoring_params
+    //                 );
+
+    //                 fs::write(format!(r"C:\Anti_Num\output\{i}\params.txt"),
+    //                           format!("CDR_PEN: {0}\nCP_INCR: {1}\nLEAPS (kabat/imgt): {2}/{3}",
+    //                                   scoring_params.gap_pen_cdr, scoring_params.cdr_increase,
+    //                                   scoring_params.pen_leap_insertion_point_kabat,
+    //                                   scoring_params.pen_leap_insertion_point_imgt))
+    //                     .expect("Something went wrong writing to data file");
+
+    //                 i += 1;
+    //             }
+    //         }
+    //     }
+    // }
 
     #[test]
     fn single_sequence_find_all() {
@@ -217,36 +238,6 @@ mod tests {
         for o in output {
             println!("{:?}", o);
         }
-    }
-
-    #[test]
-    fn test_apply_prefiltering() {
-        let heavy_chain: &[u8] = "QVQLVQSGAVIKTPGSSVKISCRASGYNFRDYSIHWVRLIPDKGFEWIGWIKPLWGAVSYARQL\
-        QGRVSMTRQLSQDPDDPDWGVAYMEFSGLTPADTAEYFCVRRGSCDYCGDFPWQYWCQGTVVVVSSASTKGPSVFPLAPSSGGTAALGCLV\
-        KDYFPEPVTVSWNSGALTSGVHTFPAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
-            .as_bytes();
-        
-        let schemes = vec![
-            get_scheme(Scheme::IMGT, Chain::IGH, None),
-            get_scheme(Scheme::IMGT, Chain::IGK, None),
-            get_scheme(Scheme::IMGT, Chain::IGL, None),
-        ];
-        
-        let filtered_schemes = apply_prefiltering(heavy_chain, &schemes);
-        
-        // Should return at least one scheme (preferably the heavy chain one)
-        assert!(!filtered_schemes.is_empty());
-        // Heavy chain should be among the filtered schemes since it's the best match
-        assert!(filtered_schemes.iter().any(|s| s.chain_type == Chain::IGH));
-    }
-    
-    #[test]
-    fn test_apply_prefiltering_empty_schemes() {
-        let sequence: &[u8] = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".as_bytes();
-        let schemes: Vec<NumberingScheme> = vec![];
-        
-        let filtered_schemes = apply_prefiltering(sequence, &schemes);
-        assert!(filtered_schemes.is_empty());
     }
 
     #[test]
@@ -275,24 +266,21 @@ mod tests {
         assert_eq!(
             find_highest_identity_chain(heavy_chain, &schemes)
                 .expect("")
-                .scheme
-                .chain_type,
+                .chain,
             Chain::IGH
         );
 
         assert_eq!(
             find_highest_identity_chain(kappa_chain, &schemes)
                 .expect("")
-                .scheme
-                .chain_type,
+                .chain,
             Chain::IGK
         );
 
         assert_eq!(
             find_highest_identity_chain(lambda_chain, &schemes)
                 .expect("")
-                .scheme
-                .chain_type,
+                .chain,
             Chain::IGL
         );
     }

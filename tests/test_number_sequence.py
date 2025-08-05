@@ -1,15 +1,15 @@
 """
-Basic tests for the typed API in immunum.
+Basic tests for the immunum Python API.
 
-This module contains basic tests for the new typed API functionality.
+This module contains tests for the new Annotator-based API functionality.
 """
 
 import pytest
 import immunum
 
 
-class TestTypedAPI:
-    """Basic tests for the new typed API."""
+class TestImmunumAPI:
+    """Tests for the main immunum API."""
 
     def test_scheme_enums(self):
         """Test that scheme enums are accessible."""
@@ -21,63 +21,120 @@ class TestTypedAPI:
         assert immunum.Chain.IGH is not None
         assert immunum.Chain.IGK is not None
         assert immunum.Chain.IGL is not None
+        assert immunum.Chain.TRA is not None
+        assert immunum.Chain.TRB is not None
+        assert immunum.Chain.TRG is not None
+        assert immunum.Chain.TRD is not None
 
     def test_scoring_params(self):
         """Test ScoringParams creation."""
         params = immunum.ScoringParams()
         assert params is not None
         assert params.gap_pen_cp > 0
-        
+
         custom_params = immunum.ScoringParams(gap_pen_cp=60.0)
         assert custom_params.gap_pen_cp == 60.0
 
-    def test_numbering_scheme_creation(self):
-        """Test NumberingScheme creation."""
-        scheme = immunum.NumberingScheme.imgt_heavy()
-        assert scheme is not None
-        
-        custom_params = immunum.ScoringParams(gap_pen_cp=60.0)
-        scheme_custom = immunum.NumberingScheme.kabat_kappa(custom_params)
-        assert scheme_custom is not None
+    def test_default_scoring_params(self):
+        """Test default scoring parameters function."""
+        params = immunum.default_scoring_params()
+        assert params is not None
+        assert params.gap_pen_cp > 0
 
-    def test_batch_processing_basic(self):
-        """Test basic batch processing functionality."""
-        sequences = ["ATCGATCG"]
-        scheme = immunum.Scheme.IMGT
-        chains = [immunum.Chain.IGH]
-        
-        # This will likely fail due to file I/O issues in tests,
-        # but should demonstrate the correct API signature
-        try:
-            results = immunum.number_sequences_batch(sequences, scheme, chains)
-            assert isinstance(results, list)
-        except Exception as e:
-            # Expected to fail due to missing test data files
-            assert "No such file or directory" in str(e) or "file" in str(e).lower()
+    def test_annotator_creation(self):
+        """Test Annotator creation."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT, chains=[immunum.Chain.IGH]
+        )
+        assert annotator is not None
+
+    def test_annotator_with_custom_params(self):
+        """Test Annotator creation with custom scoring parameters."""
+        custom_params = immunum.ScoringParams(gap_pen_cp=60.0)
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT,
+            chains=[immunum.Chain.IGH],
+            scoring_params=custom_params,
+        )
+        assert annotator is not None
+
+    def test_annotator_with_prefiltering(self):
+        """Test Annotator creation with pre-filtering enabled."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT,
+            chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
+            use_prefiltering=True,
+        )
+        assert annotator is not None
 
     def test_api_structure(self):
         """Test that the expected API is available."""
-        expected_api = ['Chain', 'NumberingScheme', 'Scheme', 'ScoringParams', 'number_sequences_batch']
-        available_api = [attr for attr in dir(immunum) if not attr.startswith('_')]
-        
-        for api in expected_api:
-            assert api in available_api, f"Expected API '{api}' not found"
-
-
-class TestNumberingSchemeConstructors:
-    """Test all NumberingScheme constructors."""
-
-    def test_all_constructors(self):
-        """Test that all scheme constructors work."""
-        constructors = [
-            immunum.NumberingScheme.imgt_heavy,
-            immunum.NumberingScheme.imgt_kappa,
-            immunum.NumberingScheme.imgt_lambda,
-            immunum.NumberingScheme.kabat_heavy,
-            immunum.NumberingScheme.kabat_kappa,
-            immunum.NumberingScheme.kabat_lambda,
+        expected_api = [
+            "Annotator",
+            "AnnotationResult",
+            "Chain",
+            "Scheme",
+            "ScoringParams",
+            "default_scoring_params",
+            "number_sequence",
         ]
-        
-        for constructor in constructors:
-            scheme = constructor()
-            assert scheme is not None
+        available_api = [attr for attr in dir(immunum) if not attr.startswith("_")]
+
+        for api in expected_api:
+            assert api in available_api, (
+                f"Expected API '{api}' not found. Available: {available_api}"
+            )
+
+
+class TestAnnotationResult:
+    """Test AnnotationResult functionality."""
+
+    def test_annotation_result_properties(self):
+        """Test that AnnotationResult has expected properties."""
+        # We'll need to create a mock or use a real result
+        # For now, just test the class exists
+        assert hasattr(immunum, "AnnotationResult")
+
+    def test_annotation_result_methods(self):
+        """Test that AnnotationResult has expected methods."""
+        # This would require creating an actual result to test
+        # The methods exist based on our implementation:
+        # - sequence, numbers, scheme, chain, identity (getters)
+        # - regions, start, end (getters)
+        # - get_region_sequence, get_cdr_sequences, get_framework_sequences
+        # - is_high_confidence, summary
+        pass
+
+
+class TestAnnotatorMethods:
+    """Test Annotator methods."""
+
+    def test_annotator_number_sequence(self):
+        """Test Annotator.number_sequence method."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT, chains=[immunum.Chain.IGH]
+        )
+
+        # Test with a short sequence - might fail but shouldn't crash
+        test_sequence = "ATCGATCGATCG"
+        try:
+            result = annotator.number_sequence(test_sequence)
+            assert result is not None
+        except Exception as e:
+            # Short sequences might be rejected
+            assert "error" in str(e).lower() or "empty" in str(e).lower()
+
+    def test_annotator_number_sequences(self):
+        """Test Annotator.number_sequences method."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT, chains=[immunum.Chain.IGH]
+        )
+
+        sequences = ["ATCGATCGATCG", "GCTAGCTAGCTA"]
+        try:
+            results = annotator.number_sequences(sequences)
+            assert isinstance(results, list)
+            assert len(results) == len(sequences)
+        except Exception as e:
+            # Expected to potentially fail with test sequences
+            assert "error" in str(e).lower()

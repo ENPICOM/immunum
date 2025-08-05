@@ -405,7 +405,7 @@ const KABAT_CONSENSUS_L_DATA: &str = include_str!("../resources/consensus/KABAT_
 pub fn parse_consensus_data(data: &str) -> HashMap<u32, Vec<u8>> {
     let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
     let total_lines = data.lines().count();
-    
+
     // Skip first and last line
     for line in data.lines().skip(1).take(total_lines - 2) {
         let split_line: Vec<&str> = line.split(',').collect();
