@@ -18,23 +18,47 @@ impl ScoringMatrix {
 
     /// Create a scoring matrix from existing data
     pub fn from_data(data: Vec<f64>, rows: usize, cols: usize) -> Self {
-        assert_eq!(data.len(), rows * cols, "Data length must match rows * cols");
+        assert_eq!(
+            data.len(),
+            rows * cols,
+            "Data length must match rows * cols"
+        );
         Self { data, rows, cols }
     }
 
     /// Get a value at the specified row and column
     #[inline]
     pub fn get(&self, row: usize, col: usize) -> f64 {
-        assert!(row < self.rows, "Row index {} out of bounds (max: {})", row, self.rows);
-        assert!(col < self.cols, "Column index {} out of bounds (max: {})", col, self.cols);
+        assert!(
+            row < self.rows,
+            "Row index {} out of bounds (max: {})",
+            row,
+            self.rows
+        );
+        assert!(
+            col < self.cols,
+            "Column index {} out of bounds (max: {})",
+            col,
+            self.cols
+        );
         self.data[row * self.cols + col]
     }
 
     /// Set a value at the specified row and column
     #[inline]
     pub fn set(&mut self, row: usize, col: usize, value: f64) {
-        assert!(row < self.rows, "Row index {} out of bounds (max: {})", row, self.rows);
-        assert!(col < self.cols, "Column index {} out of bounds (max: {})", col, self.cols);
+        assert!(
+            row < self.rows,
+            "Row index {} out of bounds (max: {})",
+            row,
+            self.rows
+        );
+        assert!(
+            col < self.cols,
+            "Column index {} out of bounds (max: {})",
+            col,
+            self.cols
+        );
         self.data[row * self.cols + col] = value;
     }
 
@@ -48,22 +72,35 @@ impl ScoringMatrix {
         Self::new(rows, cols)
     }
 
-
     /// Create a slice view of the matrix (similar to ndarray's slice functionality)
-    pub fn slice(&self, row_range: std::ops::Range<usize>, col_range: std::ops::Range<usize>) -> ScoringMatrix {
-        assert!(row_range.end <= self.rows, "Row range end {} out of bounds (max: {})", row_range.end, self.rows);
-        assert!(col_range.end <= self.cols, "Column range end {} out of bounds (max: {})", col_range.end, self.cols);
-        
+    pub fn slice(
+        &self,
+        row_range: std::ops::Range<usize>,
+        col_range: std::ops::Range<usize>,
+    ) -> ScoringMatrix {
+        assert!(
+            row_range.end <= self.rows,
+            "Row range end {} out of bounds (max: {})",
+            row_range.end,
+            self.rows
+        );
+        assert!(
+            col_range.end <= self.cols,
+            "Column range end {} out of bounds (max: {})",
+            col_range.end,
+            self.cols
+        );
+
         let new_rows = row_range.len();
         let new_cols = col_range.len();
         let mut new_data = Vec::with_capacity(new_rows * new_cols);
-        
+
         for row in row_range {
             for col in col_range.clone() {
                 new_data.push(self.get(row, col));
             }
         }
-        
+
         ScoringMatrix::from_data(new_data, new_rows, new_cols)
     }
 }
@@ -109,7 +146,7 @@ mod tests {
         let mut matrix = ScoringMatrix::new(4, 4);
         matrix.set(1, 1, 10.0);
         matrix.set(2, 2, 20.0);
-        
+
         let slice = matrix.slice(1..3, 1..3);
         assert_eq!(slice.get(0, 0), 10.0);
         assert_eq!(slice.get(1, 1), 20.0);

@@ -1,46 +1,45 @@
 use phf::{phf_map, Map};
 use std::collections::HashMap;
 
-
 pub const GAP_PEN_START: f64 = 1.0;
 pub const GAP_PEN_END: f64 = 1.0;
 pub const MATCH_CP_MULTIPLIER: f64 = 8.0; // Multiplier of match score
 
 #[derive(Clone)]
 pub struct ScoringParams {
-        pub gap_pen_cp: f64,
-        pub gap_pen_fr: f64,
-        pub gap_pen_ip: f64,
-        pub gap_pen_op: f64,
-        pub gap_pen_cdr: f64,
-        pub gap_pen_other: f64,
-        pub cdr_increase: f64, // increase per position away from insertion position CDR
+    pub gap_pen_cp: f64,
+    pub gap_pen_fr: f64,
+    pub gap_pen_ip: f64,
+    pub gap_pen_op: f64,
+    pub gap_pen_cdr: f64,
+    pub gap_pen_other: f64,
+    pub cdr_increase: f64, // increase per position away from insertion position CDR
 
-        pub pen_leap_insertion_point_imgt: f64, // better name
-        pub pen_leap_insertion_point_kabat: f64 // better name
+    pub pen_leap_insertion_point_imgt: f64,  // better name
+    pub pen_leap_insertion_point_kabat: f64, // better name
 }
 
-pub fn get_scoring_params() -> ScoringParams{
-        ScoringParams::default()
-        // use below if you want to chance params
-        // ScoringParams {gap_pen_start: 10.0, ..Default::default()
-        }
+pub fn get_scoring_params() -> ScoringParams {
+    ScoringParams::default()
+    // use below if you want to chance params
+    // ScoringParams {gap_pen_start: 10.0, ..Default::default()
+}
 
 impl Default for ScoringParams {
-        fn default() -> ScoringParams{
-                ScoringParams {
-                        gap_pen_cp: 55.0,
-                        gap_pen_fr: 26.0,
-                        gap_pen_ip: 1.5,
-                        gap_pen_op: 1.0,
-                        gap_pen_cdr: 2.5,
-                        gap_pen_other: 11.0,
-                        cdr_increase: 0.5, // increase per position away from insertion position CDR
+    fn default() -> ScoringParams {
+        ScoringParams {
+            gap_pen_cp: 55.0,
+            gap_pen_fr: 26.0,
+            gap_pen_ip: 1.5,
+            gap_pen_op: 1.0,
+            gap_pen_cdr: 2.5,
+            gap_pen_other: 11.0,
+            cdr_increase: 0.5, // increase per position away from insertion position CDR
 
-                        pen_leap_insertion_point_imgt: 1.0, // better name 6 best until now
-                        pen_leap_insertion_point_kabat: 10.0,// better name
-                }
+            pen_leap_insertion_point_imgt: 1.0, // better name 6 best until now
+            pen_leap_insertion_point_kabat: 10.0, // better name
         }
+    }
 }
 // Pre scan identity cutoff, minimal identity for program to assume a chain
 //pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
@@ -407,7 +406,7 @@ const KABAT_CONSENSUS_L_DATA: &str = include_str!("../resources/consensus/KABAT_
 pub fn parse_consensus_data(data: &str) -> HashMap<u32, Vec<u8>> {
     let mut consensus_aas: HashMap<u32, Vec<u8>> = HashMap::new();
     let total_lines = data.lines().count();
-    
+
     // Skip first and last line
     for line in data.lines().skip(1).take(total_lines - 2) {
         let split_line: Vec<&str> = line.split(',').collect();

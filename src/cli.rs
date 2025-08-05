@@ -1,4 +1,7 @@
-use crate::types::{Chain, Scheme};
+use crate::{
+    result::OutputFormat,
+    types::{Chain, Scheme},
+};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -28,4 +31,56 @@ pub struct Cli {
         help = "Output file path (if omitted, output goes to stdout)"
     )]
     pub output: Option<String>,
+    /// Enable pre-filtering to reduce chain types tested based on sequence characteristics
+    #[arg(
+        long,
+        help = "Enable pre-filtering to speed up numbering by reducing tested chain types"
+    )]
+    pub prefilter: bool,
+    /// Enable paired sequence numbering to find multiple chains in a single sequence
+    #[arg(
+        long,
+        help = "Enable paired sequence numbering to find multiple antibody/TCR chains within a single sequence"
+    )]
+    pub paired: bool,
+    /// Gap penalty for conserved position (default: 55.0)
+    #[arg(long, help = "Gap penalty for conserved positions")]
+    pub gap_pen_cp: Option<f64>,
+    /// Gap penalty for framework regions (default: 26.0)
+    #[arg(long, help = "Gap penalty for framework regions")]
+    pub gap_pen_fr: Option<f64>,
+    /// Gap penalty for insertion points (default: 1.5)
+    #[arg(long, help = "Gap penalty for insertion points")]
+    pub gap_pen_ip: Option<f64>,
+    /// Gap penalty for other positions (default: 1.0)
+    #[arg(long, help = "Gap penalty for other positions")]
+    pub gap_pen_op: Option<f64>,
+    /// Gap penalty for CDR regions (default: 2.5)
+    #[arg(long, help = "Gap penalty for CDR regions")]
+    pub gap_pen_cdr: Option<f64>,
+    /// Gap penalty for other non-classified positions (default: 11.0)
+    #[arg(long, help = "Gap penalty for other non-classified positions")]
+    pub gap_pen_other: Option<f64>,
+    /// CDR increase penalty per position away from insertion point (default: 0.5)
+    #[arg(
+        long,
+        help = "CDR increase penalty per position away from insertion point"
+    )]
+    pub cdr_increase: Option<f64>,
+    /// Penalty for leaping insertion point in IMGT scheme (default: 1.0)
+    #[arg(long, help = "Penalty for leaping insertion point in IMGT scheme")]
+    pub pen_leap_insertion_point_imgt: Option<f64>,
+    /// Penalty for leaping insertion point in KABAT scheme (default: 10.0)
+    #[arg(long, help = "Penalty for leaping insertion point in KABAT scheme")]
+    pub pen_leap_insertion_point_kabat: Option<f64>,
+    /// Output format for results
+    #[arg(
+        short = 'f',
+        long = "format",
+        value_enum,
+        ignore_case = true,
+        default_value_t = OutputFormat::Simple,
+        help = "Output format for results"
+    )]
+    pub format: OutputFormat,
 }

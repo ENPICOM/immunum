@@ -5,7 +5,6 @@ pub mod constants;
 pub mod fastx;
 pub mod insertion_numbering;
 pub mod needleman_wunsch;
-pub mod numbering;
 pub mod numbering_scheme_type;
 pub mod prefiltering;
 pub mod result;
@@ -24,19 +23,9 @@ pub use schemes::get_scheme;
 
 // New primary API
 pub use annotator::Annotator;
-pub use result::AnnotationResult;
+pub use result::{AnnotationResult, OutputFormat};
 
-pub use constants::{ScoringParams, get_scoring_params};
-pub use numbering_scheme_type::{NumberingScheme, NumberingOutput};
+pub use constants::{get_scoring_params, ScoringParams};
+pub use numbering_scheme_type::NumberingScheme;
 pub use scoring_matrix::ScoringMatrix;
-pub use types::{Chain, Scheme, RegionRange};
-
-// Make the Python module available as the main entry point for the cdylib
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
-
-#[cfg(feature = "python")]
-#[pymodule]
-fn immunum(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    python_bindings::immunum(m)
-}
+pub use types::{Chain, RegionRange, Scheme};

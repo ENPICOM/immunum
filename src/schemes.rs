@@ -2,7 +2,7 @@ use crate::consensus_scoring::calculate_scoring_matrix;
 use crate::constants::{
     get_imgt_heavy_consensus, get_imgt_kappa_consensus, get_imgt_lambda_consensus,
     get_kabat_heavy_consensus, get_kabat_kappa_consensus, get_kabat_lambda_consensus,
-    ScoringParams, get_scoring_params,
+    get_scoring_params, ScoringParams,
 };
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::scoring_matrix::ScoringMatrix;
@@ -32,9 +32,18 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
             cdr1: RegionRange { start: 27, end: 39 },
             fr2: RegionRange { start: 39, end: 56 },
             cdr2: RegionRange { start: 56, end: 66 },
-            fr3: RegionRange { start: 66, end: 105 },
-            cdr3: RegionRange { start: 105, end: 118 },
-            fr4: RegionRange { start: 118, end: 129 },
+            fr3: RegionRange {
+                start: 66,
+                end: 105,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 118,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 129,
+            },
         },
         (Scheme::IMGT, Chain::IGK) => SchemeConfig {
             conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -44,9 +53,18 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
             cdr1: RegionRange { start: 27, end: 39 },
             fr2: RegionRange { start: 39, end: 56 },
             cdr2: RegionRange { start: 56, end: 66 },
-            fr3: RegionRange { start: 66, end: 105 },
-            cdr3: RegionRange { start: 105, end: 118 },
-            fr4: RegionRange { start: 118, end: 128 },
+            fr3: RegionRange {
+                start: 66,
+                end: 105,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 118,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 128,
+            },
         },
         (Scheme::IMGT, Chain::IGL) => SchemeConfig {
             conserved_positions: vec![23, 41, 104, 118, 119, 121],
@@ -56,9 +74,18 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
             cdr1: RegionRange { start: 27, end: 39 },
             fr2: RegionRange { start: 39, end: 56 },
             cdr2: RegionRange { start: 56, end: 66 },
-            fr3: RegionRange { start: 66, end: 105 },
-            cdr3: RegionRange { start: 105, end: 118 },
-            fr4: RegionRange { start: 118, end: 129 },
+            fr3: RegionRange {
+                start: 66,
+                end: 105,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 118,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 129,
+            },
         },
         (Scheme::KABAT, Chain::IGH) => SchemeConfig {
             conserved_positions: vec![22, 36, 92, 103, 104, 106],
@@ -69,8 +96,14 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
             fr2: RegionRange { start: 36, end: 50 },
             cdr2: RegionRange { start: 50, end: 66 },
             fr3: RegionRange { start: 66, end: 95 },
-            cdr3: RegionRange { start: 95, end: 103 },
-            fr4: RegionRange { start: 103, end: 114 },
+            cdr3: RegionRange {
+                start: 95,
+                end: 103,
+            },
+            fr4: RegionRange {
+                start: 103,
+                end: 114,
+            },
         },
         (Scheme::KABAT, Chain::IGK) => SchemeConfig {
             conserved_positions: vec![23, 35, 88, 98, 99, 101],
@@ -82,7 +115,10 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
             cdr2: RegionRange { start: 50, end: 57 },
             fr3: RegionRange { start: 57, end: 89 },
             cdr3: RegionRange { start: 89, end: 98 },
-            fr4: RegionRange { start: 98, end: 108 },
+            fr4: RegionRange {
+                start: 98,
+                end: 108,
+            },
         },
         (Scheme::KABAT, Chain::IGL) => SchemeConfig {
             conserved_positions: vec![23, 35, 88, 98, 99, 101],
@@ -94,7 +130,10 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
             cdr2: RegionRange { start: 50, end: 57 },
             fr3: RegionRange { start: 57, end: 89 },
             cdr3: RegionRange { start: 89, end: 98 },
-            fr4: RegionRange { start: 98, end: 108 },
+            fr4: RegionRange {
+                start: 98,
+                end: 108,
+            },
         },
         // For unsupported T-cell receptor chains, default to heavy chain patterns
         (Scheme::IMGT, _) => get_scheme_config(&Scheme::IMGT, &Chain::IGH),
@@ -121,7 +160,7 @@ pub fn get_scheme(scheme: Scheme, chain: Chain, params: Option<ScoringParams>) -
     let consensus_function = get_consensus_function(&scheme, &chain);
     let consensus_amino_acids = consensus_function();
     let config = get_scheme_config(&scheme, &chain);
-    
+
     // Create a temporary scheme to access the gap_penalty method
     let temp_scheme = NumberingScheme {
         scheme_type: scheme.clone(),
@@ -139,13 +178,12 @@ pub fn get_scheme(scheme: Scheme, chain: Chain, params: Option<ScoringParams>) -
         cdr3: config.cdr3.clone(),
         fr4: config.fr4.clone(),
     };
-    
-    let scoring_matrix = calculate_scoring_matrix(
-        &consensus_amino_acids,
-        &scoring_params,
-        |pos, params| temp_scheme.gap_penalty(pos, params),
-    );
-    
+
+    let scoring_matrix =
+        calculate_scoring_matrix(&consensus_amino_acids, &scoring_params, |pos, params| {
+            temp_scheme.gap_penalty(pos, params)
+        });
+
     NumberingScheme {
         scheme_type: scheme,
         chain_type: chain,
@@ -164,12 +202,10 @@ pub fn get_scheme(scheme: Scheme, chain: Chain, params: Option<ScoringParams>) -
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::{get_scoring_params};
+    use crate::constants::get_scoring_params;
 
     #[test]
     fn scheme_creation() {

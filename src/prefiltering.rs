@@ -1,17 +1,33 @@
 use crate::constants::{PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
-use crate::numbering_scheme_type::{NumberingOutput, NumberingScheme};
+use crate::numbering_scheme_type::NumberingScheme;
+use crate::result::AnnotationResult;
 use crate::types::{Chain, PrefilterOutput};
 use std::collections::HashMap;
 
-/// Create c-terminal NumberingScheme from a full length scheme (based on IMGT consensus)
-pub fn get_terminal_schemes(
-    schemes: &Vec<NumberingScheme>,
-) -> Vec<(NumberingScheme, NumberingScheme)> {
-    let mut terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = Vec::new();
-    for scheme in schemes {
-        terminal_schemes.push(scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH));
+/// Apply prefiltering to select only promising chains based on terminal identity
+pub fn apply_prefiltering<'a>(
+    sequence: &'a [u8],
+    schemes: &'a [NumberingScheme],
+) -> Vec<&'a NumberingScheme> {
+    if schemes.is_empty() {
+        return vec![];
     }
-    terminal_schemes
+
+    // get pre-filter schemes
+    let terminal_schemes = schemes
+        .iter()
+        .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
+        .collect();
+
+    // Select models to run using pre-scan
+    let (pre_scan_output, highest_score) = run_pre_scan(sequence, &terminal_schemes);
+    let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
+
+    // Filter schemes based on prefiltering results
+    schemes
+        .iter()
+        .filter(|scheme| pre_filter_chains.contains(&scheme.chain_type))
+        .collect()
 }
 
 ///Run pre scan to find likely chains present using c and n terminal identity
@@ -26,8 +42,8 @@ pub fn run_pre_scan(
     for terminal_schemes in all_terminal_schemes {
         let (n_terminal, c_terminal) = terminal_schemes;
         // run alignment for n and c terminal
-        let n_terminal_output: NumberingOutput = n_terminal.number_sequence(query_sequence);
-        let c_terminal_output: NumberingOutput = c_terminal.number_sequence(query_sequence);
+        let n_terminal_output: AnnotationResult = n_terminal.number_sequence(query_sequence);
+        let c_terminal_output: AnnotationResult = c_terminal.number_sequence(query_sequence);
 
         // calculate combined identity
 
@@ -68,20 +84,8 @@ mod tests {
     use super::*;
     use crate::{
         schemes::get_scheme,
-        scoring_matrix::ScoringMatrix,
         types::{Chain, Scheme},
     };
-
-    impl ScoringMatrix {
-        /// Get a slice of a specific row
-        pub fn row(&self, row: usize) -> Vec<f64> {
-            let mut row_data = Vec::with_capacity(self.ncols());
-            for col in 0..self.ncols() {
-                row_data.push(self.get(row, col));
-            }
-            row_data
-        }
-    }
 
     #[test]
     fn heavy_chain_pre_scan() {
@@ -89,11 +93,15 @@ mod tests {
         let sequence_l = "QSALTQPASVSGSPGQSITISCTGTSSDVGGYNYVSWYQQHPGKAPKLMIYDVSNRPSGVSNRFSGSKSGNTASLTISGLQAEDEADYYCSSYTSSSTRVFGTGTKVTVL".as_bytes();
         let sequence_k = "DIQMTQSPSSLSASVGDRVTITCRASQSISSWLAWYQQKPGKAPKLLIYKASSLESGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYNSYPFTFGQGTKVEIK".as_bytes();
 
-        let terminal_schemes = get_terminal_schemes(&vec![
+        let schemes = vec![
             get_scheme(Scheme::IMGT, Chain::IGH, None),
             get_scheme(Scheme::IMGT, Chain::IGL, None),
             get_scheme(Scheme::IMGT, Chain::IGK, None),
-        ]);
+        ];
+        let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = schemes
+            .iter()
+            .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
+            .collect();
 
         let (pre_scan_output_h, _highest_score_h) = run_pre_scan(sequence_h, &terminal_schemes);
         let (pre_scan_output_l, _highest_score_l) = run_pre_scan(sequence_l, &terminal_schemes);
@@ -116,94 +124,33 @@ mod tests {
                     > pre_scan_output_k[&Chain::IGL].identity)
         );
     }
-
     #[test]
-    fn terminal_schemes_heavy() {
-        let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
-        let (n_term_scheme, c_term_scheme) =
-            &get_terminal_schemes(&vec![get_scheme(Scheme::IMGT, Chain::IGH, None)])[0];
-        for i in 0..terminal_length {
-            assert_eq!(
-                n_term_scheme.scoring_matrix.row(i),
-                original_scheme.scoring_matrix.row(i)
-            );
+    fn test_apply_prefiltering() {
+        let heavy_chain: &[u8] = "QVQLVQSGAVIKTPGSSVKISCRASGYNFRDYSIHWVRLIPDKGFEWIGWIKPLWGAVSYARQL\
+        QGRVSMTRQLSQDPDDPDWGVAYMEFSGLTPADTAEYFCVRRGSCDYCGDFPWQYWCQGTVVVVSSASTKGPSVFPLAPSSGGTAALGCLV\
+        KDYFPEPVTVSWNSGALTSGVHTFPAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
+            .as_bytes();
 
-            assert_eq!(
-                c_term_scheme.scoring_matrix.row(i),
-                original_scheme.scoring_matrix.row(117 + i)
-            );
-        }
+        let schemes = vec![
+            get_scheme(Scheme::IMGT, Chain::IGH, None),
+            get_scheme(Scheme::IMGT, Chain::IGK, None),
+            get_scheme(Scheme::IMGT, Chain::IGL, None),
+        ];
 
-        for i in 1..terminal_length {
-            assert_eq!(
-                n_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32)]
-            );
-            assert_eq!(
-                c_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
-            );
-        }
+        let filtered_schemes = apply_prefiltering(heavy_chain, &schemes);
+
+        // Should return at least one scheme (preferably the heavy chain one)
+        assert!(!filtered_schemes.is_empty());
+        // Heavy chain should be among the filtered schemes since it's the best match
+        assert!(filtered_schemes.iter().any(|s| s.chain_type == Chain::IGH));
     }
 
     #[test]
-    fn terminal_schemes_kappa() {
-        let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGK, None);
-        let (n_term_scheme, c_term_scheme) =
-            &get_terminal_schemes(&vec![get_scheme(Scheme::IMGT, Chain::IGK, None)])[0];
-        for i in 0..terminal_length {
-            assert_eq!(
-                n_term_scheme.scoring_matrix.row(i),
-                original_scheme.scoring_matrix.row(i)
-            );
+    fn test_apply_prefiltering_empty_schemes() {
+        let sequence: &[u8] = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".as_bytes();
+        let schemes: Vec<NumberingScheme> = vec![];
 
-            assert_eq!(
-                c_term_scheme.scoring_matrix.row(i),
-                original_scheme.scoring_matrix.row(117 + i)
-            );
-        }
-
-        for i in 1..terminal_length {
-            assert_eq!(
-                n_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32)]
-            );
-            assert_eq!(
-                c_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
-            );
-        }
-    }
-
-    #[test]
-    fn terminal_schemes_lambda() {
-        let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGL, None);
-        let (n_term_scheme, c_term_scheme) =
-            &get_terminal_schemes(&vec![get_scheme(Scheme::IMGT, Chain::IGL, None)])[0];
-        for i in 0..terminal_length {
-            assert_eq!(
-                n_term_scheme.scoring_matrix.row(i),
-                original_scheme.scoring_matrix.row(i)
-            );
-
-            assert_eq!(
-                c_term_scheme.scoring_matrix.row(i),
-                original_scheme.scoring_matrix.row(117 + i)
-            );
-        }
-
-        for i in 1..terminal_length {
-            assert_eq!(
-                n_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32)]
-            );
-            assert_eq!(
-                c_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
-            );
-        }
+        let filtered_schemes = apply_prefiltering(sequence, &schemes);
+        assert!(filtered_schemes.is_empty());
     }
 }

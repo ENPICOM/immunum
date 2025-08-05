@@ -1,76 +1,18 @@
-#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::annotator::Annotator;
-use crate::constants::{ScoringParams, get_scoring_params};
+use crate::constants::{get_scoring_params, ScoringParams};
 use crate::result::AnnotationResult;
 use crate::types::{Chain, Scheme};
 
-/// Python enum for numbering schemes
-#[cfg(feature = "python")]
-#[pyclass(name = "Scheme")]
-#[derive(Clone)]
-pub enum PyScheme {
-    /// IMGT numbering scheme
-    IMGT,
-    /// Kabat numbering scheme
-    KABAT,
-}
-
-impl From<PyScheme> for Scheme {
-    fn from(py_scheme: PyScheme) -> Self {
-        match py_scheme {
-            PyScheme::IMGT => Scheme::IMGT,
-            PyScheme::KABAT => Scheme::KABAT,
-        }
-    }
-}
-
-/// Python enum for chain types
-#[cfg(feature = "python")]
-#[pyclass(name = "Chain")]
-#[derive(Clone)]
-pub enum PyChain {
-    /// Immunoglobulin Heavy chain
-    IGH,
-    /// Immunoglobulin Kappa chain
-    IGK,
-    /// Immunoglobulin Lambda chain
-    IGL,
-    /// T-cell receptor Alpha chain
-    TRA,
-    /// T-cell receptor Beta chain
-    TRB,
-    /// T-cell receptor Gamma chain
-    TRG,
-    /// T-cell receptor Delta chain
-    TRD,
-}
-
-impl From<PyChain> for Chain {
-    fn from(py_chain: PyChain) -> Self {
-        match py_chain {
-            PyChain::IGH => Chain::IGH,
-            PyChain::IGK => Chain::IGK,
-            PyChain::IGL => Chain::IGL,
-            PyChain::TRA => Chain::TRA,
-            PyChain::TRB => Chain::TRB,
-            PyChain::TRG => Chain::TRG,
-            PyChain::TRD => Chain::TRD,
-        }
-    }
-}
-
 /// Python wrapper for ScoringParams
-#[cfg(feature = "python")]
 #[pyclass(name = "ScoringParams")]
 #[derive(Clone)]
 pub struct PyScoringParams {
     inner: ScoringParams,
 }
 
-#[cfg(feature = "python")]
 #[pymethods]
 impl PyScoringParams {
     #[new]
@@ -126,13 +68,11 @@ impl PyScoringParams {
 }
 
 /// Python wrapper for AnnotationResult
-#[cfg(feature = "python")]
 #[pyclass(name = "AnnotationResult")]
 pub struct PyAnnotationResult {
     inner: AnnotationResult,
 }
 
-#[cfg(feature = "python")]
 #[pymethods]
 impl PyAnnotationResult {
     #[getter]
@@ -146,24 +86,13 @@ impl PyAnnotationResult {
     }
 
     #[getter]
-    pub fn scheme(&self) -> PyScheme {
-        match self.inner.scheme {
-            Scheme::IMGT => PyScheme::IMGT,
-            Scheme::KABAT => PyScheme::KABAT,
-        }
+    pub fn scheme(&self) -> Scheme {
+        self.inner.scheme
     }
 
     #[getter]
-    pub fn chain(&self) -> PyChain {
-        match self.inner.chain {
-            Chain::IGH => PyChain::IGH,
-            Chain::IGK => PyChain::IGK,
-            Chain::IGL => PyChain::IGL,
-            Chain::TRA => PyChain::TRA,
-            Chain::TRB => PyChain::TRB,
-            Chain::TRG => PyChain::TRG,
-            Chain::TRD => PyChain::TRD,
-        }
+    pub fn chain(&self) -> Chain {
+        self.inner.chain
     }
 
     #[getter]
@@ -183,42 +112,75 @@ impl PyAnnotationResult {
     pub fn summary(&self) -> String {
         self.inner.summary()
     }
+
+    #[getter]
+    pub fn start(&self) -> u32 {
+        self.inner.start
+    }
+
+    #[getter]
+    pub fn end(&self) -> u32 {
+        self.inner.end
+    }
+
+    pub fn get_region_sequence(&self, region_name: &str) -> Option<String> {
+        self.inner.get_region_sequence(region_name)
+    }
+
+    pub fn get_cdr_sequences(&self, py: Python) -> PyResult<PyObject> {
+        let dict = PyDict::new(py);
+        let cdrs = self.inner.get_cdr_sequences();
+        for (key, value) in cdrs {
+            dict.set_item(key, value)?;
+        }
+        Ok(dict.into())
+    }
+
+    pub fn get_framework_sequences(&self, py: Python) -> PyResult<PyObject> {
+        let dict = PyDict::new(py);
+        let frameworks = self.inner.get_framework_sequences();
+        for (key, value) in frameworks {
+            dict.set_item(key, value)?;
+        }
+        Ok(dict.into())
+    }
+
+    pub fn is_high_confidence(&self, threshold: f64) -> bool {
+        self.inner.is_high_confidence(threshold)
+    }
 }
 
 /// Python wrapper for Annotator - the main entry point
-#[cfg(feature = "python")]
 #[pyclass(name = "Annotator")]
 pub struct PyAnnotator {
     inner: Annotator,
 }
 
-#[cfg(feature = "python")]
 #[pymethods]
 impl PyAnnotator {
     #[new]
-    #[pyo3(signature = (scheme, chains, scoring_params=None))]
+    #[pyo3(signature = (scheme, chains, scoring_params=None, use_prefiltering=None))]
     pub fn new(
-        scheme: PyScheme,
+        scheme: Scheme,
         chains: PyObject,
         scoring_params: Option<PyScoringParams>,
+        use_prefiltering: Option<bool>,
         py: Python,
     ) -> PyResult<Self> {
-        let rust_scheme: Scheme = scheme.into();
-        
         // Handle both single chain and list of chains
-        let rust_chains: Vec<Chain> = if let Ok(chain_list) = chains.extract::<Vec<PyChain>>(py) {
-            chain_list.into_iter().map(|c| c.into()).collect()
-        } else if let Ok(single_chain) = chains.extract::<PyChain>(py) {
-            vec![single_chain.into()]
+        let rust_chains: Vec<Chain> = if let Ok(chain_list) = chains.extract::<Vec<Chain>>(py) {
+            chain_list
+        } else if let Ok(single_chain) = chains.extract::<Chain>(py) {
+            vec![single_chain]
         } else {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "chains must be a Chain or list of Chains"
+                "chains must be a Chain or list of Chains",
             ));
         };
 
         let scoring_params_inner = scoring_params.map(|p| p.inner);
 
-        match Annotator::new(rust_scheme, rust_chains, scoring_params_inner, None) {
+        match Annotator::new(scheme, rust_chains, scoring_params_inner, use_prefiltering) {
             Ok(annotator) => Ok(PyAnnotator { inner: annotator }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
         }
@@ -239,36 +201,53 @@ impl PyAnnotator {
     ) -> PyResult<Vec<PyAnnotationResult>> {
         let results = self.inner.number_sequences(&sequences, parallel);
         let mut py_results = Vec::new();
-        
+
         for result in results {
             match result {
                 Ok(annotation_result) => {
-                    py_results.push(PyAnnotationResult { inner: annotation_result });
+                    py_results.push(PyAnnotationResult {
+                        inner: annotation_result,
+                    });
                 }
                 Err(e) => {
                     return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e));
                 }
             }
         }
-        
+
         Ok(py_results)
     }
 
-    #[pyo3(signature = (file_path, output_path=None))]
-    pub fn number_file(
-        &self,
-        file_path: &str,
-        output_path: Option<&str>,
-    ) -> PyResult<String> {
-        match self.inner.number_file(file_path, output_path) {
-            Ok(output_file) => Ok(output_file),
+    #[pyo3(signature = (file_path))]
+    pub fn number_file(&self, file_path: &str) -> PyResult<Vec<(String, PyAnnotationResult)>> {
+        match self.inner.number_file(file_path) {
+            Ok(results) => {
+                let mut py_results = Vec::new();
+                for (name, result) in results {
+                    match result {
+                        Ok(annotation_result) => {
+                            py_results.push((
+                                name,
+                                PyAnnotationResult {
+                                    inner: annotation_result,
+                                },
+                            ));
+                        }
+                        Err(e) => {
+                            return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                                format!("Error processing sequence '{}': {}", name, e),
+                            ));
+                        }
+                    }
+                }
+                Ok(py_results)
+            }
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
         }
     }
 }
 
 /// Get default scoring parameters
-#[cfg(feature = "python")]
 #[pyfunction]
 pub fn default_scoring_params() -> PyScoringParams {
     PyScoringParams {
@@ -277,17 +256,17 @@ pub fn default_scoring_params() -> PyScoringParams {
 }
 
 /// Immunum Python module configuration
-#[cfg(feature = "python")]
+#[pymodule]
 pub fn immunum(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Main API classes
     m.add_class::<PyAnnotator>()?; // Exported as "Annotator"
     m.add_class::<PyAnnotationResult>()?; // Exported as "AnnotationResult"
     m.add_class::<PyScoringParams>()?; // Exported as "ScoringParams"
-    m.add_class::<PyScheme>()?; // Exported as "Scheme"
-    m.add_class::<PyChain>()?; // Exported as "Chain"
-    
+    m.add_class::<crate::types::Scheme>()?;
+    m.add_class::<crate::types::Chain>()?;
+
     // Utility functions
     m.add_function(wrap_pyfunction!(default_scoring_params, m)?)?;
-    
+
     Ok(())
 }
