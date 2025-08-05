@@ -389,7 +389,7 @@ mod tests {
 
         // Test Simple format
         let simple = result.to_string(OutputFormat::Simple);
-        assert!(simple.contains("Identity: 95.0%"));
+        assert!(simple.contains("Identity: 95.00%"));
         assert!(simple.contains("Numbering:"));
 
         // Test JSON format
