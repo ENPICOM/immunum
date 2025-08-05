@@ -189,13 +189,13 @@ mod tests {
 
     #[test]
     fn number_fasta_file() {
-        let fasta_file = r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta";
+        let fasta_file = r"C:\Anti_Num\benchmark\test_sequences\Paired_chains\paired_chain_linker_.fasta";
         let scoring_params = get_scoring_params();
         number_sequences_and_write_output(
             fasta_file,
             Scheme::KABAT,
             &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Anti_Num\output\rust_output_2\numbering_kabat.txt",
+            r"C:\Anti_Num\output\test_linked\numbering_kabat.txt",
             true,
             &scoring_params,
         );
@@ -203,66 +203,10 @@ mod tests {
             fasta_file,
             Scheme::IMGT,
             &[Chain::IGH, Chain::IGK, Chain::IGL],
-            r"C:\Anti_Num\output\rust_output_2\numbering_imgt.txt",
+            r"C:\Anti_Num\output\test_linked\numbering_imgt.txt",
             false,
             &scoring_params,
         );
-    }
-
-    #[test]
-    fn parameter_sweep() {
-        let fasta_file = r"C:\Antibody_Numbering\fastas\abpdseq_non_redundant.fasta";
-        let mut i = 90;
-        // loop here for different param settings
-        for cdr_pen in [2.7] {
-            for cdr_incr in [0.5] {
-                for leaps in [(10.0, 6.0)] {
-                    let (leap_kabat, leap_imgt) = leaps;
-
-                    fs::create_dir(format!(r"C:\Anti_Num\output\{i}"))
-                        .expect("TODO: panic message");
-
-                    // create adapted scoring params
-                    let scoring_params = ScoringParams {
-                        gap_pen_cdr: cdr_pen,
-                        cdr_increase: cdr_incr,
-                        pen_leap_insertion_point_kabat: leap_kabat,
-                        pen_leap_insertion_point_imgt: leap_imgt,
-                        ..Default::default()
-                    };
-                    number_sequences_and_write_output(
-                        fasta_file,
-                        Scheme::KABAT,
-                        &[Chain::IGH, Chain::IGK, Chain::IGL],
-                        &format!(r"C:\Anti_Num\output\{i}\numbering_kabat.txt"),
-                        true,
-                        &scoring_params,
-                    );
-                    number_sequences_and_write_output(
-                        fasta_file,
-                        Scheme::IMGT,
-                        &[Chain::IGH, Chain::IGK, Chain::IGL],
-                        &format!(r"C:\Anti_Num\output\{i}\numbering_imgt.txt"),
-                        false,
-                        &scoring_params,
-                    );
-
-                    fs::write(
-                        format!(r"C:\Anti_Num\output\{i}\params.txt"),
-                        format!(
-                            "CDR_PEN: {0}\nCP_INCR: {1}\nLEAPS (kabat/imgt): {2}/{3}",
-                            scoring_params.gap_pen_cdr,
-                            scoring_params.cdr_increase,
-                            scoring_params.pen_leap_insertion_point_kabat,
-                            scoring_params.pen_leap_insertion_point_imgt
-                        ),
-                    )
-                    .expect("Something went wrong writing to data file");
-
-                    i += 1;
-                }
-            }
-        }
     }
 
     #[test]
