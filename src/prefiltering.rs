@@ -60,8 +60,8 @@ pub fn run_pre_scan(
             n_terminal.chain_type,
             PrefilterOutput {
                 identity: combined_identity,
-                predicted_start: n_terminal_output.start,
-                predicted_end: c_terminal_output.end,
+                _predicted_start: n_terminal_output.start,
+                _predicted_end: c_terminal_output.end,
             },
         );
     }

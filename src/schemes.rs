@@ -163,7 +163,7 @@ pub fn get_scheme(scheme: Scheme, chain: Chain, params: Option<ScoringParams>) -
 
     // Create a temporary scheme to access the gap_penalty method
     let temp_scheme = NumberingScheme {
-        scheme_type: scheme.clone(),
+        scheme_type: scheme,
         chain_type: chain,
         conserved_positions: config.conserved_positions.clone(),
         insertion_positions: config.insertion_positions.clone(),

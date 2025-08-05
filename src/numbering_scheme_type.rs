@@ -244,7 +244,7 @@ impl NumberingScheme {
         AnnotationResult {
             sequence: query_sequence.to_vec(),
             numbers: numbering,
-            scheme: self.scheme_type.clone(),
+            scheme: self.scheme_type,
             chain: self.chain_type,
             identity,
             start: start as u32,

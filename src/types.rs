@@ -17,8 +17,8 @@ impl RegionRange {
 /// Struct for output of prefiltering, containing identity of terminals, start and end
 pub struct PrefilterOutput {
     pub identity: f64,
-    pub predicted_start: u32,
-    pub predicted_end: u32,
+    pub _predicted_start: u32,
+    pub _predicted_end: u32,
 }
 
 /// Numbering schemes for immunoglobulin sequences

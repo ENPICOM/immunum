@@ -7,6 +7,9 @@ use crate::result::AnnotationResult;
 use crate::schemes::get_scheme;
 use crate::types::{Chain, Scheme};
 
+/// Type alias for complex file processing results
+type FileProcessingResult = Result<Vec<(String, Result<AnnotationResult, String>)>, String>;
+
 /// Main annotator struct that consolidates all numbering functionality
 pub struct Annotator {
     // TODO! These fields are currently not used, we might remove them in the future
@@ -31,7 +34,7 @@ impl Annotator {
         // Pre-build all required schemes for performance
         let schemes: Vec<NumberingScheme> = chains
             .iter()
-            .map(|&chain| get_scheme(scheme.clone(), chain, Some(params.clone())))
+            .map(|&chain| get_scheme(scheme, chain, Some(params.clone())))
             .collect();
 
         if schemes.is_empty() {
@@ -115,7 +118,7 @@ impl Annotator {
     pub fn number_file(
         &self,
         file_path: &str,
-    ) -> Result<Vec<(String, Result<AnnotationResult, String>)>, String> {
+    ) -> FileProcessingResult {
         // Check if input file exists
         if !std::path::Path::new(file_path).exists() {
             return Err(format!("Input file not found: {}", file_path));
