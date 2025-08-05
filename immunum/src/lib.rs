@@ -6,6 +6,7 @@ pub mod insertion_numbering;
 pub mod needleman_wunsch;
 pub mod numbering;
 pub mod numbering_scheme_type;
+pub mod prefiltering;
 pub mod schemes;
 pub mod sequence_stream;
 pub mod types;

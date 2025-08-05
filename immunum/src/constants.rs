@@ -1,26 +1,53 @@
 use phf::{phf_map, Map};
 
-pub mod scoring {
-    pub const GAP_PEN_CP: f64 = 55.0;
-    pub const GAP_PEN_FR: f64 = 26.0;
-    pub const GAP_PEN_IP: f64 = 1.0;
-    pub const GAP_PEN_OP: f64 = 1.0;
-    pub const GAP_PEN_CDR: f64 = 1.2;
-    pub const GAP_PEN_OTHER: f64 = 11.0;
-    pub const GAP_PEN_START: f64 = 1.0;
-    pub const GAP_PEN_END: f64 = 1.0;
-    pub const MATCH_CP_MULTIPLIER: f64 = 5.0; // Multiplier of match score
-    pub const CDR_INCREASE: f64 = 1.0; // increase per position away from insertion position CDR
+pub const GAP_PEN_START: f64 = 1.0;
+pub const GAP_PEN_END: f64 = 1.0;
+pub const MATCH_CP_MULTIPLIER: f64 = 8.0; // Multiplier of match score
 
-    pub const PEN_LEAP_FROM_INSERTION_POINT_IMGT: f64 = 0.8; // better name
-    pub const PEN_LEAP_INSERTION_POINT_KABAT: f64 = 10.0; // better name
+pub struct ScoringParams {
+    pub gap_pen_cp: f64,
+    pub gap_pen_fr: f64,
+    pub gap_pen_ip: f64,
+    pub gap_pen_op: f64,
+    pub gap_pen_cdr: f64,
+    pub gap_pen_other: f64,
+    pub cdr_increase: f64, // increase per position away from insertion position CDR
+
+    pub pen_leap_insertion_point_imgt: f64,  // better name
+    pub pen_leap_insertion_point_kabat: f64, // better name
 }
-// Pre scan identity cutoff, minimal identity for program to assume a chain
-//pub const PRE_SCAN_IDENTITY_CUTOFF: f64 = 0.94;
-//pub const WITHIN_IDENTITY_RANGE: f64 = 0.20;
+
+pub fn get_scoring_params() -> ScoringParams {
+    ScoringParams::default()
+    // use below if you want to chance params
+    // ScoringParams {gap_pen_start: 10.0, ..Default::default()
+}
+
+impl Default for ScoringParams {
+    fn default() -> ScoringParams {
+        ScoringParams {
+            gap_pen_cp: 55.0,
+            gap_pen_fr: 26.0,
+            gap_pen_ip: 1.5,
+            gap_pen_op: 1.0,
+            gap_pen_cdr: 2.5,
+            gap_pen_other: 11.0,
+            cdr_increase: 0.5, // increase per position away from insertion position CDR
+
+            pen_leap_insertion_point_imgt: 1.0, // better name 6 best until now
+            pen_leap_insertion_point_kabat: 10.0, // better name
+        }
+    }
+}
+// For prefiltering, how close the identity must be to the highest found in order to run the scheme
+pub const WITHIN_IDENTITY_RANGE: f64 = 0.25;
+
+pub const MINIMAL_CHAIN_IDENTITY: f64 = 0.7;
 
 // Minimal chain length, minimal length for sequence to continue search for chain
-//pub const MINIMAL_CHAIN_LENGTH: i32 = 60;
+pub const MINIMAL_CHAIN_LENGTH: i32 = 60;
+
+pub const PRE_FILTER_TERMINAL_LENGTH: u8 = 10;
 
 // Indexes for query and consensus gap columns in scoring matrix
 pub const QUERY_GAP_COLUMN: usize = 23;

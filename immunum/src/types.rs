@@ -4,7 +4,7 @@ use clap::ValueEnum;
 use immunum_macros::ParseFromString;
 use std::ops::Range;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RegionRange {
     pub start: u32,
     pub end: u32,
@@ -13,6 +13,13 @@ impl RegionRange {
     pub fn positions(&self) -> Range<u32> {
         self.start..self.end
     }
+}
+
+/// Struct for output of prefiltering, containing identity of terminals, start and end
+pub struct PrefilterOutput {
+    pub identity: f64,
+    pub predicted_start: u32,
+    pub predicted_end: u32,
 }
 
 /// Numbering schemes for immunoglobulin sequences
@@ -27,7 +34,7 @@ pub enum Scheme {
 }
 
 /// Immunoglobulin and T-cell receptor chain types
-#[derive(Clone, Debug, PartialEq, ValueEnum, ParseFromString)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum, ParseFromString)]
 pub enum Chain {
     // IG Heavy chain variants
     #[value(alias = "Heavy", alias = "H")]

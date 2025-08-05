@@ -1,4 +1,5 @@
 use crate::annotation::number_sequences_and_write_output;
+use crate::constants::get_scoring_params;
 use crate::types::{Chain, Scheme};
 
 /// Temporary number function TODO To be changed, think about entry point for user
@@ -10,6 +11,7 @@ pub fn number_sequence(fasta_file: &str, scheme: &Scheme, chains: &[Chain]) -> S
         chains,
         "numbering_output.txt",
         true,
+        &get_scoring_params(),
     );
     "Numbered sequences and stored in numbering_output.txt".to_string()
 }

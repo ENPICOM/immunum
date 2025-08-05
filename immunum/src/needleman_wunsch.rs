@@ -1,6 +1,8 @@
 use crate::consensus_scoring::encode_sequence;
-use crate::constants::scoring::GAP_PEN_END;
-use crate::constants::{scoring, traceback_directions, CONSENSUS_GAP_COLUMN, QUERY_GAP_COLUMN};
+use crate::constants::{
+    traceback_directions, CONSENSUS_GAP_COLUMN, GAP_PEN_END, GAP_PEN_START, MATCH_CP_MULTIPLIER,
+    QUERY_GAP_COLUMN,
+};
 use crate::numbering_scheme_type::NumberingScheme;
 
 /// Classic needleman wunch alignment for sequence against consensus sequence
@@ -18,11 +20,11 @@ pub fn needleman_wunsch_consensus(
         vec![vec![0; len_query_sequence + 1]; num_positions_consensus + 1];
 
     for i in 0..len_query_sequence + 1 {
-        dynamic_matrix[0][i] = 0.0 - (scoring::GAP_PEN_START * i as f64);
+        dynamic_matrix[0][i] = 0.0 - (GAP_PEN_START * i as f64);
         traceback_matrix[0][i] = traceback_directions::FROM_LEFT;
     }
     for i in 0..num_positions_consensus + 1 {
-        dynamic_matrix[i][0] = 0.0 - (scoring::GAP_PEN_START * i as f64);
+        dynamic_matrix[i][0] = 0.0 - (GAP_PEN_START * i as f64);
         traceback_matrix[i][0] = traceback_directions::FROM_TOP;
     }
 
@@ -54,7 +56,7 @@ pub fn needleman_wunsch_consensus(
                 .conserved_positions
                 .contains(&(consensus_position as u32))
             {
-                best_score *= scoring::MATCH_CP_MULTIPLIER
+                best_score *= MATCH_CP_MULTIPLIER
             }
 
             match_value += best_score;

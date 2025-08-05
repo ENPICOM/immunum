@@ -1,4 +1,4 @@
-use crate::constants::ENCODED_RESIDUES_MAP;
+use crate::constants::{ScoringParams, ENCODED_RESIDUES_MAP};
 use crate::constants::{ACCEPTED_RESIDUES, BLOSUM62};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::schemes::{
@@ -61,7 +61,7 @@ fn blosum_lookup(residue1: &u8, residue2: &u8) -> i32 {
 }
 
 /// Calculates and writes scoring matrix for consensus sequence
-fn write_scoring_matrix(path: PathBuf, scheme: NumberingScheme) {
+fn write_scoring_matrix(path: PathBuf, scheme: NumberingScheme, scoring_params: &ScoringParams) {
     let number_accepted_residues = ACCEPTED_RESIDUES.len();
     let consensus_length = scheme.consensus_amino_acids.len();
 
@@ -78,7 +78,8 @@ fn write_scoring_matrix(path: PathBuf, scheme: NumberingScheme) {
             ) as f64
         }
         // fill in gap penalties
-        let (query_gap, consensus_gap) = scheme.gap_penalty((consensus_position + 1) as u32);
+        let (query_gap, consensus_gap) =
+            scheme.gap_penalty((consensus_position + 1) as u32, scoring_params);
         // Query gap
         matrix[[consensus_position, number_accepted_residues]] = query_gap;
         // Consensus gap
@@ -103,7 +104,7 @@ pub fn read_scoring_matrix(path: PathBuf) -> Array2<f64> {
 }
 
 /// Recalculates and writes all scoring matrices (IMGT and KABAT for now)
-pub fn write_all_scoring_matrices() {
+pub fn write_all_scoring_matrices(scoring_params: &ScoringParams) {
     let schemes: Vec<(NumberingScheme, PathBuf)> = vec![
         (
             get_imgt_heavy_scheme(),
@@ -143,13 +144,14 @@ pub fn write_all_scoring_matrices() {
         ),
     ];
     for (scheme, file_path) in schemes {
-        write_scoring_matrix(file_path, scheme);
+        write_scoring_matrix(file_path, scheme, scoring_params);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::constants::get_scoring_params;
     use std::path::PathBuf;
     //TODO tests for this part
 
@@ -165,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_write_scoring_matrix() {
-        write_all_scoring_matrices();
+        write_all_scoring_matrices(&get_scoring_params());
     }
 
     #[test]

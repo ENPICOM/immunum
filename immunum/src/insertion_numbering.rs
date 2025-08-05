@@ -7,8 +7,8 @@ pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme) {
 
     // For IMGT reverse numbering
     let reverse_numbering_positions = [
-        insertion_points::CDR1_IMGT,
-        insertion_points::CDR2_IMGT,
+        insertion_points::CDR1_IMGT - 1,
+        insertion_points::CDR2_IMGT - 1,
         insertion_points::CDR3_IMGT,
     ];
 
@@ -86,8 +86,8 @@ pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme) {
 /// Function that assigns correct IMGT labels for reverse numbering positions
 fn imgt_reverse_numbering(position: u32, insertion_length: usize, letters: bool) -> Vec<String> {
     // Function to get a list of insertion names according to imgt scheme
-    if position != insertion_points::CDR1_IMGT
-        && position != insertion_points::CDR2_IMGT
+    if position != insertion_points::CDR1_IMGT - 1
+        && position != insertion_points::CDR2_IMGT - 1
         && position != insertion_points::CDR3_IMGT
     {
         panic!("Trying to reverse number a wrong position {position}");
