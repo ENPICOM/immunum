@@ -1,13 +1,10 @@
 use crate::consensus_scoring::calculate_scoring_matrix;
 use crate::constants::{
-    get_imgt_heavy_consensus, get_imgt_kappa_consensus, get_imgt_lambda_consensus,
-    get_kabat_heavy_consensus, get_kabat_kappa_consensus, get_kabat_lambda_consensus,
-    get_scoring_params, ScoringParams,
+    get_consensus, get_scoring_params, ScoringParams,
 };
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{Chain, RegionRange, Scheme};
-use std::collections::HashMap;
 
 struct SchemeConfig {
     conserved_positions: Vec<u32>,
@@ -141,24 +138,10 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
     }
 }
 
-fn get_consensus_function(scheme: &Scheme, chain: &Chain) -> fn() -> HashMap<u32, Vec<u8>> {
-    match (scheme, chain) {
-        (Scheme::IMGT, Chain::IGH) => get_imgt_heavy_consensus,
-        (Scheme::IMGT, Chain::IGK) => get_imgt_kappa_consensus,
-        (Scheme::IMGT, Chain::IGL) => get_imgt_lambda_consensus,
-        (Scheme::KABAT, Chain::IGH) => get_kabat_heavy_consensus,
-        (Scheme::KABAT, Chain::IGK) => get_kabat_kappa_consensus,
-        (Scheme::KABAT, Chain::IGL) => get_kabat_lambda_consensus,
-        // For unsupported chains, default to heavy chain
-        (Scheme::IMGT, _) => get_imgt_heavy_consensus,
-        (Scheme::KABAT, _) => get_kabat_heavy_consensus,
-    }
-}
 
 pub fn get_scheme(scheme: Scheme, chain: Chain, params: Option<ScoringParams>) -> NumberingScheme {
     let scoring_params = params.unwrap_or_else(get_scoring_params);
-    let consensus_function = get_consensus_function(&scheme, &chain);
-    let consensus_amino_acids = consensus_function();
+    let consensus_amino_acids = get_consensus(scheme, chain);
     let config = get_scheme_config(&scheme, &chain);
 
     // Create a temporary scheme to access the gap_penalty method

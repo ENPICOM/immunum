@@ -417,32 +417,20 @@ pub fn parse_consensus_data(data: &str) -> HashMap<u32, Vec<u8>> {
     consensus_aas
 }
 
-/// Get IMGT Heavy consensus data
-pub fn get_imgt_heavy_consensus() -> HashMap<u32, Vec<u8>> {
-    parse_consensus_data(IMGT_CONSENSUS_H_DATA)
-}
 
-/// Get IMGT Kappa consensus data
-pub fn get_imgt_kappa_consensus() -> HashMap<u32, Vec<u8>> {
-    parse_consensus_data(IMGT_CONSENSUS_K_DATA)
-}
-
-/// Get IMGT Lambda consensus data
-pub fn get_imgt_lambda_consensus() -> HashMap<u32, Vec<u8>> {
-    parse_consensus_data(IMGT_CONSENSUS_L_DATA)
-}
-
-/// Get KABAT Heavy consensus data
-pub fn get_kabat_heavy_consensus() -> HashMap<u32, Vec<u8>> {
-    parse_consensus_data(KABAT_CONSENSUS_H_DATA)
-}
-
-/// Get KABAT Kappa consensus data
-pub fn get_kabat_kappa_consensus() -> HashMap<u32, Vec<u8>> {
-    parse_consensus_data(KABAT_CONSENSUS_K_DATA)
-}
-
-/// Get KABAT Lambda consensus data
-pub fn get_kabat_lambda_consensus() -> HashMap<u32, Vec<u8>> {
-    parse_consensus_data(KABAT_CONSENSUS_L_DATA)
+/// Get consensus data for any scheme and chain combination
+pub fn get_consensus(scheme: crate::types::Scheme, chain: crate::types::Chain) -> HashMap<u32, Vec<u8>> {
+    use crate::types::{Scheme, Chain};
+    
+    match (scheme, chain) {
+        (Scheme::IMGT, Chain::IGH) => parse_consensus_data(IMGT_CONSENSUS_H_DATA),
+        (Scheme::IMGT, Chain::IGK) => parse_consensus_data(IMGT_CONSENSUS_K_DATA),
+        (Scheme::IMGT, Chain::IGL) => parse_consensus_data(IMGT_CONSENSUS_L_DATA),
+        (Scheme::KABAT, Chain::IGH) => parse_consensus_data(KABAT_CONSENSUS_H_DATA),
+        (Scheme::KABAT, Chain::IGK) => parse_consensus_data(KABAT_CONSENSUS_K_DATA),
+        (Scheme::KABAT, Chain::IGL) => parse_consensus_data(KABAT_CONSENSUS_L_DATA),
+        // For unsupported chains, default to heavy chain
+        (Scheme::IMGT, _) => parse_consensus_data(IMGT_CONSENSUS_H_DATA),
+        (Scheme::KABAT, _) => parse_consensus_data(KABAT_CONSENSUS_H_DATA),
+    }
 }
