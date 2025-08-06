@@ -6,67 +6,6 @@ use crate::constants::{get_scoring_params, ScoringParams};
 use crate::result::AnnotationResult;
 use crate::types::{Chain, Scheme};
 
-/// Python wrapper for ScoringParams
-#[pyclass(name = "ScoringParams")]
-#[derive(Clone)]
-pub struct PyScoringParams {
-    inner: ScoringParams,
-}
-
-#[pymethods]
-impl PyScoringParams {
-    #[new]
-    #[pyo3(signature = (gap_pen_cp=None, gap_pen_fr=None, gap_pen_ip=None, gap_pen_op=None, gap_pen_cdr=None, gap_pen_other=None, cdr_increase=None, pen_leap_insertion_point_imgt=None, pen_leap_insertion_point_kabat=None))]
-    pub fn new(
-        gap_pen_cp: Option<f64>,
-        gap_pen_fr: Option<f64>,
-        gap_pen_ip: Option<f64>,
-        gap_pen_op: Option<f64>,
-        gap_pen_cdr: Option<f64>,
-        gap_pen_other: Option<f64>,
-        cdr_increase: Option<f64>,
-        pen_leap_insertion_point_imgt: Option<f64>,
-        pen_leap_insertion_point_kabat: Option<f64>,
-    ) -> Self {
-        let default_params = ScoringParams::default();
-        PyScoringParams {
-            inner: ScoringParams {
-                gap_pen_cp: gap_pen_cp.unwrap_or(default_params.gap_pen_cp),
-                gap_pen_fr: gap_pen_fr.unwrap_or(default_params.gap_pen_fr),
-                gap_pen_ip: gap_pen_ip.unwrap_or(default_params.gap_pen_ip),
-                gap_pen_op: gap_pen_op.unwrap_or(default_params.gap_pen_op),
-                gap_pen_cdr: gap_pen_cdr.unwrap_or(default_params.gap_pen_cdr),
-                gap_pen_other: gap_pen_other.unwrap_or(default_params.gap_pen_other),
-                cdr_increase: cdr_increase.unwrap_or(default_params.cdr_increase),
-                pen_leap_insertion_point_imgt: pen_leap_insertion_point_imgt
-                    .unwrap_or(default_params.pen_leap_insertion_point_imgt),
-                pen_leap_insertion_point_kabat: pen_leap_insertion_point_kabat
-                    .unwrap_or(default_params.pen_leap_insertion_point_kabat),
-            },
-        }
-    }
-
-    #[getter]
-    pub fn gap_pen_cp(&self) -> f64 {
-        self.inner.gap_pen_cp
-    }
-
-    #[setter]
-    pub fn set_gap_pen_cp(&mut self, value: f64) {
-        self.inner.gap_pen_cp = value;
-    }
-
-    #[getter]
-    pub fn gap_pen_op(&self) -> f64 {
-        self.inner.gap_pen_op
-    }
-
-    #[setter]
-    pub fn set_gap_pen_op(&mut self, value: f64) {
-        self.inner.gap_pen_op = value;
-    }
-}
-
 /// Python wrapper for AnnotationResult
 #[pyclass(name = "AnnotationResult")]
 pub struct PyAnnotationResult {
@@ -148,7 +87,7 @@ impl PyAnnotator {
     pub fn new(
         scheme: Scheme,
         chains: PyObject,
-        scoring_params: Option<PyScoringParams>,
+        scoring_params: Option<ScoringParams>,
         use_prefiltering: Option<bool>,
         py: Python,
     ) -> PyResult<Self> {
@@ -163,9 +102,7 @@ impl PyAnnotator {
             ));
         };
 
-        let scoring_params_inner = scoring_params.map(|p| p.inner);
-
-        match Annotator::new(scheme, rust_chains, scoring_params_inner, use_prefiltering) {
+        match Annotator::new(scheme, rust_chains, scoring_params, use_prefiltering) {
             Ok(annotator) => Ok(PyAnnotator { inner: annotator }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
         }
@@ -234,10 +171,8 @@ impl PyAnnotator {
 
 /// Get default scoring parameters
 #[pyfunction]
-pub fn default_scoring_params() -> PyScoringParams {
-    PyScoringParams {
-        inner: get_scoring_params(),
-    }
+pub fn default_scoring_params() -> ScoringParams {
+    get_scoring_params()
 }
 
 /// Immunum Python module configuration
@@ -246,7 +181,7 @@ pub fn immunum(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Main API classes
     m.add_class::<PyAnnotator>()?; // Exported as "Annotator"
     m.add_class::<PyAnnotationResult>()?; // Exported as "AnnotationResult"
-    m.add_class::<PyScoringParams>()?; // Exported as "ScoringParams"
+    m.add_class::<ScoringParams>()?; // Exported as "ScoringParams"
     m.add_class::<crate::types::Scheme>()?;
     m.add_class::<crate::types::Chain>()?;
 

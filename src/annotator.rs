@@ -115,10 +115,7 @@ impl Annotator {
     }
 
     /// Process sequences from a FASTA/FASTQ file and return results with sequence names
-    pub fn number_file(
-        &self,
-        file_path: &str,
-    ) -> FileProcessingResult {
+    pub fn number_file(&self, file_path: &str) -> FileProcessingResult {
         // Check if input file exists
         if !std::path::Path::new(file_path).exists() {
             return Err(format!("Input file not found: {}", file_path));

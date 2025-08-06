@@ -16,7 +16,11 @@ pub fn calculate_scoring_matrix(
 
     // Fill in scores
     for consensus_position in 0..consensus_length {
-        for (residue_index, &residue) in ACCEPTED_RESIDUES.iter().enumerate().take(number_accepted_residues) {
+        for (residue_index, &residue) in ACCEPTED_RESIDUES
+            .iter()
+            .enumerate()
+            .take(number_accepted_residues)
+        {
             let score =
                 best_score_consensus((consensus_position + 1) as u32, residue, consensus) as f64;
             matrix.set(consensus_position, residue_index, score);

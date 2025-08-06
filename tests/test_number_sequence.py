@@ -76,7 +76,6 @@ class TestImmunumAPI:
             "Scheme",
             "ScoringParams",
             "default_scoring_params",
-            "number_sequence",
         ]
         available_api = [attr for attr in dir(immunum) if not attr.startswith("_")]
 
@@ -138,3 +137,30 @@ class TestAnnotatorMethods:
         except Exception as e:
             # Expected to potentially fail with test sequences
             assert "error" in str(e).lower()
+
+    def test_annotator_number_file(self):
+        """Test Annotator.number_file method."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT, 
+            chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL]
+        )
+
+        # Test with the fixture file
+        results = annotator.number_file("fixtures/test.fasta")
+        assert isinstance(results, list)
+        assert len(results) == 4  # Expected 4 sequences in test.fasta
+        
+        # Check that results are tuples of (name, AnnotationResult)
+        for name, result in results:
+            assert isinstance(name, str)
+            assert hasattr(result, 'sequence')
+            assert hasattr(result, 'scheme')
+            assert hasattr(result, 'chain')
+            assert hasattr(result, 'identity')
+            
+        # Test with non-existent file
+        try:
+            annotator.number_file("fixtures/nonexistent.fasta")
+            assert False, "Should have raised an exception for non-existent file"
+        except Exception as e:
+            assert "not found" in str(e).lower() or "error" in str(e).lower()

@@ -1,11 +1,19 @@
 use phf::{phf_map, Map};
 use std::collections::HashMap;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 pub const GAP_PEN_START: f64 = 1.0;
 pub const GAP_PEN_END: f64 = 1.0;
 pub const MATCH_CP_MULTIPLIER: f64 = 8.0; // Multiplier of match score
 
 #[derive(Clone)]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct ScoringParams {
     pub gap_pen_cp: f64,
     pub gap_pen_fr: f64,
@@ -41,6 +49,72 @@ impl Default for ScoringParams {
         }
     }
 }
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl ScoringParams {
+    #[new]
+    #[pyo3(signature = (gap_pen_cp=None, gap_pen_fr=None, gap_pen_ip=None, gap_pen_op=None, gap_pen_cdr=None, gap_pen_other=None, cdr_increase=None, pen_leap_insertion_point_imgt=None, pen_leap_insertion_point_kabat=None))]
+    pub fn new(
+        gap_pen_cp: Option<f64>,
+        gap_pen_fr: Option<f64>,
+        gap_pen_ip: Option<f64>,
+        gap_pen_op: Option<f64>,
+        gap_pen_cdr: Option<f64>,
+        gap_pen_other: Option<f64>,
+        cdr_increase: Option<f64>,
+        pen_leap_insertion_point_imgt: Option<f64>,
+        pen_leap_insertion_point_kabat: Option<f64>,
+    ) -> Self {
+        let default_params = ScoringParams::default();
+        ScoringParams {
+            gap_pen_cp: gap_pen_cp.unwrap_or(default_params.gap_pen_cp),
+            gap_pen_fr: gap_pen_fr.unwrap_or(default_params.gap_pen_fr),
+            gap_pen_ip: gap_pen_ip.unwrap_or(default_params.gap_pen_ip),
+            gap_pen_op: gap_pen_op.unwrap_or(default_params.gap_pen_op),
+            gap_pen_cdr: gap_pen_cdr.unwrap_or(default_params.gap_pen_cdr),
+            gap_pen_other: gap_pen_other.unwrap_or(default_params.gap_pen_other),
+            cdr_increase: cdr_increase.unwrap_or(default_params.cdr_increase),
+            pen_leap_insertion_point_imgt: pen_leap_insertion_point_imgt
+                .unwrap_or(default_params.pen_leap_insertion_point_imgt),
+            pen_leap_insertion_point_kabat: pen_leap_insertion_point_kabat
+                .unwrap_or(default_params.pen_leap_insertion_point_kabat),
+        }
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+impl ScoringParams {
+    #[wasm_bindgen(constructor)]
+    pub fn new_wasm(
+        gap_pen_cp: Option<f64>,
+        gap_pen_fr: Option<f64>,
+        gap_pen_ip: Option<f64>,
+        gap_pen_op: Option<f64>,
+        gap_pen_cdr: Option<f64>,
+        gap_pen_other: Option<f64>,
+        cdr_increase: Option<f64>,
+        pen_leap_insertion_point_imgt: Option<f64>,
+        pen_leap_insertion_point_kabat: Option<f64>,
+    ) -> Self {
+        let default_params = ScoringParams::default();
+        ScoringParams {
+            gap_pen_cp: gap_pen_cp.unwrap_or(default_params.gap_pen_cp),
+            gap_pen_fr: gap_pen_fr.unwrap_or(default_params.gap_pen_fr),
+            gap_pen_ip: gap_pen_ip.unwrap_or(default_params.gap_pen_ip),
+            gap_pen_op: gap_pen_op.unwrap_or(default_params.gap_pen_op),
+            gap_pen_cdr: gap_pen_cdr.unwrap_or(default_params.gap_pen_cdr),
+            gap_pen_other: gap_pen_other.unwrap_or(default_params.gap_pen_other),
+            cdr_increase: cdr_increase.unwrap_or(default_params.cdr_increase),
+            pen_leap_insertion_point_imgt: pen_leap_insertion_point_imgt
+                .unwrap_or(default_params.pen_leap_insertion_point_imgt),
+            pen_leap_insertion_point_kabat: pen_leap_insertion_point_kabat
+                .unwrap_or(default_params.pen_leap_insertion_point_kabat),
+        }
+    }
+}
+
 // For prefiltering, how close the identity must be to the highest found in order to run the scheme
 pub const WITHIN_IDENTITY_RANGE: f64 = 0.25;
 
@@ -417,11 +491,13 @@ pub fn parse_consensus_data(data: &str) -> HashMap<u32, Vec<u8>> {
     consensus_aas
 }
 
-
 /// Get consensus data for any scheme and chain combination
-pub fn get_consensus(scheme: crate::types::Scheme, chain: crate::types::Chain) -> HashMap<u32, Vec<u8>> {
-    use crate::types::{Scheme, Chain};
-    
+pub fn get_consensus(
+    scheme: crate::types::Scheme,
+    chain: crate::types::Chain,
+) -> HashMap<u32, Vec<u8>> {
+    use crate::types::{Chain, Scheme};
+
     match (scheme, chain) {
         (Scheme::IMGT, Chain::IGH) => parse_consensus_data(IMGT_CONSENSUS_H_DATA),
         (Scheme::IMGT, Chain::IGK) => parse_consensus_data(IMGT_CONSENSUS_K_DATA),

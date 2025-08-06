@@ -3,3 +3,5 @@ __pycache__
 wasm_build
 
 /.idea
+
+node_modules
