@@ -115,11 +115,7 @@ impl Annotator {
     }
 
     /// Process sequences from a FASTA/FASTQ file and return results with sequence names
-    pub fn number_file(
-        &self,
-        file_path: &str,
-        parallel: bool,
-    ) -> FileProcessingResult {
+    pub fn number_file(&self, file_path: &str, parallel: bool) -> FileProcessingResult {
         // Check if input file exists
         if !std::path::Path::new(file_path).exists() {
             return Err(format!("Input file not found: {}", file_path));
@@ -269,7 +265,8 @@ mod tests {
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             None,
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         let sequences = vec![
             "QVQLVQSGAEVKKPGASVKVSCKAS".to_string(),
@@ -291,8 +288,8 @@ mod tests {
 
     #[test]
     fn test_parallel_number_file() {
-        use std::io::Write;
         use std::fs::File;
+        use std::io::Write;
 
         // Create a temporary test file
         let test_file_path = "test_parallel.fasta";
@@ -308,7 +305,8 @@ mod tests {
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             None,
             None,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Test sequential file processing
         let sequential_results = annotator.number_file(test_file_path, false).unwrap();

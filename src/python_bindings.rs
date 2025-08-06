@@ -141,7 +141,11 @@ impl PyAnnotator {
     }
 
     #[pyo3(signature = (file_path, parallel=false))]
-    pub fn number_file(&self, file_path: &str, parallel: bool) -> PyResult<Vec<(String, PyAnnotationResult)>> {
+    pub fn number_file(
+        &self,
+        file_path: &str,
+        parallel: bool,
+    ) -> PyResult<Vec<(String, PyAnnotationResult)>> {
         match self.inner.number_file(file_path, parallel) {
             Ok(results) => {
                 let mut py_results = Vec::new();
