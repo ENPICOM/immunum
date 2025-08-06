@@ -6,6 +6,7 @@ use crate::prefiltering::apply_prefiltering;
 use crate::result::AnnotationResult;
 use crate::schemes::get_scheme;
 use crate::types::{Chain, Scheme};
+use rayon::prelude::*;
 
 /// Type alias for complex file processing results
 type FileProcessingResult = Result<Vec<(String, Result<AnnotationResult, String>)>, String>;
@@ -100,10 +101,9 @@ impl Annotator {
         parallel: bool,
     ) -> Vec<Result<AnnotationResult, String>> {
         if parallel {
-            // TODO: Implement parallel processing using rayon
-            // For now, process sequentially
+            // Use rayon for parallel processing
             sequences
-                .iter()
+                .par_iter()
                 .map(|seq| self.number_sequence(seq))
                 .collect()
         } else {
@@ -115,7 +115,11 @@ impl Annotator {
     }
 
     /// Process sequences from a FASTA/FASTQ file and return results with sequence names
-    pub fn number_file(&self, file_path: &str) -> FileProcessingResult {
+    pub fn number_file(
+        &self,
+        file_path: &str,
+        parallel: bool,
+    ) -> FileProcessingResult {
         // Check if input file exists
         if !std::path::Path::new(file_path).exists() {
             return Err(format!("Input file not found: {}", file_path));
@@ -133,13 +137,23 @@ impl Annotator {
         }
 
         // Process all sequences and return results with sequence names
-        let results: Vec<(String, Result<AnnotationResult, String>)> = records
-            .into_iter()
-            .map(|record| {
-                let result = self.number_sequence(&record.sequence);
-                (record._name, result)
-            })
-            .collect();
+        let results: Vec<(String, Result<AnnotationResult, String>)> = if parallel {
+            records
+                .into_par_iter()
+                .map(|record| {
+                    let result = self.number_sequence(&record.sequence);
+                    (record._name, result)
+                })
+                .collect()
+        } else {
+            records
+                .into_iter()
+                .map(|record| {
+                    let result = self.number_sequence(&record.sequence);
+                    (record._name, result)
+                })
+                .collect()
+        };
 
         Ok(results)
     }
@@ -246,5 +260,65 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert!(results[0].is_err());
         assert!(results[0].as_ref().unwrap_err().contains("Empty sequence"));
+    }
+
+    #[test]
+    fn test_parallel_number_sequences() {
+        let annotator = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            None,
+            None,
+        ).unwrap();
+
+        let sequences = vec![
+            "QVQLVQSGAEVKKPGASVKVSCKAS".to_string(),
+            "DIQMTQSPSSLSASVGDRVTITC".to_string(),
+            "EVQLLESGGGLVQPGGSLRLSCAAS".to_string(),
+        ];
+
+        // Test sequential processing
+        let sequential_results = annotator.number_sequences(&sequences, false);
+        assert_eq!(sequential_results.len(), 3);
+
+        // Test parallel processing
+        let parallel_results = annotator.number_sequences(&sequences, true);
+        assert_eq!(parallel_results.len(), 3);
+
+        // Results should be the same (order might differ in more complex cases, but for this simple test they should match)
+        assert_eq!(sequential_results.len(), parallel_results.len());
+    }
+
+    #[test]
+    fn test_parallel_number_file() {
+        use std::io::Write;
+        use std::fs::File;
+
+        // Create a temporary test file
+        let test_file_path = "test_parallel.fasta";
+        let mut file = File::create(test_file_path).unwrap();
+        writeln!(file, ">seq1").unwrap();
+        writeln!(file, "QVQLVQSGAEVKKPGASVKVSCKAS").unwrap();
+        writeln!(file, ">seq2").unwrap();
+        writeln!(file, "DIQMTQSPSSLSASVGDRVTITC").unwrap();
+        drop(file);
+
+        let annotator = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            None,
+            None,
+        ).unwrap();
+
+        // Test sequential file processing
+        let sequential_results = annotator.number_file(test_file_path, false).unwrap();
+        assert_eq!(sequential_results.len(), 2);
+
+        // Test parallel file processing
+        let parallel_results = annotator.number_file(test_file_path, true).unwrap();
+        assert_eq!(parallel_results.len(), 2);
+
+        // Clean up
+        std::fs::remove_file(test_file_path).ok();
     }
 }

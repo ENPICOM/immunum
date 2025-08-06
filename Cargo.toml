@@ -7,6 +7,7 @@ edition = "2021"
 clap = { version = "4.5.40", features = ["derive"] }
 flate2 = "1.1.2"
 pyo3 = { version = "0.25.1", features = ["extension-module"], optional = true }
+rayon = "1.10.0"
 thiserror = "2.0.12"
 wasm-bindgen = { version = "0.2.1", optional = true }
 js-sys = { version = "0.3", optional = true }

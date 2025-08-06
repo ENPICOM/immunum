@@ -300,12 +300,13 @@ class Annotator:
         """
         ...
     
-    def number_file(self, file_path: str) -> List[Tuple[str, AnnotationResult]]:
+    def number_file(self, file_path: str, parallel: bool = False) -> List[Tuple[str, AnnotationResult]]:
         """
         Number sequences from a FASTA or FASTQ file.
         
         Args:
             file_path: Path to the input file (supports .fasta, .fastq, .gz)
+            parallel: Whether to use parallel processing for better performance
             
         Returns:
             List of tuples containing (sequence_name, annotation_result)

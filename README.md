@@ -79,47 +79,156 @@ immunum-cli -i sequences.fastq.gz -s imgt -c tra trb
 
 ### Python Library
 
-Build and install the Python package:
+#### Building from Source
+
+To build and install the Python library from source:
+
 ```bash
-# Install the virtual environment
-uv venv && uv sync && source .venv/bin/activate
+# Clone the repository
+git clone https://github.com/ENPICOM/immunum.git && cd immunum
 
-# Install the Python package in this environment
-maturin develop --features python
+# Install UV (Python package manager) if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# OR build the Python package
-maturin build --features python
-# And install the Python package in your own project
-uv add target/wheels/immunum-*.whl
+# Create and activate virtual environment
+uv venv && source .venv/bin/activate
+
+# Install dependencies
+uv sync
+
+# Build and install the Python package in development mode
+uv run maturin develop --features python
 ```
 
-Import and use the `immunum` module in your Python scripts:
+#### Installing in Your Python Environment
+
+To install the library in your own Python project:
+
+```bash
+# Option 1: Build wheel and install
+uv run maturin build --features python --release
+pip install target/wheels/immunum-*.whl
+
+# Option 2: Install directly in development mode (for contributors)
+uv run maturin develop --features python
+```
+
+#### Python API Usage
+
+The Python API provides a clean, object-oriented interface for sequence numbering:
 
 ```python
 import immunum
 
-# Number a single sequence
-sequence = "QVQLVQSGAEVKKPGASVKVSCKAS"
-result = immunum.number_sequence(sequence, "imgt", ["igh"])
-print(result)
+# Create an annotator for IMGT scheme with heavy chain support
+annotator = immunum.Annotator(
+    scheme=immunum.Scheme.IMGT,
+    chains=[immunum.Chain.IGH]
+)
 
-# Process multiple sequences with different parameters
+# Number a single sequence
+sequence = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS"
+result = annotator.number_sequence(sequence)
+
+print(f"Chain: {result.chain}")
+print(f"Scheme: {result.scheme}")
+print(f"Identity: {result.identity:.2f}")
+print(f"Numbers: {result.numbers[:10]}...")  # First 10 positions
+
+# Access specific regions
+cdr_sequences = result.get_cdr_sequences()
+print(f"CDR1: {cdr_sequences.get('CDR1', 'Not found')}")
+print(f"CDR2: {cdr_sequences.get('CDR2', 'Not found')}")
+print(f"CDR3: {cdr_sequences.get('CDR3', 'Not found')}")
+
+# Multi-chain annotator for light and heavy chains
+multi_annotator = immunum.Annotator(
+    scheme=immunum.Scheme.IMGT,
+    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL]
+)
+
+# Process multiple sequences
 sequences = [
-    "QVQLVQSGAEVKKPGASVKVSCKAS",
-    "DIQMTQSPSSLSASVGDRVTITC"
+    "QVQLVQSGAEVKKPGASVKVSCKAS",  # Heavy chain fragment
+    "DIQMTQSPSSLSASVGDRVTITC"     # Light chain fragment
 ]
 
-for seq in sequences:
-    # Use case-insensitive scheme and chain names
-    result = immunum.number_sequence(seq, "IMGT", ["IGH", "IGK"])
-    print(result)
+results = multi_annotator.number_sequences(sequences)
+for i, result in enumerate(results):
+    print(f"Sequence {i+1}: Chain {result.chain}, Identity {result.identity:.2f}")
 
-# Handle errors gracefully
+# Use parallel processing for better performance with many sequences
+parallel_results = multi_annotator.number_sequences(sequences, parallel=True)
+print(f"Processed {len(parallel_results)} sequences in parallel")
+
+# Process sequences from a FASTA file
+file_results = multi_annotator.number_file("sequences.fasta")
+for seq_name, result in file_results:
+    print(f"{seq_name}: Chain {result.chain}, Identity {result.identity:.2f}")
+
+# Use parallel processing for better performance with large files
+parallel_file_results = multi_annotator.number_file("large_sequences.fasta", parallel=True)
+print(f"Processed {len(parallel_file_results)} sequences in parallel")
+
+# Custom scoring parameters
+custom_params = immunum.ScoringParams(
+    gap_pen_cp=60.0,  # Gap penalty for conserved positions
+    gap_pen_fr=30.0,  # Gap penalty for framework regions
+    cdr_increase=0.7  # CDR increase factor
+)
+
+custom_annotator = immunum.Annotator(
+    scheme=immunum.Scheme.KABAT,
+    chains=[immunum.Chain.IGH],
+    scoring_params=custom_params
+)
+
+# Enable prefiltering for better performance with multiple chain types
+fast_annotator = immunum.Annotator(
+    scheme=immunum.Scheme.IMGT,
+    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL, 
+            immunum.Chain.TRA, immunum.Chain.TRB],
+    use_prefiltering=True
+)
+
+# Error handling
 try:
-    result = immunum.number_sequence("INVALID", "invalid_scheme", ["igh"])
-except ValueError as e:
-    print(f"Error: {e}")
+    result = annotator.number_sequence("INVALID_SHORT_SEQUENCE")
+except RuntimeError as e:
+    print(f"Numbering failed: {e}")
 ```
+
+#### Key Classes and Methods
+
+- **`Annotator`**: Main class for sequence numbering
+  - `number_sequence(sequence)`: Number a single sequence
+  - `number_sequences(sequences, parallel=False)`: Number multiple sequences with optional parallel processing
+  - `number_file(file_path, parallel=False)`: Process FASTA/FASTQ files with optional parallel processing
+
+- **`AnnotationResult`**: Contains numbering results
+  - Properties: `sequence`, `numbers`, `scheme`, `chain`, `identity`, `regions`
+  - Methods: `get_region_sequence()`, `get_cdr_sequences()`, `get_framework_sequences()`
+
+- **`ScoringParams`**: Customizable scoring parameters for alignment
+  - All parameters have getters/setters for fine-tuning alignment behavior
+
+- **Enums**: `Scheme.IMGT`/`Scheme.KABAT`, `Chain.IGH`/`Chain.IGK`/`Chain.IGL`/etc.
+
+#### Recent API Changes
+
+**v0.2.0+**: The Python API has been streamlined and enhanced:
+- **Parallel Processing**: Added `rayon`-based multithreading support for `number_sequences()` and `number_file()` methods
+- **Streamlined API**: Removed `PyScoringParams` wrapper - now uses `ScoringParams` directly with automatic property access
+- **Consistent naming**: Unified class naming between Python and WASM APIs
+- **Enhanced Properties**: All `ScoringParams` properties support direct getting/setting via PyO3 attributes
+- **Better Type Support**: Improved type annotations in `immunum.pyi` for better IDE support
+
+#### Performance Tips
+
+- **Use parallel processing** (`parallel=True`) when processing multiple sequences or large files
+- **Enable prefiltering** (`use_prefiltering=True`) when annotating with multiple chain types
+- **Batch processing** is more efficient than processing sequences individually
+- **File processing** is optimized for both FASTA and FASTQ formats, including gzip compression
 
 ### WASM Module
 
