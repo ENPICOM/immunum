@@ -190,12 +190,12 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
+            "32".to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
+            '-'.to_string(),
             "33".to_string(),
-            '-'.to_string(),
-            '-'.to_string(),
-            '-'.to_string(),
-            '-'.to_string(),
-            "34".to_string(),
             '-'.to_string(),
             '-'.to_string(),
         ];
@@ -203,12 +203,12 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
-            "33".to_string(),
-            "33A".to_string(),
+            "32".to_string(),
+            "32A".to_string(),
+            "32B".to_string(),
             "33B".to_string(),
-            "34B".to_string(),
-            "34A".to_string(),
-            "34".to_string(),
+            "33A".to_string(),
+            "33".to_string(),
             '-'.to_string(),
             '-'.to_string(),
         ];
@@ -219,7 +219,7 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
-            "61".to_string(),
+            "60".to_string(),
             '-'.to_string(),
             '-'.to_string(),
             '-'.to_string(),
@@ -232,11 +232,11 @@ mod tests {
             '-'.to_string(),
             '-'.to_string(),
             '1'.to_string(),
-            "61".to_string(),
-            "61A".to_string(),
+            "60".to_string(),
+            "60A".to_string(),
+            "60B".to_string(),
             "61B".to_string(),
-            "62B".to_string(),
-            "62A".to_string(),
+            "61A".to_string(),
             "70".to_string(),
             '-'.to_string(),
             '-'.to_string(),
@@ -307,21 +307,21 @@ mod tests {
     fn test_long_reverse_insertion() {
         let mut test_vec: Vec<String> = vec!["-".to_string(); 33]; // 10 dashes
                                                                    // Add numbers 1 to 10
-        for i in 10..=33 {
+        for i in 10..=32 {
             test_vec.push(i.to_string());
         }
         // Add 50 dashes
         test_vec.extend(vec!["-".to_string(); 100]);
         // Add numbers 11 to 15
-        for i in 34..=50 {
+        for i in 33..=50 {
             test_vec.push(i.to_string());
         }
         // Add more dashes
         test_vec.extend(vec!["-".to_string(); 10]);
         name_insertions(&mut test_vec, &Scheme::IMGT);
         // check reversal point to see if numbering goes well
+        assert!(test_vec.contains(&String::from("32AX")));
         assert!(test_vec.contains(&String::from("33AX")));
-        assert!(test_vec.contains(&String::from("34AX")));
     }
 
     #[test]
