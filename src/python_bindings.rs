@@ -108,45 +108,55 @@ impl PyAnnotator {
         }
     }
 
-    pub fn number_sequence(&self, sequence: &str) -> PyResult<PyAnnotationResult> {
-        match self.inner.number_sequence(sequence) {
-            Ok(result) => Ok(PyAnnotationResult { inner: result }),
-            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
-        }
-    }
-
-    #[pyo3(signature = (sequences, parallel=false))]
-    pub fn number_sequences(
+    #[pyo3(signature = (sequence, all_chains=false))]
+    pub fn number_sequence(
         &self,
-        sequences: Vec<String>,
-        parallel: bool,
+        sequence: &str,
+        all_chains: bool,
     ) -> PyResult<Vec<PyAnnotationResult>> {
-        let results = self.inner.number_sequences(&sequences, parallel);
+        let results = self.inner.number_sequence(sequence, all_chains);
         let mut py_results = Vec::new();
-
         for result in results {
             match result {
-                Ok(annotation_result) => {
-                    py_results.push(PyAnnotationResult {
-                        inner: annotation_result,
-                    });
-                }
-                Err(e) => {
-                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e));
-                }
+                Ok(annotation_result) => py_results.push(PyAnnotationResult { inner: annotation_result }),
+                Err(e) => return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
             }
         }
-
         Ok(py_results)
     }
 
-    #[pyo3(signature = (file_path, parallel=false))]
+    #[pyo3(signature = (sequences, all_chains=false, parallel=false))]
+    pub fn number_sequences(
+        &self,
+        sequences: Vec<String>,
+        all_chains: bool,
+        parallel: bool,
+    ) -> PyResult<Vec<Vec<PyAnnotationResult>>> {
+        let results = self.inner.number_sequences(&sequences, all_chains, parallel);
+        let mut outer: Vec<Vec<PyAnnotationResult>> = Vec::new();
+        for seq_results in results {
+            let mut inner_vec: Vec<PyAnnotationResult> = Vec::new();
+            for result in seq_results {
+                match result {
+                    Ok(annotation_result) => inner_vec.push(PyAnnotationResult { inner: annotation_result }),
+                    Err(e) => return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
+                }
+            }
+            outer.push(inner_vec);
+        }
+        Ok(outer)
+    }
+
+    // paired sequences handled by number_sequences with flag
+
+    #[pyo3(signature = (file_path, all_chains=false, parallel=false))]
     pub fn number_file(
         &self,
         file_path: &str,
+        all_chains: bool,
         parallel: bool,
     ) -> PyResult<Vec<(String, PyAnnotationResult)>> {
-        match self.inner.number_file(file_path, parallel) {
+        match self.inner.number_file(file_path, all_chains, parallel) {
             Ok(results) => {
                 let mut py_results = Vec::new();
                 for (name, multi_result) in results {
@@ -173,6 +183,8 @@ impl PyAnnotator {
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
         }
     }
+
+    // paired file mode covered by the parameter above
 }
 
 /// Get default scoring parameters

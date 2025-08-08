@@ -267,7 +267,7 @@ class Annotator:
         """
         ...
 
-    def number_sequence(self, sequence: str) -> AnnotationResult:
+    def number_sequence(self, sequence: str, *, all_chains: bool = False) -> List[AnnotationResult]:
         """
         Number a single sequence.
 
@@ -275,7 +275,7 @@ class Annotator:
             sequence: The amino acid sequence to number
 
         Returns:
-            Annotation result containing numbering and analysis
+            List of annotation results; length 1 in single mode
 
         Raises:
             RuntimeError: If sequence numbering fails
@@ -283,8 +283,8 @@ class Annotator:
         ...
 
     def number_sequences(
-        self, sequences: List[str], parallel: bool = False
-    ) -> List[AnnotationResult]:
+        self, sequences: List[str], *, all_chains: bool = False, parallel: bool = False
+    ) -> List[List[AnnotationResult]]:
         """
         Number multiple sequences.
 
@@ -293,15 +293,42 @@ class Annotator:
             parallel: Whether to use parallel processing
 
         Returns:
-            List of annotation results
+            List of lists of annotation results per input sequence
 
         Raises:
             RuntimeError: If any sequence numbering fails
         """
         ...
 
+    def number_sequence_paired(self, sequence: str) -> List[AnnotationResult]:
+        """
+        Number a single sequence in paired mode, returning all detected chain results.
+
+        Args:
+            sequence: The amino acid sequence to number
+
+        Returns:
+            List of annotation results for each detected chain
+        """
+        ...
+
+    def number_sequences_paired(
+        self, sequences: List[str], parallel: bool = False
+    ) -> List[List[AnnotationResult]]:
+        """
+        Number multiple sequences in paired mode.
+
+        Args:
+            sequences: List of amino acid sequences to number
+            parallel: Whether to use parallel processing
+
+        Returns:
+            List of lists of annotation results per input sequence
+        """
+        ...
+
     def number_file(
-        self, file_path: str, parallel: bool = False
+        self, file_path: str, *, all_chains: bool = False, parallel: bool = False
     ) -> List[Tuple[str, AnnotationResult]]:
         """
         Number sequences from a FASTA or FASTQ file.
@@ -311,7 +338,7 @@ class Annotator:
             parallel: Whether to use parallel processing for better performance
 
         Returns:
-            List of tuples containing (sequence_name, annotation_result)
+            Flattened list of tuples containing (sequence_name, annotation_result)
 
         Raises:
             RuntimeError: If file processing fails

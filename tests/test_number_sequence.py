@@ -116,12 +116,8 @@ class TestAnnotatorMethods:
 
         # Test with a short sequence - might fail but shouldn't crash
         test_sequence = "ATCGATCGATCG"
-        try:
-            result = annotator.number_sequence(test_sequence)
-            assert result is not None
-        except Exception as e:
-            # Short sequences might be rejected
-            assert "error" in str(e).lower() or "empty" in str(e).lower()
+        results = annotator.number_sequence(test_sequence)
+        assert isinstance(results, list)
 
     def test_annotator_number_sequences(self):
         """Test Annotator.number_sequences method."""
@@ -130,13 +126,29 @@ class TestAnnotatorMethods:
         )
 
         sequences = ["ATCGATCGATCG", "GCTAGCTAGCTA"]
-        try:
-            results = annotator.number_sequences(sequences)
-            assert isinstance(results, list)
-            assert len(results) == len(sequences)
-        except Exception as e:
-            # Expected to potentially fail with test sequences
-            assert "error" in str(e).lower()
+        results = annotator.number_sequences(sequences)
+        assert isinstance(results, list)
+        assert len(results) == len(sequences)
+
+    def test_annotator_paired_flag(self):
+        """Test paired-mode via parameterized API."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT, chains=[immunum.Chain.IGH, immunum.Chain.IGK]
+        )
+
+        # Single sequence paired
+        results = annotator.number_sequence("ATCGATCGATCG", all_chains=True)
+        assert isinstance(results, list)
+
+        # Multiple sequences paired
+        batch = annotator.number_sequences(["ATCGATCGATCG", "GCTAGCTAGCTA"], all_chains=True)
+        assert isinstance(batch, list)
+        for item in batch:
+            assert isinstance(item, list)
+
+        # File paired
+        results_file = annotator.number_file("fixtures/test.fasta", all_chains=True)
+        assert isinstance(results_file, list)
 
     def test_annotator_number_file(self):
         """Test Annotator.number_file method."""

@@ -37,12 +37,12 @@ pub struct Cli {
         help = "Enable pre-filtering to speed up numbering by reducing tested chain types"
     )]
     pub prefilter: bool,
-    /// Enable paired sequence numbering to find multiple chains in a single sequence
+    /// Return all detected chains for each input (instead of best single)
     #[arg(
-        long,
-        help = "Enable paired sequence numbering to find multiple antibody/TCR chains within a single sequence"
+        long = "all-chains",
+        help = "Return all detected chains within each sequence (not only the best match)"
     )]
-    pub paired: bool,
+    pub all_chains: bool,
     /// Gap penalty for conserved position (default: 55.0)
     #[arg(long, help = "Gap penalty for conserved positions")]
     pub gap_pen_cp: Option<f64>,

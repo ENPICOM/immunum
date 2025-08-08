@@ -39,4 +39,4 @@ harness = false
 [features]
 default = ["python", "wasm"]
 python = ["pyo3"]
-wasm = ["wasm-bindgen", "wee_alloc"]
+wasm = ["wasm-bindgen", "wee_alloc", "js-sys"]

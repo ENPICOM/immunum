@@ -85,23 +85,34 @@ impl Annotator {
     }
 
     #[wasm_bindgen(js_name = numberSequence)]
-    pub fn number_sequence(&self, sequence: &str) -> Result<WasmAnnotationResult, JsValue> {
-        match self.inner.number_sequence(sequence) {
-            Ok(result) => Ok(WasmAnnotationResult { inner: result }),
-            Err(e) => Err(JsValue::from_str(&e)),
-        }
-    }
-
-    #[wasm_bindgen(js_name = numberSequences)]
-    pub fn number_sequences(&self, sequences: Vec<String>) -> Vec<JsValue> {
-        let results = self.inner.number_sequences(&sequences, false);
+    pub fn number_sequence(&self, sequence: &str, all_chains: Option<bool>) -> Vec<JsValue> {
+        let all_chains = all_chains.unwrap_or(false);
+        let results = self.inner.number_sequence(sequence, all_chains);
         results
             .into_iter()
             .map(|result| match result {
-                Ok(annotation_result) => JsValue::from(WasmAnnotationResult {
-                    inner: annotation_result,
-                }),
+                Ok(annotation_result) => JsValue::from(WasmAnnotationResult { inner: annotation_result }),
                 Err(e) => JsValue::from_str(&format!("Error: {}", e)),
+            })
+            .collect()
+    }
+
+    #[wasm_bindgen(js_name = numberSequences)]
+    pub fn number_sequences(&self, sequences: Vec<String>, all_chains: Option<bool>) -> Vec<JsValue> {
+        let all_chains = all_chains.unwrap_or(false);
+        let results = self.inner.number_sequences(&sequences, all_chains, false);
+        results
+            .into_iter()
+            .map(|seq_results| {
+                let arr = js_sys::Array::new();
+                for r in seq_results {
+                    let v = match r {
+                        Ok(annotation_result) => JsValue::from(WasmAnnotationResult { inner: annotation_result }),
+                        Err(e) => JsValue::from_str(&format!("Error: {}", e)),
+                    };
+                    arr.push(&v);
+                }
+                JsValue::from(arr)
             })
             .collect()
     }

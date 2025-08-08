@@ -1,10 +1,10 @@
 use crate::constants::{get_scoring_params, ScoringParams, PRE_FILTER_TERMINAL_LENGTH};
-use crate::sequence_io::{from_path, SequenceRecord};
 use crate::needleman_wunsch::{needleman_wunsch_consensus, MatrixPool};
 use crate::numbering_scheme::NumberingScheme;
 use crate::prefiltering::prefilter_schemes;
 use crate::result::AnnotationResult;
 use crate::schemes::get_scheme;
+use crate::sequence_io::{from_path, SequenceRecord};
 use crate::types::{Chain, Scheme};
 use rayon::prelude::*;
 
@@ -61,10 +61,15 @@ impl Annotator {
         })
     }
 
-    /// Number a single sequence using optimized algorithm
-    pub fn number_sequence(&self, sequence: &str) -> Result<AnnotationResult, String> {
+    /// Number a sequence. When `paired` is true, returns all matching chain results.
+    /// When `paired` is false, returns a single best match as a 1-element vector.
+    pub fn number_sequence(
+        &self,
+        sequence: &str,
+        paired: bool,
+    ) -> Vec<Result<AnnotationResult, String>> {
         if sequence.is_empty() {
-            return Err("Empty sequence provided".to_string());
+            return vec![Err("Empty sequence provided".to_string())];
         }
 
         let sequence_bytes = sequence.as_bytes();
@@ -80,7 +85,14 @@ impl Annotator {
             self.schemes.iter().collect()
         };
 
-        self.find_best_match(sequence_bytes, &scheme_refs)
+        if paired {
+            self.number_all_chains_sequence(sequence)
+        } else {
+            match self.find_best_match(sequence_bytes, &scheme_refs) {
+                Ok(result) => vec![Ok(result)],
+                Err(e) => vec![Err(e)],
+            }
+        }
     }
 
     /// Find highest identity chain using optimized algorithm
@@ -147,27 +159,28 @@ impl Annotator {
         best_output
     }
 
-    /// Number multiple sequences, optionally in parallel
+    /// Number multiple sequences, optionally in parallel, with paired option
     pub fn number_sequences(
         &self,
         sequences: &[String],
+        paired: bool,
         parallel: bool,
-    ) -> Vec<Result<AnnotationResult, String>> {
+    ) -> Vec<Vec<Result<AnnotationResult, String>>> {
         if parallel {
             sequences
                 .par_iter()
-                .map(|seq| self.number_sequence(seq))
+                .map(|seq| self.number_sequence(seq, paired))
                 .collect()
         } else {
             sequences
                 .iter()
-                .map(|seq| self.number_sequence(seq))
+                .map(|seq| self.number_sequence(seq, paired))
                 .collect()
         }
     }
 
-    /// Number a sequence and try to find all possible chains (for paired sequences)
-    pub fn number_paired_sequence(&self, sequence: &str) -> Vec<Result<AnnotationResult, String>> {
+    /// Internal helper for all-chains mode numbering of a single sequence
+    pub fn number_all_chains_sequence(&self, sequence: &str) -> Vec<Result<AnnotationResult, String>> {
         if sequence.is_empty() {
             return vec![Err("Empty sequence provided".to_string())];
         }
@@ -239,7 +252,7 @@ impl Annotator {
 
         // If no good results, return the best single result
         if results.is_empty() {
-            match self.number_sequence(sequence) {
+            match self.find_best_match(sequence_bytes, &scheme_refs) {
                 Ok(result) => vec![Ok(result)],
                 Err(e) => vec![Err(e)],
             }
@@ -248,8 +261,8 @@ impl Annotator {
         }
     }
 
-    /// Number all sequences in a FASTA/FASTQ file
-    pub fn number_file(&self, file_path: &str, parallel: bool) -> FileProcessingResult {
+    /// Number all sequences in a FASTA/FASTQ file with paired option
+    pub fn number_file(&self, file_path: &str, paired: bool, parallel: bool) -> FileProcessingResult {
         let reader = from_path(file_path)
             .map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
 
@@ -261,7 +274,7 @@ impl Annotator {
             records
                 .par_iter()
                 .map(|record| {
-                    let results = vec![self.number_sequence(&record.sequence)];
+                    let results = self.number_sequence(&record.sequence, paired);
                     (record._name.clone(), results)
                 })
                 .collect()
@@ -269,7 +282,7 @@ impl Annotator {
             records
                 .iter()
                 .map(|record| {
-                    let results = vec![self.number_sequence(&record.sequence)];
+                    let results = self.number_sequence(&record.sequence, paired);
                     (record._name.clone(), results)
                 })
                 .collect()

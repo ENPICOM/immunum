@@ -44,7 +44,7 @@ fn main() {
     eprintln!("Scheme: {:?}", cli.scheme);
     eprintln!("Chains: {:?}", chains);
     eprintln!("Pre-filtering: {}", cli.prefilter);
-    eprintln!("Paired sequence numbering: {}", cli.paired);
+    eprintln!("All-chains mode: {}", cli.all_chains);
     eprintln!("Output format: {:?}", cli.format);
 
     // Build custom scoring parameters if any are provided
@@ -125,50 +125,36 @@ fn main() {
     for record_result in sequence_stream {
         match record_result {
             Ok(record) => {
-                if cli.paired {
-                    // Use paired sequence numbering to find multiple chains
-                    let results = annotator.number_paired_sequence(&record.sequence);
-                    if results.is_empty() {
-                        eprintln!("No chains found in sequence '{}'", record._name);
-                        continue;
-                    }
+                let results = annotator.number_sequence(&record.sequence, cli.all_chains);
+                if results.is_empty() {
+                    eprintln!("No chains found in sequence '{}'", record._name);
+                    continue;
+                }
 
-                    for (chain_index, result) in results.into_iter().enumerate() {
-                        match result {
-                            Ok(annotation_result) => {
-                                // Add chain index to sequence name for multiple results
-                                let chain_name = if chain_index > 0 {
-                                    format!("{}_chain_{}", record._name, chain_index + 1)
-                                } else {
-                                    record._name.clone()
-                                };
-                                writeln!(output_writer, "# {}", chain_name).unwrap();
-                                writeln!(
-                                    output_writer,
-                                    "{}",
-                                    annotation_result.to_string(cli.format.clone())
-                                )
-                                .unwrap();
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "Error numbering chain {} in sequence '{}': {}",
-                                    chain_index + 1,
-                                    record._name,
-                                    e
-                                );
-                            }
-                        }
-                    }
-                } else {
-                    // Use single sequence numbering (original behavior)
-                    match annotator.number_sequence(&record.sequence) {
-                        Ok(result) => {
-                            writeln!(output_writer, "{}", result.to_string(cli.format.clone()))
-                                .unwrap();
+                for (chain_index, result) in results.into_iter().enumerate() {
+                    match result {
+                        Ok(annotation_result) => {
+                            // Add chain index to sequence name for multiple results
+                            let chain_name = if cli.all_chains && chain_index > 0 {
+                                format!("{}_chain_{}", record._name, chain_index + 1)
+                            } else {
+                                record._name.clone()
+                            };
+                            writeln!(output_writer, "# {}", chain_name).unwrap();
+                            writeln!(
+                                output_writer,
+                                "{}",
+                                annotation_result.to_string(cli.format.clone())
+                            )
+                            .unwrap();
                         }
                         Err(e) => {
-                            eprintln!("Error numbering sequence '{}': {}", record._name, e);
+                            eprintln!(
+                                "Error numbering chain {} in sequence '{}': {}",
+                                chain_index + 1,
+                                record._name,
+                                e
+                            );
                         }
                     }
                 }
