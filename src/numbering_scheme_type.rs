@@ -1,19 +1,19 @@
-use crate::constants::{insertion_points, ScoringParams};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
 use crate::result::AnnotationResult;
 use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{Chain, RegionRange, Scheme};
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct NumberingScheme {
     pub scheme_type: Scheme,
     pub chain_type: Chain,
-    pub conserved_positions: Vec<u32>,
+    pub conserved_positions: HashSet<u32>,
     pub insertion_positions: Vec<u32>,
     pub gap_positions: Vec<u32>,
-    pub consensus_amino_acids: HashMap<u32, Vec<u8>>,
+    pub consensus_amino_acids: Vec<Vec<u8>>, // Indexed by position
+    pub restricted_sites: HashSet<u32>,      // Pre-computed for performance
     pub scoring_matrix: ScoringMatrix,
     pub fr1: RegionRange,
     pub fr2: RegionRange,
@@ -26,14 +26,8 @@ pub struct NumberingScheme {
 
 impl NumberingScheme {
     /// Return restricted sites according to Antpack definition (non '-' positions)
-    pub fn restricted_sites(&self) -> Vec<u32> {
-        let mut sites = Vec::new();
-        for (&key, value) in &self.consensus_amino_acids {
-            if !value.contains(&b'-') {
-                sites.push(key);
-            }
-        }
-        sites
+    pub fn restricted_sites(&self) -> &HashSet<u32> {
+        &self.restricted_sites
     }
     /// All framework positions
     pub fn framework_positions(&self) -> Vec<u32> {
@@ -52,177 +46,17 @@ impl NumberingScheme {
             .chain(self.cdr3.positions())
             .collect()
     }
-    /// Calculates gap penalty according to position and scheme
-    pub fn gap_penalty(&self, position: u32, scoring: &ScoringParams) -> (f64, f64) {
-        // Set initial gap penalties
-        let penalty = match () {
-            _ if self.conserved_positions.contains(&position) => scoring.gap_pen_cp,
-            _ if self.framework_positions().contains(&position) => scoring.gap_pen_fr,
-            _ if self.cdr_positions().contains(&position) => scoring.gap_pen_cdr,
-            _ => scoring.gap_pen_other,
-        };
-
-        let mut query_gap_penalty = penalty;
-        let mut consensus_gap_penalty = penalty;
-
-        // ADAPT CDR PENALTIES, different for every scheme
-        // IMGT
-        if self.cdr_positions().contains(&position) {
-            if self.scheme_type == Scheme::IMGT {
-                if self.cdr1.start <= position
-                    && position < self.cdr1.end
-                    && position != insertion_points::CDR1_IMGT
-                {
-                    // cdr1
-                    consensus_gap_penalty += scoring.pen_leap_insertion_point_imgt
-                        + scoring.cdr_increase
-                            * (position as isize - insertion_points::CDR1_IMGT as isize).abs()
-                                as f64;
-                    consensus_gap_penalty += if position > insertion_points::CDR1_IMGT {
-                        0.1
-                    } else {
-                        0.0
-                    };
-                } else if self.cdr2.start <= position
-                    && position < self.cdr2.end
-                    && position != insertion_points::CDR2_IMGT
-                {
-                    // cdr2
-                    consensus_gap_penalty += scoring.pen_leap_insertion_point_imgt
-                        + scoring.cdr_increase
-                            * (position as isize - insertion_points::CDR2_IMGT as isize).abs()
-                                as f64;
-                    consensus_gap_penalty += if position > insertion_points::CDR2_IMGT {
-                        0.1
-                    } else {
-                        0.0
-                    };
-                } else if self.cdr3.start <= position
-                    && position < self.cdr3.end
-                    && position != insertion_points::CDR3_IMGT
-                {
-                    // cdr3
-                    consensus_gap_penalty += scoring.pen_leap_insertion_point_imgt
-                        + scoring.cdr_increase
-                            * (position as isize - insertion_points::CDR3_IMGT as isize).abs()
-                                as f64;
-                    consensus_gap_penalty += if position < insertion_points::CDR3_IMGT {
-                        0.1
-                    } else {
-                        0.0
-                    };
-                }
-            }
-            // KABAT
-            else if self.scheme_type == Scheme::KABAT {
-                let (cdr1_insertion_position, cdr2_insertion_position, cdr3_insertion_position) =
-                    match self.chain_type {
-                        Chain::IGH => (
-                            insertion_points::CDR1_KABAT_HEAVY,
-                            insertion_points::CDR2_KABAT_HEAVY,
-                            insertion_points::CDR3_KABAT_HEAVY,
-                        ),
-                        Chain::IGL | Chain::IGK => (
-                            insertion_points::CDR1_KABAT_LIGHT,
-                            insertion_points::CDR2_KABAT_LIGHT,
-                            insertion_points::CDR3_KABAT_LIGHT,
-                        ),
-                        _ => panic!("This scheme is not implemented yet (calculating gap penalty)"),
-                    };
-
-                if self.cdr1.start <= position
-                    && position < self.cdr1.end
-                    && position != cdr1_insertion_position
-                {
-                    if self.chain_type == Chain::IGH {
-                        // cdr1
-                        consensus_gap_penalty += scoring.pen_leap_insertion_point_kabat
-                            + (scoring.cdr_increase
-                                * (position as isize - cdr1_insertion_position as isize).abs()
-                                    as f64);
-                    } else {
-                        // Exception in cdr 1 of kabat light schemes to ensure correct placement
-                        let relative_position: i32 =
-                            position as i32 - cdr1_insertion_position as i32;
-                        let penalty_addition: f64 = if relative_position < 0 {
-                            scoring.pen_leap_insertion_point_kabat
-                                + (scoring.cdr_increase
-                                    * (position as isize - cdr1_insertion_position as isize).abs()
-                                        as f64)
-                        } else if relative_position < 3 {
-                            // positions 29 and 30 have lower penalty
-                            scoring.gap_pen_cdr + (0.1 * relative_position as f64)
-                        } else {
-                            // positions 31-34
-                            // -1 times cdr_increase to line up penalties of 26 and 31
-                            scoring.pen_leap_insertion_point_kabat
-                                + (scoring.cdr_increase
-                                    * (((position as isize - cdr1_insertion_position as isize).abs()
-                                        as f64)
-                                        - 1.0))
-                        };
-                        consensus_gap_penalty += penalty_addition
-                    }
-                } else if self.cdr2.start <= position
-                    && position < self.cdr2.end
-                    && position != cdr2_insertion_position
-                {
-                    // cdr2
-                    // Exception in heavy scheme:
-                    if self.chain_type == Chain::IGH && position > 54 {
-                        consensus_gap_penalty = scoring.gap_pen_fr;
-                    } else {
-                        consensus_gap_penalty += scoring.pen_leap_insertion_point_kabat
-                            + (scoring.cdr_increase
-                                * (position as isize - cdr2_insertion_position as isize).abs()
-                                    as f64);
-                    }
-                } else if self.cdr3.start <= position
-                    && position < self.cdr3.end
-                    && position != cdr3_insertion_position
-                {
-                    // cdr3
-                    consensus_gap_penalty += scoring.pen_leap_insertion_point_kabat
-                        + (scoring.cdr_increase
-                            * (position as isize - cdr3_insertion_position as isize).abs() as f64);
-                    if position > cdr3_insertion_position {
-                        // higher penalty after insertion in cdr3
-                        consensus_gap_penalty += 4.0 * scoring.cdr_increase;
-                    }
-                }
-                // if self.chain_type != Chain::IGH && position == cdr1_insertion_position {
-                //     consensus_gap_penalty = scoring.gap_pen_other;
-                // }
-            }
-            query_gap_penalty = scoring.gap_pen_cp // TODO Maybe change to different variable
-        }
-
-        // Handle start penalty, same for all schemes
-        if position < 18 {
-            // Increase from 2 to 11, then add 0.1 until position 18
-            // TODO does not have effect yet, because these are restriced sites
-            consensus_gap_penalty = 1.0
-                + (if position > 10 { 10.0 } else { position as f64 })
-                + (if position > 10 {
-                    0.1 * (position as f64 - 10.0)
-                } else {
-                    0.0
-                });
-        }
-
-        // Adapt only query or consensus gap for insertion and gap positions
-        if self.insertion_positions.contains(&position) {
-            query_gap_penalty = scoring.gap_pen_ip
-        }
-
-        if self.gap_positions.contains(&position) {
-            consensus_gap_penalty = scoring.gap_pen_op;
-        }
-        (query_gap_penalty, consensus_gap_penalty)
-    }
     /// numbers sequence, returns AnnotationResult
     pub(crate) fn number_sequence(&self, query_sequence: &[u8]) -> AnnotationResult {
-        let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
+        // Use the optimized implementation with temporary pool
+        let mut matrix_pool = crate::needleman_wunsch::MatrixPool::new();
+
+        let (mut numbering, identity) = needleman_wunsch_consensus(
+            query_sequence,
+            self,
+            &mut matrix_pool,
+            -50.0, // Default early termination threshold
+        );
 
         // give gap positions correct names as defined by the numbering scheme
         name_insertions(&mut numbering, &self.scheme_type);
@@ -260,18 +94,33 @@ impl NumberingScheme {
     }
     pub fn to_terminal_schemes(&self, terminal_length: u8) -> (NumberingScheme, NumberingScheme) {
         // Create N-terminal scheme (positions 1 to terminal_length)
-        let mut n_terminal_consensus = HashMap::new();
+        let mut n_terminal_consensus = vec![Vec::new(); terminal_length as usize + 1];
         for i in 1..=terminal_length as u32 {
-            if let Some(amino_acids) = self.consensus_amino_acids.get(&i) {
-                n_terminal_consensus.insert(i, amino_acids.clone());
+            if (i as usize) < self.consensus_amino_acids.len()
+                && !self.consensus_amino_acids[i as usize].is_empty()
+            {
+                n_terminal_consensus[i as usize] = self.consensus_amino_acids[i as usize].clone();
+            }
+        }
+
+        // Calculate restricted sites for N-terminal (non '-' positions)
+        let mut n_restricted_sites = HashSet::new();
+        for i in 1..=terminal_length as u32 {
+            let index = i as usize;
+            if index < n_terminal_consensus.len()
+                && !n_terminal_consensus[index].is_empty()
+                && !n_terminal_consensus[index].contains(&b'-')
+            {
+                n_restricted_sites.insert(i);
             }
         }
 
         let n_terminal_scheme = NumberingScheme {
-            conserved_positions: vec![], // No conserved positions at N-terminal
+            conserved_positions: HashSet::new(), // No conserved positions at N-terminal
             insertion_positions: vec![],
             gap_positions: vec![10], // IMGT Position 10
             consensus_amino_acids: n_terminal_consensus,
+            restricted_sites: n_restricted_sites,
             scoring_matrix: self
                 .scoring_matrix
                 .slice(0..terminal_length as usize, 0..self.scoring_matrix.ncols()),
@@ -280,21 +129,40 @@ impl NumberingScheme {
 
         // Create C-terminal scheme
         let c_term_start: u32 = self.fr4.start;
-        let mut c_terminal_consensus = HashMap::new();
+        let mut c_terminal_consensus = vec![Vec::new(); terminal_length as usize + 1];
         for i in 0..terminal_length as u32 {
             let original_position = c_term_start + i;
-            if let Some(amino_acids) = self.consensus_amino_acids.get(&original_position) {
-                c_terminal_consensus.insert(i + 1, amino_acids.clone());
+            if (original_position as usize) < self.consensus_amino_acids.len()
+                && !self.consensus_amino_acids[original_position as usize].is_empty()
+            {
+                let target_index = (i + 1) as usize;
+                if target_index < c_terminal_consensus.len() {
+                    c_terminal_consensus[target_index] =
+                        self.consensus_amino_acids[original_position as usize].clone();
+                }
+            }
+        }
+
+        // Calculate restricted sites for C-terminal (non '-' positions)
+        let mut c_restricted_sites = HashSet::new();
+        for i in 1..=terminal_length as u32 {
+            let index = i as usize;
+            if index < c_terminal_consensus.len()
+                && !c_terminal_consensus[index].is_empty()
+                && !c_terminal_consensus[index].contains(&b'-')
+            {
+                c_restricted_sites.insert(i);
             }
         }
 
         let fmwk4_start = self.fr4.start - 1;
 
         let c_terminal_scheme = NumberingScheme {
-            conserved_positions: vec![1, 2, 4], // IMGT position 118, 119 and 121 (mapped to 1, 2, 4)
+            conserved_positions: [1, 2, 4].iter().cloned().collect(), // IMGT position 118, 119 and 121 (mapped to 1, 2, 4)
             insertion_positions: vec![],
             gap_positions: vec![], // No gap positions at c-terminal
             consensus_amino_acids: c_terminal_consensus,
+            restricted_sites: c_restricted_sites,
             scoring_matrix: self.scoring_matrix.slice(
                 fmwk4_start as usize..(fmwk4_start + terminal_length as u32) as usize,
                 0..self.scoring_matrix.ncols(),
@@ -344,14 +212,25 @@ mod tests {
         }
 
         for i in 1..terminal_length {
-            assert_eq!(
-                n_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32)]
-            );
-            assert_eq!(
-                c_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
-            );
+            let pos = i as usize;
+            if pos < n_term_scheme.consensus_amino_acids.len()
+                && pos < original_scheme.consensus_amino_acids.len()
+            {
+                assert_eq!(
+                    n_term_scheme.consensus_amino_acids[pos],
+                    original_scheme.consensus_amino_acids[pos]
+                );
+            }
+
+            let c_pos = (i as u32 + 117) as usize;
+            if pos < c_term_scheme.consensus_amino_acids.len()
+                && c_pos < original_scheme.consensus_amino_acids.len()
+            {
+                assert_eq!(
+                    c_term_scheme.consensus_amino_acids[pos],
+                    original_scheme.consensus_amino_acids[c_pos]
+                );
+            }
         }
     }
 
@@ -374,14 +253,25 @@ mod tests {
         }
 
         for i in 1..terminal_length {
-            assert_eq!(
-                n_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32)]
-            );
-            assert_eq!(
-                c_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
-            );
+            let pos = i as usize;
+            if pos < n_term_scheme.consensus_amino_acids.len()
+                && pos < original_scheme.consensus_amino_acids.len()
+            {
+                assert_eq!(
+                    n_term_scheme.consensus_amino_acids[pos],
+                    original_scheme.consensus_amino_acids[pos]
+                );
+            }
+
+            let c_pos = (i as u32 + 117) as usize;
+            if pos < c_term_scheme.consensus_amino_acids.len()
+                && c_pos < original_scheme.consensus_amino_acids.len()
+            {
+                assert_eq!(
+                    c_term_scheme.consensus_amino_acids[pos],
+                    original_scheme.consensus_amino_acids[c_pos]
+                );
+            }
         }
     }
 
@@ -404,14 +294,25 @@ mod tests {
         }
 
         for i in 1..terminal_length {
-            assert_eq!(
-                n_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32)]
-            );
-            assert_eq!(
-                c_term_scheme.consensus_amino_acids[&(i as u32)],
-                original_scheme.consensus_amino_acids[&(i as u32 + 117)]
-            );
+            let pos = i as usize;
+            if pos < n_term_scheme.consensus_amino_acids.len()
+                && pos < original_scheme.consensus_amino_acids.len()
+            {
+                assert_eq!(
+                    n_term_scheme.consensus_amino_acids[pos],
+                    original_scheme.consensus_amino_acids[pos]
+                );
+            }
+
+            let c_pos = (i as u32 + 117) as usize;
+            if pos < c_term_scheme.consensus_amino_acids.len()
+                && c_pos < original_scheme.consensus_amino_acids.len()
+            {
+                assert_eq!(
+                    c_term_scheme.consensus_amino_acids[pos],
+                    original_scheme.consensus_amino_acids[c_pos]
+                );
+            }
         }
     }
 }

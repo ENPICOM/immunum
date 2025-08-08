@@ -141,28 +141,28 @@ class TestAnnotatorMethods:
     def test_annotator_number_file(self):
         """Test Annotator.number_file method."""
         annotator = immunum.Annotator(
-            scheme=immunum.Scheme.IMGT, 
-            chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL]
+            scheme=immunum.Scheme.IMGT,
+            chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
         )
 
         # Test with the fixture file (sequential processing)
         results = annotator.number_file("fixtures/test.fasta")
         assert isinstance(results, list)
         assert len(results) == 4  # Expected 4 sequences in test.fasta
-        
+
         # Check that results are tuples of (name, AnnotationResult)
         for name, result in results:
             assert isinstance(name, str)
-            assert hasattr(result, 'sequence')
-            assert hasattr(result, 'scheme')
-            assert hasattr(result, 'chain')
-            assert hasattr(result, 'identity')
-        
+            assert hasattr(result, "sequence")
+            assert hasattr(result, "scheme")
+            assert hasattr(result, "chain")
+            assert hasattr(result, "identity")
+
         # Test with parallel processing
         parallel_results = annotator.number_file("fixtures/test.fasta", parallel=True)
         assert isinstance(parallel_results, list)
         assert len(parallel_results) == 4  # Same number of results
-        
+
         # Test with non-existent file
         try:
             annotator.number_file("fixtures/nonexistent.fasta")

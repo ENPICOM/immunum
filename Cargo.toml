@@ -2,6 +2,7 @@
 name = "immunum"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.89.0"
 
 [profile.release]
 opt-level = 3
@@ -19,6 +20,9 @@ wee_alloc = { version = "0.4.5", optional = true }
 wasm-bindgen-test = "0.3.50"
 phf = {version = "0.12.1" , features = ["macros"]}
 
+[dev-dependencies]
+criterion = { version = "0.7", features = ["html_reports"] }
+
 [lib]
 name = "immunum"
 path = "src/lib.rs"
@@ -27,6 +31,10 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "immunum-cli"
 path = "src/main.rs"
+
+[[bench]]
+name = "performance_benchmarks"
+harness = false
 
 [features]
 default = ["python", "wasm"]

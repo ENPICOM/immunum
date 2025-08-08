@@ -5,7 +5,7 @@ use std::path::Path;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum FastxError {
+pub enum SequenceError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Invalid FASTA/FASTQ format: {0}")]
@@ -14,13 +14,13 @@ pub enum FastxError {
 
 /// Represents a sequence record from a FASTA or FASTQ file
 #[derive(Debug, Clone)]
-pub struct FastxRecord {
+pub struct SequenceRecord {
     pub _name: String, // TODO Not used at the moment, but would be nice to print it in the output?
     pub sequence: String,
     pub _quality: Option<String>, // TODO Not used at the moment, should we keep it?
 }
 
-impl FastxRecord {
+impl SequenceRecord {
     pub fn new(name: String, sequence: String, quality: Option<String>) -> Self {
         Self {
             _name: name,
@@ -30,16 +30,16 @@ impl FastxRecord {
     }
 }
 
-/// Iterator over FASTX records
-pub struct FastxReader<R: BufRead> {
+/// Iterator over Sequence records
+pub struct SequenceReader<R: BufRead> {
     reader: R,
     is_fastq: bool,
     line_buffer: String,
     finished: bool,
 }
 
-impl<R: BufRead> FastxReader<R> {
-    pub fn new(mut reader: R) -> Result<Self, FastxError> {
+impl<R: BufRead> SequenceReader<R> {
+    pub fn new(mut reader: R) -> Result<Self, SequenceError> {
         let mut line_buffer = String::new();
         reader.read_line(&mut line_buffer)?;
 
@@ -48,7 +48,7 @@ impl<R: BufRead> FastxReader<R> {
         } else if line_buffer.starts_with('>') {
             false
         } else {
-            return Err(FastxError::InvalidFormat(
+            return Err(SequenceError::InvalidFormat(
                 "File must start with '>' (FASTA) or '@' (FASTQ)".to_string(),
             ));
         };
@@ -61,14 +61,14 @@ impl<R: BufRead> FastxReader<R> {
         })
     }
 
-    fn read_fasta_record(&mut self) -> Result<Option<FastxRecord>, FastxError> {
+    fn read_fasta_record(&mut self) -> Result<Option<SequenceRecord>, SequenceError> {
         if self.finished || self.line_buffer.is_empty() {
             return Ok(None);
         }
 
         // Parse header line (should start with '>')
         if !self.line_buffer.starts_with('>') {
-            return Err(FastxError::InvalidFormat(
+            return Err(SequenceError::InvalidFormat(
                 "FASTA header must start with '>'".to_string(),
             ));
         }
@@ -91,17 +91,17 @@ impl<R: BufRead> FastxReader<R> {
             self.finished = true;
         }
 
-        Ok(Some(FastxRecord::new(name, sequence, None)))
+        Ok(Some(SequenceRecord::new(name, sequence, None)))
     }
 
-    fn read_fastq_record(&mut self) -> Result<Option<FastxRecord>, FastxError> {
+    fn read_fastq_record(&mut self) -> Result<Option<SequenceRecord>, SequenceError> {
         if self.finished || self.line_buffer.is_empty() {
             return Ok(None);
         }
 
         // Parse header line (should start with '@')
         if !self.line_buffer.starts_with('@') {
-            return Err(FastxError::InvalidFormat(
+            return Err(SequenceError::InvalidFormat(
                 "FASTQ header must start with '@'".to_string(),
             ));
         }
@@ -111,7 +111,7 @@ impl<R: BufRead> FastxReader<R> {
         // Read sequence line
         self.line_buffer.clear();
         if self.reader.read_line(&mut self.line_buffer)? == 0 {
-            return Err(FastxError::InvalidFormat(
+            return Err(SequenceError::InvalidFormat(
                 "Unexpected end of file while reading sequence".to_string(),
             ));
         }
@@ -120,12 +120,12 @@ impl<R: BufRead> FastxReader<R> {
         // Read separator line (should start with '+')
         self.line_buffer.clear();
         if self.reader.read_line(&mut self.line_buffer)? == 0 {
-            return Err(FastxError::InvalidFormat(
+            return Err(SequenceError::InvalidFormat(
                 "Unexpected end of file while reading separator".to_string(),
             ));
         }
         if !self.line_buffer.starts_with('+') {
-            return Err(FastxError::InvalidFormat(
+            return Err(SequenceError::InvalidFormat(
                 "FASTQ separator must start with '+'".to_string(),
             ));
         }
@@ -133,7 +133,7 @@ impl<R: BufRead> FastxReader<R> {
         // Read quality line
         self.line_buffer.clear();
         if self.reader.read_line(&mut self.line_buffer)? == 0 {
-            return Err(FastxError::InvalidFormat(
+            return Err(SequenceError::InvalidFormat(
                 "Unexpected end of file while reading quality".to_string(),
             ));
         }
@@ -145,12 +145,12 @@ impl<R: BufRead> FastxReader<R> {
             self.finished = true;
         }
 
-        Ok(Some(FastxRecord::new(name, sequence, Some(quality))))
+        Ok(Some(SequenceRecord::new(name, sequence, Some(quality))))
     }
 }
 
-impl<R: BufRead> Iterator for FastxReader<R> {
-    type Item = Result<FastxRecord, FastxError>;
+impl<R: BufRead> Iterator for SequenceReader<R> {
+    type Item = Result<SequenceRecord, SequenceError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.finished {
@@ -176,8 +176,10 @@ fn is_gzipped(path: &Path) -> bool {
     path.to_string_lossy().to_lowercase().ends_with(".gz")
 }
 
-/// Creates a FastxReader from a file path, automatically handling gzipped files
-pub fn from_path<P: AsRef<Path>>(path: P) -> Result<FastxReader<Box<dyn BufRead>>, FastxError> {
+/// Creates a SequenceReader from a file path, automatically handling gzipped files
+pub fn from_path<P: AsRef<Path>>(
+    path: P,
+) -> Result<SequenceReader<Box<dyn BufRead>>, SequenceError> {
     let path = path.as_ref();
     let file = File::open(path)?;
 
@@ -187,7 +189,63 @@ pub fn from_path<P: AsRef<Path>>(path: P) -> Result<FastxReader<Box<dyn BufRead>
         Box::new(BufReader::new(file))
     };
 
-    FastxReader::new(reader)
+    SequenceReader::new(reader)
+}
+
+/// Validates if a string looks like a biological sequence
+fn is_valid_sequence(input: &str) -> bool {
+    // Check if input string contains valid protein chars
+    input.chars().all(|c| "ACDEFGHIKLMNPQRSTVWY".contains(c))
+}
+
+/// A wrapper around sequence iterators that can be created from files or direct sequence input
+pub struct SequenceStream {
+    inner: Box<dyn Iterator<Item = Result<SequenceRecord, SequenceError>>>,
+}
+
+impl SequenceStream {
+    /// Creates a new SequenceStream by auto-detecting if the input is a file path or direct sequence
+    pub fn new(input: &str) -> Result<Self, SequenceError> {
+        let input_path = Path::new(input);
+
+        if input_path.exists() {
+            Self::from_file(input)
+        } else if is_valid_sequence(input) {
+            Ok(Self::from_sequence(input))
+        } else {
+            Err(SequenceError::InvalidFormat(
+                "Input is neither a valid file path nor a valid sequence".to_string(),
+            ))
+        }
+    }
+
+    /// Creates a SequenceStream from a file path
+    fn from_file(path: &str) -> Result<Self, SequenceError> {
+        let reader = from_path(path)?;
+        Ok(Self {
+            inner: Box::new(reader),
+        })
+    }
+
+    /// Creates a SequenceStream from a direct sequence string
+    fn from_sequence(sequence: &str) -> Self {
+        let record = SequenceRecord::new(
+            "INPUT SEQUENCE".to_string(),
+            sequence.to_string(),
+            None, // No quality scores for direct sequence input
+        );
+        Self {
+            inner: Box::new(std::iter::once(Ok(record))),
+        }
+    }
+}
+
+impl Iterator for SequenceStream {
+    type Item = Result<SequenceRecord, SequenceError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
 }
 
 #[cfg(test)]
@@ -197,8 +255,8 @@ mod tests {
 
     fn from_reader<R: BufRead + 'static>(
         reader: R,
-    ) -> Result<FastxReader<Box<dyn BufRead>>, FastxError> {
-        FastxReader::new(Box::new(reader))
+    ) -> Result<SequenceReader<Box<dyn BufRead>>, SequenceError> {
+        SequenceReader::new(Box::new(reader))
     }
 
     #[test]
@@ -402,5 +460,55 @@ mod tests {
 
         // Clean up
         std::fs::remove_file(temp_path).unwrap();
+    }
+
+    #[test]
+    fn test_from_sequence() {
+        let sequence = "ACDEFGHIKLMNPQRSTVWY";
+        let stream = SequenceStream::from_sequence(sequence);
+
+        let records: Result<Vec<_>, _> = stream.collect();
+        let records = records.unwrap();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]._name, "INPUT SEQUENCE");
+        assert_eq!(records[0].sequence, sequence);
+        assert_eq!(records[0]._quality, None);
+    }
+
+    #[test]
+    fn test_new_with_sequence() {
+        let sequence = "ACDEFGHIKLMNPQRSTVWY";
+        let stream = SequenceStream::new(sequence).unwrap();
+
+        let records: Result<Vec<_>, _> = stream.collect();
+        let records = records.unwrap();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].sequence, sequence);
+    }
+
+    #[test]
+    fn test_new_with_invalid_input() {
+        let invalid_input = "not_a_file_and_not_a_sequence_123";
+        let result = SequenceStream::new(invalid_input);
+
+        assert!(result.is_err());
+        match result {
+            Err(SequenceError::InvalidFormat(msg)) => {
+                assert!(msg.contains("neither a valid file path nor a valid sequence"));
+            }
+            _ => panic!("Expected InvalidFormat error"),
+        }
+    }
+
+    #[test]
+    fn test_is_valid_sequence() {
+        assert!(is_valid_sequence("ACDEFGHIKLMNPQRSTVWY"));
+        assert!(is_valid_sequence("ACG"));
+        assert!(is_valid_sequence("")); // TODO - this should probably be invalid?
+        assert!(!is_valid_sequence("ACGX"));
+        assert!(!is_valid_sequence("123"));
+        assert!(!is_valid_sequence("acg")); // lowercase not allowed
     }
 }

@@ -55,6 +55,7 @@ impl Default for ScoringParams {
 impl ScoringParams {
     #[new]
     #[pyo3(signature = (gap_pen_cp=None, gap_pen_fr=None, gap_pen_ip=None, gap_pen_op=None, gap_pen_cdr=None, gap_pen_other=None, cdr_increase=None, pen_leap_insertion_point_imgt=None, pen_leap_insertion_point_kabat=None))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         gap_pen_cp: Option<f64>,
         gap_pen_fr: Option<f64>,
@@ -87,6 +88,7 @@ impl ScoringParams {
 #[wasm_bindgen]
 impl ScoringParams {
     #[wasm_bindgen(constructor)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new_wasm(
         gap_pen_cp: Option<f64>,
         gap_pen_fr: Option<f64>,

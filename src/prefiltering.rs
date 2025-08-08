@@ -5,7 +5,7 @@ use crate::types::{Chain, PrefilterOutput};
 use std::collections::HashMap;
 
 /// Apply prefiltering to select only promising chains based on terminal identity
-pub fn apply_prefiltering<'a>(
+pub fn prefilter_schemes<'a>(
     sequence: &'a [u8],
     schemes: &'a [NumberingScheme],
 ) -> Vec<&'a NumberingScheme> {
@@ -19,28 +19,28 @@ pub fn apply_prefiltering<'a>(
         .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
         .collect();
 
-    // Select models to run using pre-scan
-    let (pre_scan_output, highest_score) = run_pre_scan(sequence, &terminal_schemes);
-    let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
+    // Select models to run using terminal numbering
+    let (terminal_number_output, highest_score) =
+        terminal_number_sequence(sequence, &terminal_schemes);
+    let best_chains = select_best_chains(&terminal_number_output, highest_score);
 
     // Filter schemes based on prefiltering results
     schemes
         .iter()
-        .filter(|scheme| pre_filter_chains.contains(&scheme.chain_type))
+        .filter(|scheme| best_chains.contains(&scheme.chain_type))
         .collect()
 }
 
 ///Run pre scan to find likely chains present using c and n terminal identity
-pub fn run_pre_scan(
+pub fn terminal_number_sequence(
     query_sequence: &[u8],
-    all_terminal_schemes: &Vec<(NumberingScheme, NumberingScheme)>,
+    terminal_schemes: &Vec<(NumberingScheme, NumberingScheme)>,
 ) -> (HashMap<Chain, PrefilterOutput>, f64) {
     let mut chain_identity_map: HashMap<Chain, PrefilterOutput> = HashMap::new();
 
     let mut highest_identity: f64 = 0.0;
 
-    for terminal_schemes in all_terminal_schemes {
-        let (n_terminal, c_terminal) = terminal_schemes;
+    for (n_terminal, c_terminal) in terminal_schemes {
         // run alignment for n and c terminal
         let n_terminal_output: AnnotationResult = n_terminal.number_sequence(query_sequence);
         let c_terminal_output: AnnotationResult = c_terminal.number_sequence(query_sequence);
@@ -68,11 +68,11 @@ pub fn run_pre_scan(
     (chain_identity_map, highest_identity)
 }
 
-pub fn select_chains_from_pre_scan(
-    pre_scan_output: &HashMap<Chain, PrefilterOutput>,
+pub fn select_best_chains(
+    terminal_numbering_output: &HashMap<Chain, PrefilterOutput>,
     highest_score: f64,
 ) -> Vec<Chain> {
-    pre_scan_output
+    terminal_numbering_output
         .iter()
         .filter(|(_, output)| output.identity >= highest_score - WITHIN_IDENTITY_RANGE)
         .map(|(chain, _)| *chain)
@@ -103,9 +103,12 @@ mod tests {
             .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
             .collect();
 
-        let (pre_scan_output_h, _highest_score_h) = run_pre_scan(sequence_h, &terminal_schemes);
-        let (pre_scan_output_l, _highest_score_l) = run_pre_scan(sequence_l, &terminal_schemes);
-        let (pre_scan_output_k, _highest_score_k) = run_pre_scan(sequence_k, &terminal_schemes);
+        let (pre_scan_output_h, _highest_score_h) =
+            terminal_number_sequence(sequence_h, &terminal_schemes);
+        let (pre_scan_output_l, _highest_score_l) =
+            terminal_number_sequence(sequence_l, &terminal_schemes);
+        let (pre_scan_output_k, _highest_score_k) =
+            terminal_number_sequence(sequence_k, &terminal_schemes);
 
         // check if correct chain has highest identity
         assert!(
@@ -137,7 +140,7 @@ mod tests {
             get_scheme(Scheme::IMGT, Chain::IGL, None),
         ];
 
-        let filtered_schemes = apply_prefiltering(heavy_chain, &schemes);
+        let filtered_schemes = prefilter_schemes(heavy_chain, &schemes);
 
         // Should return at least one scheme (preferably the heavy chain one)
         assert!(!filtered_schemes.is_empty());
@@ -150,7 +153,7 @@ mod tests {
         let sequence: &[u8] = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".as_bytes();
         let schemes: Vec<NumberingScheme> = vec![];
 
-        let filtered_schemes = apply_prefiltering(sequence, &schemes);
+        let filtered_schemes = prefilter_schemes(sequence, &schemes);
         assert!(filtered_schemes.is_empty());
     }
 }

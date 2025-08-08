@@ -34,15 +34,13 @@ def create_test_sequences(count: int) -> List[str]:
     return sequences
 
 
-
-
 def quick_test():
     """Quick test with 2000 sequences comparing prefiltering and parallel processing."""
     print("🚀 Immunum Performance Test - 200 Sequences")
     print("=" * 50)
 
     # Test with 200 sequences
-    sequences = create_test_sequences(200)
+    sequences = create_test_sequences(2000)
     print(f"Testing with {len(sequences)} sequences...")
     print()
 
@@ -52,19 +50,27 @@ def quick_test():
     annotator_no_filter = immunum.Annotator(
         scheme=immunum.Scheme.IMGT,
         chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-        use_prefiltering=False
+        use_prefiltering=False,
     )
 
     start = time.time()
-    sequential_results_no_filter = annotator_no_filter.number_sequences(sequences, parallel=False)
+    sequential_results_no_filter = annotator_no_filter.number_sequences(
+        sequences, parallel=False
+    )
     seq_time_no_filter = time.time() - start
 
     start = time.time()
-    parallel_results_no_filter = annotator_no_filter.number_sequences(sequences, parallel=True)
+    parallel_results_no_filter = annotator_no_filter.number_sequences(
+        sequences, parallel=True
+    )
     par_time_no_filter = time.time() - start
 
-    print(f"  Sequential: {seq_time_no_filter:.3f}s ({len(sequential_results_no_filter)} results)")
-    print(f"  Parallel:   {par_time_no_filter:.3f}s ({len(parallel_results_no_filter)} results)")
+    print(
+        f"  Sequential: {seq_time_no_filter:.3f}s ({len(sequential_results_no_filter)} results)"
+    )
+    print(
+        f"  Parallel:   {par_time_no_filter:.3f}s ({len(parallel_results_no_filter)} results)"
+    )
     print(f"  Speedup:    {seq_time_no_filter / par_time_no_filter:.2f}x faster")
     print()
 
@@ -74,19 +80,27 @@ def quick_test():
     annotator_with_filter = immunum.Annotator(
         scheme=immunum.Scheme.IMGT,
         chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-        use_prefiltering=True
+        use_prefiltering=True,
     )
 
     start = time.time()
-    sequential_results_with_filter = annotator_with_filter.number_sequences(sequences, parallel=False)
+    sequential_results_with_filter = annotator_with_filter.number_sequences(
+        sequences, parallel=False
+    )
     seq_time_with_filter = time.time() - start
 
     start = time.time()
-    parallel_results_with_filter = annotator_with_filter.number_sequences(sequences, parallel=True)
+    parallel_results_with_filter = annotator_with_filter.number_sequences(
+        sequences, parallel=True
+    )
     par_time_with_filter = time.time() - start
 
-    print(f"  Sequential: {seq_time_with_filter:.3f}s ({len(sequential_results_with_filter)} results)")
-    print(f"  Parallel:   {par_time_with_filter:.3f}s ({len(parallel_results_with_filter)} results)")
+    print(
+        f"  Sequential: {seq_time_with_filter:.3f}s ({len(sequential_results_with_filter)} results)"
+    )
+    print(
+        f"  Parallel:   {par_time_with_filter:.3f}s ({len(parallel_results_with_filter)} results)"
+    )
     print(f"  Speedup:    {seq_time_with_filter / par_time_with_filter:.2f}x faster")
     print()
 
@@ -95,12 +109,14 @@ def quick_test():
     print("-" * 30)
     seq_prefilter_speedup = seq_time_no_filter / seq_time_with_filter
     par_prefilter_speedup = par_time_no_filter / par_time_with_filter
-    
+
     print(f"Prefiltering benefit (Sequential): {seq_prefilter_speedup:.2f}x faster")
     print(f"Prefiltering benefit (Parallel):   {par_prefilter_speedup:.2f}x faster")
     print()
     print(f"Best performance: Parallel with prefiltering = {par_time_with_filter:.3f}s")
-    print(f"Overall speedup vs sequential no prefiltering: {seq_time_no_filter / par_time_with_filter:.2f}x faster")
+    print(
+        f"Overall speedup vs sequential no prefiltering: {seq_time_no_filter / par_time_with_filter:.2f}x faster"
+    )
 
 
 if __name__ == "__main__":

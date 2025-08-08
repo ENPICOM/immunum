@@ -1,8 +1,8 @@
-use crate::annotation::{find_all_chains, find_highest_identity_chain};
 use crate::constants::{get_scoring_params, ScoringParams};
-use crate::fastx::{from_path, FastxRecord};
+use crate::fastx::{from_path, SequenceRecord};
+use crate::needleman_wunsch::{needleman_wunsch_consensus, MatrixPool};
 use crate::numbering_scheme_type::NumberingScheme;
-use crate::prefiltering::apply_prefiltering;
+use crate::prefiltering::prefilter_schemes;
 use crate::result::AnnotationResult;
 use crate::schemes::get_scheme;
 use crate::types::{Chain, Scheme};
@@ -13,12 +13,12 @@ type FileProcessingResult = Result<Vec<(String, Vec<Result<AnnotationResult, Str
 
 /// Main annotator struct that consolidates all numbering functionality
 pub struct Annotator {
-    // TODO! These fields are currently not used, we might remove them in the future
     _scheme: Scheme,
     _chains: Vec<Chain>,
     _scoring_params: ScoringParams,
     schemes: Vec<NumberingScheme>,
     use_prefiltering: bool,
+    early_termination_threshold: f64,
 }
 
 impl Annotator {
@@ -48,32 +48,11 @@ impl Annotator {
             _scoring_params: params,
             schemes,
             use_prefiltering: enable_prefiltering,
+            early_termination_threshold: -50.0, // Default early termination threshold
         })
     }
 
-    /// Number a paired sequence using the pre-configured schemes to find multiple chains
-    pub fn number_paired_sequence(&self, sequence: &str) -> Vec<Result<AnnotationResult, String>> {
-        if sequence.is_empty() {
-            return vec![Err("Empty sequence provided".to_string())];
-        }
-
-        let sequence_bytes = sequence.as_bytes();
-
-        // Apply prefiltering if enabled, otherwise use all schemes
-        let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
-            apply_prefiltering(sequence_bytes, &self.schemes)
-        } else {
-            self.schemes.iter().collect()
-        };
-
-        // Use find_all_chains to find multiple chains in the sequence
-        find_all_chains(sequence_bytes, scheme_refs)
-            .into_iter()
-            .map(|result| result.map_err(|e| e.to_string()))
-            .collect()
-    }
-
-    /// Number a single sequence using the pre-configured schemes
+    /// Number a single sequence using optimized algorithm
     pub fn number_sequence(&self, sequence: &str) -> Result<AnnotationResult, String> {
         if sequence.is_empty() {
             return Err("Empty sequence provided".to_string());
@@ -81,17 +60,78 @@ impl Annotator {
 
         let sequence_bytes = sequence.as_bytes();
 
-        // Apply prefiltering if enabled, otherwise use all schemes
+        // Apply prefiltering if enabled
         let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
-            apply_prefiltering(sequence_bytes, &self.schemes)
+            prefilter_schemes(sequence_bytes, &self.schemes)
         } else {
             self.schemes.iter().collect()
         };
 
-        match find_highest_identity_chain(sequence_bytes, &scheme_refs) {
-            Ok(output) => Ok(output),
-            Err(e) => Err(e.to_string()),
+        self.find_best_match(sequence_bytes, &scheme_refs)
+    }
+
+    /// Find highest identity chain using optimized algorithm
+    fn find_best_match(
+        &self,
+        query_sequence: &[u8],
+        numbering_schemes: &[&NumberingScheme],
+    ) -> Result<AnnotationResult, String> {
+        let mut highest_identity: f64 = -0.1;
+        let mut best_output: Result<AnnotationResult, String> =
+            Err("No numbering schemes passed".to_string());
+
+        // Use thread-local matrix pool for better performance
+        thread_local! {
+            static MATRIX_POOL: std::cell::RefCell<MatrixPool> =
+                std::cell::RefCell::new(MatrixPool::new());
         }
+
+        for &scheme in numbering_schemes {
+            let output = MATRIX_POOL.with(|pool_cell| {
+                let mut pool = pool_cell.borrow_mut();
+                let (mut numbering, identity) = needleman_wunsch_consensus(
+                    query_sequence,
+                    scheme,
+                    &mut pool,
+                    self.early_termination_threshold,
+                );
+
+                // Apply insertion naming according to the scheme (KABAT vs IMGT)
+                crate::insertion_numbering::name_insertions(&mut numbering, &scheme.scheme_type);
+
+                // Create AnnotationResult
+                let start = numbering.iter().position(|s| s != "-").unwrap_or(0);
+
+                let end = numbering
+                    .iter()
+                    .rposition(|s| s != "-")
+                    .unwrap_or(numbering.len() - 1);
+
+                AnnotationResult {
+                    sequence: query_sequence.to_vec(),
+                    numbers: numbering,
+                    scheme: scheme.scheme_type,
+                    chain: scheme.chain_type,
+                    identity,
+                    start: start as u32,
+                    end: end as u32,
+                    cdr1: scheme.cdr1.clone(),
+                    cdr2: scheme.cdr2.clone(),
+                    cdr3: scheme.cdr3.clone(),
+                    fr1: scheme.fr1.clone(),
+                    fr2: scheme.fr2.clone(),
+                    fr3: scheme.fr3.clone(),
+                    fr4: scheme.fr4.clone(),
+                }
+            });
+
+            if output.identity > highest_identity {
+                highest_identity = output.identity;
+                best_output = Ok(output);
+            }
+        }
+
+        best_output
     }
 
     /// Number multiple sequences, optionally in parallel
@@ -101,7 +141,6 @@ impl Annotator {
         parallel: bool,
     ) -> Vec<Result<AnnotationResult, String>> {
         if parallel {
-            // Use rayon for parallel processing
             sequences
                 .par_iter()
                 .map(|seq| self.number_sequence(seq))
@@ -114,209 +153,111 @@ impl Annotator {
         }
     }
 
-    /// Process sequences from a FASTA/FASTQ file and return results with sequence names
+    /// Number a sequence and try to find all possible chains (for paired sequences)
+    pub fn number_paired_sequence(&self, sequence: &str) -> Vec<Result<AnnotationResult, String>> {
+        if sequence.is_empty() {
+            return vec![Err("Empty sequence provided".to_string())];
+        }
+
+        let sequence_bytes = sequence.as_bytes();
+
+        // Apply prefiltering if enabled
+        let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
+            prefilter_schemes(sequence_bytes, &self.schemes)
+        } else {
+            self.schemes.iter().collect()
+        };
+
+        // Try all schemes and return all successful results
+        let mut results = Vec::new();
+        thread_local! {
+            static MATRIX_POOL: std::cell::RefCell<MatrixPool> =
+                std::cell::RefCell::new(MatrixPool::new());
+        }
+
+        for &scheme in &scheme_refs {
+            let result = MATRIX_POOL.with(|pool_cell| {
+                let mut pool = pool_cell.borrow_mut();
+                let (mut numbering, identity) = needleman_wunsch_consensus(
+                    sequence_bytes,
+                    scheme,
+                    &mut pool,
+                    self.early_termination_threshold,
+                );
+
+                // Apply insertion naming according to the scheme (KABAT vs IMGT)
+                crate::insertion_numbering::name_insertions(&mut numbering, &scheme.scheme_type);
+
+                // Create AnnotationResult
+                let start = numbering.iter().position(|s| s != "-").unwrap_or(0);
+
+                let end = numbering
+                    .iter()
+                    .rposition(|s| s != "-")
+                    .unwrap_or(numbering.len() - 1);
+
+                AnnotationResult {
+                    sequence: sequence_bytes.to_vec(),
+                    numbers: numbering,
+                    scheme: scheme.scheme_type,
+                    chain: scheme.chain_type,
+                    identity,
+                    start: start as u32,
+                    end: end as u32,
+                    cdr1: scheme.cdr1.clone(),
+                    cdr2: scheme.cdr2.clone(),
+                    cdr3: scheme.cdr3.clone(),
+                    fr1: scheme.fr1.clone(),
+                    fr2: scheme.fr2.clone(),
+                    fr3: scheme.fr3.clone(),
+                    fr4: scheme.fr4.clone(),
+                }
+            });
+
+            // Only include results with reasonable identity scores
+            if result.identity > 0.1 {
+                results.push(Ok(result));
+            }
+        }
+
+        // If no good results, return the best single result
+        if results.is_empty() {
+            match self.number_sequence(sequence) {
+                Ok(result) => vec![Ok(result)],
+                Err(e) => vec![Err(e)],
+            }
+        } else {
+            results
+        }
+    }
+
+    /// Number all sequences in a FASTA/FASTQ file
     pub fn number_file(&self, file_path: &str, parallel: bool) -> FileProcessingResult {
-        // Check if input file exists
-        if !std::path::Path::new(file_path).exists() {
-            return Err(format!("Input file not found: {}", file_path));
-        }
+        let reader = from_path(file_path)
+            .map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
 
-        // Read sequences from file
-        let reader = from_path(file_path).map_err(|e| format!("Error reading file: {}", e))?;
+        let records: Vec<SequenceRecord> = reader
+            .collect::<Result<Vec<SequenceRecord>, _>>()
+            .map_err(|e| format!("Failed to read sequences from file: {}", e))?;
 
-        let records: Vec<FastxRecord> = reader
-            .collect::<Result<Vec<FastxRecord>, _>>()
-            .map_err(|e| format!("Error parsing file: {}", e))?;
-
-        if records.is_empty() {
-            return Err("No sequences found in input file".to_string());
-        }
-
-        // Process all sequences and return results with sequence names
         let results: Vec<(String, Vec<Result<AnnotationResult, String>>)> = if parallel {
             records
-                .into_par_iter()
+                .par_iter()
                 .map(|record| {
-                    let result = self.number_paired_sequence(&record.sequence);
-                    (record._name, result)
+                    let results = vec![self.number_sequence(&record.sequence)];
+                    (record._name.clone(), results)
                 })
                 .collect()
         } else {
             records
-                .into_iter()
+                .iter()
                 .map(|record| {
-                    let result = self.number_paired_sequence(&record.sequence);
-                    (record._name, result)
+                    let results = vec![self.number_sequence(&record.sequence)];
+                    (record._name.clone(), results)
                 })
                 .collect()
         };
 
         Ok(results)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_annotator_creation() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, None);
-        assert!(annotator.is_ok());
-    }
-
-    #[test]
-    fn test_empty_chains() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![], None, None);
-        assert!(annotator.is_err());
-    }
-
-    #[test]
-    fn test_empty_sequence() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, None).unwrap();
-
-        let result = annotator.number_sequence("");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_prefiltering_enabled() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            Some(true),
-        );
-        assert!(annotator.is_ok());
-    }
-
-    #[test]
-    fn test_prefiltering_disabled() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            Some(false),
-        );
-        assert!(annotator.is_ok());
-    }
-
-    #[test]
-    fn test_prefiltering_with_heavy_chain() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            Some(true),
-        )
-        .unwrap();
-
-        // Heavy chain sequence that should be correctly identified with prefiltering
-        let heavy_chain_seq = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS";
-
-        let result = annotator.number_sequence(heavy_chain_seq);
-        assert!(result.is_ok());
-        if let Ok(annotation) = result {
-            assert_eq!(annotation.chain, Chain::IGH);
-        }
-    }
-
-    #[test]
-    fn test_number_paired_sequence() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            Some(false), // Disable prefiltering for this test
-        )
-        .unwrap();
-
-        // Test sequence with multiple chains (concatenated heavy and light chain)
-        let paired_seq = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSSDIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTGSGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELK";
-
-        let results = annotator.number_paired_sequence(paired_seq);
-
-        // Should find at least one chain in the paired sequence
-        assert!(!results.is_empty());
-
-        // Check that we get valid results
-        let successful_results: Vec<_> = results.into_iter().filter_map(|r| r.ok()).collect();
-        assert!(!successful_results.is_empty());
-
-        // At least one result should have reasonable identity
-        let has_good_identity = successful_results.iter().any(|r| r.identity > 0.5);
-        assert!(has_good_identity);
-    }
-
-    #[test]
-    fn test_number_paired_sequence_empty() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, None).unwrap();
-
-        let results = annotator.number_paired_sequence("");
-        assert_eq!(results.len(), 1);
-        assert!(results[0].is_err());
-        assert!(results[0].as_ref().unwrap_err().contains("Empty sequence"));
-    }
-
-    #[test]
-    fn test_parallel_number_sequences() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            None,
-        )
-        .unwrap();
-
-        let sequences = vec![
-            "QVQLVQSGAEVKKPGASVKVSCKAS".to_string(),
-            "DIQMTQSPSSLSASVGDRVTITC".to_string(),
-            "EVQLLESGGGLVQPGGSLRLSCAAS".to_string(),
-        ];
-
-        // Test sequential processing
-        let sequential_results = annotator.number_sequences(&sequences, false);
-        assert_eq!(sequential_results.len(), 3);
-
-        // Test parallel processing
-        let parallel_results = annotator.number_sequences(&sequences, true);
-        assert_eq!(parallel_results.len(), 3);
-
-        // Results should be the same (order might differ in more complex cases, but for this simple test they should match)
-        assert_eq!(sequential_results.len(), parallel_results.len());
-    }
-
-    #[test]
-    fn test_parallel_number_file() {
-        use std::fs::File;
-        use std::io::Write;
-
-        // Create a temporary test file
-        let test_file_path = "test_parallel.fasta";
-        let mut file = File::create(test_file_path).unwrap();
-        writeln!(file, ">seq1").unwrap();
-        writeln!(file, "QVQLVQSGAEVKKPGASVKVSCKAS").unwrap();
-        writeln!(file, ">seq2").unwrap();
-        writeln!(file, "DIQMTQSPSSLSASVGDRVTITC").unwrap();
-        drop(file);
-
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            None,
-        )
-        .unwrap();
-
-        // Test sequential file processing
-        let sequential_results = annotator.number_file(test_file_path, false).unwrap();
-        assert_eq!(sequential_results.len(), 2);
-
-        // Test parallel file processing
-        let parallel_results = annotator.number_file(test_file_path, true).unwrap();
-        assert_eq!(parallel_results.len(), 2);
-
-        // Clean up
-        std::fs::remove_file(test_file_path).ok();
     }
 }

@@ -1,9 +1,9 @@
-mod annotation;
 mod annotator;
 mod cli;
 mod consensus_scoring;
 mod constants;
 mod fastx;
+mod gap_penalty;
 mod insertion_numbering;
 mod needleman_wunsch;
 mod numbering_scheme_type;
@@ -11,12 +11,11 @@ mod prefiltering;
 mod result;
 mod schemes;
 mod scoring_matrix;
-mod sequence_stream;
 mod types;
 
 use clap::Parser;
 use cli::Cli;
-use sequence_stream::SequenceStream;
+use fastx::SequenceStream;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 
