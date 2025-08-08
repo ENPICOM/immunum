@@ -43,6 +43,12 @@ pub struct Cli {
         help = "Return all detected chains within each sequence (not only the best match)"
     )]
     pub all_chains: bool,
+    /// Enable parallel processing of sequences (file inputs only)
+    #[arg(
+        long,
+        help = "Enable parallel processing when input is a FASTA/FASTQ(.gz) file"
+    )]
+    pub parallel: bool,
     /// Gap penalty for conserved position (default: 55.0)
     #[arg(long, help = "Gap penalty for conserved positions")]
     pub gap_pen_cp: Option<f64>,

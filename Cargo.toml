@@ -22,6 +22,8 @@ phf = {version = "0.12.1" , features = ["macros"]}
 
 [dev-dependencies]
 criterion = { version = "0.7", features = ["html_reports"] }
+assert_cmd = "2"
+predicates = "3"
 
 [lib]
 name = "immunum"
