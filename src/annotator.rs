@@ -1,4 +1,4 @@
-use crate::constants::{get_scoring_params, ScoringParams};
+use crate::constants::{get_scoring_params, ScoringParams, PRE_FILTER_TERMINAL_LENGTH};
 use crate::sequence_io::{from_path, SequenceRecord};
 use crate::needleman_wunsch::{needleman_wunsch_consensus, MatrixPool};
 use crate::numbering_scheme::NumberingScheme;
@@ -17,6 +17,8 @@ pub struct Annotator {
     _chains: Vec<Chain>,
     _scoring_params: ScoringParams,
     schemes: Vec<NumberingScheme>,
+    // Precomputed (N-term, C-term) terminal schemes for fast prefiltering
+    terminal_schemes: Vec<(NumberingScheme, NumberingScheme)>,
     use_prefiltering: bool,
     early_termination_threshold: f64,
 }
@@ -42,11 +44,18 @@ impl Annotator {
             return Err("No valid schemes could be created for the specified chains".to_string());
         }
 
+        // Precompute terminal schemes once to avoid per-call allocations in prefiltering
+        let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = schemes
+            .iter()
+            .map(|s| s.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
+            .collect();
+
         Ok(Annotator {
             _scheme: scheme,
             _chains: chains,
             _scoring_params: params,
             schemes,
+            terminal_schemes,
             use_prefiltering: enable_prefiltering,
             early_termination_threshold: -50.0, // Default early termination threshold
         })
@@ -62,7 +71,11 @@ impl Annotator {
 
         // Apply prefiltering if enabled
         let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
-            prefilter_schemes(sequence_bytes, &self.schemes)
+            let chains = prefilter_schemes(sequence_bytes, &self.terminal_schemes);
+            self.schemes
+                .iter()
+                .filter(|s| chains.contains(&s.chain_type))
+                .collect()
         } else {
             self.schemes.iter().collect()
         };
@@ -163,7 +176,11 @@ impl Annotator {
 
         // Apply prefiltering if enabled
         let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
-            prefilter_schemes(sequence_bytes, &self.schemes)
+            let chains = prefilter_schemes(sequence_bytes, &self.terminal_schemes);
+            self.schemes
+                .iter()
+                .filter(|s| chains.contains(&s.chain_type))
+                .collect()
         } else {
             self.schemes.iter().collect()
         };
