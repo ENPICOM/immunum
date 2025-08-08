@@ -149,20 +149,22 @@ impl PyAnnotator {
         match self.inner.number_file(file_path, parallel) {
             Ok(results) => {
                 let mut py_results = Vec::new();
-                for (name, result) in results {
-                    match result {
-                        Ok(annotation_result) => {
-                            py_results.push((
-                                name,
-                                PyAnnotationResult {
-                                    inner: annotation_result,
-                                },
-                            ));
-                        }
-                        Err(e) => {
-                            return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                                format!("Error processing sequence '{}': {}", name, e),
-                            ));
+                for (name, multi_result) in results {
+                    for result in multi_result {
+                        match result {
+                            Ok(annotation_result) => {
+                                py_results.push((
+                                    name.clone(),
+                                    PyAnnotationResult {
+                                        inner: annotation_result,
+                                    },
+                                ));
+                            }
+                            Err(e) => {
+                                return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                                    format!("Error processing sequence '{}': {}", name, e),
+                                ));
+                            }
                         }
                     }
                 }

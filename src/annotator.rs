@@ -9,7 +9,7 @@ use crate::types::{Chain, Scheme};
 use rayon::prelude::*;
 
 /// Type alias for complex file processing results
-type FileProcessingResult = Result<Vec<(String, Result<AnnotationResult, String>)>, String>;
+type FileProcessingResult = Result<Vec<(String, Vec<Result<AnnotationResult, String>>)>, String>;
 
 /// Main annotator struct that consolidates all numbering functionality
 pub struct Annotator {
@@ -133,11 +133,11 @@ impl Annotator {
         }
 
         // Process all sequences and return results with sequence names
-        let results: Vec<(String, Result<AnnotationResult, String>)> = if parallel {
+        let results: Vec<(String, Vec<Result<AnnotationResult, String>>)> = if parallel {
             records
                 .into_par_iter()
                 .map(|record| {
-                    let result = self.number_sequence(&record.sequence);
+                    let result = self.number_paired_sequence(&record.sequence);
                     (record._name, result)
                 })
                 .collect()
@@ -145,7 +145,7 @@ impl Annotator {
             records
                 .into_iter()
                 .map(|record| {
-                    let result = self.number_sequence(&record.sequence);
+                    let result = self.number_paired_sequence(&record.sequence);
                     (record._name, result)
                 })
                 .collect()
