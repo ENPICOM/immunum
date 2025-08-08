@@ -1,4 +1,4 @@
-use crate::insertion_numbering::name_insertions;
+use crate::insertion_naming::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
 use crate::result::AnnotationResult;
 use crate::scoring_matrix::ScoringMatrix;

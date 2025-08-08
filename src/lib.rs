@@ -1,11 +1,11 @@
 pub mod annotator;
 pub mod consensus_scoring;
 pub mod constants;
-pub mod fastx;
+pub mod sequence_io;
 pub mod gap_penalty;
-pub mod insertion_numbering;
+pub mod insertion_naming;
 pub mod needleman_wunsch;
-pub mod numbering_scheme_type;
+pub mod numbering_scheme;
 pub mod prefiltering;
 pub mod result;
 pub mod schemes;

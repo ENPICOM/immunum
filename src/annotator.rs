@@ -1,7 +1,7 @@
 use crate::constants::{get_scoring_params, ScoringParams};
-use crate::fastx::{from_path, SequenceRecord};
+use crate::sequence_io::{from_path, SequenceRecord};
 use crate::needleman_wunsch::{needleman_wunsch_consensus, MatrixPool};
-use crate::numbering_scheme_type::NumberingScheme;
+use crate::numbering_scheme::NumberingScheme;
 use crate::prefiltering::prefilter_schemes;
 use crate::result::AnnotationResult;
 use crate::schemes::get_scheme;
@@ -97,7 +97,7 @@ impl Annotator {
                 );
 
                 // Apply insertion naming according to the scheme (KABAT vs IMGT)
-                crate::insertion_numbering::name_insertions(&mut numbering, &scheme.scheme_type);
+                crate::insertion_naming::name_insertions(&mut numbering, &scheme.scheme_type);
 
                 // Create AnnotationResult
                 let start = numbering.iter().position(|s| s != "-").unwrap_or(0);
@@ -186,7 +186,7 @@ impl Annotator {
                 );
 
                 // Apply insertion naming according to the scheme (KABAT vs IMGT)
-                crate::insertion_numbering::name_insertions(&mut numbering, &scheme.scheme_type);
+                crate::insertion_naming::name_insertions(&mut numbering, &scheme.scheme_type);
 
                 // Create AnnotationResult
                 let start = numbering.iter().position(|s| s != "-").unwrap_or(0);

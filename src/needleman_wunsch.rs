@@ -3,7 +3,7 @@ use crate::constants::{
     traceback_directions, CONSENSUS_GAP_COLUMN, GAP_PEN_END, GAP_PEN_START, MATCH_CP_MULTIPLIER,
     QUERY_GAP_COLUMN,
 };
-use crate::numbering_scheme_type::NumberingScheme;
+use crate::numbering_scheme::NumberingScheme;
 
 /// Optimized matrix pool for reusing memory between alignments
 pub struct MatrixPool {

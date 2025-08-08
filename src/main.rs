@@ -2,11 +2,11 @@ mod annotator;
 mod cli;
 mod consensus_scoring;
 mod constants;
-mod fastx;
+mod sequence_io;
 mod gap_penalty;
-mod insertion_numbering;
+mod insertion_naming;
 mod needleman_wunsch;
-mod numbering_scheme_type;
+mod numbering_scheme;
 mod prefiltering;
 mod result;
 mod schemes;
@@ -15,7 +15,7 @@ mod types;
 
 use clap::Parser;
 use cli::Cli;
-use fastx::SequenceStream;
+use sequence_io::SequenceStream;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 

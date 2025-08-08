@@ -1,5 +1,5 @@
 use crate::constants::{PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
-use crate::numbering_scheme_type::NumberingScheme;
+use crate::numbering_scheme::NumberingScheme;
 use crate::result::AnnotationResult;
 use crate::types::{Chain, PrefilterOutput};
 use std::collections::HashMap;

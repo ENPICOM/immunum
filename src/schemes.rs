@@ -1,7 +1,7 @@
 use crate::consensus_scoring::calculate_scoring_matrix;
 use crate::constants::{get_consensus, get_scoring_params, ScoringParams};
 use crate::gap_penalty::calculate_gap_penalty;
-use crate::numbering_scheme_type::NumberingScheme;
+use crate::numbering_scheme::NumberingScheme;
 use crate::types::{Chain, RegionRange, Scheme};
 
 pub struct SchemeConfig {
