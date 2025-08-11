@@ -119,10 +119,14 @@ pub fn find_all_chains(
                     let end_sequence: &[u8] = &current_sequence[(best_chain.end as usize + 1)..];
 
                     if front_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
-                        sequence_list.push((front_sequence, current_start, (best_chain.start - 1)))
+                        sequence_list.push((front_sequence,
+                                            current_start,
+                                            (current_start + best_chain.start - 1)))
                     }
                     if end_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
-                        sequence_list.push((end_sequence, (best_chain.end + 1), current_end))
+                        sequence_list.push((end_sequence,
+                                            (current_start + best_chain.end + 1),
+                                            current_end))
                     }
 
                     // set sequence to full original sequence
@@ -216,6 +220,24 @@ mod tests {
     //         }
     //     }
     // }
+
+    #[test]
+    fn multi_sequence_finall_all() {
+        let seq = "PLIIITGDAWWGSNQPPKDRQQQHCRVKMDELANPVASEQSYVLTQPPSVSVSPGQTARITCSGDKLGDKYASWYQQKPGQSPVLVIYQDNKRPSEIPARFSGSNSGNTATLTISGAQAMDEADYYCQAWDSNTGVFGTGTKLTVLGGSSRSSSSGGGGSGGGGVLTQPPSVSAAPGQKVTISCSGSSSNIGNNFVSWYQQRPGTAPSLLIYETNKRPSGIPDRFSGSKSATSATLAITGLQTGDEADYYCATWAASLVFGTGTKVIVSGGSSRSSSSGGGGSGGGGYELTQPPSVSVSPGQTATITCSGDKVASKNVCWYQVKPGQSPEVVMYENYKRPSGIPDRFSGSKSGSTATLTIRGTQATDEADYYCQVWDSFSTFVFGSGTQVTVLGGSSRSSSSGGGGSGGGGYELTQPPSVSVSPGQTASITCSGDKLGNKFTSWYQRKPGQSPVLVIYQDTKRPSGIPERFSGSTSGNTATLTISGTQAMDEADYYCQAWDSSTAWVFGGGTKLEVGGSSRSSSSGGGGSGGGGSYVLTQPPSASGTPGQRVAISCSGSNSNIGSNTVHWYQQLPGAAPKLLIYSNNQRPSGVPDRFSGSNSGTSASLAISRLQSEDEADYYCAAWDDSLNGVVFGGGTKVTVLQIDCEC".as_bytes();
+        let mut schemes: Vec<&NumberingScheme> = Vec::new();
+        let lambda_scheme = get_scheme(Scheme::KABAT, Chain::IGL, None);
+        let kappa_scheme = get_scheme(Scheme::KABAT, Chain::IGK, None);
+        let heavy_scheme = get_scheme(Scheme::KABAT, Chain::IGH, None);
+
+        schemes.push(&lambda_scheme);
+        schemes.push(&kappa_scheme);
+        schemes.push(&heavy_scheme);
+        let output = find_all_chains(seq, schemes);
+        for o in output {
+            let o = o.unwrap();
+            println!("{} {} {} {:?}\n{}", o.start, o.end, o.numbers.len(), o.chain, o.sequence_string());
+        }
+    }
 
     #[test]
     fn single_sequence_find_all() {
