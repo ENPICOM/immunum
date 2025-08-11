@@ -141,7 +141,9 @@ class TestAnnotatorMethods:
         assert isinstance(results, list)
 
         # Multiple sequences paired
-        batch = annotator.number_sequences(["ATCGATCGATCG", "GCTAGCTAGCTA"], all_chains=True)
+        batch = annotator.number_sequences(
+            ["ATCGATCGATCG", "GCTAGCTAGCTA"], all_chains=True
+        )
         assert isinstance(batch, list)
         for item in batch:
             assert isinstance(item, list)

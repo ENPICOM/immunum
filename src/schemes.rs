@@ -175,8 +175,6 @@ pub fn get_scheme(scheme: Scheme, chain: Chain, params: Option<ScoringParams>) -
         scheme_type: scheme,
         chain_type: chain,
         conserved_positions,
-        insertion_positions: config.insertion_positions,
-        gap_positions: config.gap_positions,
         consensus_amino_acids,
         restricted_sites,
         scoring_matrix,
@@ -200,8 +198,6 @@ mod tests {
         let scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
         let config = get_scheme_config(&Scheme::IMGT, &Chain::IGH);
         let scoring_params = get_scoring_params();
-        assert_eq!(scheme.gap_positions, vec![10, 73]);
-        assert_eq!(scheme.restricted_sites().len(), 88);
         assert_eq!(scheme.consensus_amino_acids.len(), 129); // Vec is 0-indexed plus max position
         assert_eq!(scheme.consensus_amino_acids[1], vec![b'Q', b'E', b'D']);
         assert_eq!(

@@ -1,25 +1,6 @@
 use crate::constants::{insertion_points, ScoringParams};
 use crate::schemes::SchemeConfig;
 use crate::types::{Chain, RegionRange, Scheme};
-use std::collections::HashSet;
-
-/// Parameters for gap penalty calculation
-pub struct GapPenaltyParams<'a> {
-    pub position: u32,
-    pub scheme_type: Scheme,
-    pub chain_type: Chain,
-    pub conserved_positions: &'a HashSet<u32>,
-    pub insertion_positions: &'a [u32],
-    pub gap_positions: &'a [u32],
-    pub fr1: &'a RegionRange,
-    pub fr2: &'a RegionRange,
-    pub fr3: &'a RegionRange,
-    pub fr4: &'a RegionRange,
-    pub cdr1: &'a RegionRange,
-    pub cdr2: &'a RegionRange,
-    pub cdr3: &'a RegionRange,
-    pub scoring: &'a ScoringParams,
-}
 
 /// Calculates gap penalty according to position and scheme parameters
 ///

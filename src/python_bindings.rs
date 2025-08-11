@@ -118,7 +118,9 @@ impl PyAnnotator {
         let mut py_results = Vec::new();
         for result in results {
             match result {
-                Ok(annotation_result) => py_results.push(PyAnnotationResult { inner: annotation_result }),
+                Ok(annotation_result) => py_results.push(PyAnnotationResult {
+                    inner: annotation_result,
+                }),
                 Err(e) => return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
             }
         }
@@ -132,13 +134,17 @@ impl PyAnnotator {
         all_chains: bool,
         parallel: bool,
     ) -> PyResult<Vec<Vec<PyAnnotationResult>>> {
-        let results = self.inner.number_sequences(&sequences, all_chains, parallel);
+        let results = self
+            .inner
+            .number_sequences(&sequences, all_chains, parallel);
         let mut outer: Vec<Vec<PyAnnotationResult>> = Vec::new();
         for seq_results in results {
             let mut inner_vec: Vec<PyAnnotationResult> = Vec::new();
             for result in seq_results {
                 match result {
-                    Ok(annotation_result) => inner_vec.push(PyAnnotationResult { inner: annotation_result }),
+                    Ok(annotation_result) => inner_vec.push(PyAnnotationResult {
+                        inner: annotation_result,
+                    }),
                     Err(e) => return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
                 }
             }

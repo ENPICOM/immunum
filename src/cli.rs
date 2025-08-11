@@ -33,12 +33,14 @@ pub struct Cli {
     pub output: Option<String>,
     /// Enable pre-filtering to reduce chain types tested based on sequence characteristics
     #[arg(
+        short,
         long,
         help = "Enable pre-filtering to speed up numbering by reducing tested chain types"
     )]
     pub prefilter: bool,
     /// Return all detected chains for each input (instead of best single)
     #[arg(
+        short,
         long = "all-chains",
         help = "Return all detected chains within each sequence (not only the best match)"
     )]
@@ -49,6 +51,16 @@ pub struct Cli {
         help = "Enable parallel processing when input is a FASTA/FASTQ(.gz) file"
     )]
     pub parallel: bool,
+    /// Output format for results
+    #[arg(
+        short,
+        long,
+        value_enum,
+        ignore_case = true,
+        default_value_t = OutputFormat::Simple,
+        help = "Output format for results"
+    )]
+    pub format: OutputFormat,
     /// Gap penalty for conserved position (default: 55.0)
     #[arg(long, help = "Gap penalty for conserved positions")]
     pub gap_pen_cp: Option<f64>,
@@ -79,14 +91,4 @@ pub struct Cli {
     /// Penalty for leaping insertion point in KABAT scheme (default: 10.0)
     #[arg(long, help = "Penalty for leaping insertion point in KABAT scheme")]
     pub pen_leap_insertion_point_kabat: Option<f64>,
-    /// Output format for results
-    #[arg(
-        short = 'f',
-        long = "format",
-        value_enum,
-        ignore_case = true,
-        default_value_t = OutputFormat::Simple,
-        help = "Output format for results"
-    )]
-    pub format: OutputFormat,
 }

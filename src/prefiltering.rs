@@ -1,4 +1,4 @@
-use crate::constants::{PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
+use crate::constants::WITHIN_IDENTITY_RANGE;
 use crate::needleman_wunsch::{needleman_wunsch_consensus, MatrixPool};
 use crate::numbering_scheme::NumberingScheme;
 // use crate::result::AnnotationResult; // no longer needed here
@@ -33,10 +33,7 @@ pub fn terminal_number_sequence(
             let mut pool = pool_cell.borrow_mut();
             let (numbering, identity) =
                 needleman_wunsch_consensus(query_sequence, n_terminal, &mut pool, -50.0);
-            let start = numbering
-                .iter()
-                .position(|s| s != "-")
-                .unwrap_or(0) as u32;
+            let start = numbering.iter().position(|s| s != "-").unwrap_or(0) as u32;
             (identity, start)
         });
 
@@ -84,8 +81,7 @@ pub fn select_best_chains(
 mod tests {
     use super::*;
     use crate::{
-        schemes::get_scheme,
-        types::{Chain, Scheme},
+        constants::PRE_FILTER_TERMINAL_LENGTH, schemes::get_scheme, types::{Chain, Scheme}
     };
 
     #[test]

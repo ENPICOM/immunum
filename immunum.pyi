@@ -36,32 +36,8 @@ class Chain:
 class ScoringParams:
     """Scoring parameters for sequence alignment and numbering."""
 
-    def __init__(
-        self,
-        gap_pen_cp: Optional[float] = None,
-        gap_pen_fr: Optional[float] = None,
-        gap_pen_ip: Optional[float] = None,
-        gap_pen_op: Optional[float] = None,
-        gap_pen_cdr: Optional[float] = None,
-        gap_pen_other: Optional[float] = None,
-        cdr_increase: Optional[float] = None,
-        pen_leap_insertion_point_imgt: Optional[float] = None,
-        pen_leap_insertion_point_kabat: Optional[float] = None,
-    ) -> None:
-        """
-        Create scoring parameters with optional custom values.
-
-        Args:
-            gap_pen_cp: Gap penalty for conserved positions
-            gap_pen_fr: Gap penalty for framework regions
-            gap_pen_ip: Gap penalty for insertion points
-            gap_pen_op: Gap penalty for opening positions
-            gap_pen_cdr: Gap penalty for CDR regions
-            gap_pen_other: Gap penalty for other regions
-            cdr_increase: CDR increase factor
-            pen_leap_insertion_point_imgt: Penalty for leap insertion points in IMGT
-            pen_leap_insertion_point_kabat: Penalty for leap insertion points in KABAT
-        """
+    def __init__(self) -> None:
+        """Create scoring parameters with default values."""
         ...
 
     @property
@@ -197,49 +173,15 @@ class AnnotationResult:
         """End position of the numbering."""
         ...
 
-    def summary(self) -> str:
-        """Get a summary string of the annotation result."""
-        ...
-
     def get_region_sequence(self, region_name: str) -> Optional[str]:
         """
         Get the sequence for a specific region.
 
         Args:
-            region_name: Name of the region (e.g., 'CDR1', 'FR1', etc.)
+            region_name: Name of the region (e.g., 'cdr1', 'cdr2', 'cdr3', 'fr1', 'fr2', 'fr3', 'fr4')
 
         Returns:
             The sequence for the specified region, or None if not found.
-        """
-        ...
-
-    def get_cdr_sequences(self) -> Dict[str, str]:
-        """
-        Get all CDR sequences.
-
-        Returns:
-            Dictionary mapping CDR names to their sequences.
-        """
-        ...
-
-    def get_framework_sequences(self) -> Dict[str, str]:
-        """
-        Get all framework sequences.
-
-        Returns:
-            Dictionary mapping framework names to their sequences.
-        """
-        ...
-
-    def is_high_confidence(self, threshold: float) -> bool:
-        """
-        Check if the annotation result meets a confidence threshold.
-
-        Args:
-            threshold: Minimum identity score required
-
-        Returns:
-            True if identity score >= threshold
         """
         ...
 
@@ -273,9 +215,10 @@ class Annotator:
 
         Args:
             sequence: The amino acid sequence to number
+            all_chains: Whether to return results for all chains
 
         Returns:
-            List of annotation results; length 1 in single mode
+            List of annotation results for the sequence
 
         Raises:
             RuntimeError: If sequence numbering fails
@@ -290,6 +233,7 @@ class Annotator:
 
         Args:
             sequences: List of amino acid sequences to number
+            all_chains: Whether to return results for all chains
             parallel: Whether to use parallel processing
 
         Returns:
@@ -297,33 +241,6 @@ class Annotator:
 
         Raises:
             RuntimeError: If any sequence numbering fails
-        """
-        ...
-
-    def number_sequence_paired(self, sequence: str) -> List[AnnotationResult]:
-        """
-        Number a single sequence in paired mode, returning all detected chain results.
-
-        Args:
-            sequence: The amino acid sequence to number
-
-        Returns:
-            List of annotation results for each detected chain
-        """
-        ...
-
-    def number_sequences_paired(
-        self, sequences: List[str], parallel: bool = False
-    ) -> List[List[AnnotationResult]]:
-        """
-        Number multiple sequences in paired mode.
-
-        Args:
-            sequences: List of amino acid sequences to number
-            parallel: Whether to use parallel processing
-
-        Returns:
-            List of lists of annotation results per input sequence
         """
         ...
 

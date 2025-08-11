@@ -66,7 +66,7 @@ fn benchmark_single_sequence(c: &mut Criterion) {
     let test_sequence = create_sequence_of_length(127);
 
     c.bench_function("single_sequence", |b| {
-        b.iter(|| annotator.number_sequence(black_box(&test_sequence)))
+        b.iter(|| annotator.number_sequence(black_box(&test_sequence), false))
     });
 }
 
@@ -91,7 +91,7 @@ fn benchmark_sequence_length_scaling(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("needleman_wunsch", length),
             length,
-            |b, _| b.iter(|| annotator.number_sequence(black_box(&sequence))),
+            |b, _| b.iter(|| annotator.number_sequence(black_box(&sequence), false)),
         );
     }
     group.finish();
@@ -119,14 +119,14 @@ fn benchmark_batch_processing(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("sequential", batch_size),
             &sequences,
-            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false)),
+            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false, false)),
         );
 
         // Parallel processing
         group.bench_with_input(
             BenchmarkId::new("parallel", batch_size),
             &sequences,
-            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), true)),
+            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false, true)),
         );
     }
     group.finish();
@@ -154,7 +154,7 @@ fn benchmark_prefiltering_impact(c: &mut Criterion) {
             BenchmarkId::new("no_prefilter", config_name),
             &sequences,
             |b, sequences| {
-                b.iter(|| annotator_no_filter.number_sequences(black_box(sequences), true))
+                b.iter(|| annotator_no_filter.number_sequences(black_box(sequences), false, true))
             },
         );
 
@@ -166,7 +166,7 @@ fn benchmark_prefiltering_impact(c: &mut Criterion) {
             BenchmarkId::new("with_prefilter", config_name),
             &sequences,
             |b, sequences| {
-                b.iter(|| annotator_with_filter.number_sequences(black_box(sequences), true))
+                b.iter(|| annotator_with_filter.number_sequences(black_box(sequences), false, true))
             },
         );
     }
@@ -194,13 +194,13 @@ fn benchmark_threading_efficiency(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("sequential", work_size),
             &sequences,
-            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false)),
+            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false, false)),
         );
 
         group.bench_with_input(
             BenchmarkId::new("parallel", work_size),
             &sequences,
-            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), true)),
+            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false, true)),
         );
     }
     group.finish();
@@ -226,7 +226,7 @@ fn benchmark_needleman_wunsch_core(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("core_algorithm", name),
             sequence,
-            |b, seq| b.iter(|| annotator.number_sequence(black_box(seq))),
+            |b, seq| b.iter(|| annotator.number_sequence(black_box(seq), false)),
         );
     }
     group.finish();
@@ -260,19 +260,19 @@ fn benchmark_scheme_comparison(c: &mut Criterion) {
     group.throughput(Throughput::Elements(sequences.len() as u64));
 
     group.bench_function("imgt_sequential", |b| {
-        b.iter(|| imgt_annotator.number_sequences(black_box(&sequences), false))
+        b.iter(|| imgt_annotator.number_sequences(black_box(&sequences), false, false))
     });
 
     group.bench_function("imgt_parallel", |b| {
-        b.iter(|| imgt_annotator.number_sequences(black_box(&sequences), true))
+        b.iter(|| imgt_annotator.number_sequences(black_box(&sequences), false, true))
     });
 
     group.bench_function("kabat_sequential", |b| {
-        b.iter(|| kabat_annotator.number_sequences(black_box(&sequences), false))
+        b.iter(|| kabat_annotator.number_sequences(black_box(&sequences), false, false))
     });
 
     group.bench_function("kabat_parallel", |b| {
-        b.iter(|| kabat_annotator.number_sequences(black_box(&sequences), true))
+        b.iter(|| kabat_annotator.number_sequences(black_box(&sequences), false, true))
     });
 
     group.finish();
@@ -301,7 +301,7 @@ fn benchmark_chain_configurations(c: &mut Criterion) {
         .unwrap();
 
         group.bench_function(*name, |b| {
-            b.iter(|| annotator.number_sequence(black_box(&test_sequence)))
+            b.iter(|| annotator.number_sequence(black_box(&test_sequence), false))
         });
     }
 
@@ -331,7 +331,7 @@ fn benchmark_memory_scaling(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("sequence_length", length),
             &sequence,
-            |b, seq| b.iter(|| annotator.number_sequence(black_box(seq))),
+            |b, seq| b.iter(|| annotator.number_sequence(black_box(seq), false)),
         );
     }
 

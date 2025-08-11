@@ -54,9 +54,7 @@ def quick_test():
     )
 
     start = time.time()
-    sequential_results_no_filter = annotator_no_filter.number_sequences(
-        sequences, parallel=False
-    )
+    sequential_results_no_filter = annotator_no_filter.number_sequences(sequences)
     seq_time_no_filter = time.time() - start
 
     start = time.time()

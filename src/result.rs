@@ -139,17 +139,6 @@ impl AnnotationResult {
         }
     }
 
-    /// Write the result to a file in the specified format
-    pub fn to_file<P: AsRef<Path>>(&self, path: P, format: OutputFormat) -> Result<(), String> {
-        let content = self.to_string(format);
-        fs::write(path, content).map_err(|e| format!("Failed to write file: {}", e))
-    }
-
-    /// Get the legacy TSV output string (for backward compatibility)
-    pub fn get_output_string(&self) -> String {
-        self.to_tsv()
-    }
-
     /// Convert to TSV format (tab-separated values)
     fn to_tsv(&self) -> String {
         format!(

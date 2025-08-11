@@ -1,6 +1,3 @@
-use crate::insertion_naming::name_insertions;
-use crate::needleman_wunsch::needleman_wunsch_consensus;
-use crate::result::AnnotationResult;
 use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{Chain, RegionRange, Scheme};
 use std::collections::HashSet;
@@ -10,8 +7,6 @@ pub struct NumberingScheme {
     pub scheme_type: Scheme,
     pub chain_type: Chain,
     pub conserved_positions: HashSet<u32>,
-    pub insertion_positions: Vec<u32>,
-    pub gap_positions: Vec<u32>,
     pub consensus_amino_acids: Vec<Vec<u8>>, // Indexed by position
     pub restricted_sites: HashSet<u32>,      // Pre-computed for performance
     pub scoring_matrix: ScoringMatrix,
@@ -25,73 +20,6 @@ pub struct NumberingScheme {
 }
 
 impl NumberingScheme {
-    /// Return restricted sites according to Antpack definition (non '-' positions)
-    pub fn restricted_sites(&self) -> &HashSet<u32> {
-        &self.restricted_sites
-    }
-    /// All framework positions
-    pub fn framework_positions(&self) -> Vec<u32> {
-        self.fr1
-            .positions()
-            .chain(self.fr2.positions())
-            .chain(self.fr3.positions())
-            .chain(self.fr4.positions())
-            .collect()
-    }
-    /// All cdr positions
-    pub fn cdr_positions(&self) -> Vec<u32> {
-        self.cdr1
-            .positions()
-            .chain(self.cdr2.positions())
-            .chain(self.cdr3.positions())
-            .collect()
-    }
-    /// numbers sequence, returns AnnotationResult
-    pub(crate) fn number_sequence(&self, query_sequence: &[u8]) -> AnnotationResult {
-        // Use the optimized implementation with temporary pool
-        let mut matrix_pool = crate::needleman_wunsch::MatrixPool::new();
-
-        let (mut numbering, identity) = needleman_wunsch_consensus(
-            query_sequence,
-            self,
-            &mut matrix_pool,
-            -50.0, // Default early termination threshold
-        );
-
-        // give gap positions correct names as defined by the numbering scheme
-        name_insertions(&mut numbering, &self.scheme_type);
-
-        // find start and end index
-        // TODO handle numberings with no positions (only '-')
-        let start = numbering
-            .iter()
-            .position(|s| s != "-")
-            .expect("No positions numbered");
-
-        // Find the last non-dash element (searching from the end)
-        let end = numbering
-            .iter()
-            .rposition(|s| s != "-")
-            .expect("No positions numbered");
-
-        // Create result with region definitions
-        AnnotationResult {
-            sequence: query_sequence.to_vec(),
-            numbers: numbering,
-            scheme: self.scheme_type,
-            chain: self.chain_type,
-            identity,
-            start: start as u32,
-            end: end as u32,
-            cdr1: self.cdr1.clone(),
-            cdr2: self.cdr2.clone(),
-            cdr3: self.cdr3.clone(),
-            fr1: self.fr1.clone(),
-            fr2: self.fr2.clone(),
-            fr3: self.fr3.clone(),
-            fr4: self.fr4.clone(),
-        }
-    }
     pub fn to_terminal_schemes(&self, terminal_length: u8) -> (NumberingScheme, NumberingScheme) {
         // Create N-terminal scheme (positions 1 to terminal_length)
         let mut n_terminal_consensus = vec![Vec::new(); terminal_length as usize + 1];
@@ -117,8 +45,6 @@ impl NumberingScheme {
 
         let n_terminal_scheme = NumberingScheme {
             conserved_positions: HashSet::new(), // No conserved positions at N-terminal
-            insertion_positions: vec![],
-            gap_positions: vec![10], // IMGT Position 10
             consensus_amino_acids: n_terminal_consensus,
             restricted_sites: n_restricted_sites,
             scoring_matrix: self
@@ -159,8 +85,6 @@ impl NumberingScheme {
 
         let c_terminal_scheme = NumberingScheme {
             conserved_positions: [1, 2, 4].iter().cloned().collect(), // IMGT position 118, 119 and 121 (mapped to 1, 2, 4)
-            insertion_positions: vec![],
-            gap_positions: vec![], // No gap positions at c-terminal
             consensus_amino_acids: c_terminal_consensus,
             restricted_sites: c_restricted_sites,
             scoring_matrix: self.scoring_matrix.slice(
