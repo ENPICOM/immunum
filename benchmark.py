@@ -44,13 +44,13 @@ def quick_test():
     print(f"Testing with {len(sequences)} sequences...")
     print()
 
-    # Test 1: Without prefiltering
+    # Test 1: Without prefiltering (disabled)
     print("📊 WITHOUT Prefiltering:")
     print("-" * 30)
     annotator_no_filter = immunum.Annotator(
         scheme=immunum.Scheme.IMGT,
         chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-        use_prefiltering=False,
+        disable_prefiltering=True,
     )
 
     start = time.time()
@@ -72,13 +72,12 @@ def quick_test():
     print(f"  Speedup:    {seq_time_no_filter / par_time_no_filter:.2f}x faster")
     print()
 
-    # Test 2: With prefiltering
+    # Test 2: With prefiltering (default enabled)
     print("📊 WITH Prefiltering:")
     print("-" * 30)
     annotator_with_filter = immunum.Annotator(
         scheme=immunum.Scheme.IMGT,
         chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-        use_prefiltering=True,
     )
 
     start = time.time()

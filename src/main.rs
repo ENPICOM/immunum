@@ -76,7 +76,7 @@ fn main() {
 fn log_cli(cli: &Cli, chains: &Vec<Chain>) {
     eprintln!("Scheme: {:?}", cli.scheme);
     eprintln!("Chains: {:?}", chains);
-    eprintln!("Pre-filtering: {}", cli.prefilter);
+    eprintln!("Pre-filtering: {}", !cli.disable_prefiltering);
     eprintln!("All-chains mode: {}", cli.all_chains);
     eprintln!("Parallel: {}", cli.parallel);
     eprintln!("Output format: {:?}", cli.format);
@@ -128,7 +128,9 @@ fn build_scoring_params_from_cli(cli: &Cli) -> Option<ScoringParams> {
 }
 
 fn build_annotator(cli: &Cli, chains: Vec<Chain>, scoring_params: Option<ScoringParams>) -> Result<Annotator, String> {
-    Annotator::new(cli.scheme, chains, scoring_params, Some(cli.prefilter))
+    // Convert disable_prefiltering to use_prefiltering for the Rust constructor
+    let use_prefiltering = Some(!cli.disable_prefiltering);
+    Annotator::new(cli.scheme, chains, scoring_params, use_prefiltering)
 }
 
 fn open_output_writer(output: &Option<String>) -> Box<dyn Write> {

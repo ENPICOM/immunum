@@ -193,7 +193,7 @@ class Annotator:
         scheme: Scheme,
         chains: Union[Chain, List[Chain]],
         scoring_params: Optional[ScoringParams] = None,
-        use_prefiltering: Optional[bool] = None,
+        disable_prefiltering: Optional[bool] = None,
     ) -> None:
         """
         Create a new annotator instance.
@@ -202,7 +202,7 @@ class Annotator:
             scheme: The numbering scheme to use (IMGT or KABAT)
             chains: Single chain or list of chains to annotate
             scoring_params: Optional custom scoring parameters
-            use_prefiltering: Whether to use prefiltering for performance
+            disable_prefiltering: Whether to disable prefiltering optimization (default: False, prefiltering enabled)
 
         Raises:
             RuntimeError: If annotator creation fails

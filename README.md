@@ -183,12 +183,13 @@ custom_annotator = immunum.Annotator(
     scoring_params=custom_params
 )
 
-# Enable prefiltering for better performance with multiple chain types
-fast_annotator = immunum.Annotator(
+# Prefiltering is enabled by default for better performance
+# You can disable it if needed
+no_prefilter_annotator = immunum.Annotator(
     scheme=immunum.Scheme.IMGT,
     chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL, 
             immunum.Chain.TRA, immunum.Chain.TRB],
-    use_prefiltering=True
+    disable_prefiltering=True
 )
 
 # Error handling
@@ -226,7 +227,7 @@ except RuntimeError as e:
 #### Performance Tips
 
 - **Use parallel processing** (`parallel=True`) when processing multiple sequences or large files
-- **Enable prefiltering** (`use_prefiltering=True`) when annotating with multiple chain types
+- **Prefiltering is enabled by default** for optimal performance with multiple chain types
 - **Batch processing** is more efficient than processing sequences individually
 - **File processing** is optimized for both FASTA and FASTQ formats, including gzip compression
 

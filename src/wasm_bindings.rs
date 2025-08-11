@@ -76,8 +76,10 @@ impl Annotator {
         scheme: Scheme,
         chains: Vec<Chain>,
         scoring_params: Option<ScoringParams>,
-        use_prefiltering: Option<bool>,
+        disable_prefiltering: Option<bool>,
     ) -> Result<Annotator, JsValue> {
+        // Convert disable_prefiltering to use_prefiltering for the Rust constructor
+        let use_prefiltering = disable_prefiltering.map(|disable| !disable);
         match RustAnnotator::new(scheme, chains, scoring_params, use_prefiltering) {
             Ok(annotator) => Ok(Annotator { inner: annotator }),
             Err(e) => Err(JsValue::from_str(&e)),

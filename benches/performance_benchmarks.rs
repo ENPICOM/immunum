@@ -146,7 +146,7 @@ fn benchmark_prefiltering_impact(c: &mut Criterion) {
     ];
 
     for (config_name, chains) in chain_configs.iter() {
-        // Without prefiltering
+        // Without prefiltering (explicitly disabled)
         let annotator_no_filter =
             Annotator::new(Scheme::IMGT, chains.clone(), None, Some(false)).unwrap();
 
@@ -158,9 +158,9 @@ fn benchmark_prefiltering_impact(c: &mut Criterion) {
             },
         );
 
-        // With prefiltering
+        // With prefiltering (default behavior)
         let annotator_with_filter =
-            Annotator::new(Scheme::IMGT, chains.clone(), None, Some(true)).unwrap();
+            Annotator::new(Scheme::IMGT, chains.clone(), None, None).unwrap();
 
         group.bench_with_input(
             BenchmarkId::new("with_prefilter", config_name),
@@ -296,7 +296,7 @@ fn benchmark_chain_configurations(c: &mut Criterion) {
             Scheme::IMGT,
             chains.clone(),
             None,
-            Some(false), // No prefiltering for clean comparison
+            Some(false), // Disable prefiltering for clean comparison
         )
         .unwrap();
 
@@ -322,7 +322,7 @@ fn benchmark_memory_scaling(c: &mut Criterion) {
             Scheme::IMGT,
             vec![Chain::IGH],
             None,
-            Some(false), // No prefiltering for clean memory analysis
+            Some(false), // Disable prefiltering for clean memory analysis
         )
         .unwrap();
 

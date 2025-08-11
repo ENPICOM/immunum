@@ -83,12 +83,12 @@ pub struct PyAnnotator {
 #[pymethods]
 impl PyAnnotator {
     #[new]
-    #[pyo3(signature = (scheme, chains, scoring_params=None, use_prefiltering=None))]
+    #[pyo3(signature = (scheme, chains, scoring_params=None, disable_prefiltering=None))]
     pub fn new(
         scheme: Scheme,
         chains: PyObject,
         scoring_params: Option<ScoringParams>,
-        use_prefiltering: Option<bool>,
+        disable_prefiltering: Option<bool>,
         py: Python,
     ) -> PyResult<Self> {
         // Handle both single chain and list of chains
@@ -102,6 +102,8 @@ impl PyAnnotator {
             ));
         };
 
+        // Convert disable_prefiltering to use_prefiltering for the Rust constructor
+        let use_prefiltering = disable_prefiltering.map(|disable| !disable);
         match Annotator::new(scheme, rust_chains, scoring_params, use_prefiltering) {
             Ok(annotator) => Ok(PyAnnotator { inner: annotator }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),

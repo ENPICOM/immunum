@@ -32,7 +32,7 @@ impl Annotator {
         use_prefiltering: Option<bool>,
     ) -> Result<Self, String> {
         let params = scoring_params.unwrap_or_else(get_scoring_params);
-        let enable_prefiltering = use_prefiltering.unwrap_or(false);
+        let enable_prefiltering = use_prefiltering.unwrap_or(true);
 
         // Pre-build all required schemes for performance
         let schemes: Vec<NumberingScheme> = chains

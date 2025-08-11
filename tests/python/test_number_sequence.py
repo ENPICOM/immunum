@@ -58,12 +58,12 @@ class TestImmunumAPI:
         )
         assert annotator is not None
 
-    def test_annotator_with_prefiltering(self):
-        """Test Annotator creation with pre-filtering enabled."""
+    def test_annotator_with_prefiltering_disabled(self):
+        """Test Annotator creation with pre-filtering disabled."""
         annotator = immunum.Annotator(
             scheme=immunum.Scheme.IMGT,
             chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-            use_prefiltering=True,
+            disable_prefiltering=True,
         )
         assert annotator is not None
 

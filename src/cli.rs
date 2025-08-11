@@ -33,11 +33,10 @@ pub struct Cli {
     pub output: Option<String>,
     /// Enable pre-filtering to reduce chain types tested based on sequence characteristics
     #[arg(
-        short,
-        long,
-        help = "Enable pre-filtering to speed up numbering by reducing tested chain types"
+        long = "disable-prefiltering",
+        help = "Disable pre-filtering optimization (prefiltering is enabled by default)"
     )]
-    pub prefilter: bool,
+    pub disable_prefiltering: bool,
     /// Return all detected chains for each input (instead of best single)
     #[arg(
         short,
