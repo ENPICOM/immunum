@@ -4,4 +4,6 @@ wasm_build
 
 /.idea
 
+.claude
+
 node_modules
