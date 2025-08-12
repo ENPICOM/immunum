@@ -86,6 +86,7 @@ pub fn calculate_gap_penalty(
 }
 
 /// Apply CDR-specific penalties based on the numbering scheme
+#[allow(clippy::too_many_arguments)]
 fn apply_cdr_penalties(
     position: u32,
     scheme_type: Scheme,
