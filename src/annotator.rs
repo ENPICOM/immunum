@@ -19,7 +19,7 @@ pub struct Annotator {
     schemes: Vec<NumberingScheme>,
     // Precomputed (N-term, C-term) terminal schemes for fast prefiltering
     terminal_schemes: Vec<(NumberingScheme, NumberingScheme)>,
-    use_prefiltering: bool,
+    disable_prefiltering: bool,
     early_termination_threshold: f64,
 }
 
@@ -29,10 +29,10 @@ impl Annotator {
         scheme: Scheme,
         chains: Vec<Chain>,
         scoring_params: Option<ScoringParams>,
-        use_prefiltering: Option<bool>,
+        disable_prefiltering: Option<bool>,
     ) -> Result<Self, String> {
         let params = scoring_params.unwrap_or_else(get_scoring_params);
-        let enable_prefiltering = use_prefiltering.unwrap_or(true);
+        let disable_prefiltering = disable_prefiltering.unwrap_or(false);
 
         // Pre-build all required schemes for performance
         let schemes: Vec<NumberingScheme> = chains
@@ -56,7 +56,7 @@ impl Annotator {
             _scoring_params: params,
             schemes,
             terminal_schemes,
-            use_prefiltering: enable_prefiltering,
+            disable_prefiltering,
             early_termination_threshold: -50.0, // Default early termination threshold
         })
     }
@@ -75,7 +75,7 @@ impl Annotator {
         let sequence_bytes = sequence.as_bytes();
 
         // Apply prefiltering if enabled
-        let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
+        let scheme_refs: Vec<&NumberingScheme> = if !self.disable_prefiltering {
             let chains = prefilter_schemes(sequence_bytes, &self.terminal_schemes);
             self.schemes
                 .iter()
@@ -188,7 +188,7 @@ impl Annotator {
         let sequence_bytes = sequence.as_bytes();
 
         // Apply prefiltering if enabled
-        let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
+        let scheme_refs: Vec<&NumberingScheme> = if !self.disable_prefiltering {
             let chains = prefilter_schemes(sequence_bytes, &self.terminal_schemes);
             self.schemes
                 .iter()

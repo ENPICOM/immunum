@@ -128,9 +128,7 @@ fn build_scoring_params_from_cli(cli: &Cli) -> Option<ScoringParams> {
 }
 
 fn build_annotator(cli: &Cli, chains: Vec<Chain>, scoring_params: Option<ScoringParams>) -> Result<Annotator, String> {
-    // Convert disable_prefiltering to use_prefiltering for the Rust constructor
-    let use_prefiltering = Some(!cli.disable_prefiltering);
-    Annotator::new(cli.scheme, chains, scoring_params, use_prefiltering)
+    Annotator::new(cli.scheme, chains, scoring_params, Some(cli.disable_prefiltering))
 }
 
 fn open_output_writer(output: &Option<String>) -> Box<dyn Write> {

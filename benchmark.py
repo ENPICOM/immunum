@@ -36,7 +36,7 @@ def create_test_sequences(count: int) -> List[str]:
 
 def quick_test():
     """Quick test with 2000 sequences comparing prefiltering and parallel processing."""
-    print("🚀 Immunum Performance Test - 200 Sequences")
+    print("🚀 Immunum Performance Test - 2000 Sequences")
     print("=" * 50)
 
     # Test with 200 sequences
@@ -44,7 +44,7 @@ def quick_test():
     print(f"Testing with {len(sequences)} sequences...")
     print()
 
-    # Test 1: Without prefiltering (disabled)
+    # Test 1: Without prefiltering
     print("📊 WITHOUT Prefiltering:")
     print("-" * 30)
     annotator_no_filter = immunum.Annotator(
@@ -72,12 +72,13 @@ def quick_test():
     print(f"  Speedup:    {seq_time_no_filter / par_time_no_filter:.2f}x faster")
     print()
 
-    # Test 2: With prefiltering (default enabled)
+    # Test 2: With prefiltering
     print("📊 WITH Prefiltering:")
     print("-" * 30)
     annotator_with_filter = immunum.Annotator(
         scheme=immunum.Scheme.IMGT,
         chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
+        disable_prefiltering=False,
     )
 
     start = time.time()

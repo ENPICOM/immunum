@@ -102,9 +102,7 @@ impl PyAnnotator {
             ));
         };
 
-        // Convert disable_prefiltering to use_prefiltering for the Rust constructor
-        let use_prefiltering = disable_prefiltering.map(|disable| !disable);
-        match Annotator::new(scheme, rust_chains, scoring_params, use_prefiltering) {
+        match Annotator::new(scheme, rust_chains, scoring_params, disable_prefiltering) {
             Ok(annotator) => Ok(PyAnnotator { inner: annotator }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
         }
