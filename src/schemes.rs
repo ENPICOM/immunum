@@ -84,7 +84,7 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
         },
         (Scheme::KABAT, Chain::IGH) => SchemeConfig {
             conserved_positions: vec![22, 36, 92, 103, 104, 106],
-            insertion_positions: vec![6, 82],
+            insertion_positions: vec![6, 35, 52, 82, 100],
             gap_positions: vec![40, 41, 42, 43, 44, 72, 73, 74],
             fr1: RegionRange { start: 1, end: 31 },
             cdr1: RegionRange { start: 31, end: 36 },
@@ -102,7 +102,7 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
         },
         (Scheme::KABAT, Chain::IGK) => SchemeConfig {
             conserved_positions: vec![23, 35, 88, 98, 99, 101],
-            insertion_positions: vec![27],
+            insertion_positions: vec![27, 52, 95],
             gap_positions: vec![10],
             fr1: RegionRange { start: 1, end: 24 },
             cdr1: RegionRange { start: 24, end: 35 },
@@ -117,7 +117,7 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
         },
         (Scheme::KABAT, Chain::IGL) => SchemeConfig {
             conserved_positions: vec![23, 35, 88, 98, 99, 101],
-            insertion_positions: vec![27],
+            insertion_positions: vec![27, 52, 95],
             gap_positions: vec![10],
             fr1: RegionRange { start: 1, end: 24 },
             cdr1: RegionRange { start: 24, end: 35 },
