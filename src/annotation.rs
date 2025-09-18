@@ -119,14 +119,18 @@ pub fn find_all_chains(
                     let end_sequence: &[u8] = &current_sequence[(best_chain.end as usize + 1)..];
 
                     if front_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
-                        sequence_list.push((front_sequence,
-                                            current_start,
-                                            (current_start + best_chain.start - 1)))
+                        sequence_list.push((
+                            front_sequence,
+                            current_start,
+                            (current_start + best_chain.start - 1),
+                        ))
                     }
                     if end_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
-                        sequence_list.push((end_sequence,
-                                            (current_start + best_chain.end + 1),
-                                            current_end))
+                        sequence_list.push((
+                            end_sequence,
+                            (current_start + best_chain.end + 1),
+                            current_end,
+                        ))
                     }
 
                     // set sequence to full original sequence
@@ -235,7 +239,14 @@ mod tests {
         let output = find_all_chains(seq, schemes);
         for o in output {
             let o = o.unwrap();
-            println!("{} {} {} {:?}\n{}", o.start, o.end, o.numbers.len(), o.chain, o.sequence_string());
+            println!(
+                "{} {} {} {:?}\n{}",
+                o.start,
+                o.end,
+                o.numbers.len(),
+                o.chain,
+                o.sequence_string()
+            );
         }
     }
 
