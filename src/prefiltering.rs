@@ -81,7 +81,9 @@ pub fn select_best_chains(
 mod tests {
     use super::*;
     use crate::{
-        constants::PRE_FILTER_TERMINAL_LENGTH, schemes::get_scheme, types::{Chain, Scheme}
+        constants::PRE_FILTER_TERMINAL_LENGTH,
+        schemes::get_scheme,
+        types::{Chain, Scheme},
     };
 
     #[test]

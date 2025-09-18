@@ -119,7 +119,9 @@ fn benchmark_batch_processing(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("sequential", batch_size),
             &sequences,
-            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false, false)),
+            |b, sequences| {
+                b.iter(|| annotator.number_sequences(black_box(sequences), false, false))
+            },
         );
 
         // Parallel processing
@@ -194,7 +196,9 @@ fn benchmark_threading_efficiency(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("sequential", work_size),
             &sequences,
-            |b, sequences| b.iter(|| annotator.number_sequences(black_box(sequences), false, false)),
+            |b, sequences| {
+                b.iter(|| annotator.number_sequences(black_box(sequences), false, false))
+            },
         );
 
         group.bench_with_input(

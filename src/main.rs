@@ -2,7 +2,6 @@ mod annotator;
 mod cli;
 mod consensus_scoring;
 mod constants;
-mod sequence_io;
 mod gap_penalty;
 mod insertion_naming;
 mod needleman_wunsch;
@@ -11,6 +10,7 @@ mod prefiltering;
 mod result;
 mod schemes;
 mod scoring_matrix;
+mod sequence_io;
 mod types;
 
 use clap::Parser;
@@ -59,7 +59,13 @@ fn main() {
 
     // If parallel requested and input is a file, use batch processing
     if cli.parallel && Path::new(&cli.input).exists() {
-        if let Err(e) = process_file(&mut *output_writer, &annotator, &cli.input, cli.all_chains, cli.format.clone()) {
+        if let Err(e) = process_file(
+            &mut *output_writer,
+            &annotator,
+            &cli.input,
+            cli.all_chains,
+            cli.format.clone(),
+        ) {
             eprintln!("Error processing file in parallel: {}", e);
             std::process::exit(1);
         }
@@ -67,7 +73,13 @@ fn main() {
     }
 
     // Fallback: streaming (sequential) processing
-    if let Err(e) = process_stream(&mut *output_writer, &annotator, &cli.input, cli.all_chains, cli.format.clone()) {
+    if let Err(e) = process_stream(
+        &mut *output_writer,
+        &annotator,
+        &cli.input,
+        cli.all_chains,
+        cli.format.clone(),
+    ) {
         eprintln!("{}", e);
         std::process::exit(1);
     }
@@ -127,8 +139,17 @@ fn build_scoring_params_from_cli(cli: &Cli) -> Option<ScoringParams> {
     }
 }
 
-fn build_annotator(cli: &Cli, chains: Vec<Chain>, scoring_params: Option<ScoringParams>) -> Result<Annotator, String> {
-    Annotator::new(cli.scheme, chains, scoring_params, Some(cli.disable_prefiltering))
+fn build_annotator(
+    cli: &Cli,
+    chains: Vec<Chain>,
+    scoring_params: Option<ScoringParams>,
+) -> Result<Annotator, String> {
+    Annotator::new(
+        cli.scheme,
+        chains,
+        scoring_params,
+        Some(cli.disable_prefiltering),
+    )
 }
 
 fn open_output_writer(output: &Option<String>) -> Box<dyn Write> {
@@ -184,8 +205,8 @@ fn process_stream(
     all_chains: bool,
     format: OutputFormat,
 ) -> Result<(), String> {
-    let sequence_stream = SequenceStream::new(input)
-        .map_err(|e| format!("Error creating sequence stream: {}", e))?;
+    let sequence_stream =
+        SequenceStream::new(input).map_err(|e| format!("Error creating sequence stream: {}", e))?;
 
     for record_result in sequence_stream {
         let record = match record_result {

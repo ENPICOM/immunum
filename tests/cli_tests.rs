@@ -44,7 +44,14 @@ fn cli_parallel_flag_on_file() {
 #[test]
 fn cli_nonexistent_file_fails() {
     let mut cmd = Command::cargo_bin("immunum-cli").expect("binary exists");
-    cmd.args(["-i", "fixtures/does_not_exist.fasta", "-s", "imgt", "-c", "igh"]);
+    cmd.args([
+        "-i",
+        "fixtures/does_not_exist.fasta",
+        "-s",
+        "imgt",
+        "-c",
+        "igh",
+    ]);
     cmd.assert().failure();
 }
 
@@ -56,4 +63,3 @@ fn cli_direct_sequence_input() {
     cmd.args(["-i", seq, "-s", "imgt", "-c", "igh"]);
     cmd.assert().success();
 }
-

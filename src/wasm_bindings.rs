@@ -91,14 +91,20 @@ impl Annotator {
         results
             .into_iter()
             .map(|result| match result {
-                Ok(annotation_result) => JsValue::from(WasmAnnotationResult { inner: annotation_result }),
+                Ok(annotation_result) => JsValue::from(WasmAnnotationResult {
+                    inner: annotation_result,
+                }),
                 Err(e) => JsValue::from_str(&format!("Error: {}", e)),
             })
             .collect()
     }
 
     #[wasm_bindgen(js_name = numberSequences)]
-    pub fn number_sequences(&self, sequences: Vec<String>, all_chains: Option<bool>) -> Vec<JsValue> {
+    pub fn number_sequences(
+        &self,
+        sequences: Vec<String>,
+        all_chains: Option<bool>,
+    ) -> Vec<JsValue> {
         let all_chains = all_chains.unwrap_or(false);
         let results = self.inner.number_sequences(&sequences, all_chains, false);
         results
@@ -107,7 +113,9 @@ impl Annotator {
                 let arr = js_sys::Array::new();
                 for r in seq_results {
                     let v = match r {
-                        Ok(annotation_result) => JsValue::from(WasmAnnotationResult { inner: annotation_result }),
+                        Ok(annotation_result) => JsValue::from(WasmAnnotationResult {
+                            inner: annotation_result,
+                        }),
                         Err(e) => JsValue::from_str(&format!("Error: {}", e)),
                     };
                     arr.push(&v);

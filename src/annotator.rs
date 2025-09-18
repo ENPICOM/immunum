@@ -180,7 +180,10 @@ impl Annotator {
     }
 
     /// Internal helper for all-chains mode numbering of a single sequence
-    pub fn number_all_chains_sequence(&self, sequence: &str) -> Vec<Result<AnnotationResult, String>> {
+    pub fn number_all_chains_sequence(
+        &self,
+        sequence: &str,
+    ) -> Vec<Result<AnnotationResult, String>> {
         if sequence.is_empty() {
             return vec![Err("Empty sequence provided".to_string())];
         }
@@ -262,7 +265,12 @@ impl Annotator {
     }
 
     /// Number all sequences in a FASTA/FASTQ file with paired option
-    pub fn number_file(&self, file_path: &str, paired: bool, parallel: bool) -> FileProcessingResult {
+    pub fn number_file(
+        &self,
+        file_path: &str,
+        paired: bool,
+        parallel: bool,
+    ) -> FileProcessingResult {
         let reader = from_path(file_path)
             .map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
 
