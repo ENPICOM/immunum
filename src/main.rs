@@ -41,13 +41,6 @@ fn main() {
     let default_chains_vec = DEFAULT_CHAINS.to_vec();
     let chains = cli.chains.as_ref().unwrap_or(&default_chains_vec);
 
-    // Display parsed arguments to stderr for logging
-    eprintln!("Scheme: {:?}", cli.scheme);
-    eprintln!("Chains: {:?}", chains);
-    eprintln!("Pre-filtering: {}", cli.prefilter);
-    eprintln!("Paired sequence numbering: {}", cli.paired);
-    eprintln!("Output format: {:?}", cli.format);
-
     // Build custom scoring parameters if any are provided
     let scoring_params = if cli.gap_pen_cp.is_some()
         || cli.gap_pen_fr.is_some()
@@ -143,7 +136,7 @@ fn main() {
                                 } else {
                                     record._name.clone()
                                 };
-                                writeln!(output_writer, "# {}", chain_name).unwrap();
+                                // writeln!(output_writer, "# {}", chain_name).unwrap();
                                 writeln!(
                                     output_writer,
                                     "{}",
