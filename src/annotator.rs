@@ -52,12 +52,7 @@ impl Annotator {
     }
 
     /// Number a paired sequence using the pre-configured schemes to find multiple chains
-    pub fn number_paired_sequence(&self, sequence: &str) -> Vec<Result<AnnotationResult, String>> {
-        self.number_paired_sequence_with_id(sequence, "input_sequence".to_string())
-    }
-
-    /// Number a paired sequence with a specified sequence ID to find multiple chains
-    pub fn number_paired_sequence_with_id(&self, sequence: &str, sequence_id: String) -> Vec<Result<AnnotationResult, String>> {
+    pub fn number_paired_sequence(&self, sequence: &str, sequence_id: String) -> Vec<Result<AnnotationResult, String>> {
         if sequence.is_empty() {
             return vec![Err("Empty sequence provided".to_string())];
         }
@@ -79,28 +74,7 @@ impl Annotator {
     }
 
     /// Number a single sequence using the pre-configured schemes
-    pub fn number_sequence(&self, sequence: &str) -> Result<AnnotationResult, String> {
-        if sequence.is_empty() {
-            return Err("Empty sequence provided".to_string());
-        }
-
-        let sequence_bytes = sequence.as_bytes();
-
-        // Apply prefiltering if enabled, otherwise use all schemes
-        let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
-            apply_prefiltering(sequence_bytes, &self.schemes)
-        } else {
-            self.schemes.iter().collect()
-        };
-
-        match find_highest_identity_chain(sequence_bytes, &scheme_refs, "input_sequence".to_string()) {
-            Ok(output) => Ok(output),
-            Err(e) => Err(e.to_string()),
-        }
-    }
-
-    /// Number a single sequence with a specified sequence ID
-    pub fn number_sequence_with_id(&self, sequence: &str, sequence_id: String) -> Result<AnnotationResult, String> {
+    pub fn number_sequence(&self, sequence: &str, sequence_id: String) -> Result<AnnotationResult, String> {
         if sequence.is_empty() {
             return Err("Empty sequence provided".to_string());
         }
@@ -131,13 +105,13 @@ impl Annotator {
             sequences
                 .par_iter()
                 .enumerate()
-                .map(|(i, seq)| self.number_sequence_with_id(seq, format!("sequence_{}", i + 1)))
+                .map(|(i, seq)| self.number_sequence(seq, format!("sequence_{}", i + 1)))
                 .collect()
         } else {
             sequences
                 .iter()
                 .enumerate()
-                .map(|(i, seq)| self.number_sequence_with_id(seq, format!("sequence_{}", i + 1)))
+                .map(|(i, seq)| self.number_sequence(seq, format!("sequence_{}", i + 1)))
                 .collect()
         }
     }
@@ -165,7 +139,7 @@ impl Annotator {
             records
                 .into_par_iter()
                 .map(|record| {
-                    let result = self.number_paired_sequence_with_id(&record.sequence, record.name.clone());
+                    let result = self.number_paired_sequence(&record.sequence, record.name.clone());
                     (record.name, result)
                 })
                 .collect()
@@ -173,7 +147,7 @@ impl Annotator {
             records
                 .into_iter()
                 .map(|record| {
-                    let result = self.number_paired_sequence_with_id(&record.sequence, record.name.clone());
+                    let result = self.number_paired_sequence(&record.sequence, record.name.clone());
                     (record.name, result)
                 })
                 .collect()
@@ -203,7 +177,7 @@ mod tests {
     fn test_empty_sequence() {
         let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, None).unwrap();
 
-        let result = annotator.number_sequence("");
+        let result = annotator.number_sequence("", "".to_string());
         assert!(result.is_err());
     }
 
@@ -242,7 +216,7 @@ mod tests {
         // Heavy chain sequence that should be correctly identified with prefiltering
         let heavy_chain_seq = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS";
 
-        let result = annotator.number_sequence(heavy_chain_seq);
+        let result = annotator.number_sequence(heavy_chain_seq, "".to_string());
         assert!(result.is_ok());
         if let Ok(annotation) = result {
             assert_eq!(annotation.chain, Chain::IGH);
@@ -262,7 +236,7 @@ mod tests {
         // Test sequence with multiple chains (concatenated heavy and light chain)
         let paired_seq = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSSDIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTGSGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELK";
 
-        let results = annotator.number_paired_sequence(paired_seq);
+        let results = annotator.number_paired_sequence(paired_seq, "".to_string());
 
         // Should find at least one chain in the paired sequence
         assert!(!results.is_empty());
@@ -280,7 +254,7 @@ mod tests {
     fn test_number_paired_sequence_empty() {
         let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, None).unwrap();
 
-        let results = annotator.number_paired_sequence("");
+        let results = annotator.number_paired_sequence("", "".to_string());
         assert_eq!(results.len(), 1);
         assert!(results[0].is_err());
         assert!(results[0].as_ref().unwrap_err().contains("Empty sequence"));

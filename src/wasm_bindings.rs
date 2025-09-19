@@ -85,8 +85,8 @@ impl Annotator {
     }
 
     #[wasm_bindgen(js_name = numberSequence)]
-    pub fn number_sequence(&self, sequence: &str) -> Result<WasmAnnotationResult, JsValue> {
-        match self.inner.number_sequence(sequence) {
+    pub fn number_sequence(&self, sequence: &str, sequence_id: String) -> Result<WasmAnnotationResult, JsValue> {
+        match self.inner.number_sequence(sequence, sequence_id) {
             Ok(result) => Ok(WasmAnnotationResult { inner: result }),
             Err(e) => Err(JsValue::from_str(&e)),
         }
