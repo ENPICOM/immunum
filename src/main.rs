@@ -16,9 +16,11 @@ mod types;
 
 use clap::Parser;
 use cli::Cli;
+use rayon::prelude::*;
 use sequence_stream::SequenceStream;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
+use std::sync::{Arc, Mutex};
 
 use crate::annotator::Annotator;
 use crate::constants::get_scoring_params;
@@ -109,68 +111,82 @@ fn main() {
         }
     };
 
+    // Set thread pool size if specified
+    if let Some(threads) = cli.threads {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build_global()
+            .unwrap();
+    }
+
     // Create output writer (either file or stdout)
-    let mut output_writer: Box<dyn Write> = match &cli.output {
+    let output_writer: Box<dyn Write + Send> = match &cli.output {
         Some(output_path) => Box::new(BufWriter::new(File::create(output_path).unwrap())),
         None => Box::new(BufWriter::new(io::stdout())),
     };
+    let output_writer = Arc::new(Mutex::new(output_writer));
 
-    // Process each sequence and write results
-    for record_result in sequence_stream {
-        match record_result {
-            Ok(record) => {
-                if cli.paired {
-                    // Use paired sequence numbering to find multiple chains
-                    let results = annotator.number_paired_sequence(&record.sequence);
-                    if results.is_empty() {
-                        eprintln!("No chains found in sequence '{}'", record._name);
-                        continue;
-                    }
+    // Collect all sequences first for parallel processing
+    let sequences: Result<Vec<_>, _> = sequence_stream.collect();
+    let sequences = match sequences {
+        Ok(sequences) => sequences,
+        Err(e) => {
+            eprintln!("Error collecting sequences: {e}");
+            std::process::exit(1);
+        }
+    };
 
-                    for (chain_index, result) in results.into_iter().enumerate() {
-                        match result {
-                            Ok(annotation_result) => {
-                                // Add chain index to sequence name for multiple results
-                                let chain_name = if chain_index > 0 {
-                                    format!("{}_chain_{}", record._name, chain_index + 1)
-                                } else {
-                                    record._name.clone()
-                                };
-                                // writeln!(output_writer, "# {}", chain_name).unwrap();
-                                writeln!(
-                                    output_writer,
-                                    "{}",
-                                    annotation_result.to_string(cli.format.clone())
-                                )
-                                .unwrap();
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "Error numbering chain {} in sequence '{}': {}",
-                                    chain_index + 1,
-                                    record._name,
-                                    e
-                                );
-                            }
-                        }
+    // Process sequences in parallel
+    sequences.par_iter().for_each(|record| {
+        let output_writer = Arc::clone(&output_writer);
+        if cli.paired {
+            // Use paired sequence numbering to find multiple chains
+            let results = annotator.number_paired_sequence(&record.sequence);
+            if results.is_empty() {
+                eprintln!("No chains found in sequence '{}'", record._name);
+                return;
+            }
+
+            for (chain_index, result) in results.into_iter().enumerate() {
+                match result {
+                    Ok(annotation_result) => {
+                        // Add chain index to sequence name for multiple results
+                        let _chain_name = if chain_index > 0 {
+                            format!("{}_chain_{}", record._name, chain_index + 1)
+                        } else {
+                            record._name.clone()
+                        };
+                        // Write to output with thread-safe access
+                        let mut writer = output_writer.lock().unwrap();
+                        writeln!(
+                            writer,
+                            "{}",
+                            annotation_result.to_string(cli.format.clone())
+                        )
+                        .unwrap();
                     }
-                } else {
-                    // Use single sequence numbering (original behavior)
-                    match annotator.number_sequence(&record.sequence) {
-                        Ok(result) => {
-                            writeln!(output_writer, "{}", result.to_string(cli.format.clone()))
-                                .unwrap();
-                        }
-                        Err(e) => {
-                            eprintln!("Error numbering sequence '{}': {}", record._name, e);
-                        }
+                    Err(e) => {
+                        eprintln!(
+                            "Error numbering chain {} in sequence '{}': {}",
+                            chain_index + 1,
+                            record._name,
+                            e
+                        );
                     }
                 }
             }
-            Err(e) => {
-                eprintln!("Error processing sequence: {e}");
-                std::process::exit(1);
+        } else {
+            // Use single sequence numbering (original behavior)
+            match annotator.number_sequence(&record.sequence) {
+                Ok(result) => {
+                    let mut writer = output_writer.lock().unwrap();
+                    writeln!(writer, "{}", result.to_string(cli.format.clone()))
+                        .unwrap();
+                }
+                Err(e) => {
+                    eprintln!("Error numbering sequence '{}': {}", record._name, e);
+                }
             }
         }
-    }
+    });
 }

@@ -83,4 +83,11 @@ pub struct Cli {
         help = "Output format for results"
     )]
     pub format: OutputFormat,
+    /// Number of threads for parallel processing (defaults to number of CPU cores)
+    #[arg(
+        short = 't',
+        long = "threads",
+        help = "Number of threads for parallel processing (defaults to number of CPU cores)"
+    )]
+    pub threads: Option<usize>,
 }
