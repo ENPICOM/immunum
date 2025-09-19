@@ -15,7 +15,7 @@ pub enum FastxError {
 /// Represents a sequence record from a FASTA or FASTQ file
 #[derive(Debug, Clone)]
 pub struct FastxRecord {
-    pub _name: String, // TODO Not used at the moment, but would be nice to print it in the output?
+    pub name: String,
     pub sequence: String,
     pub _quality: Option<String>, // TODO Not used at the moment, should we keep it?
 }
@@ -23,7 +23,7 @@ pub struct FastxRecord {
 impl FastxRecord {
     pub fn new(name: String, sequence: String, quality: Option<String>) -> Self {
         Self {
-            _name: name,
+            name,
             sequence,
             _quality: quality,
         }
@@ -211,10 +211,10 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0]._name, "seq1 description");
+        assert_eq!(records[0].name, "seq1 description");
         assert_eq!(records[0].sequence, "ATCGTGCA");
         assert_eq!(records[0]._quality, None);
-        assert_eq!(records[1]._name, "seq2");
+        assert_eq!(records[1].name, "seq2");
         assert_eq!(records[1].sequence, "GGCC");
     }
 
@@ -228,10 +228,10 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0]._name, "seq1");
+        assert_eq!(records[0].name, "seq1");
         assert_eq!(records[0].sequence, "ATCG");
         assert_eq!(records[0]._quality, Some("IIII".to_string()));
-        assert_eq!(records[1]._name, "seq2");
+        assert_eq!(records[1].name, "seq2");
         assert_eq!(records[1].sequence, "GGCC");
         assert_eq!(records[1]._quality, Some("!!!!".to_string()));
     }
@@ -246,7 +246,7 @@ mod tests {
 
         // Test first record
         assert_eq!(
-            records[0]._name,
+            records[0].name,
             "heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
@@ -256,7 +256,7 @@ mod tests {
 
         // Test second record
         assert_eq!(
-            records[1]._name,
+            records[1].name,
             "light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]
@@ -266,7 +266,7 @@ mod tests {
 
         // Test third record
         assert_eq!(
-            records[2]._name,
+            records[2].name,
             "heavy_chain_2 Murine IgG heavy chain variable region"
         );
         assert!(records[2]
@@ -276,7 +276,7 @@ mod tests {
 
         // Test fourth record
         assert_eq!(
-            records[3]._name,
+            records[3].name,
             "light_chain_2 Human lambda light chain variable region"
         );
         assert!(records[3]
@@ -295,7 +295,7 @@ mod tests {
 
         // Test first record
         assert_eq!(
-            records[0]._name,
+            records[0].name,
             "heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
@@ -307,7 +307,7 @@ mod tests {
 
         // Test second record
         assert_eq!(
-            records[1]._name,
+            records[1].name,
             "light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]
@@ -317,7 +317,7 @@ mod tests {
 
         // Test third record
         assert_eq!(
-            records[2]._name,
+            records[2].name,
             "heavy_chain_2 Murine IgG heavy chain variable region"
         );
         assert!(records[2]
@@ -336,7 +336,7 @@ mod tests {
 
         // Test that gzipped content matches uncompressed content
         assert_eq!(
-            records[0]._name,
+            records[0].name,
             "heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(records[0]._quality, None);
 
         assert_eq!(
-            records[1]._name,
+            records[1].name,
             "light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]
@@ -364,7 +364,7 @@ mod tests {
 
         // Test that gzipped content matches uncompressed content
         assert_eq!(
-            records[0]._name,
+            records[0].name,
             "heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
@@ -373,7 +373,7 @@ mod tests {
         assert!(records[0]._quality.is_some());
 
         assert_eq!(
-            records[1]._name,
+            records[1].name,
             "light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]

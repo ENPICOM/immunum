@@ -53,6 +53,11 @@ impl Annotator {
 
     /// Number a paired sequence using the pre-configured schemes to find multiple chains
     pub fn number_paired_sequence(&self, sequence: &str) -> Vec<Result<AnnotationResult, String>> {
+        self.number_paired_sequence_with_id(sequence, "input_sequence".to_string())
+    }
+
+    /// Number a paired sequence with a specified sequence ID to find multiple chains
+    pub fn number_paired_sequence_with_id(&self, sequence: &str, sequence_id: String) -> Vec<Result<AnnotationResult, String>> {
         if sequence.is_empty() {
             return vec![Err("Empty sequence provided".to_string())];
         }
@@ -67,7 +72,7 @@ impl Annotator {
         };
 
         // Use find_all_chains to find multiple chains in the sequence
-        find_all_chains(sequence_bytes, scheme_refs)
+        find_all_chains(sequence_bytes, scheme_refs, sequence_id)
             .into_iter()
             .map(|result| result.map_err(|e| e.to_string()))
             .collect()
@@ -88,7 +93,28 @@ impl Annotator {
             self.schemes.iter().collect()
         };
 
-        match find_highest_identity_chain(sequence_bytes, &scheme_refs) {
+        match find_highest_identity_chain(sequence_bytes, &scheme_refs, "input_sequence".to_string()) {
+            Ok(output) => Ok(output),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    /// Number a single sequence with a specified sequence ID
+    pub fn number_sequence_with_id(&self, sequence: &str, sequence_id: String) -> Result<AnnotationResult, String> {
+        if sequence.is_empty() {
+            return Err("Empty sequence provided".to_string());
+        }
+
+        let sequence_bytes = sequence.as_bytes();
+
+        // Apply prefiltering if enabled, otherwise use all schemes
+        let scheme_refs: Vec<&NumberingScheme> = if self.use_prefiltering {
+            apply_prefiltering(sequence_bytes, &self.schemes)
+        } else {
+            self.schemes.iter().collect()
+        };
+
+        match find_highest_identity_chain(sequence_bytes, &scheme_refs, sequence_id) {
             Ok(output) => Ok(output),
             Err(e) => Err(e.to_string()),
         }
@@ -104,12 +130,14 @@ impl Annotator {
             // Use rayon for parallel processing
             sequences
                 .par_iter()
-                .map(|seq| self.number_sequence(seq))
+                .enumerate()
+                .map(|(i, seq)| self.number_sequence_with_id(seq, format!("sequence_{}", i + 1)))
                 .collect()
         } else {
             sequences
                 .iter()
-                .map(|seq| self.number_sequence(seq))
+                .enumerate()
+                .map(|(i, seq)| self.number_sequence_with_id(seq, format!("sequence_{}", i + 1)))
                 .collect()
         }
     }
@@ -137,16 +165,16 @@ impl Annotator {
             records
                 .into_par_iter()
                 .map(|record| {
-                    let result = self.number_paired_sequence(&record.sequence);
-                    (record._name, result)
+                    let result = self.number_paired_sequence_with_id(&record.sequence, record.name.clone());
+                    (record.name, result)
                 })
                 .collect()
         } else {
             records
                 .into_iter()
                 .map(|record| {
-                    let result = self.number_paired_sequence(&record.sequence);
-                    (record._name, result)
+                    let result = self.number_paired_sequence_with_id(&record.sequence, record.name.clone());
+                    (record.name, result)
                 })
                 .collect()
         };

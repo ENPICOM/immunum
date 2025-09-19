@@ -6,13 +6,14 @@ use crate::result::AnnotationResult;
 pub(crate) fn find_highest_identity_chain(
     query_sequence: &[u8],
     numbering_schemes: &Vec<&NumberingScheme>,
+    sequence_id: String,
 ) -> Result<AnnotationResult, &'static str> {
     let mut highest_identity: f64 = -0.1;
     let mut best_output: Result<AnnotationResult, &'static str> =
         Err("No numbering schemes passed");
 
     for scheme in numbering_schemes {
-        let output: AnnotationResult = scheme.number_sequence(query_sequence);
+        let output: AnnotationResult = scheme.number_sequence(query_sequence, sequence_id.clone());
         if output.identity > highest_identity {
             highest_identity = output.identity;
             best_output = Ok(output);
@@ -98,6 +99,7 @@ pub(crate) fn find_highest_identity_chain(
 pub fn find_all_chains(
     query_sequence: &[u8],
     numbering_schemes: Vec<&NumberingScheme>,
+    sequence_id: String,
 ) -> Vec<Result<AnnotationResult, &'static str>> {
     let mut chains_found: Vec<Result<AnnotationResult, &str>> = Vec::new();
 
@@ -109,7 +111,7 @@ pub fn find_all_chains(
         let (current_sequence, current_start, current_end) = item;
 
         let numbering_result: Result<AnnotationResult, &str> =
-            find_highest_identity_chain(current_sequence, &numbering_schemes);
+            find_highest_identity_chain(current_sequence, &numbering_schemes, sequence_id.clone());
 
         match numbering_result {
             Ok(mut best_chain) => {
@@ -236,7 +238,7 @@ mod tests {
         schemes.push(&lambda_scheme);
         schemes.push(&kappa_scheme);
         schemes.push(&heavy_scheme);
-        let output = find_all_chains(seq, schemes);
+        let output = find_all_chains(seq, schemes, "test_multi_sequence".to_string());
         for o in output {
             let o = o.unwrap();
             println!(
@@ -262,7 +264,7 @@ mod tests {
         schemes.push(&kappa_scheme);
         schemes.push(&heavy_scheme);
 
-        let output = find_all_chains(seq, schemes);
+        let output = find_all_chains(seq, schemes, "test_multi_sequence".to_string());
         for o in output {
             println!("{:?}", o);
         }
@@ -292,21 +294,21 @@ mod tests {
         schemes.push(&heavy_scheme);
 
         assert_eq!(
-            find_highest_identity_chain(heavy_chain, &schemes)
+            find_highest_identity_chain(heavy_chain, &schemes, "test_heavy".to_string())
                 .expect("")
                 .chain,
             Chain::IGH
         );
 
         assert_eq!(
-            find_highest_identity_chain(kappa_chain, &schemes)
+            find_highest_identity_chain(kappa_chain, &schemes, "test_kappa".to_string())
                 .expect("")
                 .chain,
             Chain::IGK
         );
 
         assert_eq!(
-            find_highest_identity_chain(lambda_chain, &schemes)
+            find_highest_identity_chain(lambda_chain, &schemes, "test_lambda".to_string())
                 .expect("")
                 .chain,
             Chain::IGL

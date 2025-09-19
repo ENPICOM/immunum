@@ -21,6 +21,8 @@ pub enum OutputFormat {
 /// Result of numbering a sequence, containing all relevant information
 #[derive(Debug)]
 pub struct AnnotationResult {
+    /// Identifier for the sequence (from FASTA/FASTQ header or generated)
+    pub sequence_id: String,
     /// The original sequence that was numbered (as bytes for performance)
     pub sequence: Vec<u8>,
     /// The numbering for each position in the sequence
@@ -153,7 +155,8 @@ impl AnnotationResult {
     /// Convert to TSV format (tab-separated values)
     fn to_tsv(&self) -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            self.sequence_id,
             self.sequence_string(),
             self.numbers.join(","),
             self.identity,
@@ -173,7 +176,8 @@ impl AnnotationResult {
     /// Convert to simple format (identity and numbering only)
     fn to_simple(&self) -> String {
         format!(
-            "Identity: {:.2}%, Numbering: {:?}",
+            "Sequence ID: {}, Identity: {:.2}%, Numbering: {:?}",
+            self.sequence_id,
             self.identity * 100.0,
             self.numbers
         )
@@ -182,7 +186,8 @@ impl AnnotationResult {
     /// Convert to JSON format
     fn to_json(&self) -> String {
         format!(
-            r#"{{"sequence": "{}", "numbers": {:?}, "scheme": "{:?}", "chain": "{:?}", "identity": {:.3}, "regions": {{"cdr1": "{}", "cdr2": "{}", "cdr3": "{}", "fr1": "{}", "fr2": "{}", "fr3": "{}", "fr4": "{}"}}, "start": {}, "end": {}}}"#,
+            r#"{{"sequence_id": "{}", "sequence": "{}", "numbers": {:?}, "scheme": "{:?}", "chain": "{:?}", "identity": {:.3}, "regions": {{"cdr1": "{}", "cdr2": "{}", "cdr3": "{}", "fr1": "{}", "fr2": "{}", "fr3": "{}", "fr4": "{}"}}, "start": {}, "end": {}}}"#,
+            self.sequence_id,
             self.sequence_string(),
             self.numbers,
             self.scheme,
@@ -203,7 +208,8 @@ impl AnnotationResult {
     /// Convert to CSV format
     fn to_csv(&self) -> String {
         format!(
-            "\"{}\",\"{}\",{:.3},\"{:?}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{}\n",
+            "\"{}\",\"{}\",\"{}\",{:.3},\"{:?}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},{}\n",
+            self.sequence_id,
             self.sequence_string(),
             self.numbers.join(","),
             self.identity,
@@ -248,8 +254,8 @@ impl OutputFormat {
     /// Get the header line for tabular formats
     pub fn header(&self) -> Option<String> {
         match self {
-            OutputFormat::Tsv => Some("Sequence\tNumbering\tIdentity\tChain\tCDR1\tCDR2\tCDR3\tFR1\tFR2\tFR3\tFR4\tStart\tEnd".to_string()),
-            OutputFormat::Csv => Some("Sequence,Numbering,Identity,Chain,CDR1,CDR2,CDR3,FR1,FR2,FR3,FR4,Start,End".to_string()),
+            OutputFormat::Tsv => Some("SequenceID\tSequence\tNumbering\tIdentity\tChain\tCDR1\tCDR2\tCDR3\tFR1\tFR2\tFR3\tFR4\tStart\tEnd".to_string()),
+            OutputFormat::Csv => Some("SequenceID,Sequence,Numbering,Identity,Chain,CDR1,CDR2,CDR3,FR1,FR2,FR3,FR4,Start,End".to_string()),
             OutputFormat::Simple | OutputFormat::Json => None,
         }
     }
@@ -315,6 +321,7 @@ mod tests {
     #[test]
     fn test_annotation_result_creation() {
         let result = AnnotationResult {
+            sequence_id: "test_sequence".to_string(),
             sequence: b"ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG".to_vec(),
             numbers: vec!["1".to_string(), "2".to_string(), "3".to_string()],
             scheme: Scheme::IMGT,
@@ -347,6 +354,7 @@ mod tests {
     #[test]
     fn test_region_sequence_extraction() {
         let result = AnnotationResult {
+            sequence_id: "test_sequence_2".to_string(),
             sequence: b"ATCGATCG".to_vec(),
             numbers: vec!["1".to_string(), "2".to_string()],
             scheme: Scheme::IMGT,
@@ -421,6 +429,7 @@ mod tests {
 
     fn create_test_result() -> AnnotationResult {
         AnnotationResult {
+            sequence_id: "helper_test_sequence".to_string(),
             sequence: b"ATCGATCG".to_vec(),
             numbers: vec!["1".to_string(), "2".to_string(), "3".to_string()],
             scheme: Scheme::IMGT,

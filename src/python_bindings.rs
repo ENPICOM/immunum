@@ -15,6 +15,11 @@ pub struct PyAnnotationResult {
 #[pymethods]
 impl PyAnnotationResult {
     #[getter]
+    pub fn sequence_id(&self) -> String {
+        self.inner.sequence_id.clone()
+    }
+
+    #[getter]
     pub fn sequence(&self) -> String {
         self.inner.sequence_string()
     }

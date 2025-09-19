@@ -141,7 +141,7 @@ fn main() {
         let output_writer = Arc::clone(&output_writer);
         if cli.paired {
             // Use paired sequence numbering to find multiple chains
-            let results = annotator.number_paired_sequence(&record.sequence);
+            let results = annotator.number_paired_sequence_with_id(&record.sequence, record._name.clone());
             if results.is_empty() {
                 eprintln!("No chains found in sequence '{}'", record._name);
                 return;
@@ -177,7 +177,7 @@ fn main() {
             }
         } else {
             // Use single sequence numbering (original behavior)
-            match annotator.number_sequence(&record.sequence) {
+            match annotator.number_sequence_with_id(&record.sequence, record._name.clone()) {
                 Ok(result) => {
                     let mut writer = output_writer.lock().unwrap();
                     writeln!(writer, "{}", result.to_string(cli.format.clone()))

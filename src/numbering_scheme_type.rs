@@ -221,7 +221,7 @@ impl NumberingScheme {
         (query_gap_penalty, consensus_gap_penalty)
     }
     /// numbers sequence, returns AnnotationResult
-    pub(crate) fn number_sequence(&self, query_sequence: &[u8]) -> AnnotationResult {
+    pub(crate) fn number_sequence(&self, query_sequence: &[u8], sequence_id: String) -> AnnotationResult {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
         // give gap positions correct names as defined by the numbering scheme
@@ -242,6 +242,7 @@ impl NumberingScheme {
 
         // Create result with region definitions
         AnnotationResult {
+            sequence_id,
             sequence: query_sequence.to_vec(),
             numbers: numbering,
             scheme: self.scheme_type,

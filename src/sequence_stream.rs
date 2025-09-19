@@ -70,7 +70,7 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 1);
-        assert_eq!(records[0]._name, "INPUT SEQUENCE");
+        assert_eq!(records[0].name, "INPUT SEQUENCE");
         assert_eq!(records[0].sequence, sequence);
         assert_eq!(records[0]._quality, None);
     }
