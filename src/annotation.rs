@@ -34,7 +34,7 @@ pub(crate) fn find_highest_identity_chain(
 // ) {
 //     // Read in fasta
 //     let reader = from_path(fasta_file).unwrap();
-//     let records: Vec<FastxRecord> = reader.collect::<Result<Vec<FastxRecord>, _>>().unwrap();
+//     let records: Vec<SequenceRecord> = reader.collect::<Result<Vec<SequenceRecord>, _>>().unwrap();
 
 //     // get schemes dependent on selected numbering method and chains
 //     let schemes: Vec<NumberingScheme> = chains

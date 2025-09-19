@@ -1,6 +1,6 @@
 use crate::annotation::{find_all_chains, find_highest_identity_chain};
 use crate::constants::{get_scoring_params, ScoringParams};
-use crate::fastx::{from_path, FastxRecord};
+use crate::sequence::{from_path, SequenceRecord};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::prefiltering::apply_prefiltering;
 use crate::result::AnnotationResult;
@@ -152,8 +152,8 @@ impl Annotator {
         // Read sequences from file
         let reader = from_path(file_path).map_err(|e| format!("Error reading file: {}", e))?;
 
-        let records: Vec<FastxRecord> = reader
-            .collect::<Result<Vec<FastxRecord>, _>>()
+        let records: Vec<SequenceRecord> = reader
+            .collect::<Result<Vec<SequenceRecord>, _>>()
             .map_err(|e| format!("Error parsing file: {}", e))?;
 
         if records.is_empty() {
