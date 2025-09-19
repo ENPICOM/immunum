@@ -141,9 +141,9 @@ fn main() {
         let output_writer = Arc::clone(&output_writer);
         if cli.paired {
             // Use paired sequence numbering to find multiple chains
-            let results = annotator.number_paired_sequence_with_id(&record.sequence, record._name.clone());
+            let results = annotator.number_paired_sequence_with_id(&record.sequence, record.name.clone());
             if results.is_empty() {
-                eprintln!("No chains found in sequence '{}'", record._name);
+                eprintln!("No chains found in sequence '{}'", record.name);
                 return;
             }
 
@@ -152,9 +152,9 @@ fn main() {
                     Ok(annotation_result) => {
                         // Add chain index to sequence name for multiple results
                         let _chain_name = if chain_index > 0 {
-                            format!("{}_chain_{}", record._name, chain_index + 1)
+                            format!("{}_chain_{}", record.name, chain_index + 1)
                         } else {
-                            record._name.clone()
+                            record.name.clone()
                         };
                         // Write to output with thread-safe access
                         let mut writer = output_writer.lock().unwrap();
@@ -169,7 +169,7 @@ fn main() {
                         eprintln!(
                             "Error numbering chain {} in sequence '{}': {}",
                             chain_index + 1,
-                            record._name,
+                            record.name,
                             e
                         );
                     }
@@ -177,14 +177,14 @@ fn main() {
             }
         } else {
             // Use single sequence numbering (original behavior)
-            match annotator.number_sequence_with_id(&record.sequence, record._name.clone()) {
+            match annotator.number_sequence_with_id(&record.sequence, record.name.clone()) {
                 Ok(result) => {
                     let mut writer = output_writer.lock().unwrap();
                     writeln!(writer, "{}", result.to_string(cli.format.clone()))
                         .unwrap();
                 }
                 Err(e) => {
-                    eprintln!("Error numbering sequence '{}': {}", record._name, e);
+                    eprintln!("Error numbering sequence '{}': {}", record.name, e);
                 }
             }
         }

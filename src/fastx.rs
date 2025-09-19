@@ -17,15 +17,13 @@ pub enum FastxError {
 pub struct FastxRecord {
     pub name: String,
     pub sequence: String,
-    pub _quality: Option<String>, // TODO Not used at the moment, should we keep it?
 }
 
 impl FastxRecord {
-    pub fn new(name: String, sequence: String, quality: Option<String>) -> Self {
+    pub fn new(name: String, sequence: String) -> Self {
         Self {
             name,
             sequence,
-            _quality: quality,
         }
     }
 }
@@ -61,53 +59,38 @@ impl<R: BufRead> FastxReader<R> {
         })
     }
 
-    fn read_fasta_record(&mut self) -> Result<Option<FastxRecord>, FastxError> {
-        if self.finished || self.line_buffer.is_empty() {
-            return Ok(None);
+    fn prepare_next_record(&mut self) -> Result<(), FastxError> {
+        self.line_buffer.clear();
+        if self.reader.read_line(&mut self.line_buffer)? == 0 {
+            self.finished = true;
         }
+        Ok(())
+    }
 
-        // Parse header line (should start with '>')
-        if !self.line_buffer.starts_with('>') {
-            return Err(FastxError::InvalidFormat(
-                "FASTA header must start with '>'".to_string(),
-            ));
-        }
-
-        let name = self.line_buffer[1..].trim().to_string();
+    fn read_fasta_sequence(&mut self) -> Result<String, FastxError> {
         let mut sequence = String::new();
 
         // Read sequence lines until next header or EOF
-        self.line_buffer.clear();
-        while self.reader.read_line(&mut self.line_buffer)? > 0 {
-            if self.line_buffer.starts_with('>') {
-                // Found next record, don't consume this line
+        loop {
+            self.line_buffer.clear();
+            if self.reader.read_line(&mut self.line_buffer)? == 0 {
+                // End of file
+                self.finished = true;
                 break;
             }
+
+            if self.line_buffer.starts_with('>') {
+                // Found next record header, keep it in buffer for next iteration
+                break;
+            }
+
             sequence.push_str(self.line_buffer.trim());
-            self.line_buffer.clear();
         }
 
-        if self.line_buffer.is_empty() {
-            self.finished = true;
-        }
-
-        Ok(Some(FastxRecord::new(name, sequence, None)))
+        Ok(sequence)
     }
 
-    fn read_fastq_record(&mut self) -> Result<Option<FastxRecord>, FastxError> {
-        if self.finished || self.line_buffer.is_empty() {
-            return Ok(None);
-        }
-
-        // Parse header line (should start with '@')
-        if !self.line_buffer.starts_with('@') {
-            return Err(FastxError::InvalidFormat(
-                "FASTQ header must start with '@'".to_string(),
-            ));
-        }
-
-        let name = self.line_buffer[1..].trim().to_string();
-
+    fn read_fastq_sequence(&mut self) -> Result<String, FastxError> {
         // Read sequence line
         self.line_buffer.clear();
         if self.reader.read_line(&mut self.line_buffer)? == 0 {
@@ -117,53 +100,55 @@ impl<R: BufRead> FastxReader<R> {
         }
         let sequence = self.line_buffer.trim().to_string();
 
-        // Read separator line (should start with '+')
+        // Read and skip separator line (no validation)
         self.line_buffer.clear();
         if self.reader.read_line(&mut self.line_buffer)? == 0 {
             return Err(FastxError::InvalidFormat(
                 "Unexpected end of file while reading separator".to_string(),
             ));
         }
-        if !self.line_buffer.starts_with('+') {
-            return Err(FastxError::InvalidFormat(
-                "FASTQ separator must start with '+'".to_string(),
-            ));
-        }
 
-        // Read quality line
+        // Read and skip quality line (no validation)
         self.line_buffer.clear();
         if self.reader.read_line(&mut self.line_buffer)? == 0 {
             return Err(FastxError::InvalidFormat(
                 "Unexpected end of file while reading quality".to_string(),
             ));
         }
-        let quality = self.line_buffer.trim().to_string();
 
-        // Prepare for next record
-        self.line_buffer.clear();
-        if self.reader.read_line(&mut self.line_buffer)? == 0 {
-            self.finished = true;
+        Ok(sequence)
+    }
+
+    fn read_record(&mut self) -> Result<Option<FastxRecord>, FastxError> {
+        if self.finished || self.line_buffer.is_empty() {
+            return Ok(None);
         }
 
-        Ok(Some(FastxRecord::new(name, sequence, Some(quality))))
+        // Extract name without header validation (trust the format detection)
+        let name = self.line_buffer[1..].trim().to_string();
+
+        // Read sequence using format-specific method
+        let sequence = if self.is_fastq {
+            self.read_fastq_sequence()?
+        } else {
+            self.read_fasta_sequence()?
+        };
+
+        // Prepare for next record (only needed for FASTQ since FASTA handles it internally)
+        if self.is_fastq {
+            self.prepare_next_record()?;
+        }
+
+        Ok(Some(FastxRecord::new(name, sequence)))
     }
+
 }
 
 impl<R: BufRead> Iterator for FastxReader<R> {
     type Item = Result<FastxRecord, FastxError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.finished {
-            return None;
-        }
-
-        let result = if self.is_fastq {
-            self.read_fastq_record()
-        } else {
-            self.read_fasta_record()
-        };
-
-        match result {
+        match self.read_record() {
             Ok(Some(record)) => Some(Ok(record)),
             Ok(None) => None,
             Err(e) => Some(Err(e)),
@@ -213,7 +198,6 @@ mod tests {
         assert_eq!(records.len(), 2);
         assert_eq!(records[0].name, "seq1 description");
         assert_eq!(records[0].sequence, "ATCGTGCA");
-        assert_eq!(records[0]._quality, None);
         assert_eq!(records[1].name, "seq2");
         assert_eq!(records[1].sequence, "GGCC");
     }
@@ -230,10 +214,8 @@ mod tests {
         assert_eq!(records.len(), 2);
         assert_eq!(records[0].name, "seq1");
         assert_eq!(records[0].sequence, "ATCG");
-        assert_eq!(records[0]._quality, Some("IIII".to_string()));
         assert_eq!(records[1].name, "seq2");
         assert_eq!(records[1].sequence, "GGCC");
-        assert_eq!(records[1]._quality, Some("!!!!".to_string()));
     }
 
     #[test]
@@ -252,7 +234,6 @@ mod tests {
         assert!(records[0]
             .sequence
             .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
-        assert_eq!(records[0]._quality, None);
 
         // Test second record
         assert_eq!(
@@ -262,7 +243,6 @@ mod tests {
         assert!(records[1]
             .sequence
             .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
-        assert_eq!(records[1]._quality, None);
 
         // Test third record
         assert_eq!(
@@ -272,7 +252,6 @@ mod tests {
         assert!(records[2]
             .sequence
             .starts_with("EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
-        assert_eq!(records[2]._quality, None);
 
         // Test fourth record
         assert_eq!(
@@ -282,7 +261,6 @@ mod tests {
         assert!(records[3]
             .sequence
             .starts_with("QSALTQPASVSGSPGQSITISCTGTSSDVGG"));
-        assert_eq!(records[3]._quality, None);
     }
 
     #[test]
@@ -301,9 +279,6 @@ mod tests {
         assert!(records[0]
             .sequence
             .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
-        assert!(records[0]._quality.is_some());
-        let quality = records[0]._quality.as_ref().unwrap();
-        assert!(quality.chars().all(|c| c == 'I'));
 
         // Test second record
         assert_eq!(
@@ -313,7 +288,6 @@ mod tests {
         assert!(records[1]
             .sequence
             .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
-        assert!(records[1]._quality.is_some());
 
         // Test third record
         assert_eq!(
@@ -323,7 +297,6 @@ mod tests {
         assert!(records[2]
             .sequence
             .starts_with("EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
-        assert!(records[2]._quality.is_some());
     }
 
     #[test]
@@ -342,7 +315,6 @@ mod tests {
         assert!(records[0]
             .sequence
             .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
-        assert_eq!(records[0]._quality, None);
 
         assert_eq!(
             records[1].name,
@@ -351,7 +323,6 @@ mod tests {
         assert!(records[1]
             .sequence
             .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
-        assert_eq!(records[1]._quality, None);
     }
 
     #[test]
@@ -370,7 +341,6 @@ mod tests {
         assert!(records[0]
             .sequence
             .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
-        assert!(records[0]._quality.is_some());
 
         assert_eq!(
             records[1].name,
@@ -379,7 +349,6 @@ mod tests {
         assert!(records[1]
             .sequence
             .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
-        assert!(records[1]._quality.is_some());
     }
 
     #[test]

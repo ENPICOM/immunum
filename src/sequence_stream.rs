@@ -41,7 +41,6 @@ impl SequenceStream {
         let record = FastxRecord::new(
             "INPUT SEQUENCE".to_string(),
             sequence.to_string(),
-            None, // No quality scores for direct sequence input
         );
         Self {
             inner: Box::new(std::iter::once(Ok(record))),
@@ -72,7 +71,6 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].name, "INPUT SEQUENCE");
         assert_eq!(records[0].sequence, sequence);
-        assert_eq!(records[0]._quality, None);
     }
 
     #[test]
