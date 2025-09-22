@@ -458,7 +458,7 @@ impl SequenceStream {
 
     /// Creates a SequenceStream from a direct sequence string
     fn from_sequence(sequence: &str) -> Self {
-        let record = SequenceRecord::new("INPUT SEQUENCE".to_string(), sequence.to_string());
+        let record = SequenceRecord::new("sequence_1".to_string(), sequence.to_string());
         Self {
             inner: Box::new(std::iter::once(Ok(record))),
         }

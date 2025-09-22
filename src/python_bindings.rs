@@ -113,12 +113,11 @@ impl PyAnnotator {
         }
     }
 
-    #[pyo3(signature = (sequence, sequence_id="input".to_string()))]
     pub fn number_sequence(
         &self,
         sequence: &str,
-        sequence_id: String,
     ) -> PyResult<PyAnnotationResult> {
+        let sequence_id = "sequence_1".to_string();
         match self.inner.number_sequence(sequence, sequence_id) {
             Ok(result) => Ok(PyAnnotationResult { inner: result }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
