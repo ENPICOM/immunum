@@ -21,10 +21,7 @@ pub struct SequenceRecord {
 
 impl SequenceRecord {
     pub fn new(name: String, sequence: String) -> Self {
-        Self {
-            name,
-            sequence,
-        }
+        Self { name, sequence }
     }
 }
 
@@ -141,7 +138,6 @@ impl<R: BufRead> SequenceReader<R> {
 
         Ok(Some(SequenceRecord::new(name, sequence)))
     }
-
 }
 
 impl<R: BufRead> Iterator for SequenceReader<R> {
@@ -162,7 +158,9 @@ fn is_gzipped(path: &Path) -> bool {
 }
 
 /// Creates a SequenceReader from a file path, automatically handling gzipped files
-pub fn from_path<P: AsRef<Path>>(path: P) -> Result<SequenceReader<Box<dyn BufRead>>, SequenceError> {
+pub fn from_path<P: AsRef<Path>>(
+    path: P,
+) -> Result<SequenceReader<Box<dyn BufRead>>, SequenceError> {
     let path = path.as_ref();
     let file = File::open(path)?;
 
@@ -460,10 +458,7 @@ impl SequenceStream {
 
     /// Creates a SequenceStream from a direct sequence string
     fn from_sequence(sequence: &str) -> Self {
-        let record = SequenceRecord::new(
-            "INPUT SEQUENCE".to_string(),
-            sequence.to_string(),
-        );
+        let record = SequenceRecord::new("INPUT SEQUENCE".to_string(), sequence.to_string());
         Self {
             inner: Box::new(std::iter::once(Ok(record))),
         }

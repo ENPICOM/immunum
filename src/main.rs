@@ -3,7 +3,6 @@ mod annotator;
 mod cli;
 mod consensus_scoring;
 mod constants;
-mod sequence;
 mod insertion_numbering;
 mod needleman_wunsch;
 mod numbering_scheme_type;
@@ -11,6 +10,7 @@ mod prefiltering;
 mod result;
 mod schemes;
 mod scoring_matrix;
+mod sequence;
 mod types;
 
 use clap::Parser;
@@ -179,8 +179,7 @@ fn main() {
             match annotator.number_sequence(&record.sequence, record.name.clone()) {
                 Ok(result) => {
                     let mut writer = output_writer.lock().unwrap();
-                    writeln!(writer, "{}", result.to_string(cli.format.clone()))
-                        .unwrap();
+                    writeln!(writer, "{}", result.to_string(cli.format.clone())).unwrap();
                 }
                 Err(e) => {
                     eprintln!("Error numbering sequence '{}': {}", record.name, e);

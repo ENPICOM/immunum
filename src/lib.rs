@@ -2,7 +2,6 @@ pub mod annotation;
 pub mod annotator;
 pub mod consensus_scoring;
 pub mod constants;
-pub mod sequence;
 pub mod insertion_numbering;
 pub mod needleman_wunsch;
 pub mod numbering_scheme_type;
@@ -10,6 +9,7 @@ pub mod prefiltering;
 pub mod result;
 pub mod schemes;
 pub mod scoring_matrix;
+pub mod sequence;
 pub mod types;
 // Binding modules
 #[cfg(feature = "python")]

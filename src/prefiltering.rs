@@ -42,8 +42,10 @@ pub fn run_pre_scan(
     for terminal_schemes in all_terminal_schemes {
         let (n_terminal, c_terminal) = terminal_schemes;
         // run alignment for n and c terminal
-        let n_terminal_output: AnnotationResult = n_terminal.number_sequence(query_sequence, "prefilter_n".to_string());
-        let c_terminal_output: AnnotationResult = c_terminal.number_sequence(query_sequence, "prefilter_c".to_string());
+        let n_terminal_output: AnnotationResult =
+            n_terminal.number_sequence(query_sequence, "prefilter_n".to_string());
+        let c_terminal_output: AnnotationResult =
+            c_terminal.number_sequence(query_sequence, "prefilter_c".to_string());
 
         // calculate combined identity
 

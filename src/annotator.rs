@@ -1,10 +1,10 @@
 use crate::annotation::{find_all_chains, find_highest_identity_chain};
 use crate::constants::{get_scoring_params, ScoringParams};
-use crate::sequence::{from_path, SequenceRecord};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::prefiltering::apply_prefiltering;
 use crate::result::AnnotationResult;
 use crate::schemes::get_scheme;
+use crate::sequence::{from_path, SequenceRecord};
 use crate::types::{Chain, Scheme};
 use rayon::prelude::*;
 
@@ -52,7 +52,11 @@ impl Annotator {
     }
 
     /// Number a paired sequence using the pre-configured schemes to find multiple chains
-    pub fn number_paired_sequence(&self, sequence: &str, sequence_id: String) -> Vec<Result<AnnotationResult, String>> {
+    pub fn number_paired_sequence(
+        &self,
+        sequence: &str,
+        sequence_id: String,
+    ) -> Vec<Result<AnnotationResult, String>> {
         if sequence.is_empty() {
             return vec![Err("Empty sequence provided".to_string())];
         }
@@ -74,7 +78,11 @@ impl Annotator {
     }
 
     /// Number a single sequence using the pre-configured schemes
-    pub fn number_sequence(&self, sequence: &str, sequence_id: String) -> Result<AnnotationResult, String> {
+    pub fn number_sequence(
+        &self,
+        sequence: &str,
+        sequence_id: String,
+    ) -> Result<AnnotationResult, String> {
         if sequence.is_empty() {
             return Err("Empty sequence provided".to_string());
         }
