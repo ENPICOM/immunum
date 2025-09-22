@@ -102,6 +102,7 @@ impl Annotator {
     }
 
     /// Number multiple sequences, optionally in parallel
+    #[allow(dead_code)]  // Used in python/wasm features
     pub fn number_sequences(
         &self,
         sequences: &[String],
@@ -124,6 +125,7 @@ impl Annotator {
     }
 
     /// Process sequences from a FASTA/FASTQ file and return results with sequence names
+    #[allow(dead_code)]  // Used in python/wasm features
     pub fn number_file(&self, file_path: &str, parallel: bool) -> FileProcessingResult {
         // Check if input file exists
         if !std::path::Path::new(file_path).exists() {
