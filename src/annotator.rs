@@ -1,5 +1,4 @@
-use crate::annotation::{find_all_chains, find_highest_identity_chain};
-use crate::constants::{get_scoring_params, ScoringParams};
+use crate::constants::{get_scoring_params, ScoringParams, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::prefiltering::apply_prefiltering;
 use crate::result::AnnotationResult;
@@ -71,7 +70,7 @@ impl Annotator {
         };
 
         // Use find_all_chains to find multiple chains in the sequence
-        find_all_chains(sequence_bytes, scheme_refs, sequence_id)
+        self.find_all_chains(sequence_bytes, scheme_refs, sequence_id)
             .into_iter()
             .map(|result| result.map_err(|e| e.to_string()))
             .collect()
@@ -96,7 +95,7 @@ impl Annotator {
             self.schemes.iter().collect()
         };
 
-        match find_highest_identity_chain(sequence_bytes, &scheme_refs, sequence_id) {
+        match self.find_highest_identity_chain(sequence_bytes, &scheme_refs, sequence_id) {
             Ok(output) => Ok(output),
             Err(e) => Err(e.to_string()),
         }
@@ -162,6 +161,91 @@ impl Annotator {
         };
 
         Ok(results)
+    }
+
+    /// Runs alignment of given schemes on sequence and selects one with highest identity
+    fn find_highest_identity_chain(
+        &self,
+        query_sequence: &[u8],
+        numbering_schemes: &Vec<&NumberingScheme>,
+        sequence_id: String,
+    ) -> Result<AnnotationResult, &'static str> {
+        let mut highest_identity: f64 = -0.1;
+        let mut best_output: Result<AnnotationResult, &'static str> =
+            Err("No numbering schemes passed");
+
+        for scheme in numbering_schemes {
+            let output: AnnotationResult = scheme.number_sequence(query_sequence, sequence_id.clone());
+            if output.identity > highest_identity {
+                highest_identity = output.identity;
+                best_output = Ok(output);
+            }
+        }
+        best_output
+    }
+
+    /// Attempts to find all antibody chains in a sequence
+    fn find_all_chains(
+        &self,
+        query_sequence: &[u8],
+        numbering_schemes: Vec<&NumberingScheme>,
+        sequence_id: String,
+    ) -> Vec<Result<AnnotationResult, &'static str>> {
+        let mut chains_found: Vec<Result<AnnotationResult, &str>> = Vec::new();
+
+        let full_query_length: u32 = query_sequence.len() as u32;
+        let mut sequence_list: Vec<(&[u8], u32, u32)> = Vec::new();
+        sequence_list.push((query_sequence, 0u32, full_query_length - 1));
+
+        while let Some(item) = sequence_list.pop() {
+            let (current_sequence, current_start, current_end) = item;
+
+            let numbering_result: Result<AnnotationResult, &str> =
+                self.find_highest_identity_chain(current_sequence, &numbering_schemes, sequence_id.clone());
+
+            match numbering_result {
+                Ok(mut best_chain) => {
+                    if best_chain.identity > MINIMAL_CHAIN_IDENTITY {
+                        // split the remaining sequence, add sequences that are long enough to the list
+                        let front_sequence: &[u8] = &current_sequence[0..best_chain.start as usize];
+                        let end_sequence: &[u8] = &current_sequence[(best_chain.end as usize + 1)..];
+
+                        if front_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
+                            sequence_list.push((
+                                front_sequence,
+                                current_start,
+                                (current_start + best_chain.start - 1),
+                            ))
+                        }
+                        if end_sequence.len() > MINIMAL_CHAIN_LENGTH as usize {
+                            sequence_list.push((
+                                end_sequence,
+                                (current_start + best_chain.end + 1),
+                                current_end,
+                            ))
+                        }
+
+                        // set sequence to full original sequence
+                        best_chain.sequence = query_sequence.to_vec();
+                        best_chain.start += current_start;
+                        best_chain.end += current_start;
+
+                        // add gaps to front and end to match with length of original sequence
+                        let mut start_addition = vec![String::from("-"); current_start as usize];
+                        let end_addition =
+                            vec![String::from("-"); (full_query_length - current_end - 1) as usize];
+                        start_addition.extend(best_chain.numbers);
+                        start_addition.extend(end_addition);
+
+                        best_chain.numbers = start_addition;
+                        chains_found.push(Ok(best_chain));
+                    }
+                }
+                Err(e) => chains_found.push(Err::<AnnotationResult, &str>(e)),
+            }
+        }
+
+        chains_found
     }
 }
 
@@ -328,5 +412,138 @@ mod tests {
 
         // Clean up
         std::fs::remove_file(test_file_path).ok();
+    }
+
+    #[test]
+    fn multi_sequence_finall_all() {
+        let seq = "PLIIITGDAWWGSNQPPKDRQQQHCRVKMDELANPVASEQSYVLTQPPSVSVSPGQTARITCSGDKLGDKYASWYQQKPGQSPVLVIYQDNKRPSEIPARFSGSNSGNTATLTISGAQAMDEADYYCQAWDSNTGVFGTGTKLTVLGGSSRSSSSGGGGSGGGGVLTQPPSVSAAPGQKVTISCSGSSSNIGNNFVSWYQQRPGTAPSLLIYETNKRPSGIPDRFSGSKSATSATLAITGLQTGDEADYYCATWAASLVFGTGTKVIVSGGSSRSSSSGGGGSGGGGYELTQPPSVSVSPGQTATITCSGDKVASKNVCWYQVKPGQSPEVVMYENYKRPSGIPDRFSGSKSGSTATLTIRGTQATDEADYYCQVWDSFSTFVFGSGTQVTVLGGSSRSSSSGGGGSGGGGYELTQPPSVSVSPGQTASITCSGDKLGNKFTSWYQRKPGQSPVLVIYQDTKRPSGIPERFSGSTSGNTATLTISGTQAMDEADYYCQAWDSSTAWVFGGGTKLEVGGSSRSSSSGGGGSGGGGSYVLTQPPSASGTPGQRVAISCSGSNSNIGSNTVHWYQQLPGAAPKLLIYSNNQRPSGVPDRFSGSNSGTSASLAISRLQSEDEADYYCAAWDDSLNGVVFGGGTKVTVLQIDCEC".as_bytes();
+
+        let annotator = Annotator::new(
+            Scheme::KABAT,
+            vec![Chain::IGL, Chain::IGK, Chain::IGH],
+            None,
+            None,
+        )
+        .unwrap();
+
+        let results = annotator.find_all_chains(seq, annotator.schemes.iter().collect(), "test_multi_sequence".to_string());
+        for o in results {
+            let o = o.unwrap();
+            println!(
+                "{} {} {} {:?}\n{}",
+                o.start,
+                o.end,
+                o.numbers.len(),
+                o.chain,
+                o.sequence_string()
+            );
+        }
+    }
+
+    #[test]
+    fn single_sequence_find_all() {
+        let seq = "VLTQSPGTLSLSPGETAIISCRTSQYGSLAWYQQRPGQAPRLVIYSGSTRAAGIPDRFSGSRWGPDYNLTISNLESGDFGVYYCQQYEFFGQGTKVQVDIKRTVAAPSVFIFPPSDEQLKSGTASVVCLLNNFYPREAKVQWKVDNALQSGNSQESVTEQDSKDSTYSLSSTLTLSKADYEKHKVYACEVTHQGLRSPVTKSFNRGEC".as_bytes();
+
+        let annotator = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGL],
+            None,
+            None,
+        )
+        .unwrap();
+
+        let annotator_kabat = Annotator::new(
+            Scheme::KABAT,
+            vec![Chain::IGK],
+            None,
+            None,
+        )
+        .unwrap();
+
+        let annotator_heavy = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGH],
+            None,
+            None,
+        )
+        .unwrap();
+
+        // Collect schemes from different annotators
+        let mut schemes: Vec<&NumberingScheme> = Vec::new();
+        schemes.extend(annotator.schemes.iter());
+        schemes.extend(annotator_kabat.schemes.iter());
+        schemes.extend(annotator_heavy.schemes.iter());
+
+        let results = annotator.find_all_chains(seq, schemes, "test_multi_sequence".to_string());
+        for o in results {
+            println!("{:?}", o);
+        }
+    }
+
+    #[test]
+    fn test_correct_chain_identification() {
+        let heavy_chain: &[u8] = "QVQLVQSGAVIKTPGSSVKISCRASGYNFRDYSIHWVRLIPDKGFEWIGWIKPLWGAVSYARQL\
+        QGRVSMTRQLSQDPDDPDWGVAYMEFSGLTPADTAEYFCVRRGSCDYCGDFPWQYWCQGTVVVVSSASTKGPSVFPLAPSSGGTAALGCLV\
+        KDYFPEPVTVSWNSGALTSGVHTFPAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
+            .as_bytes();
+        let lambda_chain: &[u8] = "SALTQPPSASGSLGQSVTISCTGTSSDVGGYNYVSWYQQHAGKAPKVIIYEVNKRPSGVPDRF\
+        SGSKSGNTASLTVSGLQAEDEADYYCSSYEGSDNFVFGTGTKVTVLGQPKANPTVTLFPPSSEELQANKATLVCLISDFYPGAVTVAWK\
+        ADGSPVKAGVETTKPSKQSNNKYAASSYLSLTPEQWKSHRSYSCQVTHEGSTVEKTVAPTECS"
+            .as_bytes();
+        let kappa_chain: &[u8] = "DIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTG\
+        SGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELKRADAAPTVSIFPPSSEQLTSGGASVVCFLNNFYPKDINVKWKIDGSE\
+        RQNGVLNSATDQDSKDSTYSMSSTLTLTKDEYERHNSYTCEATHKTSTSPIVKSFNRNEC"
+            .as_bytes();
+
+        let annotator_lambda = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGL],
+            None,
+            None,
+        )
+        .unwrap();
+
+        let annotator_kappa = Annotator::new(
+            Scheme::KABAT,
+            vec![Chain::IGK],
+            None,
+            None,
+        )
+        .unwrap();
+
+        let annotator_heavy = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGH],
+            None,
+            None,
+        )
+        .unwrap();
+
+        // Collect schemes from different annotators
+        let mut schemes: Vec<&NumberingScheme> = Vec::new();
+        schemes.extend(annotator_lambda.schemes.iter());
+        schemes.extend(annotator_kappa.schemes.iter());
+        schemes.extend(annotator_heavy.schemes.iter());
+
+        assert_eq!(
+            annotator_heavy.find_highest_identity_chain(heavy_chain, &schemes, "test_heavy".to_string())
+                .expect("")
+                .chain,
+            Chain::IGH
+        );
+
+        assert_eq!(
+            annotator_kappa.find_highest_identity_chain(kappa_chain, &schemes, "test_kappa".to_string())
+                .expect("")
+                .chain,
+            Chain::IGK
+        );
+
+        assert_eq!(
+            annotator_lambda.find_highest_identity_chain(lambda_chain, &schemes, "test_lambda".to_string())
+                .expect("")
+                .chain,
+            Chain::IGL
+        );
     }
 }

@@ -1,4 +1,3 @@
-mod annotation;
 mod annotator;
 mod cli;
 mod consensus_scoring;

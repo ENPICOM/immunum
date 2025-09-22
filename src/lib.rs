@@ -1,4 +1,3 @@
-pub mod annotation;
 pub mod annotator;
 pub mod consensus_scoring;
 pub mod constants;
