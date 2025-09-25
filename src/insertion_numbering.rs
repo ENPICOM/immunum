@@ -27,9 +27,8 @@ pub(crate) fn name_insertions(numbering: &mut Vec<String>, scheme: &Scheme) {
             latest_number = Some(item.to_string()); // set to latest
         } else if item == "-" {
             // gap
-            if first_number.is_some() && latest_number.is_some() {
+            if let (Some(_), Some(latest)) = (&first_number, &latest_number) {
                 // inside antibody
-                let latest = latest_number.as_ref().unwrap();
                 gaps_dict.entry(latest.to_string()).or_default().push(i); // add i
             }
         }

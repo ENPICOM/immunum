@@ -1,5 +1,5 @@
 use crate::consensus_scoring::calculate_scoring_matrix;
-use crate::constants::{get_consensus, get_scoring_params, ScoringParams};
+use crate::constants::{get_consensus, get_scoring_params};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{Chain, RegionRange, Scheme};
@@ -136,8 +136,8 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
     }
 }
 
-pub fn get_scheme(scheme: Scheme, chain: Chain, params: Option<ScoringParams>) -> NumberingScheme {
-    let scoring_params = params.unwrap_or_else(get_scoring_params);
+pub fn get_scheme(scheme: Scheme, chain: Chain) -> NumberingScheme {
+    let scoring_params = get_scoring_params();
     let consensus_amino_acids = get_consensus(scheme, chain);
     let config = get_scheme_config(&scheme, &chain);
 
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn scheme_creation() {
-        let scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
+        let scheme = get_scheme(Scheme::IMGT, Chain::IGH);
         let scoring_params = get_scoring_params();
         assert_eq!(scheme.gap_positions, vec![10, 73]);
         assert_eq!(scheme.restricted_sites().len(), 88);

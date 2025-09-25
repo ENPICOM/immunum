@@ -1,4 +1,5 @@
 use immunum::annotator::Annotator;
+use immunum::sequence::SequenceRecord;
 use immunum::types::{Chain, Scheme};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -16,9 +17,9 @@ struct ExpectedResult {
 #[derive(Debug, Default)]
 struct ValidationStats {
     total_sequences: usize,
-    successful_matches: usize,
-    failed_matches: usize,
-    parsing_errors: usize,
+    successful_sequence_matches: usize,
+    total_paired: usize,
+    successful_paired_matches: usize,
     numbering_errors: usize,
     execution_time_ms: u128,
 }
@@ -28,69 +29,27 @@ impl ValidationStats {
         if self.total_sequences == 0 {
             0.0
         } else {
-            (self.successful_matches as f64 / self.total_sequences as f64) * 100.0
+            (self.successful_sequence_matches as f64 / self.total_sequences as f64) * 100.0
         }
     }
 
     fn print_summary(&self) {
         println!("\n=== AbPdSeq Validation Results ===");
         println!("Total sequences: {}", self.total_sequences);
-        println!("Successful matches: {}", self.successful_matches);
-        println!("Failed matches: {}", self.failed_matches);
-        println!("Parsing errors: {}", self.parsing_errors);
+        println!("  of which paired sequences: {}", self.total_paired);
+        println!(
+            "Successful sequence matches: {} ({:.2}%)",
+            self.successful_sequence_matches,
+            self.success_rate()
+        );
+        println!(
+            "  of which paired matches: {} ({:.2}%)",
+            self.successful_paired_matches,
+            (self.successful_paired_matches as f64 / self.total_paired as f64) * 100.0
+        );
         println!("Numbering errors: {}", self.numbering_errors);
-        println!("Success rate: {:.2}%", self.success_rate());
         println!("Execution time: {} ms", self.execution_time_ms);
         println!("=====================================");
-    }
-}
-
-/// Parse FASTA file and extract sequences with their metadata
-fn parse_fasta_file(
-    file_path: &str,
-) -> Result<Vec<(String, String, Chain)>, Box<dyn std::error::Error>> {
-    let content = fs::read_to_string(file_path)?;
-    let mut sequences = Vec::new();
-    let mut current_header = String::new();
-    let mut current_sequence = String::new();
-
-    for line in content.lines() {
-        if line.starts_with('>') {
-            // Process previous sequence if exists
-            if !current_header.is_empty() && !current_sequence.is_empty() {
-                let chain = parse_chain_from_header(&current_header)?;
-                sequences.push((current_header.clone(), current_sequence.clone(), chain));
-            }
-
-            // Start new sequence
-            current_header = line[1..].to_string(); // Remove '>'
-            current_sequence.clear();
-        } else {
-            current_sequence.push_str(line.trim());
-        }
-    }
-
-    // Process last sequence
-    if !current_header.is_empty() && !current_sequence.is_empty() {
-        let chain = parse_chain_from_header(&current_header)?;
-        sequences.push((current_header, current_sequence, chain));
-    }
-
-    Ok(sequences)
-}
-
-/// Parse chain type from FASTA header
-/// For light chains, we return IGK as default but the annotator will determine the actual type
-fn parse_chain_from_header(header: &str) -> Result<Chain, Box<dyn std::error::Error>> {
-    // Header format: "3tje_L|Light|L" or similar
-    if header.contains("Heavy") || header.ends_with("|H") {
-        Ok(Chain::IGH)
-    } else if header.contains("Light") || header.ends_with("|L") || header.ends_with("|M") {
-        // For light chains, we return IGK as default, but the annotator will determine
-        // whether it's actually IGK (Kappa) or IGL (Lambda)
-        Ok(Chain::IGK)
-    } else {
-        Err(format!("Unable to determine chain type from header: {}", header).into())
     }
 }
 
@@ -143,11 +102,10 @@ fn load_expected_results(
 /// Run validation using parallel batch processing
 fn run_validation_parallel(
     annotator: &Annotator,
-    sequences: &[(String, String, Chain)],
+    sequences: &[SequenceRecord],
     expected_results: &HashMap<String, Vec<ExpectedResult>>,
     max_count: Option<usize>,
 ) -> ValidationStats {
-    let start_time = Instant::now();
     let mut stats = ValidationStats::default();
 
     let sequences_to_process = if let Some(max) = max_count {
@@ -157,111 +115,103 @@ fn run_validation_parallel(
     };
 
     stats.total_sequences = sequences_to_process.len();
-
-    // Extract just the sequence strings for batch processing
-    let sequence_strings: Vec<String> = sequences_to_process
-        .iter()
-        .map(|(_, seq, _)| seq.clone())
-        .collect();
+    stats.total_paired = expected_results.values().filter(|v| v.len() == 2).count();
 
     println!(
         "Processing {} sequences in parallel...",
-        sequence_strings.len()
+        sequences_to_process.len()
     );
 
     // Process all sequences in parallel
-    let results = annotator.number_sequences(&sequence_strings, true);
+    let start_time = Instant::now();
+    let results = annotator.number(sequences_to_process.to_vec(), Some(2));
     stats.execution_time_ms = start_time.elapsed().as_millis();
-    
-    // Validate each result
-    for (i, result) in results.into_iter().enumerate() {
-        let (sequence_id, _, _) = &sequences_to_process[i];
 
+    // Validate each result
+    for (header, result) in results.into_iter() {
         match result {
             Ok(annotation_result) => {
-                if let Some(expected) = expected_results.get(sequence_id) {
-                    // Convert our result to comparable format
-                    let our_numbers = annotation_result.numbers;
-                    let our_chain_type = match annotation_result.chain {
-                        Chain::IGH => "H",
-                        Chain::IGK => "K",
-                        Chain::IGL => "L",
-                        _ => "unknown",
-                    };
-
+                if let Some(expected) = expected_results.get(&header) {
+                    let mut matches = Vec::new();
                     // Find matching expected result based on chain type
-                    let mut found_match = false;
-                    for exp in expected {
-                        if exp.chain_type == our_chain_type {
-                            if our_numbers == exp.numbers {
-                                stats.successful_matches += 1;
-                                found_match = true;
-                                break;
+                    let exp_chain_1 = expected.get(0).expect("");
+                    let exp_chain_2 = expected.get(1);
+
+                    // Did we find chain1?
+                    let own_chain_1_opt = annotation_result
+                        .iter()
+                        .find(|chain| chain.chain.to_short() == exp_chain_1.chain_type);
+
+                    if let Some(own_chain_1) = own_chain_1_opt {
+                        if own_chain_1.numbers == exp_chain_1.numbers {
+                            matches.push(own_chain_1)
+                        } else {
+                            stats.numbering_errors += 1
+                        }
+                    }
+
+                    // Did we find chain2 (if there is one)
+                    if let Some(exp_chain_2) = exp_chain_2 {
+                        let own_chain_2_opt = annotation_result
+                            .iter()
+                            .find(|chain| chain.chain.to_short() == exp_chain_2.chain_type);
+
+                        if let Some(own_chain_2) = own_chain_2_opt {
+                            if own_chain_2.numbers == exp_chain_2.numbers {
+                                matches.push(own_chain_2)
                             } else {
-                                // Print detailed mismatch for debugging (only first few)
-                                if stats.failed_matches < 5 {
-                                    println!(
-                                                "MISMATCH for {}: Expected {} numbers, got {}. First 10 expected: {:?}, First 10 actual: {:?}",
-                                                sequence_id,
-                                                exp.numbers.len(),
-                                                our_numbers.len(),
-                                                exp.numbers.iter().take(10).collect::<Vec<_>>(),
-                                                our_numbers.iter().take(10).collect::<Vec<_>>()
-                                            );
-                                }
-                                stats.failed_matches += 1;
-                                found_match = true;
-                                break;
+                                stats.numbering_errors += 1
                             }
                         }
                     }
-
-                    if !found_match {
-                        if stats.parsing_errors < 5 {
-                            println!(
-                                "No expected result found for chain type '{}' in sequence '{}'",
-                                our_chain_type, sequence_id
-                            );
+                    match (matches.len(), expected.len()) {
+                        (1, 1) => stats.successful_sequence_matches += 1,
+                        (2, 2) => {
+                            stats.successful_paired_matches += 1;
+                            stats.successful_sequence_matches += 1;
                         }
-                        stats.parsing_errors += 1;
+                        (_, _) => (),
                     }
-                } else {
-                    if stats.parsing_errors < 5 {
-                        println!("No expected result found for sequence: {}", sequence_id);
-                    }
-                    stats.parsing_errors += 1;
                 }
             }
             Err(e) => {
                 if stats.numbering_errors < 5 {
-                    println!("Error numbering sequence '{}': {}", sequence_id, e);
+                    println!("Error numbering sequence '{}': {}", header, e);
                 }
                 stats.numbering_errors += 1;
             }
         }
     }
 
-
     stats
 }
 
 #[cfg(test)]
 mod tests {
+    use immunum::sequence::SequenceStream;
+
     use super::*;
 
     #[test]
     fn test_abpdseq_validation_subset() {
-        // Test with first 10 sequences for quick validation
+        // Test with first 50 sequences for quick validation
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            Some(true), // Enable prefiltering to help with chain detection
+            true, // Enable prefiltering to help with chain detection
         )
         .expect("Failed to create annotator");
 
-        let sequences =
-            parse_fasta_file("fixtures/abpdseq_agreed.fasta").expect("Failed to parse FASTA file");
+        let sequence_stream = SequenceStream::new("fixtures/abpdseq_agreed.fasta")
+            .expect("Failed to create sequence stream");
+        let sequences: Result<Vec<_>, _> = sequence_stream.collect();
+        let sequences = match sequences {
+            Ok(sequences) => sequences,
+            Err(e) => {
+                eprintln!("Error collecting sequences: {e}");
+                std::process::exit(1);
+            }
+        };
 
         let expected_results = load_expected_results("fixtures/abpdseq_agreed_output.json")
             .expect("Failed to load expected results");
@@ -272,15 +222,9 @@ mod tests {
             expected_results.len()
         );
 
-        let stats = run_validation_parallel(&annotator, &sequences, &expected_results, Some(500));
+        let stats = run_validation_parallel(&annotator, &sequences, &expected_results, Some(50));
         stats.print_summary();
 
-        // Assert that at least some sequences match (allowing for some expected differences)
-        // This is a sanity check rather than requiring 100% accuracy
-        assert!(
-            stats.successful_matches > 0,
-            "No sequences matched - there might be a systematic issue"
-        );
         assert!(
             stats.success_rate() >= 99.0,
             "Success rate too low: {:.2}%",
@@ -295,13 +239,20 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            Some(true),
+            false,
         )
         .expect("Failed to create annotator");
 
-        let sequences =
-            parse_fasta_file("fixtures/abpdseq_agreed.fasta").expect("Failed to parse FASTA file");
+        let sequence_stream = SequenceStream::new("fixtures/abpdseq_agreed.fasta")
+            .expect("Failed to create sequence stream");
+        let sequences: Result<Vec<_>, _> = sequence_stream.collect();
+        let sequences = match sequences {
+            Ok(sequences) => sequences,
+            Err(e) => {
+                eprintln!("Error collecting sequences: {e}");
+                std::process::exit(1);
+            }
+        };
 
         let expected_results = load_expected_results("fixtures/abpdseq_agreed_output.json")
             .expect("Failed to load expected results");

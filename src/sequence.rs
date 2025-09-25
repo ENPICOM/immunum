@@ -15,13 +15,16 @@ pub enum SequenceError {
 /// Represents a sequence record from a FASTA or FASTQ file
 #[derive(Debug, Clone)]
 pub struct SequenceRecord {
-    pub name: String,
-    pub sequence: String,
+    pub name: Vec<u8>,
+    pub sequence: Vec<u8>,
 }
 
 impl SequenceRecord {
     pub fn new(name: String, sequence: String) -> Self {
-        Self { name, sequence }
+        Self {
+            name: name.as_bytes().to_vec(),
+            sequence: sequence.as_bytes().to_vec(),
+        }
     }
 }
 
@@ -194,10 +197,10 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0].name, "seq1 description");
-        assert_eq!(records[0].sequence, "ATCGTGCA");
-        assert_eq!(records[1].name, "seq2");
-        assert_eq!(records[1].sequence, "GGCC");
+        assert_eq!(records[0].name, b"seq1 description");
+        assert_eq!(records[0].sequence, b"ATCGTGCA");
+        assert_eq!(records[1].name, b"seq2");
+        assert_eq!(records[1].sequence, b"GGCC");
     }
 
     #[test]
@@ -210,10 +213,10 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 2);
-        assert_eq!(records[0].name, "seq1");
-        assert_eq!(records[0].sequence, "ATCG");
-        assert_eq!(records[1].name, "seq2");
-        assert_eq!(records[1].sequence, "GGCC");
+        assert_eq!(records[0].name, b"seq1");
+        assert_eq!(records[0].sequence, b"ATCG");
+        assert_eq!(records[1].name, b"seq2");
+        assert_eq!(records[1].sequence, b"GGCC");
     }
 
     #[test]
@@ -227,38 +230,38 @@ mod tests {
         // Test first record
         assert_eq!(
             records[0].name,
-            "heavy_chain_1 Human IgG heavy chain variable region"
+            b"heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
             .sequence
-            .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+            .starts_with(b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
 
         // Test second record
         assert_eq!(
             records[1].name,
-            "light_chain_1 Human kappa light chain variable region"
+            b"light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]
             .sequence
-            .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+            .starts_with(b"DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
 
         // Test third record
         assert_eq!(
             records[2].name,
-            "heavy_chain_2 Murine IgG heavy chain variable region"
+            b"heavy_chain_2 Murine IgG heavy chain variable region"
         );
         assert!(records[2]
             .sequence
-            .starts_with("EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
+            .starts_with(b"EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
 
         // Test fourth record
         assert_eq!(
             records[3].name,
-            "light_chain_2 Human lambda light chain variable region"
+            b"light_chain_2 Human lambda light chain variable region"
         );
         assert!(records[3]
             .sequence
-            .starts_with("QSALTQPASVSGSPGQSITISCTGTSSDVGG"));
+            .starts_with(b"QSALTQPASVSGSPGQSITISCTGTSSDVGG"));
     }
 
     #[test]
@@ -272,29 +275,29 @@ mod tests {
         // Test first record
         assert_eq!(
             records[0].name,
-            "heavy_chain_1 Human IgG heavy chain variable region"
+            b"heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
             .sequence
-            .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+            .starts_with(b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
 
         // Test second record
         assert_eq!(
             records[1].name,
-            "light_chain_1 Human kappa light chain variable region"
+            b"light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]
             .sequence
-            .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+            .starts_with(b"DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
 
         // Test third record
         assert_eq!(
             records[2].name,
-            "heavy_chain_2 Murine IgG heavy chain variable region"
+            b"heavy_chain_2 Murine IgG heavy chain variable region"
         );
         assert!(records[2]
             .sequence
-            .starts_with("EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
+            .starts_with(b"EVQLLESGGGLVQPGGSLRLSCAASGFTFSS"));
     }
 
     #[test]
@@ -308,19 +311,19 @@ mod tests {
         // Test that gzipped content matches uncompressed content
         assert_eq!(
             records[0].name,
-            "heavy_chain_1 Human IgG heavy chain variable region"
+            b"heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
             .sequence
-            .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+            .starts_with(b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
 
         assert_eq!(
             records[1].name,
-            "light_chain_1 Human kappa light chain variable region"
+            b"light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]
             .sequence
-            .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+            .starts_with(b"DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
     }
 
     #[test]
@@ -334,19 +337,19 @@ mod tests {
         // Test that gzipped content matches uncompressed content
         assert_eq!(
             records[0].name,
-            "heavy_chain_1 Human IgG heavy chain variable region"
+            b"heavy_chain_1 Human IgG heavy chain variable region"
         );
         assert!(records[0]
             .sequence
-            .starts_with("QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
+            .starts_with(b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTS"));
 
         assert_eq!(
             records[1].name,
-            "light_chain_1 Human kappa light chain variable region"
+            b"light_chain_1 Human kappa light chain variable region"
         );
         assert!(records[1]
             .sequence
-            .starts_with("DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
+            .starts_with(b"DIQMTQSPSSLSASVGDRVTITCRASQSISS"));
     }
 
     #[test]
@@ -380,8 +383,8 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 1);
-        assert_eq!(records[0].name, "sequence_1");
-        assert_eq!(records[0].sequence, sequence);
+        assert_eq!(records[0].name, b"sequence_1");
+        assert_eq!(records[0].sequence, sequence.as_bytes());
     }
 
     #[test]
@@ -393,7 +396,7 @@ mod tests {
         let records = records.unwrap();
 
         assert_eq!(records.len(), 1);
-        assert_eq!(records[0].sequence, sequence);
+        assert_eq!(records[0].sequence, sequence.as_bytes());
     }
 
     #[test]

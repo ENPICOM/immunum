@@ -1,7 +1,6 @@
 use crate::constants::{insertion_points, ScoringParams};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
-use crate::result::AnnotationResult;
 use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{Chain, RegionRange, Scheme};
 use std::collections::HashMap;
@@ -220,19 +219,19 @@ impl NumberingScheme {
         }
         (query_gap_penalty, consensus_gap_penalty)
     }
-    /// numbers sequence, returns AnnotationResult
+
+    /// Number a sequence by alignment, returns numbers and score
     pub(crate) fn number_sequence(
         &self,
         query_sequence: &[u8],
-        sequence_id: String,
-    ) -> AnnotationResult {
+    ) -> (Vec<String>, f64, usize, usize) {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
         // give gap positions correct names as defined by the numbering scheme
         name_insertions(&mut numbering, &self.scheme_type);
 
         // find start and end index
-        // TODO handle numberings with no positions (only '-')
+        // TODO do we need to handle numberings with no positions? (only '-')
         let start = numbering
             .iter()
             .position(|s| s != "-")
@@ -244,24 +243,7 @@ impl NumberingScheme {
             .rposition(|s| s != "-")
             .expect("No positions numbered");
 
-        // Create result with region definitions
-        AnnotationResult {
-            sequence_id,
-            sequence: query_sequence.to_vec(),
-            numbers: numbering,
-            scheme: self.scheme_type,
-            chain: self.chain_type,
-            identity,
-            start: start as u32,
-            end: end as u32,
-            cdr1: self.cdr1.clone(),
-            cdr2: self.cdr2.clone(),
-            cdr3: self.cdr3.clone(),
-            fr1: self.fr1.clone(),
-            fr2: self.fr2.clone(),
-            fr3: self.fr3.clone(),
-            fr4: self.fr4.clone(),
-        }
+        (numbering, identity, start, end)
     }
     pub fn to_terminal_schemes(&self, terminal_length: u8) -> (NumberingScheme, NumberingScheme) {
         // Create N-terminal scheme (positions 1 to terminal_length)
@@ -333,7 +315,7 @@ mod tests {
     #[test]
     fn terminal_schemes_heavy() {
         let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGH);
         let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
 
         for i in 0..terminal_length {
@@ -363,7 +345,7 @@ mod tests {
     #[test]
     fn terminal_schemes_kappa() {
         let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGK, None);
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGK);
         let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
 
         for i in 0..terminal_length {
@@ -393,7 +375,7 @@ mod tests {
     #[test]
     fn terminal_schemes_lambda() {
         let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGL, None);
+        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGL);
         let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
 
         for i in 0..terminal_length {

@@ -17,8 +17,8 @@ impl RegionRange {
 /// Struct for output of prefiltering, containing identity of terminals, start and end
 pub struct PrefilterOutput {
     pub identity: f64,
-    pub _predicted_start: u32,
-    pub _predicted_end: u32,
+    pub _predicted_start: usize,
+    pub _predicted_end: usize,
 }
 
 /// Numbering schemes for immunoglobulin sequences
@@ -66,4 +66,34 @@ pub enum Chain {
     // T-cell receptor Delta chain variants
     #[value(alias = "Delta", alias = "D")]
     TRD,
+}
+
+impl Chain {
+    pub fn to_short(self) -> &'static str {
+        match self {
+            Chain::IGH => "H",
+            Chain::IGK => "K",
+            Chain::IGL => "L",
+            Chain::TRA => "A",
+            Chain::TRB => "B",
+            Chain::TRG => "G",
+            Chain::TRD => "D",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ChainNumbering {
+    pub numbers: Vec<String>,
+    pub identity: f64,
+    pub scheme: Scheme,
+    pub chain: Chain,
+    pub start: usize,
+    pub end: usize,
+}
+
+impl ChainNumbering {
+    pub fn to_json_string(&self, name: String) -> String {
+        format!("{{\"name\": \"{}\", \"numbers\": {:?}, \"identity\": {}, \"scheme\": {:?}, \"chain\": {:?}, \"start\": {}, \"end\": {}}}", name, self.numbers, self.identity, self.scheme, self.chain, self.start, self.end)
+    }
 }

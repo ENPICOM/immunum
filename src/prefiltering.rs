@@ -1,9 +1,11 @@
+use crate::annotator::find_best_chain;
 use crate::constants::{PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
 use crate::numbering_scheme_type::NumberingScheme;
-use crate::result::AnnotationResult;
+// use crate::result::AnnotationResult;
 use crate::types::{Chain, PrefilterOutput};
 use std::collections::HashMap;
 
+// TODO try prefilter during the iter()
 /// Apply prefiltering to select only promising chains based on terminal identity
 pub fn apply_prefiltering<'a>(
     sequence: &'a [u8],
@@ -42,15 +44,22 @@ pub fn run_pre_scan(
     for terminal_schemes in all_terminal_schemes {
         let (n_terminal, c_terminal) = terminal_schemes;
         // run alignment for n and c terminal
-        let n_terminal_output: AnnotationResult =
-            n_terminal.number_sequence(query_sequence, "prefilter_n".to_string());
-        let c_terminal_output: AnnotationResult =
-            c_terminal.number_sequence(query_sequence, "prefilter_c".to_string());
+        let n_terminal_output = find_best_chain(query_sequence, &[n_terminal]);
+
+        let c_terminal_output = find_best_chain(query_sequence, &[c_terminal]);
+
+        let (n_terminal_identity, n_terminal_start) = match n_terminal_output {
+            Ok(n_numbering) => (n_numbering.identity, n_numbering.start),
+            Err(_) => (0.0, 0), // Default values for error case
+        };
+
+        let (c_terminal_identity, c_terminal_end) = match c_terminal_output {
+            Ok(c_numbering) => (c_numbering.identity, c_numbering.end),
+            Err(_) => (0.0, 0), // Default values for error case
+        };
 
         // calculate combined identity
-
-        let combined_identity: f64 =
-            (n_terminal_output.identity + c_terminal_output.identity) / 2.0;
+        let combined_identity: f64 = (n_terminal_identity + c_terminal_identity) / 2.0;
 
         // Store if best match
         if combined_identity > highest_identity {
@@ -62,8 +71,8 @@ pub fn run_pre_scan(
             n_terminal.chain_type,
             PrefilterOutput {
                 identity: combined_identity,
-                _predicted_start: n_terminal_output.start,
-                _predicted_end: c_terminal_output.end,
+                _predicted_start: n_terminal_start,
+                _predicted_end: c_terminal_end,
             },
         );
     }
@@ -96,9 +105,9 @@ mod tests {
         let sequence_k = "DIQMTQSPSSLSASVGDRVTITCRASQSISSWLAWYQQKPGKAPKLLIYKASSLESGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYNSYPFTFGQGTKVEIK".as_bytes();
 
         let schemes = vec![
-            get_scheme(Scheme::IMGT, Chain::IGH, None),
-            get_scheme(Scheme::IMGT, Chain::IGL, None),
-            get_scheme(Scheme::IMGT, Chain::IGK, None),
+            get_scheme(Scheme::IMGT, Chain::IGH),
+            get_scheme(Scheme::IMGT, Chain::IGL),
+            get_scheme(Scheme::IMGT, Chain::IGK),
         ];
         let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = schemes
             .iter()
@@ -134,9 +143,9 @@ mod tests {
             .as_bytes();
 
         let schemes = vec![
-            get_scheme(Scheme::IMGT, Chain::IGH, None),
-            get_scheme(Scheme::IMGT, Chain::IGK, None),
-            get_scheme(Scheme::IMGT, Chain::IGL, None),
+            get_scheme(Scheme::IMGT, Chain::IGH),
+            get_scheme(Scheme::IMGT, Chain::IGK),
+            get_scheme(Scheme::IMGT, Chain::IGL),
         ];
 
         let filtered_schemes = apply_prefiltering(heavy_chain, &schemes);

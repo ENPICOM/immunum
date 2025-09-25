@@ -143,7 +143,7 @@ mod tests {
         QGKATMTADTSSNTAYLQLSSLTSEDTAVYYCNAGHDYDRGRFPYWGQGTLVTVSAAKTTPPSVYPLAPGSAAQTNSMVTLGCLVKGYFPE\
         PVTVTWNSGSLSSGVHTFPAVLQSDLYTLSSSVTVPSSTWPSETVTCNVAHPASSTKVDKKIVPRD"
             .as_bytes();
-        let scheme = get_scheme(Scheme::IMGT, Chain::IGH, None);
+        let scheme = get_scheme(Scheme::IMGT, Chain::IGH);
         let output = needleman_wunsch_consensus(heavy_chain, &scheme);
         println!("{output:?}");
     }

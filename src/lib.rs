@@ -5,7 +5,6 @@ pub mod insertion_numbering;
 pub mod needleman_wunsch;
 pub mod numbering_scheme_type;
 pub mod prefiltering;
-pub mod result;
 pub mod schemes;
 pub mod scoring_matrix;
 pub mod sequence;
@@ -21,7 +20,6 @@ pub use schemes::get_scheme;
 
 // New primary API
 pub use annotator::Annotator;
-pub use result::{AnnotationResult, OutputFormat};
 
 pub use constants::{get_scoring_params, ScoringParams};
 pub use numbering_scheme_type::NumberingScheme;
