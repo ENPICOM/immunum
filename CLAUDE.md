@@ -127,3 +127,9 @@ The CLI supports parallel processing via the `--threads` option. Set thread coun
 - **Rust**: Standard `cargo` for Rust dependencies
 - **Python**: `uv` (modern Python package manager, faster than pip)
 - **JavaScript**: `npm` for WASM testing dependencies
+
+# Important instructions"
+- We dont care about changes to the rust, python or wasm api, because there are no active users (yet). Breaking changes are fine, and should be picked before other convoluted solutions
+- Run cargo fmt after changes
+- Run tests after changes
+- Run clippy and fix warnings at the end of a big code change

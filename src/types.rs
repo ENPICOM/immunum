@@ -1,6 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use clap::ValueEnum;
+use serde::Serialize;
 use std::ops::Range;
 
 #[derive(Debug, Clone)]
@@ -22,7 +23,7 @@ pub struct PrefilterOutput {
 }
 
 /// Numbering schemes for immunoglobulin sequences
-#[derive(Clone, Copy, Debug, PartialEq, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Serialize)]
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum Scheme {
@@ -35,7 +36,7 @@ pub enum Scheme {
 }
 
 /// Immunoglobulin and T-cell receptor chain types
-#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum, Serialize)]
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum Chain {
@@ -82,7 +83,7 @@ impl Chain {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ChainNumbering {
     pub numbers: Vec<String>,
     pub identity: f64,
@@ -92,8 +93,17 @@ pub struct ChainNumbering {
     pub end: usize,
 }
 
-impl ChainNumbering {
-    pub fn to_json_string(&self, name: String) -> String {
-        format!("{{\"name\": \"{}\", \"numbers\": {:?}, \"identity\": {}, \"scheme\": {:?}, \"chain\": {:?}, \"start\": {}, \"end\": {}}}", name, self.numbers, self.identity, self.scheme, self.chain, self.start, self.end)
+#[derive(Debug, Clone, Serialize)]
+pub struct SequenceResult {
+    pub sequence_id: String,
+    pub chains: Vec<ChainNumbering>,
+}
+
+impl SequenceResult {
+    pub fn new(sequence_id: String, chains: Vec<ChainNumbering>) -> Self {
+        Self {
+            sequence_id,
+            chains,
+        }
     }
 }

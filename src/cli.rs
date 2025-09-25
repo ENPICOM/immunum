@@ -21,13 +21,9 @@ pub struct Cli {
     #[arg(
         short, long, value_enum, ignore_case = true, num_args = 1.., help = "Chain types to number with (multiple values allowed)")]
     pub chains: Option<Vec<Chain>>,
-    /// Output file path (optional, defaults to stdout)
-    #[arg(
-        short,
-        long,
-        help = "Output file path (if omitted, output goes to stdout)"
-    )]
-    pub output: Option<String>,
+    /// Output file path (required)
+    #[arg(short, long, help = "Output file path for results")]
+    pub output: String,
     /// Enable pre-filtering to reduce chain types tested based on sequence characteristics
     #[arg(
         long,
@@ -58,4 +54,11 @@ pub struct Cli {
         help = "Number of threads for parallel processing (defaults to number of CPU cores)"
     )]
     pub threads: Option<usize>,
+    /// Enable verbose output with per-sequence progress logging
+    #[arg(
+        short = 'v',
+        long = "verbose",
+        help = "Show detailed progress for each sequence processed"
+    )]
+    pub verbose: bool,
 }

@@ -4,7 +4,6 @@ use crate::prefiltering::apply_prefiltering;
 use crate::schemes::get_scheme;
 use crate::sequence::SequenceRecord;
 use crate::types::{Chain, ChainNumbering, Scheme};
-use rayon::prelude::*;
 
 /// Main annotator struct that consolidates all numbering functionality
 pub struct Annotator {
@@ -31,27 +30,8 @@ impl Annotator {
         })
     }
 
-    /// Numbers sequences against the setup numbering schemes in the annotator class.  
-    /// Returns a Vec with the same order as the input sequences, for each the name a Result with vec of ChainNumbering.
-    /// This is the only public class on Annotator
-    pub fn number(
-        &self,
-        sequences: Vec<SequenceRecord>,
-        max_chains: Option<usize>,
-    ) -> Vec<(String, Result<Vec<ChainNumbering>, String>)> {
-        sequences
-            .into_par_iter()
-            .map(|record| {
-                let name = String::from_utf8_lossy(&record.name).to_string();
-                match self.number_sequence(&record, max_chains) {
-                    Ok(results) => (name, Ok(results)),
-                    Err(e) => (name, Err(e)),
-                }
-            })
-            .collect()
-    }
-
-    fn number_sequence(
+    /// Numbers a sequence against the (prefiltered) numbering schemes in the annotator class finding at most max_chains
+    pub fn number_sequence(
         &self,
         sequence: &SequenceRecord,
         max_chains: Option<usize>,
@@ -70,7 +50,6 @@ impl Annotator {
         // Use find_all_chains to find multiple chains in the sequence
         find_all_chains(&sequence.sequence, schemes.as_slice(), max_chains)
     }
-
 }
 
 /// Runs sequence alignment on given schemes, filters the output and return the numbering with the highest confidence
@@ -209,12 +188,8 @@ mod tests {
                 sequence: b"DIVMTQSPDSLAVSLGERATINCKASQSVTNDVAWYQQKPGQPPKLLIYYASNRYTGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQDYSSPYTFGQGTKVEIKRTVAAPSVFIFPPSDEQLKSGTASVVCLLNNFYPREAKVQWKVDNALQSGNSQESVTEQDSKDSTYSLSSTLTLSKADYEKHKVYACEVTHQGLSSPVTKSFNRGE".to_vec(),
             };
 
-        let mut results = annotator.number(vec![record], Some(1));
-        assert_eq!(results.len(), 1);
-
-        let (name, annotations) = results.pop().unwrap();
+        let annotations = annotator.number_sequence(&record, Some(1));
         assert!(annotations.is_ok());
-        assert_eq!(name, "light");
 
         if let Ok(annotations) = annotations {
             assert_eq!(annotations.len(), 1);
@@ -233,12 +208,8 @@ mod tests {
                 sequence: b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".to_vec(),
             };
 
-        let mut results = annotator.number(vec![heavy_chain_record], Some(1));
-        assert_eq!(results.len(), 1);
-
-        let (name, annotations) = results.pop().unwrap();
+        let annotations = annotator.number_sequence(&heavy_chain_record, Some(1));
         assert!(annotations.is_ok());
-        assert_eq!(name, "heavy");
 
         if let Ok(annotations) = annotations {
             assert_eq!(annotations.len(), 1);
@@ -261,34 +232,12 @@ mod tests {
                 sequence: b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSSDIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTGSGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELK".to_vec()
         };
 
-        let mut results = annotator.number(vec![paired_record], Some(2));
-        assert_eq!(results.len(), 1);
-
-        let (_, annotations) = results.pop().unwrap();
+        let annotations = annotator.number_sequence(&paired_record, Some(2));
         assert!(annotations.is_ok());
         if let Ok(annotations) = annotations {
             // Should find two chains in the paired sequence
             assert_eq!(annotations.len(), 2);
         }
-    }
-
-    #[test]
-    fn test_number_sequences() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            false,
-        )
-        .unwrap();
-
-        let records = vec![
-            SequenceRecord::new("seq_1".to_string(), "QVQLVQSGAEVKKPGASVKVSCKAS".to_string()),
-            SequenceRecord::new("seq_2".to_string(), "DIQMTQSPSSLSASVGDRVTITC".to_string()),
-            SequenceRecord::new("seq_3".to_string(), "EVQLLESGGGLVQPGGSLRLSCAAS".to_string()),
-        ];
-
-        let results = annotator.number(records, Some(1));
-        assert_eq!(results.len(), 3);
     }
 
     #[test]

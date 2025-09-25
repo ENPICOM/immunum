@@ -1,6 +1,7 @@
 use immunum::annotator::Annotator;
 use immunum::sequence::SequenceRecord;
 use immunum::types::{Chain, Scheme};
+use rayon::prelude::*;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -124,7 +125,14 @@ fn run_validation_parallel(
 
     // Process all sequences in parallel
     let start_time = Instant::now();
-    let results = annotator.number(sequences_to_process.to_vec(), Some(2));
+    let results: Vec<(String, Result<Vec<_>, String>)> = sequences_to_process
+        .par_iter()
+        .map(|sequence| {
+            let header = String::from_utf8_lossy(&sequence.name).to_string();
+            let result = annotator.number_sequence(sequence, Some(2));
+            (header, result)
+        })
+        .collect();
     stats.execution_time_ms = start_time.elapsed().as_millis();
 
     // Validate each result

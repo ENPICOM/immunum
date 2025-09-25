@@ -13,12 +13,13 @@ mod types;
 
 use clap::Parser;
 use cli::Cli;
+use rayon::prelude::*;
 use sequence::SequenceStream;
 use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::BufWriter;
 
 use crate::annotator::Annotator;
-use crate::types::Chain;
+use crate::types::{Chain, SequenceResult};
 
 const DEFAULT_CHAINS: [Chain; 3] = [Chain::IGH, Chain::IGK, Chain::IGL];
 
@@ -55,33 +56,78 @@ fn main() {
             .unwrap();
     }
 
-    // Create output writer (either file or stdout)
-    let mut output_writer: Box<dyn Write + Send> = match &cli.output {
-        Some(output_path) => Box::new(BufWriter::new(File::create(output_path).unwrap())),
-        None => Box::new(BufWriter::new(io::stdout())),
-    };
+    // Create output file writer
+    let mut output_writer = BufWriter::new(File::create(&cli.output).unwrap());
 
-    // ?NOTE Loading everything into memory first might not be optimal for huge files
     // Collect all sequences first for parallel processing
     let sequences: Result<Vec<_>, _> = sequence_stream.collect();
     let sequences = match sequences {
-        Ok(sequences) => sequences,
+        Ok(sequences) => {
+            eprintln!("Loaded {} sequences for processing", sequences.len());
+            sequences
+        }
         Err(e) => {
-            eprintln!("Error collecting sequences: {e}");
+            eprintln!("Error: Failed to collect sequences - {}", e);
             std::process::exit(1);
         }
     };
 
-    for (header, annotation_result) in annotator.number(sequences, Some(cli.max_chains)).iter() {
-        match annotation_result {
-            // TODO improve the json output
-            Ok(annotation_result) => {
-                for chain_numbering in annotation_result.iter() {
-                    // println!("{}", chain_numbering.to_json_string(header.to_owned()))
-                    writeln!(output_writer, "{}", chain_numbering.to_json_string(header.to_owned())).unwrap();
+    let total_sequences = sequences.len();
+
+    if !cli.verbose && total_sequences > 10 {
+        eprintln!("Processing sequences...");
+    }
+
+    // Process sequences in parallel and collect results
+    let sequence_results: Vec<SequenceResult> = sequences
+        .par_iter()
+        .map(|sequence| {
+            let header = String::from_utf8_lossy(&sequence.name).to_string();
+            let annotation_result = annotator.number_sequence(sequence, Some(cli.max_chains));
+
+            match annotation_result {
+                Ok(chains) => {
+                    if cli.verbose {
+                        if !chains.is_empty() {
+                            eprintln!(
+                                "  Processed '{}': found {} {}",
+                                header,
+                                chains.len(),
+                                if chains.len() == 1 { "chain" } else { "chains" }
+                            );
+                        } else {
+                            eprintln!("  Processed '{}': no chains found", header);
+                        }
+                    }
+                    SequenceResult::new(header, chains)
+                }
+                Err(err) => {
+                    if cli.verbose {
+                        eprintln!("  Error processing '{}': {}", header, err);
+                    }
+                    SequenceResult::new(header, Vec::new())
                 }
             }
-            Err(err) => eprintln!("Error numbering sequence: {}", err),
-        }
-    }
+        })
+        .collect();
+
+    // Calculate summary statistics
+    let total_chains: usize = sequence_results
+        .iter()
+        .map(|result| result.chains.len())
+        .sum();
+    let successful_sequences = sequence_results
+        .iter()
+        .filter(|result| !result.chains.is_empty())
+        .count();
+
+    // Write clean JSON using serde
+    serde_json::to_writer_pretty(&mut output_writer, &sequence_results).unwrap();
+
+    eprintln!();
+    eprintln!("Done!");
+    eprintln!("* Sequences processed: {}", total_sequences);
+    eprintln!("* Total chains found: {}", total_chains);
+    eprintln!("* Successful sequences: {}", successful_sequences);
+    eprintln!("* Results written to: {}", cli.output);
 }

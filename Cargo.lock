@@ -209,6 +209,7 @@ dependencies = [
  "phf",
  "pyo3",
  "rayon",
+ "serde",
  "serde_json",
  "thiserror",
  "wasm-bindgen",
@@ -485,6 +486,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd6c24dee235d0da097043389623fb913daddf92c76e9f5a1db88607a0bcbd1d"
 dependencies = [
  "serde_core",
+ "serde_derive",
 ]
 
 [[package]]
