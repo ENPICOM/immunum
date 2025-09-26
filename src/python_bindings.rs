@@ -9,7 +9,6 @@ use crate::types::{Chain, Scheme};
 #[pyclass(name = "Annotator")]
 pub struct Annotator {
     inner: RustAnnotator,
-    min_confidence: f64,
     thread_pool: rayon::ThreadPool,
 }
 
@@ -42,7 +41,6 @@ impl Annotator {
         match RustAnnotator::new(scheme, chains, disable_prefiltering, Some(min_confidence)) {
             Ok(annotator) => Ok(Annotator {
                 inner: annotator,
-                min_confidence,
                 thread_pool,
             }),
             Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e)),
@@ -102,11 +100,12 @@ impl Annotator {
                     match self.inner.number_sequence(sequence, Some(max_chains)) {
                         Ok(chains) => chains
                             .into_iter()
-                            .filter(|chain| chain.identity >= self.min_confidence)
                             .map(|chain| {
-                                let numbers: Vec<String> =
-                                    chain.numbers.iter().map(|n| n.to_string()).collect();
-                                (numbers, chain.identity, chain.chain)
+                                (
+                                    chain.numbers.iter().map(|n| n.to_string()).collect(),
+                                    chain.identity,
+                                    chain.chain,
+                                )
                             })
                             .collect(),
                         Err(_) => {

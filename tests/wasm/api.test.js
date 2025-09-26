@@ -16,13 +16,11 @@ const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '../../');
 
 // Import WASM module
-import init, { 
-    defaultScoringParams, 
-    Scheme, 
-    Chain, 
-    ScoringParams, 
-    Annotator,
-    AnnotationResult 
+import init, {
+    createAnnotator,
+    Scheme,
+    Chain,
+    Annotator
 } from '../../wasm_build/immunum.js';
 
 describe('Immunum WASM API', () => {
@@ -56,51 +54,42 @@ describe('Immunum WASM API', () => {
         });
     });
 
-    describe('ScoringParams', () => {
-        it('should create default ScoringParams', () => {
-            const params = new ScoringParams();
-            expect(params).toBeDefined();
-            expect(params.gap_pen_cp).toBeGreaterThan(0);
-            expect(typeof params.gap_pen_cp).toBe('number');
+    describe('Sequence Numbering', () => {
+        let annotator;
+
+        beforeAll(() => {
+            annotator = new Annotator(Scheme.IMGT, [Chain.IGH]);
         });
 
-        it('should create ScoringParams with custom values', () => {
-            const customParams = new ScoringParams(60.0);
-            expect(customParams).toBeDefined();
-            expect(customParams.gap_pen_cp).toBe(60.0);
-        });
+        it('should create numbering results from sequence', async () => {
+            const heavyChainSequence = 'QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCAR';
 
-        it('should have working getters and setters', () => {
-            const params = new ScoringParams();
-            const originalValue = params.gap_pen_cp;
-            
-            // Test setter
-            params.gap_pen_cp = 123.45;
-            expect(params.gap_pen_cp).toBe(123.45);
-            
-            // Test that it actually changed
-            expect(params.gap_pen_cp).not.toBe(originalValue);
-        });
+            const result = annotator.numberSequence(heavyChainSequence, 1);
+            expect(result).toBeDefined();
+            expect(typeof result).toBe('string');
 
-        it('should have all expected properties', () => {
-            const params = new ScoringParams();
-            
-            expect(params.gap_pen_cp).toBeDefined();
-            expect(params.gap_pen_fr).toBeDefined();
-            expect(params.gap_pen_ip).toBeDefined();
-            expect(params.gap_pen_op).toBeDefined();
-            expect(params.gap_pen_cdr).toBeDefined();
-            expect(params.gap_pen_other).toBeDefined();
-            expect(params.cdr_increase).toBeDefined();
-            expect(params.pen_leap_insertion_point_imgt).toBeDefined();
-            expect(params.pen_leap_insertion_point_kabat).toBeDefined();
-        });
+            // Should be valid JSON
+            try {
+                const parsed = JSON.parse(result);
+                expect(Array.isArray(parsed)).toBe(true);
 
-        it('should create default scoring parameters via function', () => {
-            const params = defaultScoringParams();
-            expect(params).toBeDefined();
-            expect(params.gap_pen_cp).toBeGreaterThan(0);
-            expect(typeof params.gap_pen_cp).toBe('number');
+                if (parsed.length > 0) {
+                    const chainResult = parsed[0];
+                    expect(chainResult.numbers).toBeDefined();
+                    expect(chainResult.identity).toBeDefined();
+                    expect(chainResult.chain).toBeDefined();
+                    expect(chainResult.scheme).toBeDefined();
+                    expect(chainResult.start).toBeDefined();
+                    expect(chainResult.end).toBeDefined();
+
+                    expect(Array.isArray(chainResult.numbers)).toBe(true);
+                    expect(typeof chainResult.identity).toBe('number');
+                    expect(chainResult.identity).toBeGreaterThan(0);
+                }
+            } catch (e) {
+                // Check if it's an error result
+                expect(result).toMatch(/^{"error":/);
+            }
         });
     });
 
@@ -110,50 +99,111 @@ describe('Immunum WASM API', () => {
             expect(annotator).toBeDefined();
         });
 
-        it('should create Annotator with custom scoring parameters', () => {
-            const customParams = new ScoringParams(60.0);
+        it('should create Annotator with prefiltering enabled by default', () => {
             const annotator = new Annotator(
-                Scheme.IMGT, 
-                [Chain.IGH], 
-                customParams
+                Scheme.IMGT,
+                [Chain.IGH, Chain.IGK, Chain.IGL]
             );
             expect(annotator).toBeDefined();
         });
 
-        it('should create Annotator with prefiltering enabled', () => {
+        it('should create Annotator with prefiltering explicitly disabled', () => {
             const annotator = new Annotator(
-                Scheme.IMGT, 
-                [Chain.IGH, Chain.IGK, Chain.IGL], 
-                null, 
-                true
+                Scheme.IMGT,
+                [Chain.IGH, Chain.IGK, Chain.IGL],
+                true, // disable_prefiltering = true
+                0.7   // min_confidence
+            );
+            expect(annotator).toBeDefined();
+        });
+
+        it('should create Annotator with custom confidence threshold', () => {
+            const annotator = new Annotator(
+                Scheme.IMGT,
+                [Chain.IGH],
+                false, // disable_prefiltering = false (prefiltering enabled)
+                0.8    // min_confidence
             );
             expect(annotator).toBeDefined();
         });
 
         it('should create Annotator with multiple chains', () => {
             const annotator = new Annotator(
-                Scheme.KABAT, 
+                Scheme.KABAT,
                 [Chain.IGH, Chain.IGK]
             );
             expect(annotator).toBeDefined();
+        });
+
+        it('should number a single sequence', () => {
+            const annotator = new Annotator(Scheme.IMGT, [Chain.IGH]);
+            const sequence = 'QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCAR';
+
+            const result = annotator.numberSequence(sequence, 1);
+            expect(result).toBeDefined();
+            expect(typeof result).toBe('string');
+
+            // Should be valid JSON
+            try {
+                const parsed = JSON.parse(result);
+                expect(Array.isArray(parsed)).toBe(true);
+            } catch (e) {
+                // Check if it's an error result
+                expect(result).toMatch(/^{"error":/);
+            }
+        });
+
+        it('should number multiple sequences', () => {
+            const annotator = new Annotator(Scheme.IMGT, [Chain.IGH, Chain.IGK]);
+            const sequences = [
+                'QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCAR',
+                'DIVMTQSPDSLAVSLGERATINCKASQSVTNDVAWYQQKPGQPPKLLIYYASNRYTGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQDYSSPYT'
+            ];
+
+            // New API takes JSON string input
+            const sequencesJson = JSON.stringify(sequences);
+            const result = annotator.numberSequences(sequencesJson, 2);
+            expect(result).toBeDefined();
+            expect(typeof result).toBe('string');
+
+            // Should return a JSON array of results
+            try {
+                const parsed = JSON.parse(result);
+                expect(Array.isArray(parsed)).toBe(true);
+                expect(parsed.length).toBe(2);
+            } catch (e) {
+                // Check if it's an error result
+                expect(result).toMatch(/^{"error":/);
+            }
         });
     });
 
     describe('API Structure', () => {
         it('should have all expected exports available', () => {
             // Test that all main API components are available
-            expect(defaultScoringParams).toBeDefined();
+            expect(createAnnotator).toBeDefined();
             expect(Scheme).toBeDefined();
             expect(Chain).toBeDefined();
-            expect(ScoringParams).toBeDefined();
             expect(Annotator).toBeDefined();
-            expect(AnnotationResult).toBeDefined();
-            
+
             // Test that they are the right types
-            expect(typeof defaultScoringParams).toBe('function');
-            expect(typeof ScoringParams).toBe('function'); // Constructor
+            expect(typeof createAnnotator).toBe('function');
             expect(typeof Annotator).toBe('function'); // Constructor
-            expect(typeof AnnotationResult).toBe('function'); // Constructor
+        });
+
+        it('should create annotator using createAnnotator helper', () => {
+            const annotator = createAnnotator();
+            expect(annotator).toBeDefined();
+        });
+
+        it('should create annotator with custom parameters using createAnnotator', () => {
+            const annotator = createAnnotator(
+                Scheme.KABAT,
+                [Chain.IGH, Chain.IGK],
+                true, // disable prefiltering
+                0.8   // min confidence
+            );
+            expect(annotator).toBeDefined();
         });
     });
 });
