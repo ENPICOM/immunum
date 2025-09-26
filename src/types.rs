@@ -83,14 +83,110 @@ impl Chain {
     }
 }
 
+/// Efficient representation of a numbering position
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(untagged)]
+pub enum NumberingPosition {
+    /// Gap in alignment
+    Gap,
+    /// Simple numeric position
+    Number(u32),
+    /// Position with insertion (e.g., "32A")
+    Insertion { position: u32, insertion: char },
+}
+
+impl std::fmt::Display for NumberingPosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NumberingPosition::Gap => write!(f, "-"),
+            NumberingPosition::Number(n) => write!(f, "{}", n),
+            NumberingPosition::Insertion {
+                position,
+                insertion,
+            } => {
+                write!(f, "{}{}", position, insertion)
+            }
+        }
+    }
+}
+
+impl NumberingPosition {
+    /// Create from string (for backward compatibility)
+    pub fn from_string(s: &str) -> Self {
+        if s == "-" {
+            NumberingPosition::Gap
+        } else if let Ok(num) = s.parse::<u32>() {
+            NumberingPosition::Number(num)
+        } else {
+            // Try to parse as insertion (e.g., "32A")
+            if s.len() > 1 {
+                if let Ok(position) = s[..s.len() - 1].parse::<u32>() {
+                    if let Some(insertion) = s.chars().last() {
+                        return NumberingPosition::Insertion {
+                            position,
+                            insertion,
+                        };
+                    }
+                }
+            }
+            // Fallback to treating as number 0 if can't parse
+            NumberingPosition::Number(0)
+        }
+    }
+}
+
+impl PartialEq<str> for NumberingPosition {
+    fn eq(&self, other: &str) -> bool {
+        match self {
+            NumberingPosition::Gap => other == "-",
+            NumberingPosition::Number(n) => other == n.to_string(),
+            NumberingPosition::Insertion {
+                position,
+                insertion,
+            } => other == format!("{}{}", position, insertion),
+        }
+    }
+}
+
+impl PartialEq<&str> for NumberingPosition {
+    fn eq(&self, other: &&str) -> bool {
+        self == *other
+    }
+}
+
+impl PartialEq<String> for NumberingPosition {
+    fn eq(&self, other: &String) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl PartialEq<NumberingPosition> for String {
+    fn eq(&self, other: &NumberingPosition) -> bool {
+        other == self.as_str()
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ChainNumbering {
-    pub numbers: Vec<String>,
+    #[serde(serialize_with = "serialize_numbering_positions")]
+    pub numbers: Vec<NumberingPosition>,
     pub identity: f64,
     pub scheme: Scheme,
     pub chain: Chain,
     pub start: usize,
     pub end: usize,
+}
+
+/// Custom serializer to maintain backward compatibility with JSON output
+fn serialize_numbering_positions<S>(
+    positions: &[NumberingPosition],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
+    strings.serialize(serializer)
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -1,23 +1,24 @@
+use crate::buffer_pool::{get_dynamic_matrix, get_traceback_matrix};
 use crate::consensus_scoring::encode_sequence;
 use crate::constants::{
     traceback_directions, CONSENSUS_GAP_COLUMN, GAP_PEN_END, GAP_PEN_START, MATCH_CP_MULTIPLIER,
     QUERY_GAP_COLUMN,
 };
 use crate::numbering_scheme_type::NumberingScheme;
+use crate::types::NumberingPosition;
 
 /// Classic needleman wunch alignment for sequence against consensus sequence
 pub fn needleman_wunsch_consensus(
     query_sequence: &[u8],
     scheme: &NumberingScheme,
-) -> (Vec<String>, f64) {
+) -> (Vec<NumberingPosition>, f64) {
     let encoded_query = encode_sequence(query_sequence);
     let num_positions_consensus: usize = scheme.consensus_amino_acids.len();
     let len_query_sequence: usize = query_sequence.len();
 
-    let mut dynamic_matrix: Vec<Vec<f64>> =
-        vec![vec![0.0; len_query_sequence + 1]; num_positions_consensus + 1];
-    let mut traceback_matrix: Vec<Vec<u8>> =
-        vec![vec![0; len_query_sequence + 1]; num_positions_consensus + 1];
+    // Use buffer pool for matrices to reduce allocations
+    let mut dynamic_matrix = get_dynamic_matrix(num_positions_consensus, len_query_sequence);
+    let mut traceback_matrix = get_traceback_matrix(num_positions_consensus, len_query_sequence);
 
     for i in 0..len_query_sequence + 1 {
         dynamic_matrix[0][i] = 0.0 - (GAP_PEN_START * i as f64);
@@ -103,9 +104,9 @@ fn traceback_alignment(
     sequence_length: usize,
     consensus_length: usize,
     traceback_matrix: &[Vec<u8>],
-) -> (Vec<String>, u32) {
+) -> (Vec<NumberingPosition>, u32) {
     let mut matches: u32 = 0;
-    let mut numbering = Vec::new();
+    let mut numbering = Vec::with_capacity(consensus_length.max(sequence_length));
 
     let mut i = consensus_length;
     let mut j = sequence_length;
@@ -113,13 +114,13 @@ fn traceback_alignment(
     while i != 0 || j != 0 {
         // Figure out if it was top, left or top left
         if traceback_matrix[i][j] == traceback_directions::FROM_LEFT {
-            numbering.insert(0, "-".to_string());
+            numbering.insert(0, NumberingPosition::Gap);
             j -= 1;
         } else if traceback_matrix[i][j] == traceback_directions::FROM_TOP {
             i -= 1;
         } else {
             // FROM_DIAG or PERFECT_MATCH
-            numbering.insert(0, i.to_string());
+            numbering.insert(0, NumberingPosition::Number(i as u32));
             if traceback_matrix[i][j] == traceback_directions::PERFECT_MATCH {
                 matches += 1; // Used to calculate identity
             }
@@ -174,9 +175,29 @@ mod tests {
 
         let output1 = traceback_alignment(7, 7, &traceback1);
         let output2 = traceback_alignment(7, 7, &traceback2);
-        assert_eq!(output1.0, vec!["1", "2", "3", "4", "5", "6", "7"]);
+
+        let expected1 = vec![
+            NumberingPosition::Number(1),
+            NumberingPosition::Number(2),
+            NumberingPosition::Number(3),
+            NumberingPosition::Number(4),
+            NumberingPosition::Number(5),
+            NumberingPosition::Number(6),
+            NumberingPosition::Number(7),
+        ];
+        let expected2 = vec![
+            NumberingPosition::Number(4),
+            NumberingPosition::Number(5),
+            NumberingPosition::Gap,
+            NumberingPosition::Number(6),
+            NumberingPosition::Gap,
+            NumberingPosition::Number(7),
+            NumberingPosition::Gap,
+        ];
+
+        assert_eq!(output1.0, expected1);
         assert_eq!(output1.1, 2);
-        assert_eq!(output2.0, vec!["4", "5", "-", "6", "-", "7", "-"]);
+        assert_eq!(output2.0, expected2);
         assert_eq!(output2.1, 1);
     }
 }

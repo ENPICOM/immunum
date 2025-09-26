@@ -1,4 +1,5 @@
 mod annotator;
+mod buffer_pool;
 mod cli;
 mod consensus_scoring;
 mod constants;

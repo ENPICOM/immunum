@@ -244,12 +244,9 @@ mod tests {
     #[ignore] // Ignore by default due to long runtime - run with `cargo test --ignored`
     fn test_abpdseq_validation_full() {
         // Full validation - will take much longer
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            false,
-        )
-        .expect("Failed to create annotator");
+        let annotator =
+            Annotator::new(Scheme::IMGT, vec![Chain::IGH, Chain::IGK, Chain::IGL], true)
+                .expect("Failed to create annotator");
 
         let sequence_stream = SequenceStream::new("fixtures/abpdseq_agreed.fasta")
             .expect("Failed to create sequence stream");

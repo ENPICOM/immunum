@@ -3,7 +3,7 @@ use crate::numbering_scheme_type::NumberingScheme;
 use crate::prefiltering::apply_prefiltering;
 use crate::schemes::get_scheme;
 use crate::sequence::SequenceRecord;
-use crate::types::{Chain, ChainNumbering, Scheme};
+use crate::types::{Chain, ChainNumbering, NumberingPosition, Scheme};
 
 /// Main annotator struct that consolidates all numbering functionality
 pub struct Annotator {
@@ -138,13 +138,14 @@ fn find_all_chains(
                 best_chain.end += current_start;
 
                 // add gaps to front and end to match with length of original sequence
-                let mut start_padding = vec![String::from("-"); current_start];
-                let end_padding = vec![String::from("-"); full_query_length - current_end - 1];
-                // TODO improve naming
-                start_padding.extend(best_chain.numbers);
-                start_padding.extend(end_padding);
+                let mut padded_numbering = vec![NumberingPosition::Gap; current_start];
+                padded_numbering.extend(best_chain.numbers);
+                padded_numbering.extend(vec![
+                    NumberingPosition::Gap;
+                    full_query_length - current_end - 1
+                ]);
 
-                best_chain.numbers = start_padding;
+                best_chain.numbers = padded_numbering;
                 chains_found.push(best_chain);
             }
             Err(_) => {

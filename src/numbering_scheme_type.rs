@@ -2,7 +2,7 @@ use crate::constants::{insertion_points, ScoringParams};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
 use crate::scoring_matrix::ScoringMatrix;
-use crate::types::{Chain, RegionRange, Scheme};
+use crate::types::{Chain, NumberingPosition, RegionRange, Scheme};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -224,7 +224,7 @@ impl NumberingScheme {
     pub(crate) fn number_sequence(
         &self,
         query_sequence: &[u8],
-    ) -> (Vec<String>, f64, usize, usize) {
+    ) -> (Vec<NumberingPosition>, f64, usize, usize) {
         let (mut numbering, identity) = needleman_wunsch_consensus(query_sequence, self);
 
         // give gap positions correct names as defined by the numbering scheme

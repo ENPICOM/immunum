@@ -1,4 +1,5 @@
 pub mod annotator;
+pub mod buffer_pool;
 pub mod consensus_scoring;
 pub mod constants;
 pub mod insertion_numbering;
