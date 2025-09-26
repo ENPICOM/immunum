@@ -1,5 +1,5 @@
 use crate::annotator::find_best_chain;
-use crate::constants::{MINIMAL_CHAIN_IDENTITY, PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
+use crate::constants::WITHIN_IDENTITY_RANGE;
 use crate::numbering_scheme_type::NumberingScheme;
 // use crate::result::AnnotationResult;
 use crate::types::{Chain, PrefilterOutput};
@@ -10,19 +10,14 @@ use std::collections::HashMap;
 pub fn apply_prefiltering<'a>(
     sequence: &'a [u8],
     schemes: &'a [NumberingScheme],
+    terminal_schemes: &[(NumberingScheme, NumberingScheme)],
 ) -> Vec<&'a NumberingScheme> {
     if schemes.is_empty() {
         return vec![];
     }
 
-    // get pre-filter schemes
-    let terminal_schemes = schemes
-        .iter()
-        .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
-        .collect();
-
     // Select models to run using pre-scan
-    let (pre_scan_output, highest_score) = run_pre_scan(sequence, &terminal_schemes);
+    let (pre_scan_output, highest_score) = run_pre_scan(sequence, terminal_schemes);
     let pre_filter_chains = select_chains_from_pre_scan(&pre_scan_output, highest_score);
 
     // Filter schemes based on prefiltering results
@@ -35,7 +30,7 @@ pub fn apply_prefiltering<'a>(
 ///Run pre scan to find likely chains present using c and n terminal identity
 pub fn run_pre_scan(
     query_sequence: &[u8],
-    all_terminal_schemes: &Vec<(NumberingScheme, NumberingScheme)>,
+    all_terminal_schemes: &[(NumberingScheme, NumberingScheme)],
 ) -> (HashMap<Chain, PrefilterOutput>, f64) {
     let mut chain_identity_map: HashMap<Chain, PrefilterOutput> = HashMap::new();
 
@@ -44,11 +39,9 @@ pub fn run_pre_scan(
     for terminal_schemes in all_terminal_schemes {
         let (n_terminal, c_terminal) = terminal_schemes;
         // run alignment for n and c terminal
-        let n_terminal_output =
-            find_best_chain(query_sequence, &[n_terminal], MINIMAL_CHAIN_IDENTITY);
+        let n_terminal_output = find_best_chain(query_sequence, &[n_terminal], 0.0);
 
-        let c_terminal_output =
-            find_best_chain(query_sequence, &[c_terminal], MINIMAL_CHAIN_IDENTITY);
+        let c_terminal_output = find_best_chain(query_sequence, &[c_terminal], 0.0);
 
         let (n_terminal_identity, n_terminal_start) = match n_terminal_output {
             Ok(n_numbering) => (n_numbering.identity, n_numbering.start),
@@ -96,8 +89,9 @@ pub fn select_chains_from_pre_scan(
 mod tests {
     use super::*;
     use crate::{
-        schemes::get_scheme,
-        types::{Chain, Scheme},
+        constants::PRE_FILTER_TERMINAL_LENGTH,
+        schemes::get_scheme_with_cdr_definition,
+        types::{CdrDefinitions, Chain, Scheme},
     };
 
     #[test]
@@ -107,9 +101,9 @@ mod tests {
         let sequence_k = "DIQMTQSPSSLSASVGDRVTITCRASQSISSWLAWYQQKPGKAPKLLIYKASSLESGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYNSYPFTFGQGTKVEIK".as_bytes();
 
         let schemes = vec![
-            get_scheme(Scheme::IMGT, Chain::IGH),
-            get_scheme(Scheme::IMGT, Chain::IGL),
-            get_scheme(Scheme::IMGT, Chain::IGK),
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT),
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGL, CdrDefinitions::IMGT),
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGK, CdrDefinitions::IMGT),
         ];
         let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = schemes
             .iter()
@@ -145,12 +139,17 @@ mod tests {
             .as_bytes();
 
         let schemes = vec![
-            get_scheme(Scheme::IMGT, Chain::IGH),
-            get_scheme(Scheme::IMGT, Chain::IGK),
-            get_scheme(Scheme::IMGT, Chain::IGL),
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT),
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGK, CdrDefinitions::IMGT),
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGL, CdrDefinitions::IMGT),
         ];
 
-        let filtered_schemes = apply_prefiltering(heavy_chain, &schemes);
+        let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = schemes
+            .iter()
+            .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
+            .collect();
+
+        let filtered_schemes = apply_prefiltering(heavy_chain, &schemes, &terminal_schemes);
 
         // Should return at least one scheme (preferably the heavy chain one)
         assert!(!filtered_schemes.is_empty());
@@ -162,8 +161,9 @@ mod tests {
     fn test_apply_prefiltering_empty_schemes() {
         let sequence: &[u8] = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".as_bytes();
         let schemes: Vec<NumberingScheme> = vec![];
+        let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = vec![];
 
-        let filtered_schemes = apply_prefiltering(sequence, &schemes);
+        let filtered_schemes = apply_prefiltering(sequence, &schemes, &terminal_schemes);
         assert!(filtered_schemes.is_empty());
     }
 }

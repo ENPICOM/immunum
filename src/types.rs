@@ -16,6 +16,7 @@ impl RegionRange {
 }
 
 /// Struct for output of prefiltering, containing identity of terminals, start and end
+#[derive(Debug)]
 pub struct PrefilterOutput {
     pub identity: f64,
     pub _predicted_start: usize,
@@ -39,7 +40,7 @@ pub enum Scheme {
 #[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Serialize)]
 #[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub enum CdrDefinition {
+pub enum CdrDefinitions {
     /// IMGT CDR definitions (default for IMGT scheme)
     #[value(alias = "I")]
     IMGT,
@@ -51,12 +52,12 @@ pub enum CdrDefinition {
     NORTH,
 }
 
-impl CdrDefinition {
+impl CdrDefinitions {
     /// Get the default CDR definition for a given numbering scheme
     pub fn from_scheme(scheme: Scheme) -> Self {
         match scheme {
-            Scheme::IMGT => CdrDefinition::IMGT,
-            Scheme::KABAT => CdrDefinition::KABAT,
+            Scheme::IMGT => CdrDefinitions::IMGT,
+            Scheme::KABAT => CdrDefinitions::KABAT,
         }
     }
 }
@@ -196,7 +197,6 @@ impl PartialEq<NumberingPosition> for String {
 pub struct RegionInfo {
     pub start: usize,
     pub end: usize,
-    pub sequence: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -217,7 +217,7 @@ pub struct ChainNumbering {
     pub identity: f64,
     pub scheme: Scheme,
     pub chain: Chain,
-    pub cdr_definition: CdrDefinition,
+    pub cdr_definition: CdrDefinitions,
     pub start: usize,
     pub end: usize,
     pub regions: Regions,

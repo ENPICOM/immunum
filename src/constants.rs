@@ -90,24 +90,24 @@ pub struct RegionRanges {
 
 /// Get region ranges based on CDR definition, numbering scheme, and chain type
 pub fn get_region_ranges(
-    cdr_definition: crate::types::CdrDefinition,
+    cdr_definitions: crate::types::CdrDefinitions,
     scheme: crate::types::Scheme,
     chain: crate::types::Chain,
 ) -> RegionRanges {
-    use crate::types::{CdrDefinition, Chain, RegionRange, Scheme};
+    use crate::types::{CdrDefinitions, Chain, RegionRange, Scheme};
 
     // If CDR definition matches the scheme, use the default ranges from scheme
-    if (cdr_definition == CdrDefinition::IMGT && scheme == Scheme::IMGT)
-        || (cdr_definition == CdrDefinition::KABAT && scheme == Scheme::KABAT)
+    if (cdr_definitions == CdrDefinitions::IMGT && scheme == Scheme::IMGT)
+        || (cdr_definitions == CdrDefinitions::KABAT && scheme == Scheme::KABAT)
     {
         // Use the original scheme-based ranges
         return get_default_region_ranges(scheme, chain);
     }
 
     // Custom CDR definitions with different boundaries
-    match (cdr_definition, chain) {
+    match (cdr_definitions, chain) {
         // IMGT CDR definitions on any numbering scheme
-        (CdrDefinition::IMGT, Chain::IGH) => RegionRanges {
+        (CdrDefinitions::IMGT, Chain::IGH) => RegionRanges {
             fr1: RegionRange { start: 1, end: 26 },
             cdr1: RegionRange { start: 27, end: 38 },
             fr2: RegionRange { start: 39, end: 55 },
@@ -125,7 +125,7 @@ pub fn get_region_ranges(
                 end: 129,
             },
         },
-        (CdrDefinition::IMGT, Chain::IGK | Chain::IGL) => RegionRanges {
+        (CdrDefinitions::IMGT, Chain::IGK | Chain::IGL) => RegionRanges {
             fr1: RegionRange { start: 1, end: 26 },
             cdr1: RegionRange { start: 27, end: 38 },
             fr2: RegionRange { start: 39, end: 55 },
@@ -145,7 +145,7 @@ pub fn get_region_ranges(
         },
 
         // KABAT CDR definitions on any numbering scheme
-        (CdrDefinition::KABAT, Chain::IGH) => RegionRanges {
+        (CdrDefinitions::KABAT, Chain::IGH) => RegionRanges {
             fr1: RegionRange { start: 1, end: 30 },
             cdr1: RegionRange { start: 31, end: 35 },
             fr2: RegionRange { start: 36, end: 49 },
@@ -160,7 +160,7 @@ pub fn get_region_ranges(
                 end: 114,
             },
         },
-        (CdrDefinition::KABAT, Chain::IGK | Chain::IGL) => RegionRanges {
+        (CdrDefinitions::KABAT, Chain::IGK | Chain::IGL) => RegionRanges {
             fr1: RegionRange { start: 1, end: 23 },
             cdr1: RegionRange { start: 24, end: 34 },
             fr2: RegionRange { start: 35, end: 49 },
@@ -174,7 +174,7 @@ pub fn get_region_ranges(
         },
 
         // NORTH CDR definitions
-        (CdrDefinition::NORTH, Chain::IGH) => RegionRanges {
+        (CdrDefinitions::NORTH, Chain::IGH) => RegionRanges {
             fr1: RegionRange { start: 1, end: 22 },
             cdr1: RegionRange { start: 23, end: 35 },
             fr2: RegionRange { start: 36, end: 49 },
@@ -189,7 +189,7 @@ pub fn get_region_ranges(
                 end: 114,
             },
         },
-        (CdrDefinition::NORTH, Chain::IGK | Chain::IGL) => RegionRanges {
+        (CdrDefinitions::NORTH, Chain::IGK | Chain::IGL) => RegionRanges {
             fr1: RegionRange { start: 1, end: 22 },
             cdr1: RegionRange { start: 23, end: 35 },
             fr2: RegionRange { start: 36, end: 49 },
@@ -204,7 +204,7 @@ pub fn get_region_ranges(
 
         // For T-cell receptors, default to heavy chain patterns
         (_, Chain::TRA | Chain::TRB | Chain::TRG | Chain::TRD) => {
-            get_region_ranges(cdr_definition, scheme, Chain::IGH)
+            get_region_ranges(cdr_definitions, scheme, Chain::IGH)
         }
     }
 }

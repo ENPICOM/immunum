@@ -284,6 +284,7 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            None,  // Use default CDR definitions
             false, // Enable prefiltering to help with chain detection
             None,
         )
@@ -326,6 +327,7 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            None, // Use default CDR definitions
             false,
             None,
         )

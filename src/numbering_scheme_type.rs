@@ -2,15 +2,14 @@ use crate::constants::{insertion_points, ScoringParams};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
 use crate::scoring_matrix::ScoringMatrix;
-use crate::types::{CdrDefinition, Chain, NumberingPosition, RegionRange, Scheme};
-use std::collections::HashMap;
+use crate::types::{CdrDefinitions, Chain, NumberingPosition, RegionRange, Scheme};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct NumberingScheme {
     pub scheme_type: Scheme,
     pub chain_type: Chain,
-    pub cdr_definition: CdrDefinition,
-    pub conserved_positions: Vec<u32>,
+    pub cdr_definition: CdrDefinitions,
     pub insertion_positions: Vec<u32>,
     pub gap_positions: Vec<u32>,
     pub consensus_amino_acids: HashMap<u32, Vec<u8>>,
@@ -22,19 +21,12 @@ pub struct NumberingScheme {
     pub cdr1: RegionRange,
     pub cdr2: RegionRange,
     pub cdr3: RegionRange,
+    // Cached HashSets for O(1) lookups (computed lazily)
+    pub conserved_positions_set: HashSet<u32>,
+    pub restricted_sites_set: HashSet<u32>,
 }
 
 impl NumberingScheme {
-    /// Return restricted sites according to Antpack definition (non '-' positions)
-    pub fn restricted_sites(&self) -> Vec<u32> {
-        let mut sites = Vec::new();
-        for (&key, value) in &self.consensus_amino_acids {
-            if !value.contains(&b'-') {
-                sites.push(key);
-            }
-        }
-        sites
-    }
     /// All framework positions
     pub fn framework_positions(&self) -> Vec<u32> {
         self.fr1
@@ -55,11 +47,14 @@ impl NumberingScheme {
     /// Calculates gap penalty according to position and scheme
     pub fn gap_penalty(&self, position: u32, scoring: &ScoringParams) -> (f64, f64) {
         // Set initial gap penalties
-        let penalty = match () {
-            _ if self.conserved_positions.contains(&position) => scoring.gap_pen_cp,
-            _ if self.framework_positions().contains(&position) => scoring.gap_pen_fr,
-            _ if self.cdr_positions().contains(&position) => scoring.gap_pen_cdr,
-            _ => scoring.gap_pen_other,
+        let penalty = if self.conserved_positions_set.contains(&position) {
+            scoring.gap_pen_cp
+        } else if self.framework_positions().contains(&position) {
+            scoring.gap_pen_fr
+        } else if self.cdr_positions().contains(&position) {
+            scoring.gap_pen_cdr
+        } else {
+            scoring.gap_pen_other
         };
 
         let mut query_gap_penalty = penalty;
@@ -256,7 +251,6 @@ impl NumberingScheme {
         }
 
         let n_terminal_scheme = NumberingScheme {
-            conserved_positions: vec![], // No conserved positions at N-terminal
             insertion_positions: vec![],
             gap_positions: vec![10], // IMGT Position 10
             consensus_amino_acids: n_terminal_consensus,
@@ -279,7 +273,6 @@ impl NumberingScheme {
         let fmwk4_start = self.fr4.start - 1;
 
         let c_terminal_scheme = NumberingScheme {
-            conserved_positions: vec![1, 2, 4], // IMGT position 118, 119 and 121 (mapped to 1, 2, 4)
             insertion_positions: vec![],
             gap_positions: vec![], // No gap positions at c-terminal
             consensus_amino_acids: c_terminal_consensus,
@@ -297,9 +290,9 @@ impl NumberingScheme {
 #[cfg(test)]
 mod tests {
     use crate::{
-        schemes::get_scheme,
+        schemes::get_scheme_with_cdr_definition,
         scoring_matrix::ScoringMatrix,
-        types::{Chain, Scheme},
+        types::{CdrDefinitions, Chain, Scheme},
     };
 
     impl ScoringMatrix {
@@ -316,7 +309,8 @@ mod tests {
     #[test]
     fn terminal_schemes_heavy() {
         let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGH);
+        let original_scheme =
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT);
         let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
 
         for i in 0..terminal_length {
@@ -346,7 +340,8 @@ mod tests {
     #[test]
     fn terminal_schemes_kappa() {
         let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGK);
+        let original_scheme =
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGK, CdrDefinitions::IMGT);
         let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
 
         for i in 0..terminal_length {
@@ -376,7 +371,8 @@ mod tests {
     #[test]
     fn terminal_schemes_lambda() {
         let terminal_length = 10;
-        let original_scheme = get_scheme(Scheme::IMGT, Chain::IGL);
+        let original_scheme =
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGL, CdrDefinitions::IMGT);
         let (n_term_scheme, c_term_scheme) = original_scheme.to_terminal_schemes(terminal_length);
 
         for i in 0..terminal_length {

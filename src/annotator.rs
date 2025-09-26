@@ -1,10 +1,12 @@
-use crate::constants::{get_region_ranges, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
+use crate::constants::{
+    get_region_ranges, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH, PRE_FILTER_TERMINAL_LENGTH,
+};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::prefiltering::apply_prefiltering;
 use crate::schemes::get_scheme_with_cdr_definition;
 use crate::sequence::SequenceRecord;
 use crate::types::{
-    CdrDefinition, Chain, ChainNumbering, NumberingPosition, RegionInfo, Regions, Scheme,
+    CdrDefinitions, Chain, ChainNumbering, NumberingPosition, RegionInfo, Regions, Scheme,
 };
 
 /// Main annotator struct that consolidates all numbering functionality
@@ -12,6 +14,8 @@ pub struct Annotator {
     schemes: Vec<NumberingScheme>,
     disable_prefiltering: bool,
     min_confidence: f64,
+    // Cache terminal schemes for prefiltering performance
+    terminal_schemes: Vec<(NumberingScheme, NumberingScheme)>,
 }
 
 impl Annotator {
@@ -19,40 +23,32 @@ impl Annotator {
     pub fn new(
         scheme: Scheme,
         chains: Vec<Chain>,
+        cdr_definitions: Option<CdrDefinitions>,
         disable_prefiltering: bool,
         min_confidence: Option<f64>,
     ) -> Result<Self, String> {
-        Self::new_with_cdr_definition(
-            scheme,
-            chains,
-            CdrDefinition::from_scheme(scheme),
-            disable_prefiltering,
-            min_confidence,
-        )
-    }
-
-    /// Create a new Annotator with custom CDR definitions
-    pub fn new_with_cdr_definition(
-        scheme: Scheme,
-        chains: Vec<Chain>,
-        cdr_definition: CdrDefinition,
-        disable_prefiltering: bool,
-        min_confidence: Option<f64>,
-    ) -> Result<Self, String> {
+        let cdr_definitions = cdr_definitions.unwrap_or(CdrDefinitions::from_scheme(scheme));
         // Pre-build all required schemes for performance
         let schemes: Vec<NumberingScheme> = chains
             .iter()
-            .map(|&chain| get_scheme_with_cdr_definition(scheme, chain, cdr_definition))
+            .map(|&chain| get_scheme_with_cdr_definition(scheme, chain, cdr_definitions))
             .collect();
 
         if schemes.is_empty() {
             return Err("No valid schemes could be created for the specified chains".to_string());
         }
 
+        // Pre-build terminal schemes for prefiltering performance
+        let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = schemes
+            .iter()
+            .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
+            .collect();
+
         Ok(Annotator {
             schemes,
             disable_prefiltering,
             min_confidence: min_confidence.unwrap_or(MINIMAL_CHAIN_IDENTITY),
+            terminal_schemes,
         })
     }
 
@@ -68,7 +64,7 @@ impl Annotator {
 
         // Apply prefiltering if enabled, otherwise use all schemes
         let schemes: Vec<&NumberingScheme> = if !self.disable_prefiltering {
-            apply_prefiltering(&sequence.sequence, &self.schemes)
+            apply_prefiltering(&sequence.sequence, &self.schemes, &self.terminal_schemes)
         } else {
             self.schemes.iter().collect()
         };
@@ -94,7 +90,6 @@ pub fn find_best_chain(
         .map(|&scheme| {
             let (numbers, identity, start, end) = scheme.number_sequence(query_sequence);
             let regions = extract_regions(
-                query_sequence,
                 &numbers,
                 scheme.scheme_type,
                 scheme.chain_type,
@@ -192,7 +187,6 @@ fn find_all_chains(
 
                 // Re-extract regions using the full sequence and padded numbering
                 best_chain.regions = extract_regions(
-                    query_sequence,
                     &best_chain.numbers,
                     best_chain.scheme,
                     best_chain.chain,
@@ -212,81 +206,86 @@ fn find_all_chains(
     Ok(chains_found)
 }
 
-/// Extract region sequences and positions from numbering and sequence
+/// Extract region positions from numbering (optimized - positions only, no sequence extraction)
 fn extract_regions(
-    sequence: &[u8],
     numbers: &[NumberingPosition],
     scheme: Scheme,
     chain: Chain,
-    cdr_definition: CdrDefinition,
+    cdr_definition: CdrDefinitions,
     sequence_start: usize,
 ) -> Regions {
     let region_ranges = get_region_ranges(cdr_definition, scheme, chain);
 
-    // Helper function to extract sequence for a region
-    let extract_region_sequence = |start_pos: u32, end_pos: u32| -> RegionInfo {
-        let mut sequence_start_idx = None;
-        let mut sequence_end_idx = None;
-        let mut region_sequence = String::new();
+    // Pre-allocate region boundary trackers
+    let mut region_boundaries = [None; 14]; // 7 regions * 2 (start, end)
 
-        // Find the actual sequence positions corresponding to the numbering positions
-        for (seq_idx, number_pos) in numbers.iter().enumerate() {
-            let position_matches = match number_pos {
-                NumberingPosition::Gap => false,
-                NumberingPosition::Number(n) => *n >= start_pos && *n < end_pos,
-                NumberingPosition::Insertion { position, .. } => {
-                    *position >= start_pos && *position < end_pos
-                }
-            };
+    // Single pass through numbering positions to find all region boundaries
+    for (seq_idx, number_pos) in numbers.iter().enumerate() {
+        let position = match number_pos {
+            NumberingPosition::Gap => continue,
+            NumberingPosition::Number(n) => *n,
+            NumberingPosition::Insertion { position, .. } => *position,
+        };
 
-            if position_matches {
-                if sequence_start_idx.is_none() {
-                    sequence_start_idx = Some(seq_idx);
-                }
-                sequence_end_idx = Some(seq_idx);
+        // Check each region and update boundaries if this position falls within it
+        let regions = [
+            (region_ranges.fr1.start, region_ranges.fr1.end, 0),
+            (region_ranges.cdr1.start, region_ranges.cdr1.end, 2),
+            (region_ranges.fr2.start, region_ranges.fr2.end, 4),
+            (region_ranges.cdr2.start, region_ranges.cdr2.end, 6),
+            (region_ranges.fr3.start, region_ranges.fr3.end, 8),
+            (region_ranges.cdr3.start, region_ranges.cdr3.end, 10),
+            (region_ranges.fr4.start, region_ranges.fr4.end, 12),
+        ];
 
-                // Add the amino acid if it's within sequence bounds
-                if seq_idx < sequence.len() {
-                    region_sequence.push(sequence[seq_idx] as char);
+        for &(start_pos, end_pos, boundary_idx) in &regions {
+            if position >= start_pos && position < end_pos {
+                let start_idx = boundary_idx;
+                let end_idx = boundary_idx + 1;
+
+                // Update start boundary (first occurrence)
+                if region_boundaries[start_idx].is_none() {
+                    region_boundaries[start_idx] = Some(sequence_start + seq_idx);
                 }
+                // Always update end boundary (last occurrence)
+                region_boundaries[end_idx] = Some(sequence_start + seq_idx);
             }
         }
+    }
 
-        // Calculate absolute positions in the full sequence
-        let abs_start = sequence_start_idx.map_or(0, |idx| sequence_start + idx);
-        let abs_end = sequence_end_idx.map_or(abs_start, |idx| sequence_start + idx);
-
+    // Helper to create RegionInfo from boundary indices
+    let create_region = |start_idx: usize, end_idx: usize| -> RegionInfo {
         RegionInfo {
-            start: abs_start,
-            end: abs_end,
-            sequence: region_sequence,
+            start: region_boundaries[start_idx].unwrap_or(0),
+            end: region_boundaries[end_idx].unwrap_or(0),
         }
     };
 
     Regions {
-        fr1: extract_region_sequence(region_ranges.fr1.start, region_ranges.fr1.end),
-        cdr1: extract_region_sequence(region_ranges.cdr1.start, region_ranges.cdr1.end),
-        fr2: extract_region_sequence(region_ranges.fr2.start, region_ranges.fr2.end),
-        cdr2: extract_region_sequence(region_ranges.cdr2.start, region_ranges.cdr2.end),
-        fr3: extract_region_sequence(region_ranges.fr3.start, region_ranges.fr3.end),
-        cdr3: extract_region_sequence(region_ranges.cdr3.start, region_ranges.cdr3.end),
-        fr4: extract_region_sequence(region_ranges.fr4.start, region_ranges.fr4.end),
+        fr1: create_region(0, 1),
+        cdr1: create_region(2, 3),
+        fr2: create_region(4, 5),
+        cdr2: create_region(6, 7),
+        fr3: create_region(8, 9),
+        cdr3: create_region(10, 11),
+        fr4: create_region(12, 13),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schemes::get_scheme_with_cdr_definition;
 
     #[test]
     fn test_annotator_creation() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], false, None);
+        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, false, None);
         assert!(annotator.is_ok());
     }
 
     #[test]
     fn test_empty_chains() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![], false, None);
+        let annotator = Annotator::new(Scheme::IMGT, vec![], None, false, None);
         assert!(annotator.is_err());
     }
 
@@ -295,6 +294,7 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            None,
             false,
             None,
         )
@@ -320,6 +320,7 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            None,
             true,
             None,
         )
@@ -345,6 +346,7 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            None,
             false, // Disable prefiltering for this test
             None,
         )
@@ -379,9 +381,12 @@ mod tests {
         RQNGVLNSATDQDSKDSTYSMSSTLTLTKDEYERHNSYTCEATHKTSTSPIVKSFNRNEC"
             .as_bytes();
 
-        let heavy_scheme = get_scheme(Scheme::IMGT, Chain::IGH);
-        let lambda_scheme = get_scheme(Scheme::IMGT, Chain::IGL);
-        let kappa_scheme = get_scheme(Scheme::KABAT, Chain::IGK);
+        let heavy_scheme =
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT);
+        let lambda_scheme =
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGL, CdrDefinitions::IMGT);
+        let kappa_scheme =
+            get_scheme_with_cdr_definition(Scheme::KABAT, Chain::IGK, CdrDefinitions::KABAT);
         let schemes: Vec<&NumberingScheme> = vec![&heavy_scheme, &lambda_scheme, &kappa_scheme];
 
         assert_eq!(
@@ -422,9 +427,12 @@ mod tests {
             .as_bytes();
         let linker: &[u8] = "GGGGGGG".as_bytes();
 
-        let heavy_scheme = get_scheme(Scheme::IMGT, Chain::IGH);
-        let lambda_scheme = get_scheme(Scheme::IMGT, Chain::IGL);
-        let kappa_scheme = get_scheme(Scheme::KABAT, Chain::IGK);
+        let heavy_scheme =
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT);
+        let lambda_scheme =
+            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGL, CdrDefinitions::IMGT);
+        let kappa_scheme =
+            get_scheme_with_cdr_definition(Scheme::KABAT, Chain::IGK, CdrDefinitions::KABAT);
         let schemes: Vec<&NumberingScheme> = vec![&heavy_scheme, &lambda_scheme, &kappa_scheme];
 
         let heavy_kappa = [heavy_chain, linker, kappa_chain].concat();

@@ -31,9 +31,18 @@ impl Annotator {
     ) -> Result<Annotator, JsValue> {
         use crate::constants::MINIMAL_CHAIN_IDENTITY;
 
+        // TODO enable this in the WASM API
+        let cdr_definitions = None;
+
         let disable_prefiltering = disable_prefiltering.unwrap_or(false);
         let min_confidence = Some(min_confidence.unwrap_or(MINIMAL_CHAIN_IDENTITY));
-        match RustAnnotator::new(scheme, chains, disable_prefiltering, min_confidence) {
+        match RustAnnotator::new(
+            scheme,
+            chains,
+            cdr_definitions,
+            disable_prefiltering,
+            min_confidence,
+        ) {
             Ok(annotator) => Ok(Annotator { inner: annotator }),
             Err(e) => Err(JsValue::from_str(&e)),
         }

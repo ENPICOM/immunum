@@ -54,7 +54,7 @@ pub fn needleman_wunsch_consensus(
             ]];
 
             if scheme
-                .conserved_positions
+                .conserved_positions_set
                 .contains(&(consensus_position as u32))
             {
                 best_score *= MATCH_CP_MULTIPLIER
@@ -80,7 +80,7 @@ pub fn needleman_wunsch_consensus(
             if transfer == traceback_directions::FROM_DIAG
                 && scheme.consensus_amino_acids[&(consensus_position as u32)].contains(&seq_char)
                 && scheme
-                    .restricted_sites()
+                    .restricted_sites_set
                     .contains(&(consensus_position as u32))
             {
                 traceback_matrix[consensus_position][query_position] =
@@ -95,7 +95,7 @@ pub fn needleman_wunsch_consensus(
         &traceback_matrix,
     );
 
-    let identity: f64 = matches as f64 / (scheme.restricted_sites().len() as f64);
+    let identity: f64 = matches as f64 / (scheme.restricted_sites_set.len() as f64);
     (numbering, identity)
 }
 
@@ -135,8 +135,8 @@ fn traceback_alignment(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schemes::get_scheme;
-    use crate::types::{Chain, Scheme};
+    use crate::schemes::get_scheme_with_cdr_definition;
+    use crate::types::{CdrDefinitions, Chain, Scheme};
 
     #[test]
     fn test_needleman_wunsch_consensus() {
@@ -144,7 +144,7 @@ mod tests {
         QGKATMTADTSSNTAYLQLSSLTSEDTAVYYCNAGHDYDRGRFPYWGQGTLVTVSAAKTTPPSVYPLAPGSAAQTNSMVTLGCLVKGYFPE\
         PVTVTWNSGSLSSGVHTFPAVLQSDLYTLSSSVTVPSSTWPSETVTCNVAHPASSTKVDKKIVPRD"
             .as_bytes();
-        let scheme = get_scheme(Scheme::IMGT, Chain::IGH);
+        let scheme = get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT);
         let output = needleman_wunsch_consensus(heavy_chain, &scheme);
         println!("{output:?}");
     }

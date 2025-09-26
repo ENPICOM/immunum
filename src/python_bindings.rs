@@ -37,8 +37,17 @@ impl Annotator {
             .build()
             .expect("Failed to create thread pool");
 
+        // TODO enable this in the python API
+        let cdr_definitions = None;
+
         // Create the Rust annotator
-        match RustAnnotator::new(scheme, chains, disable_prefiltering, Some(min_confidence)) {
+        match RustAnnotator::new(
+            scheme,
+            chains,
+            cdr_definitions,
+            disable_prefiltering,
+            Some(min_confidence),
+        ) {
             Ok(annotator) => Ok(Annotator {
                 inner: annotator,
                 thread_pool,

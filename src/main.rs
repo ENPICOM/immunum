@@ -31,17 +31,12 @@ fn main() {
     let default_chains_vec = DEFAULT_CHAINS.to_vec();
     let chains = cli.chains.as_ref().unwrap_or(&default_chains_vec);
 
-    // Determine CDR definition to use (defaults to scheme if not specified)
-    let cdr_definition = cli
-        .cdr_definitions
-        .unwrap_or_else(|| crate::types::CdrDefinition::from_scheme(cli.scheme));
-
     // Create annotator with custom parameters
-    let annotator = match Annotator::new_with_cdr_definition(
+    let annotator = match Annotator::new(
         cli.scheme,
         chains.clone(),
-        cdr_definition,
-        cli.disable_prefiltering, // Pass the disable flag directly
+        cli.cdr_definitions,
+        cli.disable_prefiltering,
         Some(cli.min_confidence),
     ) {
         Ok(annotator) => annotator,
