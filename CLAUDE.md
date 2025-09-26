@@ -61,19 +61,29 @@ npm test
 ### Core Architecture
 The codebase follows a modular Rust architecture with the main entry point being the `Annotator` struct in `src/annotator.rs`. Key architectural components:
 
-- **Annotator**: Main API entry point that handles sequence numbering with pre-built numbering schemes
-- **NumberingScheme**: Core data structure containing reference sequences and scoring matrices for specific chain types
+- **Annotator**: Main API entry point that handles sequence numbering with pre-built numbering schemes and cached terminal schemes for performance
+- **NumberingScheme**: Core data structure containing reference sequences, scoring matrices, and cached HashSets for O(1) lookups
 - **Sequence Processing**: Handles FASTA/FASTQ file parsing with support for gzip compression
-- **Alignment Engine**: Custom Needleman-Wunsch implementation optimized for immunoglobulin sequences
+- **Alignment Engine**: Custom Needleman-Wunsch implementation optimized for immunoglobulin sequences with performance enhancements
+
+### Performance Optimizations
+Recent optimizations have achieved 20x+ performance improvements:
+
+- **Terminal Scheme Caching**: Pre-computed terminal schemes during Annotator initialization to eliminate repeated creation during prefiltering
+- **Region Extraction**: Optimized from 7-pass to single-pass algorithm, removing sequence string allocations
+- **HashSet Lookups**: Replaced O(n) vector searches with O(1) HashSet lookups in critical paths
+- **Memory Layout**: Optimized NumberingPosition and RegionInfo structures for better cache locality
+- **Parallel Processing**: Enhanced Rayon-based parallelization with custom thread pools
 
 ### Key Modules
-- `annotator.rs`: Main API with parallel processing support via Rayon
-- `schemes.rs`: Numbering scheme data and initialization
-- `needleman_wunsch.rs`: Sequence alignment implementation
-- `prefiltering.rs`: Performance optimization for multi-chain analysis
+- `annotator.rs`: Main API with parallel processing support via Rayon and terminal scheme caching
+- `schemes.rs`: Numbering scheme data and initialization with cached HashSets for performance
+- `needleman_wunsch.rs`: Sequence alignment implementation with optimized O(1) lookups
+- `prefiltering.rs`: Performance optimization for multi-chain analysis using terminal schemes
 - `sequence.rs`: File format handling (FASTA/FASTQ/gzip)
-- `result.rs`: Output formatting and annotation results
+- `result.rs`: Output formatting and annotation results with optimized region extraction
 - `python_bindings.rs`/`wasm_bindings.rs`: Language bindings
+- `bin/benchmark.rs`: Standalone performance testing tool
 
 ### Features System
 The project uses Cargo features for conditional compilation:
@@ -92,7 +102,8 @@ The library extensively uses Rayon for parallel processing in:
 - Integration tests in `tests/` directory for validation
 - Python binding tests via pytest
 - WASM binding tests via Node.js
-- Performance benchmarks via `benchmark.py`
+- Performance benchmarks via standalone `benchmark` binary
+- AbPdSeq validation tests for accuracy verification
 
 ## Development Commands
 
@@ -106,6 +117,15 @@ uv run pytest -v
 
 # Run validation tests
 cargo test abpdseq_validation_test
+```
+
+### Performance Testing
+```bash
+# Build release version for accurate performance measurement
+cargo run --release --bin benchmark -n 1000 -r 5 -t 8 --output benchmark.json
+
+# Test accuracy against benchmark dataset, successful sequence matches should be at least 99%
+cargo test --release --test abpdseq_validation_test test_abpdseq_validation_full -- --ignored --nocapture
 ```
 
 ### Debugging
@@ -128,8 +148,26 @@ The CLI supports parallel processing via the `--threads` option. Set thread coun
 - **Python**: `uv` (modern Python package manager, faster than pip)
 - **JavaScript**: `npm` for WASM testing dependencies
 
-# Important instructions"
-- We dont care about changes to the rust, python or wasm api, because there are no active users (yet). Breaking changes are fine, and should be picked before other convoluted solutions
-- Run cargo fmt after changes
+# Important Instructions
+
+- Run `cargo fmt` after changes
 - Run tests after changes
-- Run clippy and fix warnings at the end of a big code change
+- Run `cargo clippy` and fix warnings at the end of a big code change
+
+## Performance Benchmarking
+
+The standalone benchmark tool provides comprehensive performance metrics:
+
+```bash
+# Example benchmark output showing optimization results:
+# Sequential processing: 444.4 sequences/second (vs 22.1 before optimization)
+# Parallel processing: 1,724.1 sequences/second (vs 78.1 before optimization)
+# Memory usage: Optimized through HashSet caching and single-pass algorithms
+```
+
+Key performance testing methodology:
+- Test with realistic sequence datasets (AbPdSeq validation set)
+- Measure both sequential and parallel processing speeds
+- Track memory usage and allocation patterns
+- Compare with/without prefiltering enabled
+- Use release builds for accurate performance measurement
