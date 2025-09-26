@@ -25,6 +25,42 @@ struct ValidationStats {
     execution_time_ms: u128,
 }
 
+/// Calculate Levenshtein distance between two sequences
+fn edit_distance<T: PartialEq>(a: &[T], b: &[T]) -> usize {
+    let len_a = a.len();
+    let len_b = b.len();
+
+    if len_a == 0 {
+        return len_b;
+    }
+    if len_b == 0 {
+        return len_a;
+    }
+
+    let mut matrix = vec![vec![0; len_b + 1]; len_a + 1];
+
+    // Initialize first row and column
+    for i in 0..=len_a {
+        matrix[i][0] = i;
+    }
+    for j in 0..=len_b {
+        matrix[0][j] = j;
+    }
+
+    // Fill the matrix
+    for i in 1..=len_a {
+        for j in 1..=len_b {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            matrix[i][j] = std::cmp::min(
+                std::cmp::min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1),
+                matrix[i - 1][j - 1] + cost,
+            );
+        }
+    }
+
+    matrix[len_a][len_b]
+}
+
 impl ValidationStats {
     fn success_rate(&self) -> f64 {
         if self.total_sequences == 0 {
@@ -135,6 +171,17 @@ fn run_validation_parallel(
         .collect();
     stats.execution_time_ms = start_time.elapsed().as_millis();
 
+    // Print missing headers if there are any
+    let expected_headers = expected_results.keys().collect::<Vec<_>>();
+    let result_headers = results.iter().map(|(header, _)| header).collect::<Vec<_>>();
+    let missing_headers: Vec<_> = expected_headers
+        .iter()
+        .filter(|h| !result_headers.contains(h))
+        .collect::<Vec<_>>();
+    if !missing_headers.is_empty() {
+        println!("Missing headers: {:?}", missing_headers);
+    }
+
     // Validate each result
     for (header, result) in results.into_iter() {
         match result {
@@ -151,10 +198,21 @@ fn run_validation_parallel(
                         .find(|chain| chain.chain.to_short() == exp_chain_1.chain_type);
 
                     if let Some(own_chain_1) = own_chain_1_opt {
-                        if own_chain_1.numbers == exp_chain_1.numbers {
+                        // Convert NumberingPosition to String for comparison
+                        let own_numbers_as_strings: Vec<String> = own_chain_1.numbers.iter().map(|n| n.to_string()).collect();
+                        if own_numbers_as_strings == exp_chain_1.numbers {
                             matches.push(own_chain_1)
                         } else {
-                            stats.numbering_errors += 1
+                            stats.numbering_errors += 1;
+                            // Calculate edit distance for debugging
+                            let edit_dist_1 = edit_distance(&own_numbers_as_strings, &exp_chain_1.numbers);
+                            let accuracy_1 = if exp_chain_1.numbers.len() > 0 {
+                                100.0 * (1.0 - edit_dist_1 as f64 / exp_chain_1.numbers.len() as f64)
+                            } else {
+                                0.0
+                            };
+                            println!("{} - Chain 1 ({}) mismatch - Edit distance: {}, Accuracy: {:.1}% (length: {} vs {} expected)",
+                                header, exp_chain_1.chain_type, edit_dist_1, accuracy_1, own_numbers_as_strings.len(), exp_chain_1.numbers.len());
                         }
                     }
 
@@ -165,10 +223,21 @@ fn run_validation_parallel(
                             .find(|chain| chain.chain.to_short() == exp_chain_2.chain_type);
 
                         if let Some(own_chain_2) = own_chain_2_opt {
-                            if own_chain_2.numbers == exp_chain_2.numbers {
+                            // Convert NumberingPosition to String for comparison
+                            let own_numbers_as_strings: Vec<String> = own_chain_2.numbers.iter().map(|n| n.to_string()).collect();
+                            if own_numbers_as_strings == exp_chain_2.numbers {
                                 matches.push(own_chain_2)
                             } else {
-                                stats.numbering_errors += 1
+                                stats.numbering_errors += 1;
+                                // Calculate edit distance for debugging
+                                let edit_dist_2 = edit_distance(&own_numbers_as_strings, &exp_chain_2.numbers);
+                                let accuracy_2 = if exp_chain_2.numbers.len() > 0 {
+                                    100.0 * (1.0 - edit_dist_2 as f64 / exp_chain_2.numbers.len() as f64)
+                                } else {
+                                    0.0
+                                };
+                                println!("{} - Chain 2 ({}) mismatch - Edit distance: {}, Accuracy: {:.1}% (length: {} vs {} expected)",
+                                    header, exp_chain_2.chain_type, edit_dist_2, accuracy_2, own_numbers_as_strings.len(), exp_chain_2.numbers.len());
                             }
                         }
                     }
@@ -178,14 +247,16 @@ fn run_validation_parallel(
                             stats.successful_paired_matches += 1;
                             stats.successful_sequence_matches += 1;
                         }
-                        (_, _) => (),
+                        (_, _) => {
+                            // println!("No (perfect) match found for sequence '{}'", header);
+                            // println!("Our results: {:?}", annotation_result);
+                            // println!("Expected results: {:?}\n", expected);
+                        }
                     }
                 }
             }
             Err(e) => {
-                if stats.numbering_errors < 5 {
-                    println!("Error numbering sequence '{}': {}", header, e);
-                }
+                println!("Error numbering sequence '{}': {}", header, e);
                 stats.numbering_errors += 1;
             }
         }
