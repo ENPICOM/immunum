@@ -32,7 +32,12 @@ fn main() {
     let chains = cli.chains.as_ref().unwrap_or(&default_chains_vec);
 
     // Create annotator with custom parameters
-    let annotator = match Annotator::new(cli.scheme, chains.clone(), cli.prefilter) {
+    let annotator = match Annotator::new(
+        cli.scheme,
+        chains.clone(),
+        cli.prefilter,
+        Some(cli.min_confidence),
+    ) {
         Ok(annotator) => annotator,
         Err(e) => {
             eprintln!("Error creating annotator: {}", e);
@@ -50,12 +55,10 @@ fn main() {
     };
 
     // Set thread pool size if specified
-    if let Some(threads) = cli.threads {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(threads)
-            .build_global()
-            .unwrap();
-    }
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(cli.threads)
+        .build_global()
+        .unwrap();
 
     // Create output file writer
     let mut output_writer = BufWriter::new(File::create(&cli.output).unwrap());

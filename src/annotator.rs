@@ -9,11 +9,17 @@ use crate::types::{Chain, ChainNumbering, NumberingPosition, Scheme};
 pub struct Annotator {
     schemes: Vec<NumberingScheme>,
     use_prefiltering: bool,
+    min_confidence: f64,
 }
 
 impl Annotator {
     /// Create a new Annotator with the specified scheme, chains, and optional scoring parameters
-    pub fn new(scheme: Scheme, chains: Vec<Chain>, use_prefiltering: bool) -> Result<Self, String> {
+    pub fn new(
+        scheme: Scheme,
+        chains: Vec<Chain>,
+        use_prefiltering: bool,
+        min_confidence: Option<f64>,
+    ) -> Result<Self, String> {
         // Pre-build all required schemes for performance
         let schemes: Vec<NumberingScheme> = chains
             .iter()
@@ -27,6 +33,7 @@ impl Annotator {
         Ok(Annotator {
             schemes,
             use_prefiltering,
+            min_confidence: min_confidence.unwrap_or(MINIMAL_CHAIN_IDENTITY),
         })
     }
 
@@ -48,7 +55,12 @@ impl Annotator {
         };
 
         // Use find_all_chains to find multiple chains in the sequence
-        find_all_chains(&sequence.sequence, schemes.as_slice(), max_chains)
+        find_all_chains(
+            &sequence.sequence,
+            schemes.as_slice(),
+            self.min_confidence,
+            max_chains,
+        )
     }
 }
 
@@ -56,6 +68,7 @@ impl Annotator {
 pub fn find_best_chain(
     query_sequence: &[u8],
     numbering_schemes: &[&NumberingScheme],
+    min_confidence: f64,
 ) -> Result<ChainNumbering, String> {
     numbering_schemes
         .iter()
@@ -70,7 +83,7 @@ pub fn find_best_chain(
                 end,
             }
         })
-        .filter(|chain| chain.identity > MINIMAL_CHAIN_IDENTITY)
+        .filter(|chain| chain.identity > min_confidence)
         .max_by(|numbers_a, numbers_b| {
             numbers_a
                 .identity
@@ -85,6 +98,7 @@ pub fn find_best_chain(
 fn find_all_chains(
     query_sequence: &[u8],
     numbering_schemes: &[&NumberingScheme],
+    min_confidence: f64,
     max_chains: Option<usize>,
 ) -> Result<Vec<ChainNumbering>, String> {
     let max_chains = max_chains.unwrap_or(99); // Default is "unlimited"
@@ -101,7 +115,7 @@ fn find_all_chains(
             break;
         }
 
-        let numbering_result = find_best_chain(current_sequence, numbering_schemes);
+        let numbering_result = find_best_chain(current_sequence, numbering_schemes, min_confidence);
 
         // Break early for single chain optimization
         if max_chains == 1 {
@@ -164,13 +178,13 @@ mod tests {
 
     #[test]
     fn test_annotator_creation() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], false);
+        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], false, None);
         assert!(annotator.is_ok());
     }
 
     #[test]
     fn test_empty_chains() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![], false);
+        let annotator = Annotator::new(Scheme::IMGT, vec![], false, None);
         assert!(annotator.is_err());
     }
 
@@ -180,6 +194,7 @@ mod tests {
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             false,
+            None,
         )
         .unwrap();
 
@@ -200,8 +215,13 @@ mod tests {
 
     #[test]
     fn test_prefiltering_with_heavy_chain() {
-        let annotator =
-            Annotator::new(Scheme::IMGT, vec![Chain::IGH, Chain::IGK, Chain::IGL], true).unwrap();
+        let annotator = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            true,
+            None,
+        )
+        .unwrap();
 
         // Heavy chain sequence that should be correctly identified with prefiltering
         let heavy_chain_record = SequenceRecord {
@@ -224,6 +244,7 @@ mod tests {
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             false, // Disable prefiltering for this test
+            None,
         )
         .unwrap();
 
@@ -262,21 +283,21 @@ mod tests {
         let schemes: Vec<&NumberingScheme> = vec![&heavy_scheme, &lambda_scheme, &kappa_scheme];
 
         assert_eq!(
-            find_best_chain(heavy_chain, &schemes)
+            find_best_chain(heavy_chain, &schemes, MINIMAL_CHAIN_IDENTITY)
                 .expect("Did not find match")
                 .chain,
             Chain::IGH
         );
 
         assert_eq!(
-            find_best_chain(kappa_chain, &schemes)
+            find_best_chain(kappa_chain, &schemes, MINIMAL_CHAIN_IDENTITY)
                 .expect("Did not find match")
                 .chain,
             Chain::IGK
         );
 
         assert_eq!(
-            find_best_chain(lambda_chain, &schemes)
+            find_best_chain(lambda_chain, &schemes, MINIMAL_CHAIN_IDENTITY)
                 .expect("Did not find match")
                 .chain,
             Chain::IGL
@@ -305,19 +326,19 @@ mod tests {
         let schemes: Vec<&NumberingScheme> = vec![&heavy_scheme, &lambda_scheme, &kappa_scheme];
 
         let heavy_kappa = [heavy_chain, linker, kappa_chain].concat();
-        let hk_results = find_all_chains(&heavy_kappa, &schemes, Some(2));
+        let hk_results = find_all_chains(&heavy_kappa, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
         assert_eq!(hk_results.unwrap().len(), 2);
 
         let heavy_lambda = [heavy_chain, linker, lambda_chain].concat();
-        let hl_results = find_all_chains(&heavy_lambda, &schemes, Some(2));
+        let hl_results = find_all_chains(&heavy_lambda, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
         assert_eq!(hl_results.unwrap().len(), 2);
 
         let kappa_lambda = [kappa_chain, linker, lambda_chain].concat();
-        let kl_results = find_all_chains(&kappa_lambda, &schemes, Some(2));
+        let kl_results = find_all_chains(&kappa_lambda, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
         assert_eq!(kl_results.unwrap().len(), 2);
 
         let heavy_heavy = [heavy_chain, linker, heavy_chain].concat();
-        let hh_results = find_all_chains(&heavy_heavy, &schemes, Some(2));
+        let hh_results = find_all_chains(&heavy_heavy, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
         assert_eq!(hh_results.unwrap().len(), 2);
     }
 }

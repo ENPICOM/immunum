@@ -16,13 +16,14 @@ pub mod python_bindings;
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
 
-// Re-export public API functions for convenience
-pub use schemes::get_scheme;
-
-// New primary API
+// Primary API
 pub use annotator::Annotator;
 
 pub use constants::{get_scoring_params, ScoringParams};
 pub use numbering_scheme_type::NumberingScheme;
 pub use scoring_matrix::ScoringMatrix;
 pub use types::{Chain, RegionRange, Scheme};
+
+// Re-export the Python module function for PyO3
+#[cfg(feature = "python")]
+pub use python_bindings::immunum;

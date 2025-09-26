@@ -199,15 +199,18 @@ fn run_validation_parallel(
 
                     if let Some(own_chain_1) = own_chain_1_opt {
                         // Convert NumberingPosition to String for comparison
-                        let own_numbers_as_strings: Vec<String> = own_chain_1.numbers.iter().map(|n| n.to_string()).collect();
+                        let own_numbers_as_strings: Vec<String> =
+                            own_chain_1.numbers.iter().map(|n| n.to_string()).collect();
                         if own_numbers_as_strings == exp_chain_1.numbers {
                             matches.push(own_chain_1)
                         } else {
                             stats.numbering_errors += 1;
                             // Calculate edit distance for debugging
-                            let edit_dist_1 = edit_distance(&own_numbers_as_strings, &exp_chain_1.numbers);
+                            let edit_dist_1 =
+                                edit_distance(&own_numbers_as_strings, &exp_chain_1.numbers);
                             let accuracy_1 = if exp_chain_1.numbers.len() > 0 {
-                                100.0 * (1.0 - edit_dist_1 as f64 / exp_chain_1.numbers.len() as f64)
+                                100.0
+                                    * (1.0 - edit_dist_1 as f64 / exp_chain_1.numbers.len() as f64)
                             } else {
                                 0.0
                             };
@@ -224,15 +227,19 @@ fn run_validation_parallel(
 
                         if let Some(own_chain_2) = own_chain_2_opt {
                             // Convert NumberingPosition to String for comparison
-                            let own_numbers_as_strings: Vec<String> = own_chain_2.numbers.iter().map(|n| n.to_string()).collect();
+                            let own_numbers_as_strings: Vec<String> =
+                                own_chain_2.numbers.iter().map(|n| n.to_string()).collect();
                             if own_numbers_as_strings == exp_chain_2.numbers {
                                 matches.push(own_chain_2)
                             } else {
                                 stats.numbering_errors += 1;
                                 // Calculate edit distance for debugging
-                                let edit_dist_2 = edit_distance(&own_numbers_as_strings, &exp_chain_2.numbers);
+                                let edit_dist_2 =
+                                    edit_distance(&own_numbers_as_strings, &exp_chain_2.numbers);
                                 let accuracy_2 = if exp_chain_2.numbers.len() > 0 {
-                                    100.0 * (1.0 - edit_dist_2 as f64 / exp_chain_2.numbers.len() as f64)
+                                    100.0
+                                        * (1.0
+                                            - edit_dist_2 as f64 / exp_chain_2.numbers.len() as f64)
                                 } else {
                                     0.0
                                 };
@@ -278,6 +285,7 @@ mod tests {
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             true, // Enable prefiltering to help with chain detection
+            None,
         )
         .expect("Failed to create annotator");
 
@@ -315,9 +323,13 @@ mod tests {
     #[ignore] // Ignore by default due to long runtime - run with `cargo test --ignored`
     fn test_abpdseq_validation_full() {
         // Full validation - will take much longer
-        let annotator =
-            Annotator::new(Scheme::IMGT, vec![Chain::IGH, Chain::IGK, Chain::IGL], true)
-                .expect("Failed to create annotator");
+        let annotator = Annotator::new(
+            Scheme::IMGT,
+            vec![Chain::IGH, Chain::IGK, Chain::IGL],
+            true,
+            None,
+        )
+        .expect("Failed to create annotator");
 
         let sequence_stream = SequenceStream::new("fixtures/abpdseq_agreed.fasta")
             .expect("Failed to create sequence stream");

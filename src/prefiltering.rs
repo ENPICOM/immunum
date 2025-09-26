@@ -1,5 +1,5 @@
 use crate::annotator::find_best_chain;
-use crate::constants::{PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
+use crate::constants::{MINIMAL_CHAIN_IDENTITY, PRE_FILTER_TERMINAL_LENGTH, WITHIN_IDENTITY_RANGE};
 use crate::numbering_scheme_type::NumberingScheme;
 // use crate::result::AnnotationResult;
 use crate::types::{Chain, PrefilterOutput};
@@ -44,9 +44,11 @@ pub fn run_pre_scan(
     for terminal_schemes in all_terminal_schemes {
         let (n_terminal, c_terminal) = terminal_schemes;
         // run alignment for n and c terminal
-        let n_terminal_output = find_best_chain(query_sequence, &[n_terminal]);
+        let n_terminal_output =
+            find_best_chain(query_sequence, &[n_terminal], MINIMAL_CHAIN_IDENTITY);
 
-        let c_terminal_output = find_best_chain(query_sequence, &[c_terminal]);
+        let c_terminal_output =
+            find_best_chain(query_sequence, &[c_terminal], MINIMAL_CHAIN_IDENTITY);
 
         let (n_terminal_identity, n_terminal_start) = match n_terminal_output {
             Ok(n_numbering) => (n_numbering.identity, n_numbering.start),

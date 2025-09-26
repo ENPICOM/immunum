@@ -1,171 +1,210 @@
-# """
-# Basic tests for the immunum Python API.
+"""
+Basic tests for the immunum Python API.
 
-# This module contains tests for the new Annotator-based API functionality.
-# """
+This module contains tests for the new Annotator-based API functionality.
+"""
 
-# import pytest
-# import immunum
-
-
-# class TestImmunumAPI:
-#     """Tests for the main immunum API."""
-
-#     def test_scheme_enums(self):
-#         """Test that scheme enums are accessible."""
-#         assert immunum.Scheme.IMGT is not None
-#         assert immunum.Scheme.KABAT is not None
-
-#     def test_chain_enums(self):
-#         """Test that chain enums are accessible."""
-#         assert immunum.Chain.IGH is not None
-#         assert immunum.Chain.IGK is not None
-#         assert immunum.Chain.IGL is not None
-#         assert immunum.Chain.TRA is not None
-#         assert immunum.Chain.TRB is not None
-#         assert immunum.Chain.TRG is not None
-#         assert immunum.Chain.TRD is not None
-
-#     def test_scoring_params(self):
-#         """Test ScoringParams creation."""
-#         params = immunum.ScoringParams()
-#         assert params is not None
-#         assert params.gap_pen_cp > 0
-
-#         custom_params = immunum.ScoringParams(gap_pen_cp=60.0)
-#         assert custom_params.gap_pen_cp == 60.0
-
-#     def test_default_scoring_params(self):
-#         """Test default scoring parameters function."""
-#         params = immunum.default_scoring_params()
-#         assert params is not None
-#         assert params.gap_pen_cp > 0
-
-#     def test_annotator_creation(self):
-#         """Test Annotator creation."""
-#         annotator = immunum.Annotator(
-#             scheme=immunum.Scheme.IMGT, chains=[immunum.Chain.IGH]
-#         )
-#         assert annotator is not None
-
-#     def test_annotator_with_custom_params(self):
-#         """Test Annotator creation with custom scoring parameters."""
-#         custom_params = immunum.ScoringParams(gap_pen_cp=60.0)
-#         annotator = immunum.Annotator(
-#             scheme=immunum.Scheme.IMGT,
-#             chains=[immunum.Chain.IGH],
-#             scoring_params=custom_params,
-#         )
-#         assert annotator is not None
-
-#     def test_annotator_with_prefiltering(self):
-#         """Test Annotator creation with pre-filtering enabled."""
-#         annotator = immunum.Annotator(
-#             scheme=immunum.Scheme.IMGT,
-#             chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-#             use_prefiltering=True,
-#         )
-#         assert annotator is not None
-
-#     def test_api_structure(self):
-#         """Test that the expected API is available."""
-#         expected_api = [
-#             "Annotator",
-#             "AnnotationResult",
-#             "Chain",
-#             "Scheme",
-#             "ScoringParams",
-#             "default_scoring_params",
-#         ]
-#         available_api = [attr for attr in dir(immunum) if not attr.startswith("_")]
-
-#         for api in expected_api:
-#             assert api in available_api, (
-#                 f"Expected API '{api}' not found. Available: {available_api}"
-#             )
+import pytest
+import immunum
 
 
-# class TestAnnotationResult:
-#     """Test AnnotationResult functionality."""
+class TestImmunumAPI:
+    """Tests for the main immunum API."""
 
-#     def test_annotation_result_properties(self):
-#         """Test that AnnotationResult has expected properties."""
-#         # We'll need to create a mock or use a real result
-#         # For now, just test the class exists
-#         assert hasattr(immunum, "AnnotationResult")
+    def test_scheme_enum_class(self):
+        """Test that Scheme enum class is accessible."""
+        assert hasattr(immunum, "Scheme")
+        assert immunum.Scheme is not None
 
-#     def test_annotation_result_methods(self):
-#         """Test that AnnotationResult has expected methods."""
-#         # This would require creating an actual result to test
-#         # The methods exist based on our implementation:
-#         # - sequence, numbers, scheme, chain, identity (getters)
-#         # - regions, start, end (getters)
-#         # - get_region_sequence, get_cdr_sequences, get_framework_sequences
-#         # - is_high_confidence, summary
-#         pass
+    def test_chain_enum_class(self):
+        """Test that Chain enum class is accessible."""
+        assert hasattr(immunum, "Chain")
+        assert immunum.Chain is not None
+
+    def test_annotator_creation_default(self):
+        """Test Annotator creation with default parameters."""
+        annotator = immunum.Annotator()
+        assert annotator is not None
+
+    def test_annotator_creation_custom(self):
+        """Test Annotator creation with custom parameters."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT,
+            chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
+            disable_prefiltering=False,
+            threads=2,
+            min_confidence=0.8,
+        )
+        assert annotator is not None
+
+    def test_annotator_creation_kabat(self):
+        """Test Annotator creation with KABAT scheme."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.KABAT,
+            chains=[immunum.Chain.IGH],
+            disable_prefiltering=True,
+            min_confidence=0.5,
+        )
+        assert annotator is not None
+
+    def test_api_structure(self):
+        """Test that the expected API is available."""
+        expected_api = [
+            "Annotator",
+            "Chain",
+            "Scheme",
+        ]
+        available_api = [attr for attr in dir(immunum) if not attr.startswith("_")]
+
+        for api in expected_api:
+            assert api in available_api, (
+                f"Expected API '{api}' not found. Available: {available_api}"
+            )
 
 
-# class TestAnnotatorMethods:
-#     """Test Annotator methods."""
+class TestAnnotatorMethods:
+    """Test Annotator methods with the new API."""
 
-#     def test_annotator_number_sequence(self):
-#         """Test Annotator.number_sequence method."""
-#         annotator = immunum.Annotator(
-#             scheme=immunum.Scheme.IMGT, chains=[immunum.Chain.IGH]
-#         )
+    def test_number_sequences_basic(self):
+        """Test basic number_sequences functionality."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT,
+            chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
+        )
 
-#         # Test with a short sequence - might fail but shouldn't crash
-#         test_sequence = "ATCGATCGATCG"
-#         try:
-#             result = annotator.number_sequence(test_sequence)
-#             assert result is not None
-#         except Exception as e:
-#             # Short sequences might be rejected
-#             assert "error" in str(e).lower() or "empty" in str(e).lower()
+        # Test with realistic antibody sequences
+        heavy_chain = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS"
+        light_chain = "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK"
 
-#     def test_annotator_number_sequences(self):
-#         """Test Annotator.number_sequences method."""
-#         annotator = immunum.Annotator(
-#             scheme=immunum.Scheme.IMGT, chains=[immunum.Chain.IGH]
-#         )
+        sequences = [heavy_chain, light_chain]
+        results = annotator.number_sequences(sequences, max_chains=2)
 
-#         sequences = ["ATCGATCGATCG", "GCTAGCTAGCTA"]
-#         try:
-#             results = annotator.number_sequences(sequences)
-#             assert isinstance(results, list)
-#             assert len(results) == len(sequences)
-#         except Exception as e:
-#             # Expected to potentially fail with test sequences
-#             assert "error" in str(e).lower()
+        assert isinstance(results, list)
+        assert len(results) == 2  # Two input sequences
 
-#     def test_annotator_number_file(self):
-#         """Test Annotator.number_file method."""
-#         annotator = immunum.Annotator(
-#             scheme=immunum.Scheme.IMGT,
-#             chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL]
-#         )
+        # Check heavy chain result
+        heavy_result = results[0]
+        assert len(heavy_result) >= 1  # Should find at least one chain
+        numbers, confidence, chain_type = heavy_result[0]
+        print(dir(chain_type))
+        assert isinstance(numbers, list)
+        assert isinstance(confidence, float)
+        assert confidence >= 0.0 and confidence <= 1.0
+        assert chain_type == immunum.Chain.IGH  # Should be heavy chain
 
-#         # Test with the fixture file (sequential processing)
-#         results = annotator.number_file("fixtures/test.fasta")
-#         assert isinstance(results, list)
-#         assert len(results) == 4  # Expected 4 sequences in test.fasta
+        # Check light chain result
+        light_result = results[1]
+        assert len(light_result) >= 1  # Should find at least one chain
+        numbers, confidence, chain_type = light_result[0]
+        assert isinstance(numbers, list)
+        assert isinstance(confidence, float)
+        assert confidence >= 0.0 and confidence <= 1.0
+        assert chain_type in [
+            immunum.Chain.IGK,
+            immunum.Chain.IGL,
+        ]  # Should be light chain
 
-#         # Check that results are tuples of (name, AnnotationResult)
-#         for name, result in results:
-#             assert isinstance(name, str)
-#             assert hasattr(result, 'sequence')
-#             assert hasattr(result, 'scheme')
-#             assert hasattr(result, 'chain')
-#             assert hasattr(result, 'identity')
+    def test_number_sequences_with_tuples(self):
+        """Test number_sequences with tuple input (id, sequence)."""
+        annotator = immunum.Annotator()
 
-#         # Test with parallel processing
-#         parallel_results = annotator.number_file("fixtures/test.fasta", parallel=True)
-#         assert isinstance(parallel_results, list)
-#         assert len(parallel_results) == 4  # Same number of results
+        sequences = [
+            (
+                "heavy_seq",
+                "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS",
+            ),
+            (
+                "light_seq",
+                "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK",
+            ),
+        ]
 
-#         # Test with non-existent file
-#         try:
-#             annotator.number_file("fixtures/nonexistent.fasta")
-#             assert False, "Should have raised an exception for non-existent file"
-#         except Exception as e:
-#             assert "not found" in str(e).lower() or "error" in str(e).lower()
+        results = annotator.number_sequences(sequences)
+        assert isinstance(results, list)
+        assert len(results) == 2
+
+    def test_number_sequences_mixed_input(self):
+        """Test number_sequences with mixed string and tuple input."""
+        annotator = immunum.Annotator(min_confidence=0.5)
+
+        sequences = [
+            "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS",
+            (
+                "light_seq",
+                "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK",
+            ),
+        ]
+
+        results = annotator.number_sequences(sequences, max_chains=1)
+        assert isinstance(results, list)
+        assert len(results) == 2
+
+    def test_number_sequences_empty(self):
+        """Test number_sequences with empty input."""
+        annotator = immunum.Annotator()
+
+        results = annotator.number_sequences([])
+        assert isinstance(results, list)
+        assert len(results) == 0
+
+    def test_number_sequences_no_chains_found(self):
+        """Test number_sequences with sequences that likely won't match."""
+        annotator = immunum.Annotator(min_confidence=0.9)  # High confidence threshold
+
+        # Very short, non-antibody sequence
+        sequences = ["ATCGATCG"]
+        results = annotator.number_sequences(sequences)
+
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert len(results[0]) == 0  # No chains found
+
+    def test_number_sequences_max_chains(self):
+        """Test max_chains parameter."""
+        annotator = immunum.Annotator()
+
+        # Test with a longer sequence that might contain multiple chains
+        long_sequence = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSSDIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK"
+
+        results_max1 = annotator.number_sequences([long_sequence], max_chains=1)
+        results_max2 = annotator.number_sequences([long_sequence], max_chains=2)
+
+        assert len(results_max1[0]) <= 1
+        assert len(results_max2[0]) <= 2
+
+    def test_confidence_filtering(self):
+        """Test that min_confidence parameter works."""
+        # Create annotators with different confidence thresholds
+        low_confidence = immunum.Annotator(min_confidence=0.1)
+        high_confidence = immunum.Annotator(min_confidence=0.95)
+
+        sequence = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS"
+
+        low_results = low_confidence.number_sequences([sequence])
+        high_results = high_confidence.number_sequences([sequence])
+
+        # Low confidence should find chains (if any exist)
+        # High confidence might filter some out
+        assert len(low_results[0]) >= len(high_results[0])
+
+    def test_different_schemes(self):
+        """Test different numbering schemes."""
+        imgt_annotator = immunum.Annotator(scheme=immunum.Scheme.IMGT)
+        kabat_annotator = immunum.Annotator(scheme=immunum.Scheme.KABAT)
+
+        sequence = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS"
+
+        imgt_results = imgt_annotator.number_sequences([sequence])
+        kabat_results = kabat_annotator.number_sequences([sequence])
+
+        # Both should process without errors
+        assert isinstance(imgt_results, list)
+        assert isinstance(kabat_results, list)
+
+        # If chains are found, the numbering might be different
+        if len(imgt_results[0]) > 0 and len(kabat_results[0]) > 0:
+            imgt_numbers = imgt_results[0][0][0]  # First chain's numbers
+            kabat_numbers = kabat_results[0][0][0]  # First chain's numbers
+            # Numbers might be different between schemes
+            assert isinstance(imgt_numbers, list)
+            assert isinstance(kabat_numbers, list)

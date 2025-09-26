@@ -1,4 +1,7 @@
-use crate::types::{Chain, Scheme};
+use crate::{
+    constants::MINIMAL_CHAIN_IDENTITY,
+    types::{Chain, Scheme},
+};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -37,23 +40,23 @@ pub struct Cli {
         help = "Maximum number of non-overlapping chains to find in each sequence (0 = unlimited, 1 = single chain mode)"
     )]
     pub max_chains: usize,
-    /// Output format for results
-    // #[arg(
-    //     short = 'f',
-    //     long = "format",
-    //     value_enum,
-    //     ignore_case = true,
-    //     default_value_t = OutputFormat::Simple,
-    //     help = "Output format for results"
-    // )]
-    // pub format: OutputFormat,
     /// Number of threads for parallel processing (defaults to number of CPU cores)
     #[arg(
         short = 't',
         long = "threads",
+        default_value_t = num_cpus::get(),
         help = "Number of threads for parallel processing (defaults to number of CPU cores)"
     )]
-    pub threads: Option<usize>,
+    pub threads: usize,
+    /// Minimal confidence score of alignment to a scheme to pass
+    #[arg(
+        short = 'm',
+        long = "min-confidence",
+        default_value_t = MINIMAL_CHAIN_IDENTITY,
+        help = "Minimal confidence score of alignment to a scheme to pass"
+
+    )]
+    pub min_confidence: f64,
     /// Enable verbose output with per-sequence progress logging
     #[arg(
         short = 'v',

@@ -24,7 +24,7 @@ pub struct PrefilterOutput {
 
 /// Numbering schemes for immunoglobulin sequences
 #[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Serialize)]
-#[cfg_attr(feature = "python", pyo3::pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum Scheme {
     /// IMGT numbering scheme
@@ -37,7 +37,7 @@ pub enum Scheme {
 
 /// Immunoglobulin and T-cell receptor chain types
 #[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum, Serialize)]
-#[cfg_attr(feature = "python", pyo3::pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 pub enum Chain {
     // IG Heavy chain variants
