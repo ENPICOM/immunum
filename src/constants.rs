@@ -76,6 +76,233 @@ pub mod insertion_points {
     pub const CDR3_KABAT_HEAVY: u32 = 100;
     pub const CDR3_KABAT_LIGHT: u32 = 95;
 }
+
+/// Region range definitions for different CDR definition schemes
+pub struct RegionRanges {
+    pub fr1: crate::types::RegionRange,
+    pub cdr1: crate::types::RegionRange,
+    pub fr2: crate::types::RegionRange,
+    pub cdr2: crate::types::RegionRange,
+    pub fr3: crate::types::RegionRange,
+    pub cdr3: crate::types::RegionRange,
+    pub fr4: crate::types::RegionRange,
+}
+
+/// Get region ranges based on CDR definition, numbering scheme, and chain type
+pub fn get_region_ranges(
+    cdr_definition: crate::types::CdrDefinition,
+    scheme: crate::types::Scheme,
+    chain: crate::types::Chain,
+) -> RegionRanges {
+    use crate::types::{CdrDefinition, Chain, RegionRange, Scheme};
+
+    // If CDR definition matches the scheme, use the default ranges from scheme
+    if (cdr_definition == CdrDefinition::IMGT && scheme == Scheme::IMGT)
+        || (cdr_definition == CdrDefinition::KABAT && scheme == Scheme::KABAT)
+    {
+        // Use the original scheme-based ranges
+        return get_default_region_ranges(scheme, chain);
+    }
+
+    // Custom CDR definitions with different boundaries
+    match (cdr_definition, chain) {
+        // IMGT CDR definitions on any numbering scheme
+        (CdrDefinition::IMGT, Chain::IGH) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 26 },
+            cdr1: RegionRange { start: 27, end: 38 },
+            fr2: RegionRange { start: 39, end: 55 },
+            cdr2: RegionRange { start: 56, end: 65 },
+            fr3: RegionRange {
+                start: 66,
+                end: 104,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 117,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 129,
+            },
+        },
+        (CdrDefinition::IMGT, Chain::IGK | Chain::IGL) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 26 },
+            cdr1: RegionRange { start: 27, end: 38 },
+            fr2: RegionRange { start: 39, end: 55 },
+            cdr2: RegionRange { start: 56, end: 65 },
+            fr3: RegionRange {
+                start: 66,
+                end: 104,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 117,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 128,
+            },
+        },
+
+        // KABAT CDR definitions on any numbering scheme
+        (CdrDefinition::KABAT, Chain::IGH) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 30 },
+            cdr1: RegionRange { start: 31, end: 35 },
+            fr2: RegionRange { start: 36, end: 49 },
+            cdr2: RegionRange { start: 50, end: 65 },
+            fr3: RegionRange { start: 66, end: 94 },
+            cdr3: RegionRange {
+                start: 95,
+                end: 102,
+            },
+            fr4: RegionRange {
+                start: 103,
+                end: 114,
+            },
+        },
+        (CdrDefinition::KABAT, Chain::IGK | Chain::IGL) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 23 },
+            cdr1: RegionRange { start: 24, end: 34 },
+            fr2: RegionRange { start: 35, end: 49 },
+            cdr2: RegionRange { start: 50, end: 56 },
+            fr3: RegionRange { start: 57, end: 88 },
+            cdr3: RegionRange { start: 89, end: 97 },
+            fr4: RegionRange {
+                start: 98,
+                end: 108,
+            },
+        },
+
+        // NORTH CDR definitions
+        (CdrDefinition::NORTH, Chain::IGH) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 22 },
+            cdr1: RegionRange { start: 23, end: 35 },
+            fr2: RegionRange { start: 36, end: 49 },
+            cdr2: RegionRange { start: 50, end: 58 },
+            fr3: RegionRange { start: 59, end: 94 },
+            cdr3: RegionRange {
+                start: 95,
+                end: 102,
+            },
+            fr4: RegionRange {
+                start: 103,
+                end: 114,
+            },
+        },
+        (CdrDefinition::NORTH, Chain::IGK | Chain::IGL) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 22 },
+            cdr1: RegionRange { start: 23, end: 35 },
+            fr2: RegionRange { start: 36, end: 49 },
+            cdr2: RegionRange { start: 50, end: 58 },
+            fr3: RegionRange { start: 59, end: 88 },
+            cdr3: RegionRange { start: 89, end: 97 },
+            fr4: RegionRange {
+                start: 98,
+                end: 108,
+            },
+        },
+
+        // For T-cell receptors, default to heavy chain patterns
+        (_, Chain::TRA | Chain::TRB | Chain::TRG | Chain::TRD) => {
+            get_region_ranges(cdr_definition, scheme, Chain::IGH)
+        }
+    }
+}
+
+/// Get default region ranges for a scheme and chain (original behavior)
+fn get_default_region_ranges(
+    scheme: crate::types::Scheme,
+    chain: crate::types::Chain,
+) -> RegionRanges {
+    use crate::types::{Chain, RegionRange, Scheme};
+
+    match (scheme, chain) {
+        (Scheme::IMGT, Chain::IGH) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 27 },
+            cdr1: RegionRange { start: 27, end: 39 },
+            fr2: RegionRange { start: 39, end: 56 },
+            cdr2: RegionRange { start: 56, end: 66 },
+            fr3: RegionRange {
+                start: 66,
+                end: 105,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 118,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 129,
+            },
+        },
+        (Scheme::IMGT, Chain::IGK) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 27 },
+            cdr1: RegionRange { start: 27, end: 39 },
+            fr2: RegionRange { start: 39, end: 56 },
+            cdr2: RegionRange { start: 56, end: 66 },
+            fr3: RegionRange {
+                start: 66,
+                end: 105,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 118,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 128,
+            },
+        },
+        (Scheme::IMGT, Chain::IGL) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 27 },
+            cdr1: RegionRange { start: 27, end: 39 },
+            fr2: RegionRange { start: 39, end: 56 },
+            cdr2: RegionRange { start: 56, end: 66 },
+            fr3: RegionRange {
+                start: 66,
+                end: 105,
+            },
+            cdr3: RegionRange {
+                start: 105,
+                end: 118,
+            },
+            fr4: RegionRange {
+                start: 118,
+                end: 129,
+            },
+        },
+        (Scheme::KABAT, Chain::IGH) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 31 },
+            cdr1: RegionRange { start: 31, end: 36 },
+            fr2: RegionRange { start: 36, end: 50 },
+            cdr2: RegionRange { start: 50, end: 66 },
+            fr3: RegionRange { start: 66, end: 95 },
+            cdr3: RegionRange {
+                start: 95,
+                end: 103,
+            },
+            fr4: RegionRange {
+                start: 103,
+                end: 114,
+            },
+        },
+        (Scheme::KABAT, Chain::IGK | Chain::IGL) => RegionRanges {
+            fr1: RegionRange { start: 1, end: 24 },
+            cdr1: RegionRange { start: 24, end: 35 },
+            fr2: RegionRange { start: 35, end: 50 },
+            cdr2: RegionRange { start: 50, end: 57 },
+            fr3: RegionRange { start: 57, end: 89 },
+            cdr3: RegionRange { start: 89, end: 98 },
+            fr4: RegionRange {
+                start: 98,
+                end: 108,
+            },
+        },
+        // For unsupported T-cell receptor chains, default to heavy chain patterns
+        (Scheme::IMGT, _) => get_default_region_ranges(Scheme::IMGT, Chain::IGH),
+        (Scheme::KABAT, _) => get_default_region_ranges(Scheme::KABAT, Chain::IGH),
+    }
+}
 // ALPHABET for numbering
 pub const ALPHABET: [char; 26] = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',

@@ -1,6 +1,6 @@
 use crate::{
     constants::MINIMAL_CHAIN_IDENTITY,
-    types::{Chain, Scheme},
+    types::{CdrDefinition, Chain, Scheme},
 };
 use clap::Parser;
 
@@ -20,6 +20,14 @@ pub struct Cli {
     #[arg(
         short, long, value_enum, ignore_case = true, default_value_t = Scheme::IMGT, help = "Numbering scheme")]
     pub scheme: Scheme,
+    /// CDR definition scheme to use (defaults to same as numbering scheme)
+    #[arg(
+        long = "cdr-definitions",
+        value_enum,
+        ignore_case = true,
+        help = "CDR definition scheme (defaults to same as numbering scheme)"
+    )]
+    pub cdr_definitions: Option<CdrDefinition>,
     /// Chain types to try numbering with (supports multiple values)
     #[arg(
         short, long, value_enum, ignore_case = true, num_args = 1.., help = "Chain types to number with (multiple values allowed)")]

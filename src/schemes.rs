@@ -1,20 +1,13 @@
 use crate::consensus_scoring::calculate_scoring_matrix;
-use crate::constants::{get_consensus, get_scoring_params};
+use crate::constants::{get_consensus, get_region_ranges, get_scoring_params};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::scoring_matrix::ScoringMatrix;
-use crate::types::{Chain, RegionRange, Scheme};
+use crate::types::{CdrDefinition, Chain, Scheme};
 
 struct SchemeConfig {
     conserved_positions: Vec<u32>,
     insertion_positions: Vec<u32>,
     gap_positions: Vec<u32>,
-    fr1: RegionRange,
-    cdr1: RegionRange,
-    fr2: RegionRange,
-    cdr2: RegionRange,
-    fr3: RegionRange,
-    cdr3: RegionRange,
-    fr4: RegionRange,
 }
 
 fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
@@ -23,112 +16,31 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
             conserved_positions: vec![23, 41, 104, 118, 119, 121],
             insertion_positions: vec![32, 60, 111],
             gap_positions: vec![10, 73],
-            fr1: RegionRange { start: 1, end: 27 },
-            cdr1: RegionRange { start: 27, end: 39 },
-            fr2: RegionRange { start: 39, end: 56 },
-            cdr2: RegionRange { start: 56, end: 66 },
-            fr3: RegionRange {
-                start: 66,
-                end: 105,
-            },
-            cdr3: RegionRange {
-                start: 105,
-                end: 118,
-            },
-            fr4: RegionRange {
-                start: 118,
-                end: 129,
-            },
         },
         (Scheme::IMGT, Chain::IGK) => SchemeConfig {
             conserved_positions: vec![23, 41, 104, 118, 119, 121],
             insertion_positions: vec![32, 60, 111],
             gap_positions: vec![10, 73, 81, 82],
-            fr1: RegionRange { start: 1, end: 27 },
-            cdr1: RegionRange { start: 27, end: 39 },
-            fr2: RegionRange { start: 39, end: 56 },
-            cdr2: RegionRange { start: 56, end: 66 },
-            fr3: RegionRange {
-                start: 66,
-                end: 105,
-            },
-            cdr3: RegionRange {
-                start: 105,
-                end: 118,
-            },
-            fr4: RegionRange {
-                start: 118,
-                end: 128,
-            },
         },
         (Scheme::IMGT, Chain::IGL) => SchemeConfig {
             conserved_positions: vec![23, 41, 104, 118, 119, 121],
             insertion_positions: vec![32, 60, 111],
             gap_positions: vec![10, 73, 81, 82],
-            fr1: RegionRange { start: 1, end: 27 },
-            cdr1: RegionRange { start: 27, end: 39 },
-            fr2: RegionRange { start: 39, end: 56 },
-            cdr2: RegionRange { start: 56, end: 66 },
-            fr3: RegionRange {
-                start: 66,
-                end: 105,
-            },
-            cdr3: RegionRange {
-                start: 105,
-                end: 118,
-            },
-            fr4: RegionRange {
-                start: 118,
-                end: 129,
-            },
         },
         (Scheme::KABAT, Chain::IGH) => SchemeConfig {
             conserved_positions: vec![22, 36, 92, 103, 104, 106],
             insertion_positions: vec![6, 35, 52, 82, 100],
             gap_positions: vec![40, 41, 42, 43, 44, 72, 73, 74],
-            fr1: RegionRange { start: 1, end: 31 },
-            cdr1: RegionRange { start: 31, end: 36 },
-            fr2: RegionRange { start: 36, end: 50 },
-            cdr2: RegionRange { start: 50, end: 66 },
-            fr3: RegionRange { start: 66, end: 95 },
-            cdr3: RegionRange {
-                start: 95,
-                end: 103,
-            },
-            fr4: RegionRange {
-                start: 103,
-                end: 114,
-            },
         },
         (Scheme::KABAT, Chain::IGK) => SchemeConfig {
             conserved_positions: vec![23, 35, 88, 98, 99, 101],
             insertion_positions: vec![27, 52, 95],
             gap_positions: vec![10],
-            fr1: RegionRange { start: 1, end: 24 },
-            cdr1: RegionRange { start: 24, end: 35 },
-            fr2: RegionRange { start: 35, end: 50 },
-            cdr2: RegionRange { start: 50, end: 57 },
-            fr3: RegionRange { start: 57, end: 89 },
-            cdr3: RegionRange { start: 89, end: 98 },
-            fr4: RegionRange {
-                start: 98,
-                end: 108,
-            },
         },
         (Scheme::KABAT, Chain::IGL) => SchemeConfig {
             conserved_positions: vec![23, 35, 88, 98, 99, 101],
             insertion_positions: vec![27, 52, 95],
             gap_positions: vec![10],
-            fr1: RegionRange { start: 1, end: 24 },
-            cdr1: RegionRange { start: 24, end: 35 },
-            fr2: RegionRange { start: 35, end: 50 },
-            cdr2: RegionRange { start: 50, end: 57 },
-            fr3: RegionRange { start: 57, end: 89 },
-            cdr3: RegionRange { start: 89, end: 98 },
-            fr4: RegionRange {
-                start: 98,
-                end: 108,
-            },
         },
         // For unsupported T-cell receptor chains, default to heavy chain patterns
         (Scheme::IMGT, _) => get_scheme_config(&Scheme::IMGT, &Chain::IGH),
@@ -137,26 +49,36 @@ fn get_scheme_config(scheme: &Scheme, chain: &Chain) -> SchemeConfig {
 }
 
 pub fn get_scheme(scheme: Scheme, chain: Chain) -> NumberingScheme {
+    get_scheme_with_cdr_definition(scheme, chain, CdrDefinition::from_scheme(scheme))
+}
+
+pub fn get_scheme_with_cdr_definition(
+    scheme: Scheme,
+    chain: Chain,
+    cdr_definition: CdrDefinition,
+) -> NumberingScheme {
     let scoring_params = get_scoring_params();
     let consensus_amino_acids = get_consensus(scheme, chain);
     let config = get_scheme_config(&scheme, &chain);
+    let region_ranges = get_region_ranges(cdr_definition, scheme, chain);
 
     // Create a temporary scheme to access the gap_penalty method
     let temp_scheme = NumberingScheme {
         scheme_type: scheme,
         chain_type: chain,
+        cdr_definition,
         conserved_positions: config.conserved_positions.clone(),
         insertion_positions: config.insertion_positions.clone(),
         gap_positions: config.gap_positions.clone(),
         consensus_amino_acids: consensus_amino_acids.clone(),
         scoring_matrix: ScoringMatrix::zeros(1, 1), // Temporary
-        fr1: config.fr1.clone(),
-        cdr1: config.cdr1.clone(),
-        fr2: config.fr2.clone(),
-        cdr2: config.cdr2.clone(),
-        fr3: config.fr3.clone(),
-        cdr3: config.cdr3.clone(),
-        fr4: config.fr4.clone(),
+        fr1: region_ranges.fr1.clone(),
+        cdr1: region_ranges.cdr1.clone(),
+        fr2: region_ranges.fr2.clone(),
+        cdr2: region_ranges.cdr2.clone(),
+        fr3: region_ranges.fr3.clone(),
+        cdr3: region_ranges.cdr3.clone(),
+        fr4: region_ranges.fr4.clone(),
     };
 
     let scoring_matrix =
@@ -167,18 +89,19 @@ pub fn get_scheme(scheme: Scheme, chain: Chain) -> NumberingScheme {
     NumberingScheme {
         scheme_type: scheme,
         chain_type: chain,
+        cdr_definition,
         conserved_positions: config.conserved_positions,
         insertion_positions: config.insertion_positions,
         gap_positions: config.gap_positions,
         consensus_amino_acids,
         scoring_matrix,
-        fr1: config.fr1,
-        cdr1: config.cdr1,
-        fr2: config.fr2,
-        cdr2: config.cdr2,
-        fr3: config.fr3,
-        cdr3: config.cdr3,
-        fr4: config.fr4,
+        fr1: region_ranges.fr1,
+        cdr1: region_ranges.cdr1,
+        fr2: region_ranges.fr2,
+        cdr2: region_ranges.cdr2,
+        fr3: region_ranges.fr3,
+        cdr3: region_ranges.cdr3,
+        fr4: region_ranges.fr4,
     }
 }
 

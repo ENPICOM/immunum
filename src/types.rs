@@ -35,6 +35,32 @@ pub enum Scheme {
     KABAT,
 }
 
+/// CDR definition schemes for determining CDR boundaries
+#[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Serialize)]
+#[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+pub enum CdrDefinition {
+    /// IMGT CDR definitions (default for IMGT scheme)
+    #[value(alias = "I")]
+    IMGT,
+    /// Kabat CDR definitions (default for KABAT scheme)
+    #[value(alias = "K")]
+    KABAT,
+    /// North CDR definitions
+    #[value(alias = "N")]
+    NORTH,
+}
+
+impl CdrDefinition {
+    /// Get the default CDR definition for a given numbering scheme
+    pub fn from_scheme(scheme: Scheme) -> Self {
+        match scheme {
+            Scheme::IMGT => CdrDefinition::IMGT,
+            Scheme::KABAT => CdrDefinition::KABAT,
+        }
+    }
+}
+
 /// Immunoglobulin and T-cell receptor chain types
 #[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum, Serialize)]
 #[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
@@ -167,14 +193,34 @@ impl PartialEq<NumberingPosition> for String {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct RegionInfo {
+    pub start: usize,
+    pub end: usize,
+    pub sequence: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Regions {
+    pub fr1: RegionInfo,
+    pub cdr1: RegionInfo,
+    pub fr2: RegionInfo,
+    pub cdr2: RegionInfo,
+    pub fr3: RegionInfo,
+    pub cdr3: RegionInfo,
+    pub fr4: RegionInfo,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ChainNumbering {
     #[serde(serialize_with = "serialize_numbering_positions")]
     pub numbers: Vec<NumberingPosition>,
     pub identity: f64,
     pub scheme: Scheme,
     pub chain: Chain,
+    pub cdr_definition: CdrDefinition,
     pub start: usize,
     pub end: usize,
+    pub regions: Regions,
 }
 
 /// Custom serializer to maintain backward compatibility with JSON output

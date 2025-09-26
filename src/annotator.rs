@@ -1,9 +1,11 @@
-use crate::constants::{MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
+use crate::constants::{get_region_ranges, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::prefiltering::apply_prefiltering;
-use crate::schemes::get_scheme;
+use crate::schemes::get_scheme_with_cdr_definition;
 use crate::sequence::SequenceRecord;
-use crate::types::{Chain, ChainNumbering, NumberingPosition, Scheme};
+use crate::types::{
+    CdrDefinition, Chain, ChainNumbering, NumberingPosition, RegionInfo, Regions, Scheme,
+};
 
 /// Main annotator struct that consolidates all numbering functionality
 pub struct Annotator {
@@ -20,10 +22,27 @@ impl Annotator {
         disable_prefiltering: bool,
         min_confidence: Option<f64>,
     ) -> Result<Self, String> {
+        Self::new_with_cdr_definition(
+            scheme,
+            chains,
+            CdrDefinition::from_scheme(scheme),
+            disable_prefiltering,
+            min_confidence,
+        )
+    }
+
+    /// Create a new Annotator with custom CDR definitions
+    pub fn new_with_cdr_definition(
+        scheme: Scheme,
+        chains: Vec<Chain>,
+        cdr_definition: CdrDefinition,
+        disable_prefiltering: bool,
+        min_confidence: Option<f64>,
+    ) -> Result<Self, String> {
         // Pre-build all required schemes for performance
         let schemes: Vec<NumberingScheme> = chains
             .iter()
-            .map(|&chain| get_scheme(scheme, chain))
+            .map(|&chain| get_scheme_with_cdr_definition(scheme, chain, cdr_definition))
             .collect();
 
         if schemes.is_empty() {
@@ -74,13 +93,23 @@ pub fn find_best_chain(
         .iter()
         .map(|&scheme| {
             let (numbers, identity, start, end) = scheme.number_sequence(query_sequence);
+            let regions = extract_regions(
+                query_sequence,
+                &numbers,
+                scheme.scheme_type,
+                scheme.chain_type,
+                scheme.cdr_definition,
+                start,
+            );
             ChainNumbering {
                 numbers,
                 identity,
                 scheme: scheme.scheme_type,
                 chain: scheme.chain_type,
+                cdr_definition: scheme.cdr_definition,
                 start,
                 end,
+                regions,
             }
         })
         .filter(|chain| chain.identity > min_confidence)
@@ -160,6 +189,17 @@ fn find_all_chains(
                 ]);
 
                 best_chain.numbers = padded_numbering;
+
+                // Re-extract regions using the full sequence and padded numbering
+                best_chain.regions = extract_regions(
+                    query_sequence,
+                    &best_chain.numbers,
+                    best_chain.scheme,
+                    best_chain.chain,
+                    best_chain.cdr_definition,
+                    0, // start from 0 since we're using the full sequence
+                );
+
                 chains_found.push(best_chain);
             }
             Err(_) => {
@@ -170,6 +210,68 @@ fn find_all_chains(
     }
 
     Ok(chains_found)
+}
+
+/// Extract region sequences and positions from numbering and sequence
+fn extract_regions(
+    sequence: &[u8],
+    numbers: &[NumberingPosition],
+    scheme: Scheme,
+    chain: Chain,
+    cdr_definition: CdrDefinition,
+    sequence_start: usize,
+) -> Regions {
+    let region_ranges = get_region_ranges(cdr_definition, scheme, chain);
+
+    // Helper function to extract sequence for a region
+    let extract_region_sequence = |start_pos: u32, end_pos: u32| -> RegionInfo {
+        let mut sequence_start_idx = None;
+        let mut sequence_end_idx = None;
+        let mut region_sequence = String::new();
+
+        // Find the actual sequence positions corresponding to the numbering positions
+        for (seq_idx, number_pos) in numbers.iter().enumerate() {
+            let position_matches = match number_pos {
+                NumberingPosition::Gap => false,
+                NumberingPosition::Number(n) => *n >= start_pos && *n < end_pos,
+                NumberingPosition::Insertion { position, .. } => {
+                    *position >= start_pos && *position < end_pos
+                }
+            };
+
+            if position_matches {
+                if sequence_start_idx.is_none() {
+                    sequence_start_idx = Some(seq_idx);
+                }
+                sequence_end_idx = Some(seq_idx);
+
+                // Add the amino acid if it's within sequence bounds
+                if seq_idx < sequence.len() {
+                    region_sequence.push(sequence[seq_idx] as char);
+                }
+            }
+        }
+
+        // Calculate absolute positions in the full sequence
+        let abs_start = sequence_start_idx.map_or(0, |idx| sequence_start + idx);
+        let abs_end = sequence_end_idx.map_or(abs_start, |idx| sequence_start + idx);
+
+        RegionInfo {
+            start: abs_start,
+            end: abs_end,
+            sequence: region_sequence,
+        }
+    };
+
+    Regions {
+        fr1: extract_region_sequence(region_ranges.fr1.start, region_ranges.fr1.end),
+        cdr1: extract_region_sequence(region_ranges.cdr1.start, region_ranges.cdr1.end),
+        fr2: extract_region_sequence(region_ranges.fr2.start, region_ranges.fr2.end),
+        cdr2: extract_region_sequence(region_ranges.cdr2.start, region_ranges.cdr2.end),
+        fr3: extract_region_sequence(region_ranges.fr3.start, region_ranges.fr3.end),
+        cdr3: extract_region_sequence(region_ranges.cdr3.start, region_ranges.cdr3.end),
+        fr4: extract_region_sequence(region_ranges.fr4.start, region_ranges.fr4.end),
+    }
 }
 
 #[cfg(test)]

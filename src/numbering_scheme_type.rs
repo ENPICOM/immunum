@@ -2,13 +2,14 @@ use crate::constants::{insertion_points, ScoringParams};
 use crate::insertion_numbering::name_insertions;
 use crate::needleman_wunsch::needleman_wunsch_consensus;
 use crate::scoring_matrix::ScoringMatrix;
-use crate::types::{Chain, NumberingPosition, RegionRange, Scheme};
+use crate::types::{CdrDefinition, Chain, NumberingPosition, RegionRange, Scheme};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct NumberingScheme {
     pub scheme_type: Scheme,
     pub chain_type: Chain,
+    pub cdr_definition: CdrDefinition,
     pub conserved_positions: Vec<u32>,
     pub insertion_positions: Vec<u32>,
     pub gap_positions: Vec<u32>,
