@@ -284,7 +284,7 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            true, // Enable prefiltering to help with chain detection
+            false, // Enable prefiltering to help with chain detection
             None,
         )
         .expect("Failed to create annotator");
@@ -326,7 +326,7 @@ mod tests {
         let annotator = Annotator::new(
             Scheme::IMGT,
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            true,
+            false,
             None,
         )
         .expect("Failed to create annotator");

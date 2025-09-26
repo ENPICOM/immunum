@@ -38,8 +38,8 @@ impl Annotator {
             .build()
             .expect("Failed to create thread pool");
 
-        // Create the Rust annotator (note: use_prefiltering is opposite of disable_prefiltering)
-        match RustAnnotator::new(scheme, chains, !disable_prefiltering, Some(min_confidence)) {
+        // Create the Rust annotator
+        match RustAnnotator::new(scheme, chains, disable_prefiltering, Some(min_confidence)) {
             Ok(annotator) => Ok(Annotator {
                 inner: annotator,
                 min_confidence,

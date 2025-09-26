@@ -27,12 +27,12 @@ pub struct Cli {
     /// Output file path (required)
     #[arg(short, long, help = "Output file path for results")]
     pub output: String,
-    /// Enable pre-filtering to reduce chain types tested based on sequence characteristics
+    /// Disable pre-filtering (prefiltering is enabled by default to speed up numbering)
     #[arg(
-        long,
-        help = "Enable pre-filtering to speed up numbering by reducing tested chain types"
+        long = "disable-prefiltering",
+        help = "Disable pre-filtering (prefiltering is enabled by default to speed up numbering)"
     )]
-    pub prefilter: bool,
+    pub disable_prefiltering: bool,
     /// Maximum number of non-overlapping chains to find in each sequence (0 = unlimited, 1 = single chain mode)
     #[arg(
         long,

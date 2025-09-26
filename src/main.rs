@@ -35,7 +35,7 @@ fn main() {
     let annotator = match Annotator::new(
         cli.scheme,
         chains.clone(),
-        cli.prefilter,
+        cli.disable_prefiltering, // Pass the disable flag directly
         Some(cli.min_confidence),
     ) {
         Ok(annotator) => annotator,

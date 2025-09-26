@@ -10,6 +10,7 @@ lto = true
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
 flate2 = "1.1.2"
+num_cpus = "1.16"
 pyo3 = { version = "0.25.1", features = ["extension-module"], optional = true }
 rayon = "1.10.0"
 thiserror = "2.0.12"

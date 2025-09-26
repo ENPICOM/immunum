@@ -8,7 +8,7 @@ use crate::types::{Chain, ChainNumbering, NumberingPosition, Scheme};
 /// Main annotator struct that consolidates all numbering functionality
 pub struct Annotator {
     schemes: Vec<NumberingScheme>,
-    use_prefiltering: bool,
+    disable_prefiltering: bool,
     min_confidence: f64,
 }
 
@@ -17,7 +17,7 @@ impl Annotator {
     pub fn new(
         scheme: Scheme,
         chains: Vec<Chain>,
-        use_prefiltering: bool,
+        disable_prefiltering: bool,
         min_confidence: Option<f64>,
     ) -> Result<Self, String> {
         // Pre-build all required schemes for performance
@@ -32,7 +32,7 @@ impl Annotator {
 
         Ok(Annotator {
             schemes,
-            use_prefiltering,
+            disable_prefiltering,
             min_confidence: min_confidence.unwrap_or(MINIMAL_CHAIN_IDENTITY),
         })
     }
@@ -48,7 +48,7 @@ impl Annotator {
         }
 
         // Apply prefiltering if enabled, otherwise use all schemes
-        let schemes: Vec<&NumberingScheme> = if self.use_prefiltering {
+        let schemes: Vec<&NumberingScheme> = if !self.disable_prefiltering {
             apply_prefiltering(&sequence.sequence, &self.schemes)
         } else {
             self.schemes.iter().collect()
