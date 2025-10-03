@@ -3,3 +3,6 @@ __pycache__
 wasm_build
 
 /.idea
+/.claude
+
+node_modules

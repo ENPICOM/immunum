@@ -2,9 +2,17 @@
   "type": "module",
   "name": "immunum-wasm-test",
   "version": "1.0.0",
-  "description": "Test script for Immunum WASM binary",
+  "description": "Test suite for Immunum WASM bindings",
   "main": "test-wasm-node.js",
   "scripts": {
-    "test": "node test-wasm-node.js"
+    "build:wasm": "wasm-pack build --target web --out-dir wasm_build --features wasm --no-default-features",
+    "prebuild": "npm run build:wasm",
+    "test": "npm run build:wasm && vitest run",
+    "test:watch": "vitest",
+    "test:legacy": "node test-wasm-node.js",
+    "test:scoring-params": "npm run build:wasm && node test-wasm-scoring-params.js"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0"
   }
 }
