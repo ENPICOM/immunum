@@ -417,7 +417,7 @@ mod tests {
     fn test_is_valid_sequence() {
         assert!(is_valid_sequence("ACDEFGHIKLMNPQRSTVWY"));
         assert!(is_valid_sequence("ACG"));
-        assert!(is_valid_sequence("")); // TODO - this should probably be invalid?
+        assert!(!is_valid_sequence(""));
         assert!(!is_valid_sequence("ACGX"));
         assert!(!is_valid_sequence("123"));
         assert!(!is_valid_sequence("acg")); // lowercase not allowed
@@ -427,7 +427,7 @@ mod tests {
 /// Validates if a string looks like a biological sequence
 fn is_valid_sequence(input: &str) -> bool {
     // Check if input string contains valid protein chars
-    input.chars().all(|c| "ACDEFGHIKLMNPQRSTVWY".contains(c))
+    !input.is_empty() && input.chars().all(|c| "ACDEFGHIKLMNPQRSTVWY".contains(c))
 }
 
 /// A wrapper around sequence iterators that can be created from files or direct sequence input

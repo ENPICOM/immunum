@@ -1,10 +1,7 @@
-use std::collections::HashSet;
-
-use crate::consensus_scoring::calculate_scoring_matrix;
+use crate::consensus_scoring::{calculate_scoring_matrix, GapPenaltyConfig};
 use crate::constants::{get_consensus, get_region_ranges, get_scoring_params};
 use crate::kmer_prefiltering::generate_scheme_kmers;
 use crate::numbering_scheme_type::NumberingScheme;
-use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{CdrDefinitions, Chain, Scheme};
 
 struct SchemeConfig {
@@ -61,10 +58,10 @@ pub fn get_scheme_with_cdr_definition(
     let config = get_scheme_config(&scheme, &chain);
     let region_ranges = get_region_ranges(cdr_definitions, scheme, chain);
 
-    // Create a temporary scheme to access the gap_penalty method
-    let temp_conserved_set: std::collections::HashSet<u32> =
+    // Create cached HashSets for efficient lookups
+    let conserved_positions_set: std::collections::HashSet<u32> =
         config.conserved_positions.iter().cloned().collect();
-    let temp_restricted_set: std::collections::HashSet<u32> = consensus_amino_acids
+    let restricted_sites_set: std::collections::HashSet<u32> = consensus_amino_acids
         .iter()
         .filter_map(|(&key, value)| {
             if !value.contains(&b'-') {
@@ -75,50 +72,26 @@ pub fn get_scheme_with_cdr_definition(
         })
         .collect();
 
-    let temp_scheme = NumberingScheme {
+    // Create gap penalty configuration
+    let gap_penalty_config = GapPenaltyConfig {
+        conserved_positions_set: conserved_positions_set.clone(),
         scheme_type: scheme,
         chain_type: chain,
-        cdr_definition: cdr_definitions,
-        insertion_positions: config.insertion_positions.clone(),
-        gap_positions: config.gap_positions.clone(),
-        consensus_amino_acids: consensus_amino_acids.clone(),
-        scoring_matrix: ScoringMatrix::zeros(1, 1), // Temporary
-        fr1: region_ranges.fr1.clone(),
-        cdr1: region_ranges.cdr1.clone(),
-        fr2: region_ranges.fr2.clone(),
-        cdr2: region_ranges.cdr2.clone(),
-        fr3: region_ranges.fr3.clone(),
-        cdr3: region_ranges.cdr3.clone(),
-        fr4: region_ranges.fr4.clone(),
-        conserved_positions_set: temp_conserved_set.clone(),
-        restricted_sites_set: temp_restricted_set.clone(),
-        kmer_set: HashSet::new(), // Will be computed below
+        insertion_positions: config.insertion_positions,
+        gap_positions: config.gap_positions,
+        region_ranges,
     };
 
+    // Use the gap penalty config directly
     let scoring_matrix =
-        calculate_scoring_matrix(&consensus_amino_acids, &scoring_params, |pos, params| {
-            temp_scheme.gap_penalty(pos, params)
-        });
-
-    // Re-use the cached HashSets from temp_scheme
-    let conserved_positions_set = temp_conserved_set;
-    let restricted_sites_set = temp_restricted_set;
+        calculate_scoring_matrix(&consensus_amino_acids, &scoring_params, &gap_penalty_config);
 
     NumberingScheme {
         scheme_type: scheme,
         chain_type: chain,
         cdr_definition: cdr_definitions,
-        insertion_positions: config.insertion_positions,
-        gap_positions: config.gap_positions,
         consensus_amino_acids: consensus_amino_acids.clone(),
         scoring_matrix,
-        fr1: region_ranges.fr1,
-        cdr1: region_ranges.cdr1,
-        fr2: region_ranges.fr2,
-        cdr2: region_ranges.cdr2,
-        fr3: region_ranges.fr3,
-        cdr3: region_ranges.cdr3,
-        fr4: region_ranges.fr4,
         conserved_positions_set,
         restricted_sites_set,
         kmer_set: generate_scheme_kmers(consensus_amino_acids.clone()),
@@ -128,31 +101,13 @@ pub fn get_scheme_with_cdr_definition(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::get_scoring_params;
+    // use crate::constants::get_scoring_params;
     use crate::types::CdrDefinitions;
 
     #[test]
     fn scheme_creation() {
         let scheme = get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT);
-        let scoring_params = get_scoring_params();
-        assert_eq!(scheme.gap_positions, vec![10, 73]);
         assert_eq!(scheme.consensus_amino_acids.len(), 128);
         assert_eq!(scheme.consensus_amino_acids[&1], vec![b'Q', b'E', b'D']);
-        assert_eq!(
-            scheme.gap_penalty(25, &scoring_params),
-            (scoring_params.gap_pen_fr, scoring_params.gap_pen_fr)
-        );
-        assert_eq!(
-            scheme.gap_penalty(200, &scoring_params),
-            (scoring_params.gap_pen_other, scoring_params.gap_pen_other)
-        );
-        assert_eq!(
-            scheme.gap_penalty(10, &scoring_params),
-            (scoring_params.gap_pen_fr, scoring_params.gap_pen_op)
-        );
-
-        for i in 1..129 {
-            println!("{:?},", scheme.gap_penalty(i as u32, &scoring_params))
-        }
     }
 }

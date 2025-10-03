@@ -304,9 +304,6 @@ pub const ALPHABET: [char; 26] = [
     'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 ];
 
-// TODO get allowed amino acids
-//pub const ALLOWED_AMINO_ACIDS: Vec<&str> = BLOSUM62.keys().collect();
-
 pub const ACCEPTED_RESIDUES: [u8; 23] = [
     b'A', b'B', b'C', b'D', b'E', b'F', b'G', b'H', b'I', b'K', b'L', b'M', b'N', b'P', b'Q', b'R',
     b'S', b'T', b'V', b'W', b'X', b'Y', b'Z',

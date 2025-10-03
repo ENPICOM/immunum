@@ -9,13 +9,22 @@ Immunum provides a command-line interface, Python bindings and WebAssembly modul
 ## Features
 
 - **Multiple Numbering Schemes**: Support for IMGT and Kabat numbering schemes
+- **Flexible CDR Definitions**: IMGT, Kabat, and North CDR boundary definitions
 - **Chain Type Support**: Handle all major immunoglobulin and T-cell receptor chain types:
   - Immunoglobulin Heavy (IGH), Kappa (IGK), and Lambda (IGL) chains
-  - T-cell receptor Alpha (TRA), Beta (TRB), Gamma (TRG), and Delta (TRD) chains
-- **Flexible Input**: Accept both file paths (FASTA/FASTQ) and direct sequence strings
-- **File Format Support**: Parse FASTA and FASTQ files, including gzip-compressed files
-- **High Performance**: Rust implementation for fast processing of large sequence datasets
-- **Output formats**: #TODO
+  - T-cell receptor Alpha (TRA), Beta (TRB), Gamma (TRG), and Delta (TRD) chains  ( Not tested yet )
+- **Multi-Chain Analysis**: Detect multiple chain types in single sequences (paired analysis)
+- **High Performance**:
+  - Rust implementation
+  - Parallel processing support for large datasets
+  - K-mer prefiltering for fast multi-chain analysis
+  - Custom thread pool configuration
+- **Flexible Input/Output**:
+  - File formats: FASTA, FASTQ (including gzip compression)
+  - Direct sequence strings
+  - JSON output format with detailed region information
+- **Quality Control**: Configurable confidence thresholds and alignment parameters
+- **Multiple Interfaces**: CLI tool, Python library, and WebAssembly module
 
 ## Installation
 
@@ -38,25 +47,53 @@ cargo build
 
 ### Command Line Interface
 
-The CLI tool is named `immunum-cli` and provides a simple interface for sequence numbering:
+The CLI tool is named `immunum-cli` and provides a simple interface for sequence numbering with JSON output:
 
 ```bash
 # Number a sequence string using IMGT scheme for heavy chain
-immunum-cli -i "QVQLVQSGAEVKKPGASVKVSCKAS" -s imgt -c igh
+immunum-cli -i "QVQLVQSGAEVKKPGASVKVSCKAS" -s imgt -c igh -o results.json
 
 # Process a FASTA file with multiple chain types
-immunum-cli -i sequences.fasta -s kabat -c igh igk igl -o results.txt
+immunum-cli -i sequences.fasta -s kabat -c igh igk igl -o results.json
 
-# Process gzipped FASTQ file
-immunum-cli -i sequences.fastq.gz -s imgt -c tra trb
+# Process gzipped FASTQ file with custom CDR definitions
+immunum-cli -i sequences.fastq.gz -s imgt -c tra trb --cdr-definitions north -o results.json
+
+# Use parallel processing with custom confidence threshold
+immunum-cli -i large_sequences.fasta -s imgt -c igh igk igl -t 8 -m 0.8 -o results.json
+
+# Enable verbose output to see processing details
+immunum-cli -i sequences.fasta -s kabat -c igh -v -o results.json
+
+# Allow multiple chains per sequence (paired chain analysis)
+immunum-cli -i paired_sequences.fasta -s imgt -c igh igk igl --max-chains 2 -o results.json
+
+# Disable prefiltering for more exhaustive search
+immunum-cli -i sequences.fasta -s imgt -c igh igk igl --disable-prefiltering -o results.json
 ```
 
 #### CLI Options
 
+**Required:**
 - `-i, --input <INPUT>`: Input file path (FASTA/FASTQ) or sequence string
+- `-o, --output <OUTPUT>`: Output file path for JSON results
+
+**Numbering Scheme:**
 - `-s, --scheme <SCHEME>`: Numbering scheme (`imgt` or `kabat`) [default: imgt]
-- `-c, --chains <CHAINS>`: Chain types to process (multiple values allowed)
-- `-o, --output <OUTPUT>`: Output file path (optional, defaults to stdout)
+- `--cdr-definitions <CDR_DEFINITIONS>`: CDR definition scheme (`imgt`, `kabat`, or `north`) [default: matches scheme]
+
+**Chain Selection:**
+- `-c, --chains <CHAINS>...`: Chain types to process (multiple values allowed) [default: igh igk igl]
+- `--max-chains <MAX_CHAINS>`: Maximum chains per sequence (0=unlimited, 1=single) [default: 1]
+
+**Performance & Quality:**
+- `-t, --threads <THREADS>`: Number of threads for parallel processing [default: CPU cores]
+- `-m, --min-confidence <MIN_CONFIDENCE>`: Minimum alignment confidence [default: 0.7]
+- `--min-kmer-overlap <MIN_KMER_OVERLAP>`: K-mer overlap threshold for prefiltering [default: 0.2]
+- `--disable-prefiltering`: Disable prefiltering for more exhaustive search
+
+**Output:**
+- `-v, --verbose`: Show detailed progress for each sequence processed
 
 #### Supported Chain Types
 
@@ -76,6 +113,57 @@ immunum-cli -i sequences.fastq.gz -s imgt -c tra trb
 |--------|-------------|---------|
 | `imgt` | IMGT numbering scheme | `i` |
 | `kabat` | Kabat numbering scheme | `k` |
+
+#### CDR Definition Schemes
+
+| Scheme | Description | Best For |
+|--------|-------------|----------|
+| `imgt` | IMGT CDR definitions (default for IMGT scheme) | Standardized analysis |
+| `kabat` | Kabat CDR definitions (default for Kabat scheme) | Traditional analysis |
+| `north` | North CDR definitions | Alternative CDR boundaries |
+
+#### Output Format
+
+The CLI outputs results in JSON format with the following structure:
+
+```json
+[
+  {
+    "sequence_name": "sequence_1",
+    "chains": [
+      {
+        "sequence": "QVQLVQSGAEVKKPGASVKVSCKAS...",
+        "numbers": ["1", "2", "3", "4", "5", "..."],
+        "scheme": "IMGT",
+        "chain": "IGH",
+        "identity": 0.95,
+        "start": 0,
+        "end": 119,
+        "regions": {
+          "fr1": {"start": 1, "end": 26, "sequence": "QVQLVQSGAEVKKPGASVKVSCKAS"},
+          "cdr1": {"start": 27, "end": 38, "sequence": "GYTFTSYYMH"},
+          "fr2": {"start": 39, "end": 55, "sequence": "WVRQAPGQGLEWMG"},
+          "cdr2": {"start": 56, "end": 65, "sequence": "IINPSGGSTSYAQKFQ"},
+          "fr3": {"start": 66, "end": 104, "sequence": "GRVTMTRDTSTSTVYMELSSLRSEDTAVYYCAR"},
+          "cdr3": {"start": 105, "end": 117, "sequence": "WGGRGSYAMDYW"},
+          "fr4": {"start": 118, "end": 128, "sequence": "GQGTLVTVSS"}
+        }
+      }
+    ]
+  }
+]
+```
+
+**JSON Fields:**
+- `sequence_name`: Original sequence identifier from FASTA header or auto-generated
+- `chains`: Array of detected chains in the sequence
+- `sequence`: Full input sequence
+- `numbers`: Position numbers according to the numbering scheme
+- `scheme`: Applied numbering scheme (IMGT/KABAT)
+- `chain`: Detected chain type (IGH/IGK/IGL/TRA/TRB/TRG/TRD)
+- `identity`: Alignment confidence score (0.0-1.0)
+- `start`/`end`: Indices of numbered region within input sequence
+- `regions`: CDR and framework regions with positions and sequences
 
 ### Python Library
 
@@ -115,7 +203,7 @@ uv run maturin develop --features python
 
 #### Python API Usage
 
-The Python API provides a clean, object-oriented interface for sequence numbering:
+The Python API provides a simple interface for sequence numbering with automatic parallel processing:
 
 ```python
 import immunum
@@ -126,109 +214,53 @@ annotator = immunum.Annotator(
     chains=[immunum.Chain.IGH]
 )
 
-# Number a single sequence
-sequence = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS"
-result = annotator.number_sequence(sequence)
-
-print(f"Chain: {result.chain}")
-print(f"Scheme: {result.scheme}")
-print(f"Identity: {result.identity:.2f}")
-print(f"Numbers: {result.numbers[:10]}...")  # First 10 positions
-
-# Access specific regions
-cdr_sequences = result.get_cdr_sequences()
-print(f"CDR1: {cdr_sequences.get('CDR1', 'Not found')}")
-print(f"CDR2: {cdr_sequences.get('CDR2', 'Not found')}")
-print(f"CDR3: {cdr_sequences.get('CDR3', 'Not found')}")
-
-# Multi-chain annotator for light and heavy chains
-multi_annotator = immunum.Annotator(
-    scheme=immunum.Scheme.IMGT,
-    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL]
-)
-
-# Process multiple sequences
+# Process multiple sequences (returns list of chain results for each sequence)
 sequences = [
-    "QVQLVQSGAEVKKPGASVKVSCKAS",  # Heavy chain fragment
-    "DIQMTQSPSSLSASVGDRVTITC"     # Light chain fragment
+    "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS",
+    "DIQMTQSPSSLSASVGDRVTITC"
 ]
 
-results = multi_annotator.number_sequences(sequences)
-for i, result in enumerate(results):
-    print(f"Sequence {i+1}: Chain {result.chain}, Identity {result.identity:.2f}")
+# Each sequence returns a list of detected chains: [(numbers, confidence, chain), ...]
+results = annotator.number_sequences(sequences)
 
-# Use parallel processing for better performance with many sequences
-parallel_results = multi_annotator.number_sequences(sequences, parallel=True)
-print(f"Processed {len(parallel_results)} sequences in parallel")
+for i, sequence_chains in enumerate(results):
+    print(f"Sequence {i+1}: Found {len(sequence_chains)} chains")
+    for numbers, confidence, chain in sequence_chains:
+        print(f"  Chain {chain}: {confidence:.2f} confidence")
+        print(f"  Numbers: {numbers[:10]}...")  # First 10 positions
 
-# Process sequences from a FASTA file
-file_results = multi_annotator.number_file("sequences.fasta")
-for seq_name, result in file_results:
-    print(f"{seq_name}: Chain {result.chain}, Identity {result.identity:.2f}")
-
-# Use parallel processing for better performance with large files
-parallel_file_results = multi_annotator.number_file("large_sequences.fasta", parallel=True)
-print(f"Processed {len(parallel_file_results)} sequences in parallel")
-
-# Custom scoring parameters
-custom_params = immunum.ScoringParams(
-    gap_pen_cp=60.0,  # Gap penalty for conserved positions
-    gap_pen_fr=30.0,  # Gap penalty for framework regions
-    cdr_increase=0.7  # CDR increase factor
+# Multi-chain annotator for comprehensive analysis
+multi_annotator = immunum.Annotator(
+    scheme=immunum.Scheme.IMGT,
+    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
+    threads=8  # Use 8 threads for parallel processing
 )
 
+# Process with higher chain limit for paired sequences
+paired_results = multi_annotator.number_sequences(sequences, max_chains=2)
+for i, sequence_chains in enumerate(paired_results):
+    print(f"Paired sequence {i+1}:")
+    for numbers, confidence, chain in sequence_chains:
+        print(f"  {chain}: {confidence:.2f}")
+
+# Process sequences with IDs
+sequences_with_ids = [
+    ("heavy_chain_1", "QVQLVQSGAEVKKPGASVKVSCKAS"),
+    ("light_chain_1", "DIQMTQSPSSLSASVGDRVTITC")
+]
+
+id_results = multi_annotator.number_sequences(sequences_with_ids)
+
+# Custom parameters for fine-tuning
 custom_annotator = immunum.Annotator(
     scheme=immunum.Scheme.KABAT,
-    chains=[immunum.Chain.IGH],
-    scoring_params=custom_params
+    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
+    disable_prefiltering=False,  # Use prefiltering for speed
+    threads=4,                   # Use 4 threads
+    min_confidence=0.8,          # Higher confidence threshold
+    min_kmer_overlap=0.3         # Higher k-mer overlap requirement
 )
 
-# Enable prefiltering for better performance with multiple chain types
-fast_annotator = immunum.Annotator(
-    scheme=immunum.Scheme.IMGT,
-    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL, 
-            immunum.Chain.TRA, immunum.Chain.TRB],
-    use_prefiltering=True
-)
-
-# Error handling
-try:
-    result = annotator.number_sequence("INVALID_SHORT_SEQUENCE")
-except RuntimeError as e:
-    print(f"Numbering failed: {e}")
-```
-
-#### Key Classes and Methods
-
-- **`Annotator`**: Main class for sequence numbering
-  - `number_sequence(sequence)`: Number a single sequence
-  - `number_sequences(sequences, parallel=False)`: Number multiple sequences with optional parallel processing
-  - `number_file(file_path, parallel=False)`: Process FASTA/FASTQ files with optional parallel processing
-
-- **`AnnotationResult`**: Contains numbering results
-  - Properties: `sequence`, `numbers`, `scheme`, `chain`, `identity`, `regions`
-  - Methods: `get_region_sequence()`, `get_cdr_sequences()`, `get_framework_sequences()`
-
-- **`ScoringParams`**: Customizable scoring parameters for alignment
-  - All parameters have getters/setters for fine-tuning alignment behavior
-
-- **Enums**: `Scheme.IMGT`/`Scheme.KABAT`, `Chain.IGH`/`Chain.IGK`/`Chain.IGL`/etc.
-
-#### Recent API Changes
-
-**v0.2.0+**: The Python API has been streamlined and enhanced:
-- **Parallel Processing**: Added `rayon`-based multithreading support for `number_sequences()` and `number_file()` methods
-- **Streamlined API**: Removed `PyScoringParams` wrapper - now uses `ScoringParams` directly with automatic property access
-- **Consistent naming**: Unified class naming between Python and WASM APIs
-- **Enhanced Properties**: All `ScoringParams` properties support direct getting/setting via PyO3 attributes
-- **Better Type Support**: Improved type annotations in `immunum.pyi` for better IDE support
-
-#### Performance Tips
-
-- **Use parallel processing** (`parallel=True`) when processing multiple sequences or large files
-- **Enable prefiltering** (`use_prefiltering=True`) when annotating with multiple chain types
-- **Batch processing** is more efficient than processing sequences individually
-- **File processing** is optimized for both FASTA and FASTQ formats, including gzip compression
 
 ### WASM Module
 

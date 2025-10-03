@@ -226,7 +226,7 @@ fn run_benchmark_mode(
         total_chains_found: total_chains / runs,
         processing_time_ms: avg_time_ms as u64,
         sequences_per_second,
-        memory_peak_mb: None, // TODO: Implement memory profiling
+        memory_peak_mb: None,
         threads_used: if mode == "sequential" { 1 } else { threads },
         prefiltering_enabled: mode != "no-prefilter",
     }
