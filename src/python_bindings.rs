@@ -14,7 +14,7 @@ pub struct Annotator {
 }
 
 //PyResult<Vec<Vec<(Vec<String>, f64, Chain)>>>
-type PyChainNumbering = (Vec<String>, f64, Chain);
+type PyChainNumbering = (Vec<String>, f64, Chain, usize, usize);
 type PySequenceNumbering = Vec<PyChainNumbering>;
 
 /// Helper function to parse Scheme from Python object (string or enum)
@@ -180,6 +180,8 @@ impl Annotator {
                                     chain.numbers.iter().map(|n| n.to_string()).collect(),
                                     chain.confidence,
                                     chain.chain,
+                                    chain.start,
+                                    chain.end,
                                 )
                             })
                             .collect(),
