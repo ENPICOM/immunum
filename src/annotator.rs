@@ -1,8 +1,7 @@
-use crate::constants::{
-    get_region_ranges, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH, PRE_FILTER_TERMINAL_LENGTH,
-};
+use crate::constants::{get_region_ranges, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
+use crate::kmer_prefiltering::apply_kmer_prefiltering;
+use crate::kmer_prefiltering::MIN_KMER_OVERLAP;
 use crate::numbering_scheme_type::NumberingScheme;
-use crate::prefiltering::apply_prefiltering;
 use crate::schemes::get_scheme_with_cdr_definition;
 use crate::sequence::SequenceRecord;
 use crate::types::{
@@ -14,8 +13,7 @@ pub struct Annotator {
     schemes: Vec<NumberingScheme>,
     disable_prefiltering: bool,
     min_confidence: f64,
-    // Cache terminal schemes for prefiltering performance
-    terminal_schemes: Vec<(NumberingScheme, NumberingScheme)>,
+    min_kmer_overlap: f64,
 }
 
 impl Annotator {
@@ -26,6 +24,7 @@ impl Annotator {
         cdr_definitions: Option<CdrDefinitions>,
         disable_prefiltering: bool,
         min_confidence: Option<f64>,
+        min_kmer_overlap: Option<f64>,
     ) -> Result<Self, String> {
         let cdr_definitions = cdr_definitions.unwrap_or(CdrDefinitions::from_scheme(scheme));
         // Pre-build all required schemes for performance
@@ -38,17 +37,11 @@ impl Annotator {
             return Err("No valid schemes could be created for the specified chains".to_string());
         }
 
-        // Pre-build terminal schemes for prefiltering performance
-        let terminal_schemes: Vec<(NumberingScheme, NumberingScheme)> = schemes
-            .iter()
-            .map(|scheme| scheme.to_terminal_schemes(PRE_FILTER_TERMINAL_LENGTH))
-            .collect();
-
         Ok(Annotator {
             schemes,
             disable_prefiltering,
             min_confidence: min_confidence.unwrap_or(MINIMAL_CHAIN_IDENTITY),
-            terminal_schemes,
+            min_kmer_overlap: min_kmer_overlap.unwrap_or(MIN_KMER_OVERLAP),
         })
     }
 
@@ -64,7 +57,7 @@ impl Annotator {
 
         // Apply prefiltering if enabled, otherwise use all schemes
         let schemes: Vec<&NumberingScheme> = if !self.disable_prefiltering {
-            apply_prefiltering(&sequence.sequence, &self.schemes, &self.terminal_schemes)
+            apply_kmer_prefiltering(&sequence.sequence, &self.schemes, self.min_kmer_overlap)
         } else {
             self.schemes.iter().collect()
         };
@@ -279,13 +272,13 @@ mod tests {
 
     #[test]
     fn test_annotator_creation() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, false, None);
+        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, false, None, None);
         assert!(annotator.is_ok());
     }
 
     #[test]
     fn test_empty_chains() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![], None, false, None);
+        let annotator = Annotator::new(Scheme::IMGT, vec![], None, false, None, None);
         assert!(annotator.is_err());
     }
 
@@ -296,6 +289,7 @@ mod tests {
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             None,
             false,
+            None,
             None,
         )
         .unwrap();
@@ -323,6 +317,7 @@ mod tests {
             None,
             true,
             None,
+            None,
         )
         .unwrap();
 
@@ -348,6 +343,7 @@ mod tests {
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             None,
             false, // Disable prefiltering for this test
+            None,
             None,
         )
         .unwrap();

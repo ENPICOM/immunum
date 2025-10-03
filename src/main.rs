@@ -4,9 +4,9 @@ mod cli;
 mod consensus_scoring;
 mod constants;
 mod insertion_numbering;
+mod kmer_prefiltering;
 mod needleman_wunsch;
 mod numbering_scheme_type;
-mod prefiltering;
 mod schemes;
 mod scoring_matrix;
 mod sequence;
@@ -38,6 +38,7 @@ fn main() {
         cli.cdr_definitions,
         cli.disable_prefiltering,
         Some(cli.min_confidence),
+        Some(cli.min_kmer_overlap),
     ) {
         Ok(annotator) => annotator,
         Err(e) => {

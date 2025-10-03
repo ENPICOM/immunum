@@ -42,15 +42,10 @@ impl Default for ScoringParams {
     }
 }
 
-// For prefiltering, how close the identity must be to the highest found in order to run the scheme
-pub const WITHIN_IDENTITY_RANGE: f64 = 0.25;
-
 pub const MINIMAL_CHAIN_IDENTITY: f64 = 0.7;
 
 // Minimal chain length, minimal length for sequence to continue search for chain
 pub const MINIMAL_CHAIN_LENGTH: usize = 60;
-
-pub const PRE_FILTER_TERMINAL_LENGTH: u8 = 10;
 
 // Indexes for query and consensus gap columns in scoring matrix
 pub const QUERY_GAP_COLUMN: usize = 23;

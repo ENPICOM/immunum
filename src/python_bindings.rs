@@ -19,13 +19,14 @@ type PySequenceNumbering = Vec<PyChainNumbering>;
 #[pymethods]
 impl Annotator {
     #[new]
-    #[pyo3(signature = (scheme=Scheme::IMGT, chains=None, disable_prefiltering=false, threads=None, min_confidence=0.7))]
+    #[pyo3(signature = (scheme=Scheme::IMGT, chains=None, disable_prefiltering=false, threads=None, min_confidence=0.7, min_kmer_overlap=None))]
     pub fn new(
         scheme: Scheme,
         chains: Option<Vec<Chain>>,
         disable_prefiltering: bool,
         threads: Option<usize>,
         min_confidence: f64,
+        min_kmer_overlap: Option<f64>,
     ) -> PyResult<Self> {
         // Default chains if not provided
         let chains = chains.unwrap_or_else(|| vec![Chain::IGH, Chain::IGK, Chain::IGL]);
@@ -47,6 +48,7 @@ impl Annotator {
             cdr_definitions,
             disable_prefiltering,
             Some(min_confidence),
+            min_kmer_overlap,
         ) {
             Ok(annotator) => Ok(Annotator {
                 inner: annotator,

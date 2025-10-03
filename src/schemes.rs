@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use crate::consensus_scoring::calculate_scoring_matrix;
 use crate::constants::{get_consensus, get_region_ranges, get_scoring_params};
+use crate::kmer_prefiltering::generate_scheme_kmers;
 use crate::numbering_scheme_type::NumberingScheme;
 use crate::scoring_matrix::ScoringMatrix;
 use crate::types::{CdrDefinitions, Chain, Scheme};
@@ -89,6 +92,7 @@ pub fn get_scheme_with_cdr_definition(
         fr4: region_ranges.fr4.clone(),
         conserved_positions_set: temp_conserved_set.clone(),
         restricted_sites_set: temp_restricted_set.clone(),
+        kmer_set: HashSet::new(), // Will be computed below
     };
 
     let scoring_matrix =
@@ -106,7 +110,7 @@ pub fn get_scheme_with_cdr_definition(
         cdr_definition: cdr_definitions,
         insertion_positions: config.insertion_positions,
         gap_positions: config.gap_positions,
-        consensus_amino_acids,
+        consensus_amino_acids: consensus_amino_acids.clone(),
         scoring_matrix,
         fr1: region_ranges.fr1,
         cdr1: region_ranges.cdr1,
@@ -117,6 +121,7 @@ pub fn get_scheme_with_cdr_definition(
         fr4: region_ranges.fr4,
         conserved_positions_set,
         restricted_sites_set,
+        kmer_set: generate_scheme_kmers(consensus_amino_acids.clone()),
     }
 }
 

@@ -28,6 +28,7 @@ impl Annotator {
         chains: Vec<Chain>,
         disable_prefiltering: Option<bool>,
         min_confidence: Option<f64>,
+        min_kmer_overlap: Option<f64>,
     ) -> Result<Annotator, JsValue> {
         use crate::constants::MINIMAL_CHAIN_IDENTITY;
 
@@ -42,6 +43,7 @@ impl Annotator {
             cdr_definitions,
             disable_prefiltering,
             min_confidence,
+            min_kmer_overlap,
         ) {
             Ok(annotator) => Ok(Annotator { inner: annotator }),
             Err(e) => Err(JsValue::from_str(&e)),
@@ -170,5 +172,5 @@ pub fn create_annotator(
     let scheme = scheme.unwrap_or(Scheme::IMGT);
     let chains = chains.unwrap_or_else(|| vec![Chain::IGH, Chain::IGK, Chain::IGL]);
 
-    Annotator::new(scheme, chains, disable_prefiltering, min_confidence)
+    Annotator::new(scheme, chains, disable_prefiltering, min_confidence, None)
 }

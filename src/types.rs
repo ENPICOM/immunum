@@ -15,14 +15,6 @@ impl RegionRange {
     }
 }
 
-/// Struct for output of prefiltering, containing identity of terminals, start and end
-#[derive(Debug)]
-pub struct PrefilterOutput {
-    pub identity: f64,
-    pub _predicted_start: usize,
-    pub _predicted_end: usize,
-}
-
 /// Numbering schemes for immunoglobulin sequences
 #[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Serialize)]
 #[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]

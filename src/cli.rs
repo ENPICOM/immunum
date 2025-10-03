@@ -1,5 +1,6 @@
 use crate::{
     constants::MINIMAL_CHAIN_IDENTITY,
+    kmer_prefiltering::MIN_KMER_OVERLAP,
     types::{CdrDefinitions, Chain, Scheme},
 };
 use clap::Parser;
@@ -72,4 +73,11 @@ pub struct Cli {
         help = "Show detailed progress for each sequence processed"
     )]
     pub verbose: bool,
+    /// Minimum k-mer overlap threshold for prefiltering (fraction of query k-mers that must match)
+    #[arg(
+        long = "min-kmer-overlap",
+        default_value_t = MIN_KMER_OVERLAP,
+        help = "Minimum k-mer overlap threshold for prefiltering (fraction of query k-mers that must match)"
+    )]
+    pub min_kmer_overlap: f64,
 }

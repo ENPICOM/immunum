@@ -150,9 +150,21 @@ fn run_validation_parallel(
     } else {
         sequences
     };
+    // Filter expected results with sequence_to_process record names
+    let expected_results_to_process = expected_results
+        .iter()
+        .filter(|(k, _)| {
+            sequences_to_process
+                .iter()
+                .any(|s| String::from_utf8_lossy(&s.name).to_string() == **k)
+        })
+        .collect::<HashMap<_, _>>();
 
     stats.total_sequences = sequences_to_process.len();
-    stats.total_paired = expected_results.values().filter(|v| v.len() == 2).count();
+    stats.total_paired = expected_results_to_process
+        .values()
+        .filter(|v| v.len() == 2)
+        .count();
 
     println!(
         "Processing {} sequences in parallel...",
@@ -172,7 +184,7 @@ fn run_validation_parallel(
     stats.execution_time_ms = start_time.elapsed().as_millis();
 
     // Print missing headers if there are any
-    let expected_headers = expected_results.keys().collect::<Vec<_>>();
+    let expected_headers = expected_results_to_process.keys().collect::<Vec<_>>();
     let result_headers = results.iter().map(|(header, _)| header).collect::<Vec<_>>();
     let missing_headers: Vec<_> = expected_headers
         .iter()
@@ -287,6 +299,7 @@ mod tests {
             None,  // Use default CDR definitions
             false, // Enable prefiltering to help with chain detection
             None,
+            None,
         )
         .expect("Failed to create annotator");
 
@@ -329,6 +342,7 @@ mod tests {
             vec![Chain::IGH, Chain::IGK, Chain::IGL],
             None, // Use default CDR definitions
             false,
+            None,
             None,
         )
         .expect("Failed to create annotator");

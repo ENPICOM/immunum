@@ -247,6 +247,7 @@ fn run_single_benchmark(
         Some(CdrDefinitions::IMGT),
         disable_prefiltering,
         Some(0.7),
+        None,
     )
     .expect("Failed to create annotator");
 
