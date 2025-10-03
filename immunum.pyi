@@ -1,11 +1,11 @@
 """
 Python stub file for immunum - A high-performance library for numbering antibody and T-cell receptor sequences.
 
-This module provides functionality for numbering immunoglobulin and T-cell receptor sequences 
+This module provides functionality for numbering immunoglobulin and T-cell receptor sequences
 using standard immunological numbering schemes (IMGT and KABAT).
 """
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 class Scheme:
     """Numbering schemes for immunoglobulin sequences."""
@@ -31,296 +31,63 @@ class Chain:
     TRD: 'Chain'
     """T-cell receptor Delta chain"""
 
-class ScoringParams:
-    """Scoring parameters for sequence alignment and numbering."""
-    
-    def __init__(
-        self,
-        gap_pen_cp: Optional[float] = None,
-        gap_pen_fr: Optional[float] = None,
-        gap_pen_ip: Optional[float] = None,
-        gap_pen_op: Optional[float] = None,
-        gap_pen_cdr: Optional[float] = None,
-        gap_pen_other: Optional[float] = None,
-        cdr_increase: Optional[float] = None,
-        pen_leap_insertion_point_imgt: Optional[float] = None,
-        pen_leap_insertion_point_kabat: Optional[float] = None,
-    ) -> None:
-        """
-        Create scoring parameters with optional custom values.
-        
-        Args:
-            gap_pen_cp: Gap penalty for conserved positions
-            gap_pen_fr: Gap penalty for framework regions
-            gap_pen_ip: Gap penalty for insertion points
-            gap_pen_op: Gap penalty for opening positions
-            gap_pen_cdr: Gap penalty for CDR regions
-            gap_pen_other: Gap penalty for other regions
-            cdr_increase: CDR increase factor
-            pen_leap_insertion_point_imgt: Penalty for leap insertion points in IMGT
-            pen_leap_insertion_point_kabat: Penalty for leap insertion points in KABAT
-        """
-        ...
-    
-    @property
-    def gap_pen_cp(self) -> float:
-        """Gap penalty for conserved positions."""
-        ...
-    
-    @gap_pen_cp.setter
-    def gap_pen_cp(self, value: float) -> None:
-        """Set gap penalty for conserved positions."""
-        ...
-    
-    @property
-    def gap_pen_fr(self) -> float:
-        """Gap penalty for framework regions."""
-        ...
-    
-    @gap_pen_fr.setter
-    def gap_pen_fr(self, value: float) -> None:
-        """Set gap penalty for framework regions."""
-        ...
-    
-    @property
-    def gap_pen_ip(self) -> float:
-        """Gap penalty for insertion points."""
-        ...
-    
-    @gap_pen_ip.setter
-    def gap_pen_ip(self, value: float) -> None:
-        """Set gap penalty for insertion points."""
-        ...
-    
-    @property
-    def gap_pen_op(self) -> float:
-        """Gap penalty for opening positions."""
-        ...
-    
-    @gap_pen_op.setter
-    def gap_pen_op(self, value: float) -> None:
-        """Set gap penalty for opening positions."""
-        ...
-    
-    @property
-    def gap_pen_cdr(self) -> float:
-        """Gap penalty for CDR regions."""
-        ...
-    
-    @gap_pen_cdr.setter
-    def gap_pen_cdr(self, value: float) -> None:
-        """Set gap penalty for CDR regions."""
-        ...
-    
-    @property
-    def gap_pen_other(self) -> float:
-        """Gap penalty for other regions."""
-        ...
-    
-    @gap_pen_other.setter
-    def gap_pen_other(self, value: float) -> None:
-        """Set gap penalty for other regions."""
-        ...
-    
-    @property
-    def cdr_increase(self) -> float:
-        """CDR increase factor."""
-        ...
-    
-    @cdr_increase.setter
-    def cdr_increase(self, value: float) -> None:
-        """Set CDR increase factor."""
-        ...
-    
-    @property
-    def pen_leap_insertion_point_imgt(self) -> float:
-        """Penalty for leap insertion points in IMGT."""
-        ...
-    
-    @pen_leap_insertion_point_imgt.setter
-    def pen_leap_insertion_point_imgt(self, value: float) -> None:
-        """Set penalty for leap insertion points in IMGT."""
-        ...
-    
-    @property
-    def pen_leap_insertion_point_kabat(self) -> float:
-        """Penalty for leap insertion points in KABAT."""
-        ...
-    
-    @pen_leap_insertion_point_kabat.setter
-    def pen_leap_insertion_point_kabat(self, value: float) -> None:
-        """Set penalty for leap insertion points in KABAT."""
-        ...
-
-class AnnotationResult:
-    """Result of sequence annotation and numbering."""
-    
-    @property
-    def sequence(self) -> str:
-        """The original input sequence."""
-        ...
-    
-    @property
-    def numbers(self) -> List[str]:
-        """List of position numbers corresponding to each residue."""
-        ...
-    
-    @property
-    def scheme(self) -> Scheme:
-        """The numbering scheme used."""
-        ...
-    
-    @property
-    def chain(self) -> Chain:
-        """The chain type identified."""
-        ...
-    
-    @property
-    def identity(self) -> float:
-        """Identity score of the alignment."""
-        ...
-    
-    @property
-    def regions(self) -> Dict[str, Tuple[int, int]]:
-        """Dictionary mapping region names to (start, end) positions."""
-        ...
-    
-    @property
-    def start(self) -> int:
-        """Start position of the numbering."""
-        ...
-    
-    @property
-    def end(self) -> int:
-        """End position of the numbering."""
-        ...
-    
-    def summary(self) -> str:
-        """Get a summary string of the annotation result."""
-        ...
-    
-    def get_region_sequence(self, region_name: str) -> Optional[str]:
-        """
-        Get the sequence for a specific region.
-        
-        Args:
-            region_name: Name of the region (e.g., 'CDR1', 'FR1', etc.)
-            
-        Returns:
-            The sequence for the specified region, or None if not found.
-        """
-        ...
-    
-    def get_cdr_sequences(self) -> Dict[str, str]:
-        """
-        Get all CDR sequences.
-        
-        Returns:
-            Dictionary mapping CDR names to their sequences.
-        """
-        ...
-    
-    def get_framework_sequences(self) -> Dict[str, str]:
-        """
-        Get all framework sequences.
-        
-        Returns:
-            Dictionary mapping framework names to their sequences.
-        """
-        ...
-    
-    def is_high_confidence(self, threshold: float) -> bool:
-        """
-        Check if the annotation result meets a confidence threshold.
-        
-        Args:
-            threshold: Minimum identity score required
-            
-        Returns:
-            True if identity score >= threshold
-        """
-        ...
-
 class Annotator:
     """Main class for sequence annotation and numbering."""
-    
+
     def __init__(
         self,
-        scheme: Scheme,
-        chains: Union[Chain, List[Chain]],
-        scoring_params: Optional[ScoringParams] = None,
-        use_prefiltering: Optional[bool] = None,
+        scheme: Scheme = Scheme.IMGT,
+        chains: Optional[List[Chain]] = None,
+        disable_prefiltering: bool = False,
+        threads: Optional[int] = None,
+        min_confidence: float = 0.7,
+        min_kmer_overlap: Optional[float] = None,
     ) -> None:
         """
         Create a new annotator instance.
-        
+
         Args:
-            scheme: The numbering scheme to use (IMGT or KABAT)
-            chains: Single chain or list of chains to annotate
-            scoring_params: Optional custom scoring parameters
-            use_prefiltering: Whether to use prefiltering for performance
-            
+            scheme: The numbering scheme to use (IMGT or KABAT). Defaults to IMGT.
+            chains: List of chains to detect. Defaults to [IGH, IGK, IGL] if not provided.
+            disable_prefiltering: Whether to disable k-mer prefiltering. Defaults to False.
+            threads: Number of threads for parallel processing. Defaults to CPU cores.
+            min_confidence: Minimum alignment confidence threshold. Defaults to 0.7.
+            min_kmer_overlap: K-mer overlap threshold for prefiltering. Defaults to 0.2.
+
         Raises:
             RuntimeError: If annotator creation fails
         """
         ...
-    
-    def number_sequence(self, sequence: str) -> AnnotationResult:
-        """
-        Number a single sequence.
-        
-        Args:
-            sequence: The amino acid sequence to number
-            
-        Returns:
-            Annotation result containing numbering and analysis
-            
-        Raises:
-            RuntimeError: If sequence numbering fails
-        """
-        ...
-    
-    def number_sequences(
-        self, 
-        sequences: List[str], 
-        parallel: bool = False
-    ) -> List[AnnotationResult]:
-        """
-        Number multiple sequences.
-        
-        Args:
-            sequences: List of amino acid sequences to number
-            parallel: Whether to use parallel processing
-            
-        Returns:
-            List of annotation results
-            
-        Raises:
-            RuntimeError: If any sequence numbering fails
-        """
-        ...
-    
-    def number_file(self, file_path: str, parallel: bool = False) -> List[Tuple[str, AnnotationResult]]:
-        """
-        Number sequences from a FASTA or FASTQ file.
-        
-        Args:
-            file_path: Path to the input file (supports .fasta, .fastq, .gz)
-            parallel: Whether to use parallel processing for better performance
-            
-        Returns:
-            List of tuples containing (sequence_name, annotation_result)
-            
-        Raises:
-            RuntimeError: If file processing fails
-        """
-        ...
 
-def default_scoring_params() -> ScoringParams:
-    """
-    Get default scoring parameters.
-    
-    Returns:
-        Default ScoringParams instance
-    """
-    ...
+    def number_sequences(
+        self,
+        sequences: List[Union[str, Tuple[str, str]]],
+        max_chains: int = 2
+    ) -> List[List[Tuple[List[str], float, Chain]]]:
+        """
+        Number multiple sequences with automatic parallel processing.
+
+        Args:
+            sequences: List of sequences. Each can be either:
+                - str: Just the sequence string
+                - tuple(str, str): (sequence_id, sequence) pair
+            max_chains: Maximum number of chains to find per sequence. Defaults to 2.
+
+        Returns:
+            List of results for each input sequence. Each result is a list of tuples:
+            [(numbers, confidence, chain), ...]
+            where:
+            - numbers: List of position strings according to numbering scheme
+            - confidence: Alignment confidence score (0.0-1.0)
+            - chain: Detected chain type
+
+        Example:
+            >>> annotator = Annotator(scheme=Scheme.IMGT, chains=[Chain.IGH])
+            >>> sequences = ["QVQLVQSGAEVKKPGASVKVSCKAS...", "DIQMTQSPSSLSASVGDRVTITC..."]
+            >>> results = annotator.number_sequences(sequences)
+            >>> for i, sequence_chains in enumerate(results):
+            ...     print(f"Sequence {i+1}: Found {len(sequence_chains)} chains")
+            ...     for numbers, confidence, chain in sequence_chains:
+            ...         print(f"  Chain {chain}: {confidence:.2f} confidence")
+        """
+        ...

@@ -206,7 +206,7 @@ pub struct Regions {
 pub struct ChainNumbering {
     #[serde(serialize_with = "serialize_numbering_positions")]
     pub numbers: Vec<NumberingPosition>,
-    pub identity: f64,
+    pub confidence: f64,
     pub scheme: Scheme,
     pub chain: Chain,
     pub cdr_definition: CdrDefinitions,

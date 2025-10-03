@@ -81,7 +81,7 @@ pub fn find_best_chain(
     numbering_schemes
         .iter()
         .map(|&scheme| {
-            let (numbers, identity, start, end) = scheme.number_sequence(query_sequence);
+            let (numbers, confidence, start, end) = scheme.number_sequence(query_sequence);
             let regions = extract_regions(
                 &numbers,
                 scheme.scheme_type,
@@ -91,7 +91,7 @@ pub fn find_best_chain(
             );
             ChainNumbering {
                 numbers,
-                identity,
+                confidence,
                 scheme: scheme.scheme_type,
                 chain: scheme.chain_type,
                 cdr_definition: scheme.cdr_definition,
@@ -100,12 +100,12 @@ pub fn find_best_chain(
                 regions,
             }
         })
-        .filter(|chain| chain.identity > min_confidence)
+        .filter(|chain| chain.confidence > min_confidence)
         .max_by(|numbers_a, numbers_b| {
             numbers_a
-                .identity
-                .partial_cmp(&numbers_b.identity)
-                // This can only fail when an identity is NaN, which should never happen
+                .confidence
+                .partial_cmp(&numbers_b.confidence)
+                // This can only fail when a confidence is NaN, which should never happen
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
         .ok_or_else(|| "No valid numbering found".to_string())

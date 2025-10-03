@@ -76,15 +76,15 @@ describe('Immunum WASM API', () => {
                 if (parsed.length > 0) {
                     const chainResult = parsed[0];
                     expect(chainResult.numbers).toBeDefined();
-                    expect(chainResult.identity).toBeDefined();
+                    expect(chainResult.confidence).toBeDefined();
                     expect(chainResult.chain).toBeDefined();
                     expect(chainResult.scheme).toBeDefined();
                     expect(chainResult.start).toBeDefined();
                     expect(chainResult.end).toBeDefined();
 
                     expect(Array.isArray(chainResult.numbers)).toBe(true);
-                    expect(typeof chainResult.identity).toBe('number');
-                    expect(chainResult.identity).toBeGreaterThan(0);
+                    expect(typeof chainResult.confidence).toBe('number');
+                    expect(chainResult.confidence).toBeGreaterThan(0);
                 }
             } catch (e) {
                 // Check if it's an error result

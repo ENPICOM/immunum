@@ -69,9 +69,9 @@ impl Annotator {
                     .into_iter()
                     .map(|chain| {
                         format!(
-                            r#"{{"numbers":[{}],"identity":{},"chain":"{}","scheme":"{}","start":{},"end":{}}}"#,
+                            r#"{{"numbers":[{}],"confidence":{},"chain":"{}","scheme":"{}","start":{},"end":{}}}"#,
                             chain.numbers.iter().map(|n| format!(r#""{}""#, n)).collect::<Vec<_>>().join(","),
-                            chain.identity,
+                            chain.confidence,
                             chain.chain.to_short(),
                             match chain.scheme {
                                 Scheme::IMGT => "IMGT",
@@ -136,9 +136,9 @@ impl Annotator {
                             .into_iter()
                             .map(|chain| {
                                 format!(
-                                    r#"{{"numbers":[{}],"identity":{},"chain":"{}","scheme":"{}","start":{},"end":{}}}"#,
+                                    r#"{{"numbers":[{}],"confidence":{},"chain":"{}","scheme":"{}","start":{},"end":{}}}"#,
                                     chain.numbers.iter().map(|n| format!(r#""{}""#, n)).collect::<Vec<_>>().join(","),
-                                    chain.identity,
+                                    chain.confidence,
                                     chain.chain.to_short(),
                                     match chain.scheme {
                                         Scheme::IMGT => "IMGT",

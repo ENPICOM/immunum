@@ -114,7 +114,7 @@ impl Annotator {
                             .map(|chain| {
                                 (
                                     chain.numbers.iter().map(|n| n.to_string()).collect(),
-                                    chain.identity,
+                                    chain.confidence,
                                     chain.chain,
                                 )
                             })

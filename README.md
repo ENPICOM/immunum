@@ -136,7 +136,7 @@ The CLI outputs results in JSON format with the following structure:
         "numbers": ["1", "2", "3", "4", "5", "..."],
         "scheme": "IMGT",
         "chain": "IGH",
-        "identity": 0.95,
+        "confidence": 0.95,
         "start": 0,
         "end": 119,
         "regions": {
@@ -161,7 +161,7 @@ The CLI outputs results in JSON format with the following structure:
 - `numbers`: Position numbers according to the numbering scheme
 - `scheme`: Applied numbering scheme (IMGT/KABAT)
 - `chain`: Detected chain type (IGH/IGK/IGL/TRA/TRB/TRG/TRD)
-- `identity`: Alignment confidence score (0.0-1.0)
+- `confidence`: Alignment confidence score (0.0-1.0)
 - `start`/`end`: Indices of numbered region within input sequence
 - `regions`: CDR and framework regions with positions and sequences
 
