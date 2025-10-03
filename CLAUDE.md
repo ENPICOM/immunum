@@ -44,6 +44,12 @@ uv run maturin build --features python --release
 
 # Run Python tests
 uv run pytest
+
+# Important: If tests fail after making changes to Python bindings
+# uv may cache and reinstall old versions. To fix:
+rm -rf .venv/lib/python3.11/site-packages/immunum*
+uv run maturin develop --features python
+pytest tests/python/  # Run pytest directly, not via 'uv run'
 ```
 
 ### WebAssembly Development
@@ -114,6 +120,11 @@ cargo test test_name
 
 # Run Python tests with verbose output
 uv run pytest -v
+
+# If Python tests fail after code changes (due to uv caching issues):
+rm -rf .venv/lib/python3.11/site-packages/immunum*
+uv run maturin develop --features python
+pytest -v  # Run directly without 'uv run'
 
 # Run validation tests
 cargo test abpdseq_validation_test

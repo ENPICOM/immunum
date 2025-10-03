@@ -208,3 +208,108 @@ class TestAnnotatorMethods:
             # Numbers might be different between schemes
             assert isinstance(imgt_numbers, list)
             assert isinstance(kabat_numbers, list)
+
+
+class TestStringBasedAPI:
+    """Tests for string-based scheme and chain arguments."""
+
+    def test_annotator_with_string_scheme(self):
+        """Test Annotator creation with string scheme."""
+        annotator = immunum.Annotator(scheme="IMGT")
+        assert annotator is not None
+
+        annotator = immunum.Annotator(scheme="KABAT")
+        assert annotator is not None
+
+    def test_annotator_with_scheme_alias(self):
+        """Test Annotator creation with scheme aliases."""
+        annotator = immunum.Annotator(scheme="I")
+        assert annotator is not None
+
+        annotator = immunum.Annotator(scheme="K")
+        assert annotator is not None
+
+    def test_annotator_with_string_chains(self):
+        """Test Annotator creation with string chains."""
+        annotator = immunum.Annotator(chains=["IGH", "IGK", "IGL"])
+        assert annotator is not None
+
+    def test_annotator_with_chain_aliases(self):
+        """Test Annotator creation with chain aliases."""
+        annotator = immunum.Annotator(chains=["H", "K", "L"])
+        assert annotator is not None
+
+        annotator = immunum.Annotator(chains=["Heavy", "Kappa", "Lambda"])
+        assert annotator is not None
+
+    def test_annotator_string_and_enum_mixed(self):
+        """Test that string and enum arguments work together."""
+        annotator = immunum.Annotator(
+            scheme="IMGT", chains=[immunum.Chain.IGH, immunum.Chain.IGK]
+        )
+        assert annotator is not None
+
+    def test_number_sequences_with_string_scheme(self):
+        """Test number_sequences with string scheme."""
+        annotator = immunum.Annotator(scheme="IMGT", chains=["IGH", "IGK", "IGL"])
+
+        heavy_chain = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS"
+        sequences = [heavy_chain]
+        results = annotator.number_sequences(sequences)
+
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert len(results[0]) >= 1
+
+    def test_number_sequences_with_kabat_string(self):
+        """Test number_sequences with KABAT scheme as string."""
+        annotator = immunum.Annotator(scheme="KABAT", chains=["IGH"])
+
+        heavy_chain = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS"
+        results = annotator.number_sequences([heavy_chain])
+
+        assert isinstance(results, list)
+        assert len(results) == 1
+
+    def test_invalid_scheme_string(self):
+        """Test that invalid scheme strings raise ValueError."""
+        with pytest.raises(ValueError) as excinfo:
+            immunum.Annotator(scheme="INVALID")
+        assert "Invalid scheme" in str(excinfo.value)
+
+    def test_invalid_chain_string(self):
+        """Test that invalid chain strings raise ValueError."""
+        with pytest.raises(ValueError) as excinfo:
+            immunum.Annotator(chains=["INVALID"])
+        assert "Invalid chain" in str(excinfo.value)
+
+    def test_tcr_chains_with_strings(self):
+        """Test T-cell receptor chains with string arguments."""
+        annotator = immunum.Annotator(
+            scheme="IMGT", chains=["TRA", "TRB", "TRG", "TRD"]
+        )
+        assert annotator is not None
+
+    def test_tcr_chain_aliases(self):
+        """Test T-cell receptor chain aliases."""
+        annotator = immunum.Annotator(scheme="IMGT", chains=["A", "B", "G", "D"])
+        assert annotator is not None
+
+        annotator = immunum.Annotator(
+            scheme="IMGT", chains=["Alpha", "Beta", "Gamma", "Delta"]
+        )
+        assert annotator is not None
+
+    def test_backward_compatibility_enums(self):
+        """Test that old enum-based API still works."""
+        annotator = immunum.Annotator(
+            scheme=immunum.Scheme.IMGT,
+            chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
+        )
+        assert annotator is not None
+
+        heavy_chain = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGQHTLQGVVVVPATDYWGQGTLVTVSS"
+        results = annotator.number_sequences([heavy_chain])
+
+        assert isinstance(results, list)
+        assert len(results) == 1

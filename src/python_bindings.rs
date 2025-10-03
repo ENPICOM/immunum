@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
@@ -16,20 +17,83 @@ pub struct Annotator {
 type PyChainNumbering = (Vec<String>, f64, Chain);
 type PySequenceNumbering = Vec<PyChainNumbering>;
 
+/// Helper function to parse Scheme from Python object (string or enum)
+fn parse_scheme(obj: &Bound<'_, PyAny>) -> PyResult<Scheme> {
+    // Try to extract as Scheme enum first
+    if let Ok(scheme) = obj.extract::<Scheme>() {
+        return Ok(scheme);
+    }
+
+    // Try to extract as string
+    if let Ok(s) = obj.extract::<String>() {
+        Scheme::from_str(&s, true).map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid scheme '{}'. Valid values: IMGT (I), KABAT (K)",
+                s
+            ))
+        })
+    } else {
+        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "scheme must be either Scheme enum or string",
+        ))
+    }
+}
+
+/// Helper function to parse Chain from Python object (string or enum)
+fn parse_chain(obj: &Bound<'_, PyAny>) -> PyResult<Chain> {
+    // Try to extract as Chain enum first
+    if let Ok(chain) = obj.extract::<Chain>() {
+        return Ok(chain);
+    }
+
+    // Try to extract as string
+    if let Ok(s) = obj.extract::<String>() {
+        Chain::from_str(&s, true)
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Invalid chain '{}'. Valid values: IGH/Heavy/H, IGK/Kappa/K, IGL/Lambda/L, TRA/Alpha/A, TRB/Beta/B, TRG/Gamma/G, TRD/Delta/D", s)
+            ))
+    } else {
+        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "chain must be either Chain enum or string",
+        ))
+    }
+}
+
 #[pymethods]
 impl Annotator {
     #[new]
-    #[pyo3(signature = (scheme=Scheme::IMGT, chains=None, disable_prefiltering=false, threads=None, min_confidence=0.7, min_kmer_overlap=None))]
+    #[pyo3(signature = (scheme=None, chains=None, disable_prefiltering=false, threads=None, min_confidence=0.7, min_kmer_overlap=None))]
     pub fn new(
-        scheme: Scheme,
-        chains: Option<Vec<Chain>>,
+        scheme: Option<Bound<'_, PyAny>>,
+        chains: Option<Bound<'_, PyAny>>,
         disable_prefiltering: bool,
         threads: Option<usize>,
         min_confidence: f64,
         min_kmer_overlap: Option<f64>,
     ) -> PyResult<Self> {
-        // Default chains if not provided
-        let chains = chains.unwrap_or_else(|| vec![Chain::IGH, Chain::IGK, Chain::IGL]);
+        // Parse scheme (default to IMGT if not provided)
+        let scheme = if let Some(scheme_obj) = scheme {
+            parse_scheme(&scheme_obj)?
+        } else {
+            Scheme::IMGT
+        };
+
+        // Parse chains (default to IGH, IGK, IGL if not provided)
+        let chains = if let Some(chains_obj) = chains {
+            // Try to extract as list
+            if let Ok(chain_list) = chains_obj.extract::<Vec<Bound<'_, PyAny>>>() {
+                chain_list
+                    .iter()
+                    .map(|item| parse_chain(item))
+                    .collect::<PyResult<Vec<Chain>>>()?
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "chains must be a list of Chain enums or strings",
+                ));
+            }
+        } else {
+            vec![Chain::IGH, Chain::IGK, Chain::IGL]
+        };
 
         let threads = threads.unwrap_or_else(num_cpus::get);
 
