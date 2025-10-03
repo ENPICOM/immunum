@@ -157,13 +157,13 @@ mod tests {
 
     #[test]
     fn normal_insertion_numbering() {
-        let original_numbering = vec!["-", "-", "1", "2", "-", "-", "-", "3", "4", "-", "-"];
+        let original_numbering = ["-", "-", "1", "2", "-", "-", "-", "3", "4", "-", "-"];
         let mut numbering: Vec<NumberingPosition> = original_numbering
             .iter()
             .map(|s| NumberingPosition::from_string(s))
             .collect();
 
-        let correct_strings = vec!["-", "-", "1", "2", "2A", "2B", "2C", "3", "4", "-", "-"];
+        let correct_strings = ["-", "-", "1", "2", "2A", "2B", "2C", "3", "4", "-", "-"];
         let correct_numbering: Vec<NumberingPosition> = correct_strings
             .iter()
             .map(|s| NumberingPosition::from_string(s))
@@ -185,12 +185,12 @@ mod tests {
     #[test]
     fn test_reverse_numbering() {
         // Test case 1: IMGT position 32-33
-        let original_1 = vec!["-", "-", "1", "32", "-", "-", "-", "-", "33", "-", "-"];
+        let original_1 = ["-", "-", "1", "32", "-", "-", "-", "-", "33", "-", "-"];
         let mut numbering: Vec<NumberingPosition> = original_1
             .iter()
             .map(|s| NumberingPosition::from_string(s))
             .collect();
-        let correct_1 = vec![
+        let correct_1 = [
             "-", "-", "1", "32", "32A", "32B", "33B", "33A", "33", "-", "-",
         ];
         let correct_numbering: Vec<NumberingPosition> = correct_1
@@ -201,12 +201,12 @@ mod tests {
         assert_eq!(numbering, correct_numbering);
 
         // Test case 2: IMGT position 60-70
-        let original_2 = vec!["-", "-", "1", "60", "-", "-", "-", "-", "70", "-", "-"];
+        let original_2 = ["-", "-", "1", "60", "-", "-", "-", "-", "70", "-", "-"];
         let mut numbering: Vec<NumberingPosition> = original_2
             .iter()
             .map(|s| NumberingPosition::from_string(s))
             .collect();
-        let correct_2 = vec![
+        let correct_2 = [
             "-", "-", "1", "60", "60A", "60B", "61B", "61A", "70", "-", "-",
         ];
         let correct_numbering: Vec<NumberingPosition> = correct_2
@@ -217,12 +217,12 @@ mod tests {
         assert_eq!(numbering, correct_numbering);
 
         // Test case 3: IMGT position 111-114
-        let original_3 = vec!["-", "-", "1", "111", "-", "-", "-", "-", "114", "-", "-"];
+        let original_3 = ["-", "-", "1", "111", "-", "-", "-", "-", "114", "-", "-"];
         let mut numbering: Vec<NumberingPosition> = original_3
             .iter()
             .map(|s| NumberingPosition::from_string(s))
             .collect();
-        let correct_3 = vec![
+        let correct_3 = [
             "-", "-", "1", "111", "111A", "111B", "112B", "112A", "114", "-", "-",
         ];
         let correct_numbering: Vec<NumberingPosition> = correct_3
@@ -233,12 +233,12 @@ mod tests {
         assert_eq!(numbering, correct_numbering);
 
         // Test case 4: KABAT position 33-34
-        let original_4 = vec!["-", "-", "1", "33", "-", "-", "-", "-", "34", "-", "-"];
+        let original_4 = ["-", "-", "1", "33", "-", "-", "-", "-", "34", "-", "-"];
         let mut numbering: Vec<NumberingPosition> = original_4
             .iter()
             .map(|s| NumberingPosition::from_string(s))
             .collect();
-        let correct_4 = vec![
+        let correct_4 = [
             "-", "-", "1", "33", "33A", "33B", "33C", "33D", "34", "-", "-",
         ];
         let correct_numbering: Vec<NumberingPosition> = correct_4

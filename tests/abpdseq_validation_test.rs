@@ -40,8 +40,8 @@ fn edit_distance<T: PartialEq>(a: &[T], b: &[T]) -> usize {
     let mut matrix = vec![vec![0; len_b + 1]; len_a + 1];
 
     // Initialize first row and column
-    for i in 0..=len_a {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate().take(len_a + 1) {
+        row[0] = i;
     }
     for j in 0..=len_b {
         matrix[0][j] = j;
@@ -156,7 +156,7 @@ fn run_validation_parallel(
         .filter(|(k, _)| {
             sequences_to_process
                 .iter()
-                .any(|s| String::from_utf8_lossy(&s.name).to_string() == **k)
+                .any(|s| String::from_utf8_lossy(&s.name) == **k)
         })
         .collect::<HashMap<_, _>>();
 
@@ -201,7 +201,7 @@ fn run_validation_parallel(
                 if let Some(expected) = expected_results.get(&header) {
                     let mut matches = Vec::new();
                     // Find matching expected result based on chain type
-                    let exp_chain_1 = expected.get(0).expect("");
+                    let exp_chain_1 = expected.first().expect("");
                     let exp_chain_2 = expected.get(1);
 
                     // Did we find chain1?
@@ -220,7 +220,7 @@ fn run_validation_parallel(
                             // Calculate edit distance for debugging
                             let edit_dist_1 =
                                 edit_distance(&own_numbers_as_strings, &exp_chain_1.numbers);
-                            let accuracy_1 = if exp_chain_1.numbers.len() > 0 {
+                            let accuracy_1 = if !exp_chain_1.numbers.is_empty() {
                                 100.0
                                     * (1.0 - edit_dist_1 as f64 / exp_chain_1.numbers.len() as f64)
                             } else {
@@ -248,7 +248,7 @@ fn run_validation_parallel(
                                 // Calculate edit distance for debugging
                                 let edit_dist_2 =
                                     edit_distance(&own_numbers_as_strings, &exp_chain_2.numbers);
-                                let accuracy_2 = if exp_chain_2.numbers.len() > 0 {
+                                let accuracy_2 = if !exp_chain_2.numbers.is_empty() {
                                     100.0
                                         * (1.0
                                             - edit_dist_2 as f64 / exp_chain_2.numbers.len() as f64)

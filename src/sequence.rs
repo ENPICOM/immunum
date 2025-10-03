@@ -176,6 +176,58 @@ pub fn from_path<P: AsRef<Path>>(
     SequenceReader::new(reader)
 }
 
+/// Validates if a string looks like a biological sequence
+fn is_valid_sequence(input: &str) -> bool {
+    // Check if input string contains valid protein chars
+    !input.is_empty() && input.chars().all(|c| "ACDEFGHIKLMNPQRSTVWY".contains(c))
+}
+
+/// A wrapper around sequence iterators that can be created from files or direct sequence input
+pub struct SequenceStream {
+    inner: Box<dyn Iterator<Item = Result<SequenceRecord, SequenceError>>>,
+}
+
+impl SequenceStream {
+    /// Creates a new SequenceStream by auto-detecting if the input is a file path or direct sequence
+    pub fn new(input: &str) -> Result<Self, SequenceError> {
+        let input_path = Path::new(input);
+
+        if input_path.exists() {
+            Self::from_file(input)
+        } else if is_valid_sequence(input) {
+            Ok(Self::from_sequence(input))
+        } else {
+            Err(SequenceError::InvalidFormat(
+                "Input is neither a valid file path nor a valid sequence".to_string(),
+            ))
+        }
+    }
+
+    /// Creates a SequenceStream from a file path
+    fn from_file(path: &str) -> Result<Self, SequenceError> {
+        let reader = from_path(path)?;
+        Ok(Self {
+            inner: Box::new(reader),
+        })
+    }
+
+    /// Creates a SequenceStream from a direct sequence string
+    fn from_sequence(sequence: &str) -> Self {
+        let record = SequenceRecord::new("sequence_1".to_string(), sequence.to_string());
+        Self {
+            inner: Box::new(std::iter::once(Ok(record))),
+        }
+    }
+}
+
+impl Iterator for SequenceStream {
+    type Item = Result<SequenceRecord, SequenceError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,57 +473,5 @@ mod tests {
         assert!(!is_valid_sequence("ACGX"));
         assert!(!is_valid_sequence("123"));
         assert!(!is_valid_sequence("acg")); // lowercase not allowed
-    }
-}
-
-/// Validates if a string looks like a biological sequence
-fn is_valid_sequence(input: &str) -> bool {
-    // Check if input string contains valid protein chars
-    !input.is_empty() && input.chars().all(|c| "ACDEFGHIKLMNPQRSTVWY".contains(c))
-}
-
-/// A wrapper around sequence iterators that can be created from files or direct sequence input
-pub struct SequenceStream {
-    inner: Box<dyn Iterator<Item = Result<SequenceRecord, SequenceError>>>,
-}
-
-impl SequenceStream {
-    /// Creates a new SequenceStream by auto-detecting if the input is a file path or direct sequence
-    pub fn new(input: &str) -> Result<Self, SequenceError> {
-        let input_path = Path::new(input);
-
-        if input_path.exists() {
-            Self::from_file(input)
-        } else if is_valid_sequence(input) {
-            Ok(Self::from_sequence(input))
-        } else {
-            Err(SequenceError::InvalidFormat(
-                "Input is neither a valid file path nor a valid sequence".to_string(),
-            ))
-        }
-    }
-
-    /// Creates a SequenceStream from a file path
-    fn from_file(path: &str) -> Result<Self, SequenceError> {
-        let reader = from_path(path)?;
-        Ok(Self {
-            inner: Box::new(reader),
-        })
-    }
-
-    /// Creates a SequenceStream from a direct sequence string
-    fn from_sequence(sequence: &str) -> Self {
-        let record = SequenceRecord::new("sequence_1".to_string(), sequence.to_string());
-        Self {
-            inner: Box::new(std::iter::once(Ok(record))),
-        }
-    }
-}
-
-impl Iterator for SequenceStream {
-    type Item = Result<SequenceRecord, SequenceError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
     }
 }

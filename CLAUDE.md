@@ -152,7 +152,7 @@ The CLI supports parallel processing via the `--threads` option. Set thread coun
 
 - Run `cargo fmt` after changes
 - Run tests after changes
-- Run `cargo clippy` and fix warnings at the end of a big code change
+- Run `cargo clippy --workspace --all-targets --all-features -- -D warnings` and fix warnings at the end of a big code change
 
 ## Performance Benchmarking
 
