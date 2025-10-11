@@ -63,7 +63,7 @@ class Annotator:
 
     def number_sequences(
         self, sequences: List[Union[str, Tuple[str, str]]], max_chains: int = 2
-    ) -> List[List[Tuple[List[str], float, Chain]]]:
+    ) -> List[List[Tuple[List[str], float, Chain, int, int]]]:
         """
         Number multiple sequences with automatic parallel processing.
 
