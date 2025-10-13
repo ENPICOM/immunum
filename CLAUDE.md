@@ -164,6 +164,7 @@ The CLI supports parallel processing via the `--threads` option. Set thread coun
 - Run `cargo fmt` after changes
 - Run tests after changes
 - Run `cargo clippy --workspace --all-targets --all-features -- -D warnings` and fix warnings at the end of a big code change
+- `immunum.pyi` contains the python interface definition stubs and should be updated whenever we change the python bindings file
 
 ## Performance Benchmarking
 
