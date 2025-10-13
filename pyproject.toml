@@ -7,7 +7,7 @@ manifest-path = "Cargo.toml"
 
 [project]
 name = "immunum"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A high-performance Python library for numbering antibody and T-cell receptor sequences using standard immunological numbering schemes."
 readme = "docs/PYTHON_README.md"
 requires-python = ">=3.11"

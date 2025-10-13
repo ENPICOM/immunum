@@ -1,0 +1,191 @@
+name: Release Python Wheels
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Cargo.toml'
+  workflow_dispatch:  # Allow manual triggering for testing
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      should_release: ${{ steps.check_release.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tag checking
+
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found version: $VERSION"
+
+      - name: Check if version already released
+        id: check_release
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Version v$VERSION already released, skipping"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version v$VERSION is new, will create release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+  build-linux:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build wheels (manylinux)
+        uses: PyO3/maturin-action@v1
+        with:
+          target: x86_64
+          manylinux: auto
+          args: --release --features python -i python${{ matrix.python-version }}
+          sccache: 'true'
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-py${{ matrix.python-version }}
+          path: target/wheels/*.whl
+          if-no-files-found: error
+
+  build-macos:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --features python -i python${{ matrix.python-version }}
+          sccache: 'true'
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-macos-${{ matrix.target }}-py${{ matrix.python-version }}
+          path: target/wheels/*.whl
+          if-no-files-found: error
+
+  # build-windows:
+  #   needs: check-version
+  #   if: needs.check-version.outputs.should_release == 'true'
+  #   runs-on: windows-latest
+  #   strategy:
+  #     matrix:
+  #       python-version: ['3.11', '3.12', '3.13']
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+
+  #     - name: Build wheels
+  #       uses: PyO3/maturin-action@v1
+  #       with:
+  #         target: x64
+  #         args: --release --features python -i python${{ matrix.python-version }}
+  #         sccache: 'true'
+
+  #     - name: Upload wheels
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheels-windows-py${{ matrix.python-version }}
+  #         path: target/wheels/*.whl
+  #         if-no-files-found: error
+
+  build-sdist:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  create-release:
+    needs: [check-version, build-linux, build-macos, build-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lah dist/
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          gh release create "v$VERSION" \
+            --title "Release v$VERSION" \
+            --notes "Python wheels for immunum v$VERSION
+
+          Built for:
+          - Python 3.11, 3.12, 3.13
+          - Linux (manylinux x86_64)
+          - macOS (Intel and Apple Silicon)
+
+          Install with: \`pip install immunum==$VERSION\`" \
+            dist/*
+
+      # Uncomment the following section when you're ready to publish to PyPI
+      # - name: Publish to PyPI
+      #   uses: PyO3/maturin-action@v1
+      #   env:
+      #     MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+      #   with:
+      #     command: upload
+      #     args: --skip-existing dist/*
