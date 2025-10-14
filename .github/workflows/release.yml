@@ -47,6 +47,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11', '3.12', '3.13']
+        target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
 
@@ -55,10 +56,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Set up QEMU
+        if: matrix.target == 'aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Build wheels (manylinux)
         uses: PyO3/maturin-action@v1
         with:
-          target: x86_64
+          target: ${{ matrix.target }}
           manylinux: auto
           args: --release --features python -i python${{ matrix.python-version }}
           sccache: 'true'
@@ -66,7 +73,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-py${{ matrix.python-version }}
+          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python-version }}
           path: target/wheels/*.whl
           if-no-files-found: error
 
@@ -77,7 +84,6 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11', '3.12', '3.13']
-        target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
 
@@ -89,45 +95,16 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
+          target: aarch64
           args: --release --features python -i python${{ matrix.python-version }}
           sccache: 'true'
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-macos-${{ matrix.target }}-py${{ matrix.python-version }}
+          name: wheels-macos-aarch64-py${{ matrix.python-version }}
           path: target/wheels/*.whl
           if-no-files-found: error
-
-  # build-windows:
-  #   needs: check-version
-  #   if: needs.check-version.outputs.should_release == 'true'
-  #   runs-on: windows-latest
-  #   strategy:
-  #     matrix:
-  #       python-version: ['3.11', '3.12', '3.13']
-  #   steps:
-  #     - uses: actions/checkout@v4
-
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
-
-  #     - name: Build wheels
-  #       uses: PyO3/maturin-action@v1
-  #       with:
-  #         target: x64
-  #         args: --release --features python -i python${{ matrix.python-version }}
-  #         sccache: 'true'
-
-  #     - name: Upload wheels
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: wheels-windows-py${{ matrix.python-version }}
-  #         path: target/wheels/*.whl
-  #         if-no-files-found: error
 
   build-sdist:
     needs: check-version
@@ -175,10 +152,13 @@ jobs:
 
           Built for:
           - Python 3.11, 3.12, 3.13
-          - Linux (manylinux x86_64)
-          - macOS (Intel and Apple Silicon)
+          - Linux x86_64 (manylinux)
+          - Linux aarch64/ARM64 (manylinux)
+          - macOS Apple Silicon (M1/M2/M3)
 
-          Install with: \`pip install immunum==$VERSION\`" \
+          Install with: \`pip install immunum==$VERSION\`
+
+          **Note**: Intel Mac users can install via Rosetta 2. Windows users should install from source." \
             dist/*
 
       # Uncomment the following section when you're ready to publish to PyPI
