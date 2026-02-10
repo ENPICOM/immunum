@@ -1,450 +1,153 @@
-use crate::constants::{get_region_ranges, MINIMAL_CHAIN_IDENTITY, MINIMAL_CHAIN_LENGTH};
-use crate::kmer_prefiltering::apply_kmer_prefiltering;
-use crate::kmer_prefiltering::MIN_KMER_OVERLAP;
-use crate::numbering_scheme_type::NumberingScheme;
-use crate::schemes::get_scheme_with_cdr_definition;
-use crate::sequence::SequenceRecord;
-use crate::types::{
-    CdrDefinitions, Chain, ChainNumbering, NumberingPosition, RegionInfo, Regions, Scheme,
-};
+//! High-level API for sequence annotation and chain detection
 
-/// Main annotator struct that consolidates all numbering functionality
+use crate::alignment::{align, Alignment};
+use crate::error::{Error, Result};
+use crate::scoring::ScoringMatrix;
+use crate::types::{Chain, Position, Scheme};
+
+/// Result of annotating a sequence with chain detection
+#[derive(Debug, Clone)]
+pub struct AnnotationResult {
+    /// Detected chain type
+    pub chain: Chain,
+    /// Alignment result
+    pub alignment: Alignment,
+    /// Confidence score (normalized alignment score)
+    pub confidence: f32,
+}
+
+impl AnnotationResult {
+    /// Get numbering for a specific scheme
+    pub fn numbering(&self, scheme: Scheme) -> Vec<Position> {
+        match scheme {
+            Scheme::IMGT => self.alignment.get_imgt_numbering(),
+            Scheme::Kabat => self.alignment.get_kabat_numbering(self.chain),
+        }
+    }
+}
+
+/// Annotator for numbering sequences
 pub struct Annotator {
-    schemes: Vec<NumberingScheme>,
-    disable_prefiltering: bool,
-    min_confidence: f64,
-    min_kmer_overlap: f64,
+    matrices: Vec<(Chain, ScoringMatrix)>,
 }
 
 impl Annotator {
-    /// Create a new Annotator with the specified scheme, chains, and optional scoring parameters
-    pub fn new(
-        scheme: Scheme,
-        chains: Vec<Chain>,
-        cdr_definitions: Option<CdrDefinitions>,
-        disable_prefiltering: bool,
-        min_confidence: Option<f64>,
-        min_kmer_overlap: Option<f64>,
-    ) -> Result<Self, String> {
-        let cdr_definitions = cdr_definitions.unwrap_or(CdrDefinitions::from_scheme(scheme));
-        // Pre-build all required schemes for performance
-        let schemes: Vec<NumberingScheme> = chains
+    pub fn new(chains: &[Chain], scheme: Scheme) -> Result<Self> {
+        // Validate: Kabat only supported for antibody chains
+        if scheme == Scheme::Kabat && chains.iter().any(|c| c.is_tcr()) {
+            return Err(Error::InvalidScheme(
+                "Kabat scheme only supported for antibody chains (IGH, IGK, IGL)".to_string(),
+            ));
+        }
+
+        let mut matrices = Vec::new();
+        for &chain in chains {
+            let matrix = ScoringMatrix::load(chain)?;
+            matrices.push((chain, matrix));
+        }
+
+        Ok(Self { matrices })
+    }
+
+    /// Annotate a sequence using the configured numbering scheme
+    ///
+    /// If multiple chains were provided during initialization, this will align to all
+    /// of them and return the best match. If only one chain was provided, it will
+    /// align to that chain directly.
+    ///
+    /// The numbering returned will use the scheme specified during annotator creation.
+    pub fn annotate(&self, sequence: &str) -> Result<AnnotationResult> {
+        if sequence.is_empty() {
+            return Err(Error::InvalidSequence("empty sequence".to_string()));
+        }
+
+        // Align to all loaded chain types and find best match
+        self.matrices
             .iter()
-            .map(|&chain| get_scheme_with_cdr_definition(scheme, chain, cdr_definitions))
-            .collect();
-
-        if schemes.is_empty() {
-            return Err("No valid schemes could be created for the specified chains".to_string());
-        }
-
-        Ok(Annotator {
-            schemes,
-            disable_prefiltering,
-            min_confidence: min_confidence.unwrap_or(MINIMAL_CHAIN_IDENTITY),
-            min_kmer_overlap: min_kmer_overlap.unwrap_or(MIN_KMER_OVERLAP),
-        })
-    }
-
-    /// Numbers a sequence against the (prefiltered) numbering schemes in the annotator class finding at most max_chains
-    pub fn number_sequence(
-        &self,
-        sequence: &SequenceRecord,
-        max_chains: Option<usize>,
-    ) -> Result<Vec<ChainNumbering>, String> {
-        if sequence.sequence.is_empty() {
-            return Err("Empty sequence provided".to_string());
-        }
-
-        // Apply prefiltering if enabled, otherwise use all schemes
-        let schemes: Vec<&NumberingScheme> = if !self.disable_prefiltering {
-            apply_kmer_prefiltering(&sequence.sequence, &self.schemes, self.min_kmer_overlap)
-        } else {
-            self.schemes.iter().collect()
-        };
-
-        // Use find_all_chains to find multiple chains in the sequence
-        find_all_chains(
-            &sequence.sequence,
-            schemes.as_slice(),
-            self.min_confidence,
-            max_chains,
-        )
-    }
-}
-
-/// Runs sequence alignment on given schemes, filters the output and return the numbering with the highest confidence
-pub fn find_best_chain(
-    query_sequence: &[u8],
-    numbering_schemes: &[&NumberingScheme],
-    min_confidence: f64,
-) -> Result<ChainNumbering, String> {
-    numbering_schemes
-        .iter()
-        .map(|&scheme| {
-            let (numbers, confidence, start, end) = scheme.number_sequence(query_sequence);
-            let regions = extract_regions(
-                &numbers,
-                scheme.scheme_type,
-                scheme.chain_type,
-                scheme.cdr_definition,
-                start,
-            );
-            ChainNumbering {
-                numbers,
+            .filter_map(|(chain, matrix)| {
+                align(sequence, matrix).ok().map(|alignment| {
+                    let confidence = self.calculate_confidence(&alignment, sequence.len());
+                    (*chain, alignment, confidence)
+                })
+            })
+            .max_by(|(_, _, conf1), (_, _, conf2)| {
+                conf1
+                    .partial_cmp(conf2)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(chain, alignment, confidence)| AnnotationResult {
+                chain,
+                alignment,
                 confidence,
-                scheme: scheme.scheme_type,
-                chain: scheme.chain_type,
-                cdr_definition: scheme.cdr_definition,
-                start,
-                end,
-                regions,
-            }
-        })
-        .filter(|chain| chain.confidence > min_confidence)
-        .max_by(|numbers_a, numbers_b| {
-            numbers_a
-                .confidence
-                .partial_cmp(&numbers_b.confidence)
-                // This can only fail when a confidence is NaN, which should never happen
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .ok_or_else(|| "No valid numbering found".to_string())
-}
-
-/// Attempts to find all antibody chains in a sequence
-fn find_all_chains(
-    query_sequence: &[u8],
-    numbering_schemes: &[&NumberingScheme],
-    min_confidence: f64,
-    max_chains: Option<usize>,
-) -> Result<Vec<ChainNumbering>, String> {
-    let max_chains = max_chains.unwrap_or(99); // Default is "unlimited"
-
-    let mut chains_found: Vec<ChainNumbering> = Vec::new();
-
-    let full_query_length = query_sequence.len();
-    let mut sequence_list: Vec<(&[u8], usize, usize)> = Vec::new();
-    sequence_list.push((query_sequence, 0, full_query_length - 1));
-
-    while let Some((current_sequence, current_start, current_end)) = sequence_list.pop() {
-        // Early termination if we've found enough chains
-        if chains_found.len() >= max_chains {
-            break;
-        }
-
-        let numbering_result = find_best_chain(current_sequence, numbering_schemes, min_confidence);
-
-        // Break early for single chain optimization
-        if max_chains == 1 {
-            return match numbering_result {
-                Ok(best_chain) => Ok(vec![best_chain]),
-                Err(e) => Err(e.to_string()),
-            };
-        }
-
-        match numbering_result {
-            Ok(mut best_chain) => {
-                // split the remaining sequence, add sequences that are long enough to the list
-                let front_sequence: &[u8] = &current_sequence[0..best_chain.start];
-                let end_sequence: &[u8] = &current_sequence[(best_chain.end + 1)..];
-
-                if front_sequence.len() > MINIMAL_CHAIN_LENGTH {
-                    sequence_list.push((
-                        front_sequence,
-                        current_start,
-                        (current_start + best_chain.start - 1),
-                    ))
-                }
-                if end_sequence.len() > MINIMAL_CHAIN_LENGTH {
-                    sequence_list.push((
-                        end_sequence,
-                        (current_start + best_chain.end + 1),
-                        current_end,
-                    ))
-                }
-
-                // set sequence to full original sequence
-                // best_chain.sequence = query_sequence.to_vec();
-                best_chain.start += current_start;
-                best_chain.end += current_start;
-
-                // add gaps to front and end to match with length of original sequence
-                let mut padded_numbering = vec![NumberingPosition::Gap; current_start];
-                padded_numbering.extend(best_chain.numbers);
-                padded_numbering.extend(vec![
-                    NumberingPosition::Gap;
-                    full_query_length - current_end - 1
-                ]);
-
-                best_chain.numbers = padded_numbering;
-
-                // Re-extract regions using the full sequence and padded numbering
-                best_chain.regions = extract_regions(
-                    &best_chain.numbers,
-                    best_chain.scheme,
-                    best_chain.chain,
-                    best_chain.cdr_definition,
-                    0, // start from 0 since we're using the full sequence
-                );
-
-                chains_found.push(best_chain);
-            }
-            Err(_) => {
-                // Continue processing other segments even if current segment doesn't match
-                continue;
-            }
-        }
+            })
+            .ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
     }
 
-    Ok(chains_found)
-}
-
-/// Extract region positions from numbering (optimized - positions only, no sequence extraction)
-fn extract_regions(
-    numbers: &[NumberingPosition],
-    scheme: Scheme,
-    chain: Chain,
-    cdr_definition: CdrDefinitions,
-    sequence_start: usize,
-) -> Regions {
-    let region_ranges = get_region_ranges(cdr_definition, scheme, chain);
-
-    // Pre-allocate region boundary trackers
-    let mut region_boundaries = [None; 14]; // 7 regions * 2 (start, end)
-
-    // Single pass through numbering positions to find all region boundaries
-    for (seq_idx, number_pos) in numbers.iter().enumerate() {
-        let position = match number_pos {
-            NumberingPosition::Gap => continue,
-            NumberingPosition::Number(n) => *n,
-            NumberingPosition::Insertion { position, .. } => *position,
-        };
-
-        // Check each region and update boundaries if this position falls within it
-        let regions = [
-            (region_ranges.fr1.start, region_ranges.fr1.end, 0),
-            (region_ranges.cdr1.start, region_ranges.cdr1.end, 2),
-            (region_ranges.fr2.start, region_ranges.fr2.end, 4),
-            (region_ranges.cdr2.start, region_ranges.cdr2.end, 6),
-            (region_ranges.fr3.start, region_ranges.fr3.end, 8),
-            (region_ranges.cdr3.start, region_ranges.cdr3.end, 10),
-            (region_ranges.fr4.start, region_ranges.fr4.end, 12),
-        ];
-
-        for &(start_pos, end_pos, boundary_idx) in &regions {
-            if position >= start_pos && position < end_pos {
-                let start_idx = boundary_idx;
-                let end_idx = boundary_idx + 1;
-
-                // Update start boundary (first occurrence)
-                if region_boundaries[start_idx].is_none() {
-                    region_boundaries[start_idx] = Some(sequence_start + seq_idx);
-                }
-                // Always update end boundary (last occurrence)
-                region_boundaries[end_idx] = Some(sequence_start + seq_idx);
-            }
-        }
-    }
-
-    // Helper to create RegionInfo from boundary indices
-    let create_region = |start_idx: usize, end_idx: usize| -> RegionInfo {
-        RegionInfo {
-            start: region_boundaries[start_idx].unwrap_or(0),
-            end: region_boundaries[end_idx].unwrap_or(0),
-        }
-    };
-
-    Regions {
-        fr1: create_region(0, 1),
-        cdr1: create_region(2, 3),
-        fr2: create_region(4, 5),
-        cdr2: create_region(6, 7),
-        fr3: create_region(8, 9),
-        cdr3: create_region(10, 11),
-        fr4: create_region(12, 13),
+    fn calculate_confidence(&self, alignment: &Alignment, seq_len: usize) -> f32 {
+        // Simple confidence: normalize score by sequence length
+        // Positive score per residue = good alignment
+        alignment.score / (seq_len as f32)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schemes::get_scheme_with_cdr_definition;
+
+    const ALL_CHAINS: &[Chain] = &[
+        Chain::IGH,
+        Chain::IGK,
+        Chain::IGL,
+        Chain::TRA,
+        Chain::TRB,
+        Chain::TRG,
+        Chain::TRD,
+    ];
 
     #[test]
-    fn test_annotator_creation() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![Chain::IGH], None, false, None, None);
-        assert!(annotator.is_ok());
+    fn test_create_annotator() {
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        assert_eq!(annotator.matrices.len(), 7);
     }
 
     #[test]
-    fn test_empty_chains() {
-        let annotator = Annotator::new(Scheme::IMGT, vec![], None, false, None, None);
-        assert!(annotator.is_err());
+    fn test_create_annotator_with_chains() {
+        let annotator = Annotator::new(&[Chain::IGH, Chain::IGK], Scheme::IMGT).unwrap();
+        assert_eq!(annotator.matrices.len(), 2);
     }
 
     #[test]
-    fn test_light_chain() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            false,
-            None,
-            None,
-        )
-        .unwrap();
+    fn test_annotate_igh_sequence() {
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
 
-        // Heavy chain sequence that should be correctly identified with prefiltering
-        let record = SequenceRecord {
-                name: b"light".to_vec(),
-                sequence: b"DIVMTQSPDSLAVSLGERATINCKASQSVTNDVAWYQQKPGQPPKLLIYYASNRYTGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQDYSSPYTFGQGTKVEIKRTVAAPSVFIFPPSDEQLKSGTASVVCLLNNFYPREAKVQWKVDNALQSGNSQESVTEQDSKDSTYSLSSTLTLSKADYEKHKVYACEVTHQGLSSPVTKSFNRGE".to_vec(),
-            };
+        // Known IGH sequence
+        let sequence =
+            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
-        let annotations = annotator.number_sequence(&record, Some(1));
-        assert!(annotations.is_ok());
+        let result = annotator.annotate(sequence).unwrap();
 
-        if let Ok(annotations) = annotations {
-            assert_eq!(annotations.len(), 1);
-            assert_eq!(annotations[0].chain, Chain::IGK);
-        }
+        // Should detect as IGH
+        assert_eq!(result.chain, Chain::IGH);
+        assert!(result.confidence != 0.0);
+
+        let numbering = result.numbering(Scheme::IMGT);
+        assert_eq!(numbering.len(), sequence.len());
     }
 
     #[test]
-    fn test_prefiltering_with_heavy_chain() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            true,
-            None,
-            None,
-        )
-        .unwrap();
+    fn test_annotate_with_single_chain() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT).unwrap();
+        let sequence =
+            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
-        // Heavy chain sequence that should be correctly identified with prefiltering
-        let heavy_chain_record = SequenceRecord {
-                name: b"heavy".to_vec(),
-                sequence: b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS".to_vec(),
-            };
-
-        let annotations = annotator.number_sequence(&heavy_chain_record, Some(1));
-        assert!(annotations.is_ok());
-
-        if let Ok(annotations) = annotations {
-            assert_eq!(annotations.len(), 1);
-            assert_eq!(annotations[0].chain, Chain::IGH);
-        }
+        let result = annotator.annotate(sequence).unwrap();
+        assert_eq!(result.chain, Chain::IGH);
     }
 
     #[test]
-    fn test_number_paired_sequence() {
-        let annotator = Annotator::new(
-            Scheme::IMGT,
-            vec![Chain::IGH, Chain::IGK, Chain::IGL],
-            None,
-            false, // Disable prefiltering for this test
-            None,
-            None,
-        )
-        .unwrap();
-
-        // Test sequence with multiple chains (concatenated heavy and light chain)
-        let paired_record = SequenceRecord {
-                name: b"heavy_light".to_vec(),
-                sequence: b"QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSSDIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTGSGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELK".to_vec()
-        };
-
-        let annotations = annotator.number_sequence(&paired_record, Some(2));
-        assert!(annotations.is_ok());
-        if let Ok(annotations) = annotations {
-            // Should find two chains in the paired sequence
-            assert_eq!(annotations.len(), 2);
-        }
-    }
-
-    #[test]
-    fn test_correct_chain_identification() {
-        let heavy_chain: &[u8] = "QVQLVQSGAVIKTPGSSVKISCRASGYNFRDYSIHWVRLIPDKGFEWIGWIKPLWGAVSYARQL\
-        QGRVSMTRQLSQDPDDPDWGVAYMEFSGLTPADTAEYFCVRRGSCDYCGDFPWQYWCQGTVVVVSSASTKGPSVFPLAPSSGGTAALGCLV\
-        KDYFPEPVTVSWNSGALTSGVHTFPAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
-            .as_bytes();
-        let lambda_chain: &[u8] = "SALTQPPSASGSLGQSVTISCTGTSSDVGGYNYVSWYQQHAGKAPKVIIYEVNKRPSGVPDRF\
-        SGSKSGNTASLTVSGLQAEDEADYYCSSYEGSDNFVFGTGTKVTVLGQPKANPTVTLFPPSSEELQANKATLVCLISDFYPGAVTVAWK\
-        ADGSPVKAGVETTKPSKQSNNKYAASSYLSLTPEQWKSHRSYSCQVTHEGSTVEKTVAPTECS"
-            .as_bytes();
-        let kappa_chain: &[u8] = "DIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTG\
-        SGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELKRADAAPTVSIFPPSSEQLTSGGASVVCFLNNFYPKDINVKWKIDGSE\
-        RQNGVLNSATDQDSKDSTYSMSSTLTLTKDEYERHNSYTCEATHKTSTSPIVKSFNRNEC"
-            .as_bytes();
-
-        let heavy_scheme =
-            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT);
-        let lambda_scheme =
-            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGL, CdrDefinitions::IMGT);
-        let kappa_scheme =
-            get_scheme_with_cdr_definition(Scheme::KABAT, Chain::IGK, CdrDefinitions::KABAT);
-        let schemes: Vec<&NumberingScheme> = vec![&heavy_scheme, &lambda_scheme, &kappa_scheme];
-
-        assert_eq!(
-            find_best_chain(heavy_chain, &schemes, MINIMAL_CHAIN_IDENTITY)
-                .expect("Did not find match")
-                .chain,
-            Chain::IGH
-        );
-
-        assert_eq!(
-            find_best_chain(kappa_chain, &schemes, MINIMAL_CHAIN_IDENTITY)
-                .expect("Did not find match")
-                .chain,
-            Chain::IGK
-        );
-
-        assert_eq!(
-            find_best_chain(lambda_chain, &schemes, MINIMAL_CHAIN_IDENTITY)
-                .expect("Did not find match")
-                .chain,
-            Chain::IGL
-        );
-    }
-
-    #[test]
-    fn test_correct_paired_chain_identification() {
-        let heavy_chain: &[u8] = "QVQLVQSGAVIKTPGSSVKISCRASGYNFRDYSIHWVRLIPDKGFEWIGWIKPLWGAVSYARQL\
-        QGRVSMTRQLSQDPDDPDWGVAYMEFSGLTPADTAEYFCVRRGSCDYCGDFPWQYWCQGTVVVVSSASTKGPSVFPLAPSSGGTAALGCLV\
-        KDYFPEPVTVSWNSGALTSGVHTFPAVLQSSGLYSLSSVVTVPSSSLGTQTYICNVNHKPSNTKVDKKVEPK"
-            .as_bytes();
-        let lambda_chain: &[u8] = "SALTQPPSASGSLGQSVTISCTGTSSDVGGYNYVSWYQQHAGKAPKVIIYEVNKRPSGVPDRF\
-        SGSKSGNTASLTVSGLQAEDEADYYCSSYEGSDNFVFGTGTKVTVLGQPKANPTVTLFPPSSEELQANKATLVCLISDFYPGAVTVAWK\
-        ADGSPVKAGVETTKPSKQSNNKYAASSYLSLTPEQWKSHRSYSCQVTHEGSTVEKTVAPTECS"
-            .as_bytes();
-        let kappa_chain: &[u8] = "DIVMTQSQKFMSTSVGDRVSITCKASQNVGTAVAWYQQKPGQSPKLMIYSASNRYTGVPDRFTG\
-        SGSGTDFTLTISNMQSEDLADYFCQQYSSYPLTFGAGTKLELKRADAAPTVSIFPPSSEQLTSGGASVVCFLNNFYPKDINVKWKIDGSE\
-        RQNGVLNSATDQDSKDSTYSMSSTLTLTKDEYERHNSYTCEATHKTSTSPIVKSFNRNEC"
-            .as_bytes();
-        let linker: &[u8] = "GGGGGGG".as_bytes();
-
-        let heavy_scheme =
-            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGH, CdrDefinitions::IMGT);
-        let lambda_scheme =
-            get_scheme_with_cdr_definition(Scheme::IMGT, Chain::IGL, CdrDefinitions::IMGT);
-        let kappa_scheme =
-            get_scheme_with_cdr_definition(Scheme::KABAT, Chain::IGK, CdrDefinitions::KABAT);
-        let schemes: Vec<&NumberingScheme> = vec![&heavy_scheme, &lambda_scheme, &kappa_scheme];
-
-        let heavy_kappa = [heavy_chain, linker, kappa_chain].concat();
-        let hk_results = find_all_chains(&heavy_kappa, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
-        assert_eq!(hk_results.unwrap().len(), 2);
-
-        let heavy_lambda = [heavy_chain, linker, lambda_chain].concat();
-        let hl_results = find_all_chains(&heavy_lambda, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
-        assert_eq!(hl_results.unwrap().len(), 2);
-
-        let kappa_lambda = [kappa_chain, linker, lambda_chain].concat();
-        let kl_results = find_all_chains(&kappa_lambda, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
-        assert_eq!(kl_results.unwrap().len(), 2);
-
-        let heavy_heavy = [heavy_chain, linker, heavy_chain].concat();
-        let hh_results = find_all_chains(&heavy_heavy, &schemes, MINIMAL_CHAIN_IDENTITY, Some(2));
-        assert_eq!(hh_results.unwrap().len(), 2);
+    fn test_empty_sequence() {
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let result = annotator.annotate("");
+        assert!(result.is_err());
     }
 }

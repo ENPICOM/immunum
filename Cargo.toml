@@ -1,47 +1,34 @@
 [package]
-name = "immunum"
-version = "0.1.1"
+name = "immunum2"
+version = "0.1.0"
 edition = "2021"
 
-[profile.release]
-opt-level = 3
-lto = true
-
 [dependencies]
-clap = { version = "4.5.40", features = ["derive"] }
-flate2 = "1.1.2"
-num_cpus = "1.16"
-pyo3 = { version = "0.25.1", features = ["extension-module"], optional = true }
-rayon = "1.10.0"
-thiserror = "2.0.12"
-wasm-bindgen = { version = "0.2.1", optional = true }
-js-sys = { version = "0.3", optional = true }
-wee_alloc = { version = "0.4.5", optional = true }
-wasm-bindgen-test = "0.3.50"
-phf = {version = "0.12.1" , features = ["macros"]}
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-rustc_version = "0.4"
+thiserror = "2.0"
+chrono = "0.4"
+
+[build-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [lib]
-name = "immunum"
+name = "immunum2"
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "immunum-cli"
+name = "immunum"
 path = "src/main.rs"
 
 [[bin]]
-name = "immunum-benchmark"
+name = "debug-validation"
+path = "src/bin/debug_validation.rs"
+
+[[bin]]
+name = "benchmark"
 path = "src/bin/benchmark.rs"
 
-[[test]]
-name = "abpdseq_validation_test"
-path = "tests/abpdseq_validation_test.rs"
-
-[features]
-default = ["python", "wasm"]
-python = ["pyo3"]
-wasm = ["wasm-bindgen", "wee_alloc"]
+[[bin]]
+name = "speed-benchmark"
+path = "src/bin/speed_benchmark.rs"

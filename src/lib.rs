@@ -1,29 +1,25 @@
+//! Immunum2 - High-performance antibody and TCR sequence numbering
+//!
+//! This library provides tools for aligning immunoglobulin (antibody) and
+//! T-cell receptor sequences to consensus sequences and numbering them
+//! according to various schemes (IMGT, Kabat).
+
+pub mod alignment;
 pub mod annotator;
-pub mod buffer_pool;
-pub mod consensus_scoring;
-pub mod constants;
-pub mod insertion_numbering;
-pub mod kmer_prefiltering;
-pub mod needleman_wunsch;
-pub mod numbering_scheme_type;
-pub mod schemes;
-pub mod scoring_matrix;
-pub mod sequence;
+pub mod consensus;
+pub mod error;
+pub mod numbering;
+pub mod scoring;
 pub mod types;
-// Binding modules
-#[cfg(feature = "python")]
-pub mod python_bindings;
-#[cfg(feature = "wasm")]
-pub mod wasm_bindings;
+pub mod validation;
 
-// Primary API
-pub use annotator::Annotator;
+// Re-export for backwards compatibility
+pub use numbering::imgt;
+pub use numbering::kabat;
 
-pub use constants::{get_scoring_params, ScoringParams};
-pub use numbering_scheme_type::NumberingScheme;
-pub use scoring_matrix::ScoringMatrix;
-pub use types::{Chain, RegionRange, Scheme};
-
-// Re-export the Python module function for PyO3
-#[cfg(feature = "python")]
-pub use python_bindings::immunum;
+pub use alignment::{align, Alignment};
+pub use annotator::{AnnotationResult, Annotator};
+pub use error::{Error, Result};
+pub use scoring::ScoringMatrix;
+pub use types::{Chain, Position, Region, Scheme};
+pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
