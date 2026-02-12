@@ -51,7 +51,7 @@ pub fn load_validation_csv(path: &Path) -> Result<Vec<ValidationEntry>> {
         let mut expected_positions = Vec::new();
         for (i, field) in fields[3..].iter().enumerate() {
             if !field.is_empty() && i < position_headers.len() {
-                let pos = position_headers[i].clone();
+                let pos = position_headers[i];
                 let aa = field.chars().next().unwrap();
                 expected_positions.push((pos, aa));
             }
@@ -218,7 +218,7 @@ pub fn validate_entry(
                 correct_positions += 1;
             } else {
                 incorrect_positions += 1;
-                mismatches.push((idx, expected_pos.clone(), actual_pos.clone()));
+                mismatches.push((idx, *expected_pos, *actual_pos));
             }
         }
     }
@@ -270,16 +270,6 @@ mod tests {
     /// Helper function to validate all sequences for a given chain with a specific scheme
     fn validate_chain_sequences_with_scheme(chain: Chain, csv_path: &str, scheme: Scheme) {
         validate_chain_sequences_filtered(chain, csv_path, scheme, Some("human"), &[]);
-    }
-
-    /// Helper function to validate sequences, allowing exclusion of known-bad sequences
-    fn validate_chain_sequences_with_scheme_excluding(
-        chain: Chain,
-        csv_path: &str,
-        scheme: Scheme,
-        exclude_headers: &[&str],
-    ) {
-        validate_chain_sequences_filtered(chain, csv_path, scheme, Some("human"), exclude_headers);
     }
 
     /// Helper function to validate sequences with species filter and header exclusions
@@ -424,26 +414,24 @@ mod tests {
     //     validate_chain_sequences(Chain::TRB, "fixtures/validation/tcr_B_imgt.csv");
     // }
 
-    // #[test]
-    // fn test_validate_trg_sequences() {
-    //     validate_chain_sequences(Chain::TRG, "fixtures/validation/tcr_G_imgt.csv");
-    // }
+    #[test]
+    fn test_validate_trg_sequences() {
+        validate_chain_sequences(Chain::TRG, "fixtures/validation/tcr_G_imgt.csv");
+    }
 
-    // #[test]
-    // fn test_validate_trd_sequences() {
-    //     validate_chain_sequences(Chain::TRD, "fixtures/validation/tcr_D_imgt.csv");
-    // }
+    #[test]
+    fn test_validate_trd_sequences() {
+        validate_chain_sequences(Chain::TRD, "fixtures/validation/tcr_D_imgt.csv");
+    }
 
     // Kabat validation tests
     #[test]
     fn test_validate_igh_kabat_sequences() {
         // Exclude sequences that currently fail IMGT validation
-        let exclude = &["1g7l_B|Heavy|B", "4nhh_E|Heavy|E", "1g7j_B|Heavy|B"];
-        validate_chain_sequences_with_scheme_excluding(
+        validate_chain_sequences_with_scheme(
             Chain::IGH,
             "fixtures/validation/ab_H_kabat.csv",
             Scheme::Kabat,
-            exclude,
         );
     }
 

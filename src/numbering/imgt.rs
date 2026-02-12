@@ -1,5 +1,28 @@
-use super::renumber;
-use crate::types::{Position, Region, RenumberConfig};
+use crate::types::{ChainNumberingConfig, NumberingRegion, RenumberConfig};
+
+// =============================================================================
+// IMGT Chain Numbering Configuration
+// =============================================================================
+
+/// IMGT numbering regions (same for all chain types)
+const IMGT_REGIONS: &[NumberingRegion] = &[
+    NumberingRegion::offset(1, 26, 1),                   // FR1
+    NumberingRegion::with_config(27, 38, CDR1_CONFIG),   // CDR1
+    NumberingRegion::offset(39, 55, 39),                 // FR2
+    NumberingRegion::with_config(56, 65, CDR2_CONFIG),   // CDR2
+    NumberingRegion::offset(66, 104, 66),                // FR3
+    NumberingRegion::with_config(105, 117, CDR3_CONFIG), // CDR3
+    NumberingRegion::offset(118, 128, 118),              // FR4
+];
+
+/// IMGT chain numbering config (universal for all chains)
+pub const IMGT_CONFIG: ChainNumberingConfig = ChainNumberingConfig {
+    regions: IMGT_REGIONS,
+};
+
+// =============================================================================
+// CDR Renumbering Configurations
+// =============================================================================
 
 // CDR1: positions 27-38 (12 base), deletions from center outward, insertions at 32/33
 // Fill order: 27, 38, 28, 37, 29, 36, 30, 35, 31, 34, 32, 33
@@ -33,72 +56,10 @@ const CDR3_CONFIG: RenumberConfig = RenumberConfig::palindromic(
     112,
 );
 
-/// Generate IMGT CDR1 numbering for a given CDR1 length
-///
-/// CDR1-IMGT spans positions 27-38 with specific rules:
-/// - Base positions fill from edges: 27, 38, 28, 37, ...
-/// - Insertions are palindromic: 32A, 32B, 33B, 33A, 33
-pub fn cdr1_numbering(length: usize) -> Vec<Position> {
-    if length == 0 {
-        return Vec::new();
-    }
-    if length == 1 {
-        return vec![Position::new(27)];
-    }
-    // Create dummy positions slice of the right length
-    let dummy: Vec<Position> = (0..length).map(|_| Position::new(0)).collect();
-    renumber(&dummy, &CDR1_CONFIG)
-}
-
-/// Generate IMGT CDR2 numbering for a given CDR2 length
-///
-/// CDR2-IMGT spans positions 56-65 with specific rules:
-/// - Base positions fill from edges: 56, 65, 57, 64, ...
-/// - Insertions are palindromic: 60A, 61B, 61A, 61
-pub fn cdr2_numbering(length: usize) -> Vec<Position> {
-    if length == 0 {
-        return Vec::new();
-    }
-    if length == 1 {
-        return vec![Position::new(56)];
-    }
-    let dummy: Vec<Position> = (0..length).map(|_| Position::new(0)).collect();
-    renumber(&dummy, &CDR2_CONFIG)
-}
-
-/// Generate IMGT CDR3 numbering for a given CDR3 length
-///
-/// IMGT CDR3 spans positions 105-117 with specific rules:
-/// - Base positions fill from edges: 105, 117, 106, 116, ...
-/// - Insertions are palindromic: 111A, 111B, 112B, 112A
-pub fn cdr3_numbering(length: usize) -> Vec<Position> {
-    if length == 0 {
-        return Vec::new();
-    }
-    if length == 1 {
-        return vec![Position::new(105)];
-    }
-    let dummy: Vec<Position> = (0..length).map(|_| Position::new(0)).collect();
-    renumber(&dummy, &CDR3_CONFIG)
-}
-
-/// Determine which region a consensus position belongs to (IMGT scheme)
-pub fn position_to_region(pos: u8) -> Region {
-    match pos {
-        1..=26 => Region::FR1,
-        27..=38 => Region::CDR1,
-        39..=55 => Region::FR2,
-        56..=65 => Region::CDR2,
-        66..=104 => Region::FR3,
-        105..=117 => Region::CDR3,
-        118.. => Region::FR4,
-        _ => Region::FR1,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::numbering::number_with_config;
 
     #[test]
     fn test_cdr1_numbering() {
@@ -159,7 +120,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = cdr1_numbering(length);
+            let positions = number_with_config(length, &CDR1_CONFIG);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);
@@ -224,7 +185,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = cdr2_numbering(length);
+            let positions = number_with_config(length, &CDR2_CONFIG);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);
@@ -342,7 +303,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = cdr3_numbering(length);
+            let positions = number_with_config(length, &CDR3_CONFIG);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);

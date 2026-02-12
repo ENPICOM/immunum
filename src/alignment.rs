@@ -1,9 +1,9 @@
 //! Sequence alignment using Needleman-Wunsch algorithm
 
 use crate::error::{Error, Result};
-use crate::imgt;
+use crate::numbering::{apply_numbering, IMGT_CONFIG, KABAT_HEAVY_CONFIG};
 use crate::scoring::PositionScores;
-use crate::types::{Position, Region};
+use crate::types::{Chain, Position};
 
 /// Direction in the alignment traceback matrix
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,107 +47,19 @@ pub struct Alignment {
 impl Alignment {
     /// Get IMGT-specific numbering: FR regions from alignment, CDR regions from IMGT rules
     pub fn get_imgt_numbering(&self) -> Vec<Position> {
-        // First, get alignment-based numbering to identify regions
-        let alignment_positions = self.get_alignment_positions();
-
-        // Group consecutive positions by region
-        let mut regions: Vec<(Region, Vec<usize>)> = Vec::new();
-
-        for (seq_idx, pos) in alignment_positions.iter().enumerate() {
-            let region = imgt::position_to_region(pos.number);
-
-            match regions.last_mut() {
-                Some((last_region, indices)) if *last_region == region => {
-                    indices.push(seq_idx);
-                }
-                _ => {
-                    regions.push((region, vec![seq_idx]));
-                }
-            }
-        }
-
-        // Build final numbering: use IMGT rules for CDR, alignment for FR
-        let mut final_positions = vec![Position::new(1); alignment_positions.len()];
-
-        for (region, indices) in regions {
-            let length = indices.len();
-            let region_positions = match region {
-                Region::CDR1 => imgt::cdr1_numbering(length),
-                Region::CDR2 => imgt::cdr2_numbering(length),
-                Region::CDR3 => imgt::cdr3_numbering(length),
-                _ => {
-                    // For FR regions, use alignment-based numbering
-                    indices
-                        .iter()
-                        .map(|&i| alignment_positions[i].clone())
-                        .collect()
-                }
-            };
-
-            for (i, &seq_idx) in indices.iter().enumerate() {
-                final_positions[seq_idx] = region_positions[i].clone();
-            }
-        }
-
-        final_positions
+        apply_numbering(&self.positions, &IMGT_CONFIG)
     }
 
     /// Get Kabat-specific numbering: FR regions mapped from IMGT, CDR regions from Kabat rules
-    pub fn get_kabat_numbering(&self, chain: crate::types::Chain) -> Vec<Position> {
-        use crate::kabat;
-        use crate::types::Chain;
-
-        // Get IMGT alignment-based numbering
-        let alignment_positions = self.get_alignment_positions();
-
-        // Convert to Kabat numbering using chain-specific mapping
+    pub fn get_kabat_numbering(&self, chain: Chain) -> Vec<Position> {
         match chain {
-            Chain::IGH => kabat::imgt_to_kabat_heavy(&alignment_positions),
-            Chain::IGK | Chain::IGL => kabat::imgt_to_kabat_light(&alignment_positions),
+            Chain::IGH => apply_numbering(&self.positions, &KABAT_HEAVY_CONFIG),
+            // TODO: Add KABAT_LIGHT_CONFIG when implemented
+            Chain::IGK | Chain::IGL => {
+                panic!("Kabat numbering for light chains not yet implemented")
+            }
             _ => panic!("Kabat numbering only supported for antibody chains"),
         }
-    }
-
-    /// Get the assigned positions for each residue from alignment only
-    fn get_alignment_positions(&self) -> Vec<Position> {
-        let mut positions = Vec::new();
-        let mut last_consensus_pos: Option<u8> = None;
-        let mut insertion_count = 0u8;
-
-        for aligned_pos in &self.positions {
-            match aligned_pos {
-                AlignedPosition::QueryGap => {
-                    // Skip gaps in the query - no residue here
-                    continue;
-                }
-                AlignedPosition::Aligned(pos) if Some(*pos) != last_consensus_pos => {
-                    // New consensus position
-                    positions.push(Position::new(*pos));
-                    last_consensus_pos = Some(*pos);
-                    insertion_count = 0;
-                }
-                _ => {
-                    // Insertion or repeated consensus position
-                    let base_pos = last_consensus_pos.unwrap_or(1);
-                    insertion_count += 1;
-                    positions.push(Position::with_insertion(
-                        base_pos,
-                        insertion_to_letter(insertion_count),
-                    ));
-                }
-            }
-        }
-
-        positions
-    }
-}
-
-/// Convert insertion count to IMGT letter (1->A, 2->B, ..., 26->Z)
-fn insertion_to_letter(count: u8) -> char {
-    if count == 0 || count > 26 {
-        'A' // Fallback
-    } else {
-        (b'A' + count - 1) as char
     }
 }
 
@@ -362,13 +274,6 @@ mod tests {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let result = align("", &matrix.positions);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_insertion_letter_conversion() {
-        assert_eq!(insertion_to_letter(1), 'A');
-        assert_eq!(insertion_to_letter(2), 'B');
-        assert_eq!(insertion_to_letter(26), 'Z');
     }
 
     #[test]
