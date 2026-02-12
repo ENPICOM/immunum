@@ -65,7 +65,7 @@ impl Annotator {
         self.matrices
             .iter()
             .filter_map(|(chain, matrix)| {
-                align(sequence, matrix).ok().map(|alignment| {
+                align(sequence, &matrix.positions).ok().map(|alignment| {
                     let confidence = self.calculate_confidence(&alignment, sequence.len());
                     (*chain, alignment, confidence)
                 })

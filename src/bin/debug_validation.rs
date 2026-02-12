@@ -142,8 +142,8 @@ pub fn print_alignment_comparison(
             };
 
             // Match indicator
-            let match_str = if expected_pos.is_some() && actual_pos.is_some() {
-                if expected_pos.unwrap() == actual_pos.unwrap() {
+            let match_str = if let (Some(exp), Some(act)) = (expected_pos, actual_pos) {
+                if exp == act {
                     format!("{:^width$}", "|", width = max_pos_width)
                 } else {
                     format!("{:^width$}", "X", width = max_pos_width)

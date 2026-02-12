@@ -122,7 +122,7 @@ fn main() {
 
         // Generate JSON scoring matrix
         let output_path = matrix_out.join(format!("{}.json", chain));
-        write_scoring_matrix(&output_path, chain, &positions).unwrap();
+        write_scoring_matrix(&output_path, &positions).unwrap();
 
         println!(
             "Generated scoring matrix for {}: {}",
@@ -134,7 +134,6 @@ fn main() {
 
 #[derive(Serialize, Deserialize)]
 struct ScoringMatrix {
-    chain: String,
     positions: Vec<PositionScores>,
 }
 
@@ -215,7 +214,6 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
 
 fn write_scoring_matrix(
     path: &Path,
-    chain: &str,
     positions: &[PositionData],
 ) -> std::io::Result<()> {
     let mut position_scores = Vec::new();
@@ -247,7 +245,6 @@ fn write_scoring_matrix(
     }
 
     let matrix = ScoringMatrix {
-        chain: chain.to_string(),
         positions: position_scores,
     };
 

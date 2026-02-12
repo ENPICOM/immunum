@@ -4,8 +4,8 @@
 //! - Deletions: from end or custom order
 //! - Insertions: all at single position (35A, 35B, 35C, ...)
 
-use super::{renumber, renumber_offset, RenumberConfig};
-use crate::types::Position;
+use super::{renumber, renumber_offset};
+use crate::types::{Position, RenumberConfig};
 
 /// Region type for IMGT to Kabat conversion
 #[derive(Debug, Clone, Copy)]

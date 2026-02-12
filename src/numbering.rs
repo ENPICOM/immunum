@@ -10,59 +10,7 @@
 pub mod imgt;
 pub mod kabat;
 
-use crate::types::Position;
-
-/// How insertions are handled when sequence length > base positions
-#[derive(Debug, Clone, Copy)]
-pub enum InsertionStyle {
-    /// All insertions after a single position: 100A, 100B, 100C (Kabat style)
-    AfterPosition(u32),
-    /// Insertions split between two positions palindromically: 111A, 112A, 111B, 112B (IMGT style)
-    Palindromic { left: u32, right: u32 },
-}
-
-/// Configuration for CDR-style renumbering with insertions and deletions
-#[derive(Debug, Clone, Copy)]
-pub struct RenumberConfig {
-    /// Base positions to use (in order)
-    pub base_positions: &'static [u32],
-    /// Order to delete positions when len < base (None = delete from end)
-    pub deletion_order: Option<&'static [u32]>,
-    /// How to handle insertions
-    pub insertion_style: InsertionStyle,
-}
-
-impl RenumberConfig {
-    /// Create a config for sequential (Kabat-style) numbering
-    pub const fn sequential(
-        base_positions: &'static [u32],
-        insertion_pos: u32,
-        deletion_order: Option<&'static [u32]>,
-    ) -> Self {
-        Self {
-            base_positions,
-            deletion_order,
-            insertion_style: InsertionStyle::AfterPosition(insertion_pos),
-        }
-    }
-
-    /// Create a config for palindromic (IMGT-style) numbering
-    pub const fn palindromic(
-        base_positions: &'static [u32],
-        deletion_order: &'static [u32],
-        insertion_left: u32,
-        insertion_right: u32,
-    ) -> Self {
-        Self {
-            base_positions,
-            deletion_order: Some(deletion_order),
-            insertion_style: InsertionStyle::Palindromic {
-                left: insertion_left,
-                right: insertion_right,
-            },
-        }
-    }
-}
+use crate::types::{InsertionStyle, Position, RenumberConfig};
 
 /// Renumber positions based on configuration
 ///

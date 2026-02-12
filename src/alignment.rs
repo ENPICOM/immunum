@@ -2,7 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::imgt;
-use crate::scoring::ScoringMatrix;
+use crate::scoring::PositionScores;
 use crate::types::{Position, Region};
 
 /// Direction in the alignment traceback matrix
@@ -146,11 +146,11 @@ fn insertion_to_letter(count: u32) -> char {
 }
 
 /// Align a query sequence to a scoring matrix using Needleman-Wunsch
-pub fn align(query: &str, matrix: &ScoringMatrix) -> Result<Alignment> {
+pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
     let query = query.to_uppercase();
     let query_bytes: Vec<u8> = query.bytes().collect();
     let query_len = query_bytes.len();
-    let cons_len = matrix.positions.len();
+    let cons_len = positions.len();
 
     if query_len == 0 {
         return Err(Error::InvalidSequence("empty sequence".to_string()));
@@ -190,7 +190,7 @@ pub fn align(query: &str, matrix: &ScoringMatrix) -> Result<Alignment> {
         let query_aa = query_bytes[i - 1] as char;
 
         for j in 1..=cons_len {
-            let cons_pos = &matrix.positions[j - 1];
+            let cons_pos = &positions[j - 1];
 
             // Match/mismatch score
             let match_score = cons_pos.scores.get(&query_aa).copied().unwrap_or(-4.0);
@@ -238,7 +238,7 @@ pub fn align(query: &str, matrix: &ScoringMatrix) -> Result<Alignment> {
     // This prevents long CDR3 regions from being incorrectly treated as unaligned trailing sequence.
     // The query must align through its full length, but the consensus can have trailing gaps.
 
-    let (aligned_query, aligned_positions) = traceback(&dp, &query_bytes, matrix, best_i, best_j);
+    let (aligned_query, aligned_positions) = traceback(&dp, &query_bytes, positions, best_i, best_j);
 
     // Find start and end positions
     let start_pos = aligned_positions.iter().find_map(|&p| p).unwrap_or(1);
@@ -261,7 +261,7 @@ pub fn align(query: &str, matrix: &ScoringMatrix) -> Result<Alignment> {
 fn traceback(
     dp: &[Vec<Cell>],
     query: &[u8],
-    matrix: &ScoringMatrix,
+    positions: &[PositionScores],
     query_len: usize,
     cons_len: usize,
 ) -> (String, Vec<Option<u32>>) {
@@ -285,13 +285,13 @@ fn traceback(
         match dp[i][j].direction {
             Direction::Match => {
                 aligned_query.push(query[i - 1] as char);
-                aligned_positions.push(Some(matrix.positions[j - 1].position));
+                aligned_positions.push(Some(positions[j - 1].position));
                 i -= 1;
                 j -= 1;
             }
             Direction::GapInQuery => {
                 aligned_query.push('-');
-                aligned_positions.push(Some(matrix.positions[j - 1].position));
+                aligned_positions.push(Some(positions[j - 1].position));
                 j -= 1;
             }
             Direction::GapInConsensus => {
@@ -319,6 +319,7 @@ fn traceback(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scoring::ScoringMatrix;
     use crate::Chain;
 
     #[test]
@@ -329,7 +330,7 @@ mod tests {
         let sequence =
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
-        let result = align(sequence, &matrix).unwrap();
+        let result = align(sequence, &matrix.positions).unwrap();
 
         // Alignment should produce a score (may be negative for partial sequences)
         assert!(!result.aligned_query.is_empty());
@@ -344,7 +345,7 @@ mod tests {
         let sequence =
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
-        let result = align(sequence, &matrix).unwrap();
+        let result = align(sequence, &matrix.positions).unwrap();
         let numbering = result.get_imgt_numbering();
 
         assert_eq!(numbering.len(), sequence.len());
@@ -354,7 +355,7 @@ mod tests {
     #[test]
     fn test_empty_sequence() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        let result = align("", &matrix);
+        let result = align("", &matrix.positions);
         assert!(result.is_err());
     }
 
@@ -377,7 +378,7 @@ mod tests {
         ];
 
         for seq in sequences {
-            let result = align(seq, &matrix).unwrap();
+            let result = align(seq, &matrix.positions).unwrap();
             let numbering = result.get_imgt_numbering();
 
             assert_eq!(
@@ -397,7 +398,7 @@ mod tests {
 
         // A sequence starting from middle of framework should align without heavy penalty
         let partial_seq = "GLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
-        let result = align(partial_seq, &matrix).unwrap();
+        let result = align(partial_seq, &matrix.positions).unwrap();
 
         // Should have a reasonable score (not heavily penalized for missing start)
         assert!(
@@ -419,7 +420,7 @@ mod tests {
 
         // A sequence ending in middle should align without heavy penalty
         let partial_seq = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVS";
-        let result = align(partial_seq, &matrix).unwrap();
+        let result = align(partial_seq, &matrix.positions).unwrap();
 
         // Should have a reasonable score
         assert!(
@@ -434,7 +435,7 @@ mod tests {
 
         // A small fragment from the middle should align
         let fragment = "GLEWVSAISKSGGSTYY";
-        let result = align(fragment, &matrix).unwrap();
+        let result = align(fragment, &matrix.positions).unwrap();
 
         // Should align without extreme penalties for missing ends
         assert!(

@@ -1,5 +1,5 @@
-use super::{renumber, RenumberConfig};
-use crate::types::{Position, Region};
+use super::renumber;
+use crate::types::{Position, Region, RenumberConfig};
 
 // CDR1: positions 27-38 (12 base), deletions from center outward, insertions at 32/33
 // Fill order: 27, 38, 28, 37, 29, 36, 30, 35, 31, 34, 32, 33

@@ -8,8 +8,6 @@ use std::collections::HashMap;
 /// A position-specific scoring matrix for a chain type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoringMatrix {
-    /// The chain type this matrix is for
-    pub chain: String,
     /// Scoring data for each position
     pub positions: Vec<PositionScores>,
 }
@@ -45,36 +43,6 @@ impl ScoringMatrix {
         })
     }
 
-    /// Get the score for an amino acid at a specific position
-    pub fn get_score(&self, position: u32, amino_acid: char) -> Option<f32> {
-        self.positions
-            .iter()
-            .find(|p| p.position == position)
-            .and_then(|p| p.scores.get(&amino_acid).copied())
-    }
-
-    /// Get gap penalties for a specific position
-    pub fn get_gap_penalties(&self, position: u32) -> Option<(f32, f32)> {
-        self.positions
-            .iter()
-            .find(|p| p.position == position)
-            .map(|p| (p.gap_penalty, p.insertion_penalty))
-    }
-
-    /// Get position scores by position number
-    pub fn get_position(&self, position: u32) -> Option<&PositionScores> {
-        self.positions.iter().find(|p| p.position == position)
-    }
-
-    /// Get the number of positions in this matrix
-    pub fn len(&self) -> usize {
-        self.positions.len()
-    }
-
-    /// Check if the matrix is empty
-    pub fn is_empty(&self) -> bool {
-        self.positions.is_empty()
-    }
 }
 
 #[cfg(test)]
@@ -84,9 +52,8 @@ mod tests {
     #[test]
     fn test_load_igh_matrix() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        assert_eq!(matrix.chain, "IGH");
-        assert!(!matrix.is_empty());
-        assert!(matrix.len() > 100);
+        assert!(!matrix.positions.is_empty());
+        assert!(matrix.positions.len() > 100);
     }
 
     #[test]
@@ -102,21 +69,8 @@ mod tests {
             Chain::TRD,
         ] {
             let matrix = ScoringMatrix::load(chain).unwrap();
-            assert!(!matrix.is_empty());
+            assert!(!matrix.positions.is_empty());
         }
-    }
-
-    #[test]
-    fn test_get_score() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-
-        // Position 1 should have scores
-        let score = matrix.get_score(1, 'E');
-        assert!(score.is_some());
-
-        // Should return None for non-existent position
-        let score = matrix.get_score(9999, 'A');
-        assert!(score.is_none());
     }
 
     #[test]

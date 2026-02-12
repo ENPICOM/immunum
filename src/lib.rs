@@ -6,7 +6,6 @@
 
 pub mod alignment;
 pub mod annotator;
-pub mod consensus;
 pub mod error;
 pub mod numbering;
 pub mod scoring;
@@ -21,5 +20,5 @@ pub use alignment::{align, Alignment};
 pub use annotator::{AnnotationResult, Annotator};
 pub use error::{Error, Result};
 pub use scoring::ScoringMatrix;
-pub use types::{Chain, Position, Region, Scheme};
+pub use types::{Chain, InsertionStyle, Position, Region, RenumberConfig, Scheme};
 pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
