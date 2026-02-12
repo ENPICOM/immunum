@@ -16,7 +16,7 @@ pub struct ScoringMatrix {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PositionScores {
     /// IMGT position number
-    pub position: u32,
+    pub position: u8,
     /// Scores for each amino acid at this position
     pub scores: HashMap<char, f32>,
     /// Penalty for gap in query sequence (skipping this consensus position)
@@ -42,7 +42,6 @@ impl ScoringMatrix {
             Error::ConsensusParseError(format!("Failed to parse scoring matrix: {}", e))
         })
     }
-
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ use std::process;
 
 /// Get region boundaries for a given scheme (start, end) for each region
 /// Returns: (FR1, CDR1, FR2, CDR2, FR3, CDR3, FR4)
-fn get_region_boundaries(scheme: Scheme) -> [(&'static str, u32, u32); 7] {
+fn get_region_boundaries(scheme: Scheme) -> [(&'static str, u8, u8); 7] {
     match scheme {
         Scheme::IMGT => [
             ("FR1", 1, 26),
@@ -50,7 +50,7 @@ fn print_usage() {
 }
 
 /// Get the region name for a position number given the scheme
-fn get_region_for_position(pos_num: u32, scheme: Scheme) -> &'static str {
+fn get_region_for_position(pos_num: u8, scheme: Scheme) -> &'static str {
     let boundaries = get_region_boundaries(scheme);
     for (name, start, end) in boundaries {
         if pos_num >= start && pos_num <= end {

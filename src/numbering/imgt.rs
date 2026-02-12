@@ -25,7 +25,9 @@ const CDR2_CONFIG: RenumberConfig = RenumberConfig::palindromic(
 // Fill order: 105, 117, 106, 116, 107, 115, 108, 114, 109, 113, 110, 112, 111
 // Deletion order (reverse of fill): 111, 112, 110, 113, 109, 114, 108, 115, 107, 116, 106, 117
 const CDR3_CONFIG: RenumberConfig = RenumberConfig::palindromic(
-    &[105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117],
+    &[
+        105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
+    ],
     &[111, 112, 110, 113, 109, 114, 108, 115, 107, 116, 106, 117],
     111,
     112,
@@ -81,7 +83,7 @@ pub fn cdr3_numbering(length: usize) -> Vec<Position> {
 }
 
 /// Determine which region a consensus position belongs to (IMGT scheme)
-pub fn position_to_region(pos: u32) -> Region {
+pub fn position_to_region(pos: u8) -> Region {
     match pos {
         1..=26 => Region::FR1,
         27..=38 => Region::CDR1,

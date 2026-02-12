@@ -11,7 +11,7 @@ use crate::types::{Position, RenumberConfig};
 #[derive(Debug, Clone, Copy)]
 enum RegionType {
     /// Simple offset: imgt_pos - imgt_start + kabat_start
-    Offset { imgt_start: u32, kabat_start: u32 },
+    Offset { imgt_start: u8, kabat_start: u8 },
     /// Renumbering with insertions/deletions
     WithInsertions(RenumberConfig),
 }
@@ -20,13 +20,13 @@ enum RegionType {
 #[derive(Debug, Clone, Copy)]
 struct Region {
     /// IMGT position range (inclusive)
-    imgt_range: (u32, u32),
+    imgt_range: (u8, u8),
     /// How to renumber this region
     region_type: RegionType,
 }
 
 impl Region {
-    const fn offset(imgt_start: u32, imgt_end: u32, kabat_start: u32) -> Self {
+    const fn offset(imgt_start: u8, imgt_end: u8, kabat_start: u8) -> Self {
         Self {
             imgt_range: (imgt_start, imgt_end),
             region_type: RegionType::Offset {
@@ -36,14 +36,14 @@ impl Region {
         }
     }
 
-    const fn with_insertions(imgt_start: u32, imgt_end: u32, config: RenumberConfig) -> Self {
+    const fn with_insertions(imgt_start: u8, imgt_end: u8, config: RenumberConfig) -> Self {
         Self {
             imgt_range: (imgt_start, imgt_end),
             region_type: RegionType::WithInsertions(config),
         }
     }
 
-    fn contains(&self, pos: u32) -> bool {
+    fn contains(&self, pos: u8) -> bool {
         pos >= self.imgt_range.0 && pos <= self.imgt_range.1
     }
 }
@@ -141,7 +141,6 @@ pub fn imgt_to_kabat_heavy(imgt_positions: &[Position]) -> Vec<Position> {
 //     95,
 //     Some(&[100, 99, 98, 97, 96, 95, 94]),
 // );
-
 
 // /// Region mapping for Light chains (IGK, IGL)
 // const LIGHT_REGIONS: &[Region] = &[

@@ -23,7 +23,7 @@ fn main() {
     for seq in sequences.iter().take(100) {
         let _ = annotator.annotate(seq);
     }
-    
+
     // Benchmark
     let start = Instant::now();
 
@@ -35,7 +35,6 @@ fn main() {
             }
             Err(e) => eprintln!("Failed to annotate sequence: {}", e),
         }
-
     }
 
     let elapsed = start.elapsed();

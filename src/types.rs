@@ -34,7 +34,6 @@ impl Chain {
     pub fn is_tcr(&self) -> bool {
         matches!(self, Chain::TRA | Chain::TRB | Chain::TRG | Chain::TRD)
     }
-
 }
 
 impl fmt::Display for Chain {
@@ -89,17 +88,17 @@ impl FromStr for Scheme {
 
 /// Position in a numbered sequence
 /// Can be a simple number or a number with an insertion letter (e.g., "111A")
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {
-    /// The numeric part of the position
-    pub number: u32,
+    /// The numeric part of the position (max 128 for IMGT)
+    pub number: u8,
     /// Optional insertion letter (for IMGT: A, B, C, etc.)
     pub insertion: Option<char>,
 }
 
 impl Position {
     /// Create a new position with just a number
-    pub fn new(number: u32) -> Self {
+    pub fn new(number: u8) -> Self {
         Self {
             number,
             insertion: None,
@@ -107,7 +106,7 @@ impl Position {
     }
 
     /// Create a new position with a number and insertion letter
-    pub fn with_insertion(number: u32, insertion: char) -> Self {
+    pub fn with_insertion(number: u8, insertion: char) -> Self {
         Self {
             number,
             insertion: Some(insertion),
@@ -144,7 +143,7 @@ impl FromStr for Position {
             return Err(Error::InvalidPosition(format!("no numeric part: {}", s)));
         }
 
-        let number: u32 = s[..digit_end]
+        let number: u8 = s[..digit_end]
             .parse()
             .map_err(|_| Error::InvalidPosition(format!("invalid number: {}", s)))?;
 
@@ -170,18 +169,18 @@ impl FromStr for Position {
 #[derive(Debug, Clone, Copy)]
 pub enum InsertionStyle {
     /// All insertions after a single position: 100A, 100B, 100C (Kabat style)
-    AfterPosition(u32),
+    AfterPosition(u8),
     /// Insertions split between two positions palindromically: 111A, 112A, 111B, 112B (IMGT style)
-    Palindromic { left: u32, right: u32 },
+    Palindromic { left: u8, right: u8 },
 }
 
 /// Configuration for CDR-style renumbering with insertions and deletions
 #[derive(Debug, Clone, Copy)]
 pub struct RenumberConfig {
     /// Base positions to use (in order)
-    pub base_positions: &'static [u32],
+    pub base_positions: &'static [u8],
     /// Order to delete positions when len < base (None = delete from end)
-    pub deletion_order: Option<&'static [u32]>,
+    pub deletion_order: Option<&'static [u8]>,
     /// How to handle insertions
     pub insertion_style: InsertionStyle,
 }
@@ -189,9 +188,9 @@ pub struct RenumberConfig {
 impl RenumberConfig {
     /// Create a config for sequential (Kabat-style) numbering
     pub const fn sequential(
-        base_positions: &'static [u32],
-        insertion_pos: u32,
-        deletion_order: Option<&'static [u32]>,
+        base_positions: &'static [u8],
+        insertion_pos: u8,
+        deletion_order: Option<&'static [u8]>,
     ) -> Self {
         Self {
             base_positions,
@@ -202,10 +201,10 @@ impl RenumberConfig {
 
     /// Create a config for palindromic (IMGT-style) numbering
     pub const fn palindromic(
-        base_positions: &'static [u32],
-        deletion_order: &'static [u32],
-        insertion_left: u32,
-        insertion_right: u32,
+        base_positions: &'static [u8],
+        deletion_order: &'static [u8],
+        insertion_left: u8,
+        insertion_right: u8,
     ) -> Self {
         Self {
             base_positions,

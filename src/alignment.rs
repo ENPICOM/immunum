@@ -13,6 +13,17 @@ enum Direction {
     GapInConsensus,
 }
 
+/// Represents a position in the alignment result
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlignedPosition {
+    /// Gap in query (query has no residue here, consensus does)
+    QueryGap,
+    /// Aligned to consensus position N
+    Aligned(u8),
+    /// Insertion in query (query has residue, consensus doesn't)
+    Insertion,
+}
+
 /// Cell in the dynamic programming matrix
 #[derive(Debug, Clone)]
 struct Cell {
@@ -25,16 +36,12 @@ struct Cell {
 pub struct Alignment {
     /// Alignment score
     pub score: f32,
-    /// Query sequence (input)
-    pub query: String,
-    /// Aligned query sequence (with gaps)
-    pub aligned_query: String,
-    /// Aligned consensus positions
-    pub aligned_positions: Vec<Option<u32>>,
+    /// Aligned positions (merged representation of query and consensus alignment)
+    pub positions: Vec<AlignedPosition>,
     /// Start position in consensus
-    pub start_pos: u32,
+    pub start_pos: u8,
     /// End position in consensus
-    pub end_pos: u32,
+    pub end_pos: u8,
 }
 
 impl Alignment {
@@ -104,24 +111,23 @@ impl Alignment {
     /// Get the assigned positions for each residue from alignment only
     fn get_alignment_positions(&self) -> Vec<Position> {
         let mut positions = Vec::new();
-        let mut last_consensus_pos: Option<u32> = None;
-        let mut insertion_count = 0u32;
+        let mut last_consensus_pos: Option<u8> = None;
+        let mut insertion_count = 0u8;
 
-        for (i, &cons_pos) in self.aligned_positions.iter().enumerate() {
-            // Skip gaps in the query
-            if self.aligned_query.chars().nth(i) == Some('-') {
-                continue;
-            }
-
-            match cons_pos {
-                Some(pos) if Some(pos) != last_consensus_pos => {
+        for aligned_pos in &self.positions {
+            match aligned_pos {
+                AlignedPosition::QueryGap => {
+                    // Skip gaps in the query - no residue here
+                    continue;
+                }
+                AlignedPosition::Aligned(pos) if Some(*pos) != last_consensus_pos => {
                     // New consensus position
-                    positions.push(Position::new(pos));
-                    last_consensus_pos = Some(pos);
+                    positions.push(Position::new(*pos));
+                    last_consensus_pos = Some(*pos);
                     insertion_count = 0;
                 }
                 _ => {
-                    // Insertion: either gap in consensus or same consensus position repeated
+                    // Insertion or repeated consensus position
                     let base_pos = last_consensus_pos.unwrap_or(1);
                     insertion_count += 1;
                     positions.push(Position::with_insertion(
@@ -137,11 +143,11 @@ impl Alignment {
 }
 
 /// Convert insertion count to IMGT letter (1->A, 2->B, ..., 26->Z)
-fn insertion_to_letter(count: u32) -> char {
+fn insertion_to_letter(count: u8) -> char {
     if count == 0 || count > 26 {
         'A' // Fallback
     } else {
-        (b'A' + (count - 1) as u8) as char
+        (b'A' + count - 1) as char
     }
 }
 
@@ -238,21 +244,28 @@ pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
     // This prevents long CDR3 regions from being incorrectly treated as unaligned trailing sequence.
     // The query must align through its full length, but the consensus can have trailing gaps.
 
-    let (aligned_query, aligned_positions) = traceback(&dp, &query_bytes, positions, best_i, best_j);
+    let aligned_positions = traceback(&dp, &query_bytes, positions, best_i, best_j);
 
-    // Find start and end positions
-    let start_pos = aligned_positions.iter().find_map(|&p| p).unwrap_or(1);
+    // Find start and end positions from aligned consensus positions
+    let start_pos = aligned_positions
+        .iter()
+        .find_map(|p| match p {
+            AlignedPosition::Aligned(n) => Some(*n),
+            _ => None,
+        })
+        .unwrap_or(1);
     let end_pos = aligned_positions
         .iter()
         .rev()
-        .find_map(|&p| p)
+        .find_map(|p| match p {
+            AlignedPosition::Aligned(n) => Some(*n),
+            _ => None,
+        })
         .unwrap_or(128);
 
     Ok(Alignment {
         score: best_score,
-        query: query.clone(),
-        aligned_query,
-        aligned_positions,
+        positions: aligned_positions,
         start_pos,
         end_pos,
     })
@@ -260,43 +273,38 @@ pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
 
 fn traceback(
     dp: &[Vec<Cell>],
-    query: &[u8],
+    _query: &[u8],
     positions: &[PositionScores],
     query_len: usize,
     cons_len: usize,
-) -> (String, Vec<Option<u32>>) {
-    let mut aligned_query = String::new();
+) -> Vec<AlignedPosition> {
     let mut aligned_positions = Vec::new();
 
     let mut i = query_len;
     let mut j = cons_len;
 
     // For semi-global alignment, handle unaligned suffix of query
-    let query_total_len = query.len();
+    let query_total_len = _query.len();
     if i < query_total_len {
         // Add remaining query residues as insertions at the end
-        for k in (i..query_total_len).rev() {
-            aligned_query.push(query[k] as char);
-            aligned_positions.push(None);
+        for _ in i..query_total_len {
+            aligned_positions.push(AlignedPosition::Insertion);
         }
     }
 
     while i > 0 && j > 0 {
         match dp[i][j].direction {
             Direction::Match => {
-                aligned_query.push(query[i - 1] as char);
-                aligned_positions.push(Some(positions[j - 1].position));
+                aligned_positions.push(AlignedPosition::Aligned(positions[j - 1].position));
                 i -= 1;
                 j -= 1;
             }
             Direction::GapInQuery => {
-                aligned_query.push('-');
-                aligned_positions.push(Some(positions[j - 1].position));
+                aligned_positions.push(AlignedPosition::QueryGap);
                 j -= 1;
             }
             Direction::GapInConsensus => {
-                aligned_query.push(query[i - 1] as char);
-                aligned_positions.push(None);
+                aligned_positions.push(AlignedPosition::Insertion);
                 i -= 1;
             }
         }
@@ -304,16 +312,14 @@ fn traceback(
 
     // Handle unaligned prefix of query
     while i > 0 {
-        aligned_query.push(query[i - 1] as char);
-        aligned_positions.push(None);
+        aligned_positions.push(AlignedPosition::Insertion);
         i -= 1;
     }
 
     // Reverse (we built it backwards)
-    aligned_query = aligned_query.chars().rev().collect();
     aligned_positions.reverse();
 
-    (aligned_query, aligned_positions)
+    aligned_positions
 }
 
 #[cfg(test)]
@@ -333,8 +339,7 @@ mod tests {
         let result = align(sequence, &matrix.positions).unwrap();
 
         // Alignment should produce a score (may be negative for partial sequences)
-        assert!(!result.aligned_query.is_empty());
-        assert_eq!(result.aligned_positions.len(), result.aligned_query.len());
+        assert!(!result.positions.is_empty());
         assert!(result.start_pos > 0);
         assert!(result.end_pos > 0);
     }
@@ -406,7 +411,11 @@ mod tests {
             "Partial sequence should not be heavily penalized"
         );
         // Allow some gaps but not excessive (e.g., <10% of sequence length)
-        let gap_count = result.aligned_query.matches('-').count();
+        let gap_count = result
+            .positions
+            .iter()
+            .filter(|p| matches!(p, AlignedPosition::QueryGap))
+            .count();
         assert!(
             gap_count < partial_seq.len() / 10,
             "Query should have minimal gaps, found {} gaps",

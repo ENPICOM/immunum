@@ -35,14 +35,14 @@ pub fn renumber(positions: &[Position], config: &RenumberConfig) -> Vec<Position
 fn renumber_deletions(len: usize, config: &RenumberConfig) -> Vec<Position> {
     let base_len = config.base_positions.len();
 
-    let positions_to_use: Vec<u32> = match config.deletion_order {
+    let positions_to_use: Vec<u8> = match config.deletion_order {
         None => {
             // Default: use first `len` positions (delete from end)
             config.base_positions[..len].to_vec()
         }
         Some(order) => {
             // Remove positions in specified order
-            let mut available: Vec<u32> = config.base_positions.to_vec();
+            let mut available: Vec<u8> = config.base_positions.to_vec();
             let to_remove = base_len - len;
             for &pos in order.iter().take(to_remove) {
                 available.retain(|&p| p != pos);
@@ -131,11 +131,11 @@ fn renumber_insertions(len: usize, config: &RenumberConfig) -> Vec<Position> {
 }
 
 /// Simple offset-based renumbering for framework regions
-pub fn renumber_offset(positions: &[Position], src_start: u32, dst_start: u32) -> Vec<Position> {
+pub fn renumber_offset(positions: &[Position], src_start: u8, dst_start: u8) -> Vec<Position> {
     positions
         .iter()
         .map(|p| Position {
-            number: p.number - src_start + dst_start,
+            number: p.number.wrapping_sub(src_start).wrapping_add(dst_start),
             insertion: p.insertion,
         })
         .collect()

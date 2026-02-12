@@ -212,10 +212,7 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
     positions
 }
 
-fn write_scoring_matrix(
-    path: &Path,
-    positions: &[PositionData],
-) -> std::io::Result<()> {
+fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Result<()> {
     let mut position_scores = Vec::new();
 
     for pos_data in positions {
