@@ -1,9 +1,8 @@
 //! Sequence alignment using Needleman-Wunsch algorithm
 
 use crate::error::{Error, Result};
-use crate::numbering::{apply_numbering, IMGT_CONFIG, KABAT_HEAVY_CONFIG};
+use crate::numbering::{imgt::get_imgt_numbering, kabat::get_kabat_numbering};
 use crate::scoring::PositionScores;
-use crate::types::{Chain, Position};
 
 /// Direction in the alignment traceback matrix
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,25 +41,6 @@ pub struct Alignment {
     pub start_pos: u8,
     /// End position in consensus
     pub end_pos: u8,
-}
-
-impl Alignment {
-    /// Get IMGT-specific numbering: FR regions from alignment, CDR regions from IMGT rules
-    pub fn get_imgt_numbering(&self) -> Vec<Position> {
-        apply_numbering(&self.positions, &IMGT_CONFIG)
-    }
-
-    /// Get Kabat-specific numbering: FR regions mapped from IMGT, CDR regions from Kabat rules
-    pub fn get_kabat_numbering(&self, chain: Chain) -> Vec<Position> {
-        match chain {
-            Chain::IGH => apply_numbering(&self.positions, &KABAT_HEAVY_CONFIG),
-            // TODO: Add KABAT_LIGHT_CONFIG when implemented
-            Chain::IGK | Chain::IGL => {
-                panic!("Kabat numbering for light chains not yet implemented")
-            }
-            _ => panic!("Kabat numbering only supported for antibody chains"),
-        }
-    }
 }
 
 /// Align a query sequence to a scoring matrix using Needleman-Wunsch
@@ -263,7 +243,7 @@ mod tests {
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
         let result = align(sequence, &matrix.positions).unwrap();
-        let numbering = result.get_imgt_numbering();
+        let numbering = get_imgt_numbering(&result);
 
         assert_eq!(numbering.len(), sequence.len());
         assert!(numbering[0].number > 0);
@@ -289,7 +269,7 @@ mod tests {
 
         for seq in sequences {
             let result = align(seq, &matrix.positions).unwrap();
-            let numbering = result.get_imgt_numbering();
+            let numbering = get_imgt_numbering(&result);
 
             assert_eq!(
                 numbering.len(),

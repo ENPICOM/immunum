@@ -1,28 +1,15 @@
-//! Numbering schemes for antibody and TCR sequences
-//!
-//! This module provides position numbering for different schemes (IMGT, Kabat, etc.).
-//! Each scheme has its own submodule with scheme-specific configurations.
-//!
-//! The core abstraction is `RenumberConfig` which can express both:
-//! - Palindromic patterns (IMGT): deletions via custom order, insertions split between two positions
-//! - Sequential patterns (Kabat): deletions from end or custom order, insertions at single position
-
 pub mod imgt;
 pub mod kabat;
 
-// Re-export configs from submodules
-pub use imgt::IMGT_CONFIG;
-pub use kabat::KABAT_HEAVY_CONFIG;
-
 use crate::alignment::AlignedPosition;
 use crate::types::{
-    ChainNumberingConfig, InsertionStyle, NumberingRegionType, Position, RenumberConfig,
+    InsertionStyle, NumberingRegion, NumberingRegionType, Position, NumberingConfig,
 };
 
 /// Generate positions for a CDR region based on its length and config
 ///
 /// Handles both deletions (len < base) and insertions (len > base).
-pub fn number_with_config(len: usize, config: &RenumberConfig) -> Vec<Position> {
+pub fn number_with_config(len: usize, config: &NumberingConfig) -> Vec<Position> {
     if len == 0 {
         return Vec::new();
     }
@@ -98,17 +85,17 @@ pub fn number_with_config(len: usize, config: &RenumberConfig) -> Vec<Position> 
 // Apply Numbering Function
 // =============================================================================
 
-/// Apply numbering directly to alignment results using a chain config
+/// Apply numbering directly to alignment results using numbering regions
 ///
 /// Processes alignment in two phases:
 /// 1. Extract consensus positions from alignment (skipping gaps)
 /// 2. Apply region-based numbering scheme
 pub fn apply_numbering(
     aligned_positions: &[AlignedPosition],
-    config: &ChainNumberingConfig,
+    regions: &[NumberingRegion],
 ) -> Vec<Position> {
     let consensus_positions = extract_consensus_positions(aligned_positions);
-    number_by_regions(&consensus_positions, config)
+    number_by_regions(&consensus_positions, regions)
 }
 
 /// Extract consensus position for each residue from alignment
@@ -136,11 +123,11 @@ fn extract_consensus_positions(aligned: &[AlignedPosition]) -> Vec<u8> {
 }
 
 /// Apply region-based numbering to consensus positions
-fn number_by_regions(consensus_positions: &[u8], config: &ChainNumberingConfig) -> Vec<Position> {
+fn number_by_regions(consensus_positions: &[u8], regions: &[NumberingRegion]) -> Vec<Position> {
     let mut result = Vec::with_capacity(consensus_positions.len());
     let mut idx = 0;
 
-    for region in config.regions {
+    for region in regions {
         let region_start = idx;
 
         // Find all positions belonging to this region
@@ -162,8 +149,8 @@ fn number_by_regions(consensus_positions: &[u8], config: &ChainNumberingConfig) 
             } => {
                 number_with_offset(region_positions, *src_start, *dst_start, &mut result);
             }
-            NumberingRegionType::WithConfig(renumber_config) => {
-                let numbered = number_with_config(region_len, renumber_config);
+            NumberingRegionType::WithConfig(numbering_config) => {
+                let numbered = number_with_config(region_len, numbering_config);
                 result.extend(numbered);
             }
         }

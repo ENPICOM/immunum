@@ -2,6 +2,7 @@
 
 use crate::alignment::{align, Alignment};
 use crate::error::{Error, Result};
+use crate::numbering::{imgt::get_imgt_numbering, kabat::get_kabat_numbering};
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme};
 
@@ -20,8 +21,8 @@ impl AnnotationResult {
     /// Get numbering for a specific scheme
     pub fn numbering(&self, scheme: Scheme) -> Vec<Position> {
         match scheme {
-            Scheme::IMGT => self.alignment.get_imgt_numbering(),
-            Scheme::Kabat => self.alignment.get_kabat_numbering(self.chain),
+            Scheme::IMGT => get_imgt_numbering(&self.alignment),
+            Scheme::Kabat => get_kabat_numbering(&self.alignment, self.chain),
         }
     }
 }

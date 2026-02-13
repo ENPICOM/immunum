@@ -20,5 +20,5 @@ pub use alignment::{align, Alignment};
 pub use annotator::{AnnotationResult, Annotator};
 pub use error::{Error, Result};
 pub use scoring::ScoringMatrix;
-pub use types::{Chain, InsertionStyle, Position, Region, RenumberConfig, Scheme};
+pub use types::{Chain, InsertionStyle, Position, Region, NumberingConfig, Scheme};
 pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};

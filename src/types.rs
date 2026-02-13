@@ -174,9 +174,9 @@ pub enum InsertionStyle {
     Palindromic { left: u8, right: u8 },
 }
 
-/// Configuration for CDR-style renumbering with insertions and deletions
+/// Configuration for CDR-style numbering with insertions and deletions
 #[derive(Debug, Clone, Copy)]
-pub struct RenumberConfig {
+pub struct NumberingConfig {
     /// Base positions to use (in order)
     pub base_positions: &'static [u8],
     /// Order to delete positions when len < base (None = delete from end)
@@ -185,7 +185,7 @@ pub struct RenumberConfig {
     pub insertion_style: InsertionStyle,
 }
 
-impl RenumberConfig {
+impl NumberingConfig {
     /// Create a config for sequential (Kabat-style) numbering
     pub const fn sequential(
         base_positions: &'static [u8],
@@ -241,18 +241,20 @@ pub enum Region {
 pub enum NumberingRegionType {
     /// Simple offset: src_pos - src_start + dst_start
     Offset { src_start: u8, dst_start: u8 },
-    /// Renumbering with insertions/deletions using RenumberConfig
-    WithConfig(RenumberConfig),
+    /// Numbering with insertions/deletions using NumberingConfig
+    WithConfig(NumberingConfig),
 }
 
 /// A region definition for numbering conversion
 ///
-/// Maps a range of source positions to output positions using either
-/// simple offset arithmetic or full renumbering with insertions/deletions.
+/// Maps a range of positions to output positions using either
+/// simple offset arithmetic or full numbering with insertions/deletions.
 #[derive(Debug, Clone, Copy)]
 pub struct NumberingRegion {
-    /// Source position range (inclusive)
-    pub src_range: (u8, u8),
+    /// Start position (inclusive)
+    pub start: u8,
+    /// End position (inclusive)
+    pub end: u8,
     /// How to number this region
     pub region_type: NumberingRegionType,
 }
@@ -261,7 +263,8 @@ impl NumberingRegion {
     /// Create an offset-based region (for framework regions)
     pub const fn offset(src_start: u8, src_end: u8, dst_start: u8) -> Self {
         Self {
-            src_range: (src_start, src_end),
+            start: src_start,
+            end: src_end,
             region_type: NumberingRegionType::Offset {
                 src_start,
                 dst_start,
@@ -269,10 +272,11 @@ impl NumberingRegion {
         }
     }
 
-    /// Create a region with full renumbering config (for CDR regions)
-    pub const fn with_config(src_start: u8, src_end: u8, config: RenumberConfig) -> Self {
+    /// Create a region with full numbering config (for CDR regions)
+    pub const fn with_config(src_start: u8, src_end: u8, config: NumberingConfig) -> Self {
         Self {
-            src_range: (src_start, src_end),
+            start: src_start,
+            end: src_end,
             region_type: NumberingRegionType::WithConfig(config),
         }
     }
@@ -280,18 +284,8 @@ impl NumberingRegion {
     /// Check if a position falls within this region
     #[inline]
     pub const fn contains(&self, pos: u8) -> bool {
-        pos >= self.src_range.0 && pos <= self.src_range.1
+        pos >= self.start && pos <= self.end
     }
-}
-
-/// Full chain numbering configuration
-///
-/// Contains all regions needed to number a complete chain sequence.
-/// Used by both IMGT and Kabat schemes with appropriate region configs.
-#[derive(Debug, Clone, Copy)]
-pub struct ChainNumberingConfig {
-    /// Ordered list of regions covering the full sequence
-    pub regions: &'static [NumberingRegion],
 }
 
 impl fmt::Display for Region {

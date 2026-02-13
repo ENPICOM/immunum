@@ -1,11 +1,13 @@
-use crate::types::{ChainNumberingConfig, NumberingRegion, RenumberConfig};
+use crate::alignment::{AlignedPosition, Alignment};
+use crate::numbering::apply_numbering;
+use crate::types::{NumberingRegion, Position, NumberingConfig};
 
 // =============================================================================
 // IMGT Chain Numbering Configuration
 // =============================================================================
 
 /// IMGT numbering regions (same for all chain types)
-const IMGT_REGIONS: &[NumberingRegion] = &[
+pub const IMGT_REGIONS: &[NumberingRegion] = &[
     NumberingRegion::offset(1, 26, 1),                   // FR1
     NumberingRegion::with_config(27, 38, CDR1_CONFIG),   // CDR1
     NumberingRegion::offset(39, 55, 39),                 // FR2
@@ -15,19 +17,24 @@ const IMGT_REGIONS: &[NumberingRegion] = &[
     NumberingRegion::offset(118, 128, 118),              // FR4
 ];
 
-/// IMGT chain numbering config (universal for all chains)
-pub const IMGT_CONFIG: ChainNumberingConfig = ChainNumberingConfig {
-    regions: IMGT_REGIONS,
-};
+/// Get IMGT-specific numbering: FR regions from alignment, CDR regions from IMGT rules
+pub fn get_imgt_numbering(alignment: &Alignment) -> Vec<Position> {
+    apply_numbering(&alignment.positions, IMGT_REGIONS)
+}
+
+/// Get IMGT numbering from aligned positions directly
+pub fn number_imgt(aligned_positions: &[AlignedPosition]) -> Vec<Position> {
+    apply_numbering(aligned_positions, IMGT_REGIONS)
+}
 
 // =============================================================================
-// CDR Renumbering Configurations
+// CDR Numbering Configurations
 // =============================================================================
 
 // CDR1: positions 27-38 (12 base), deletions from center outward, insertions at 32/33
 // Fill order: 27, 38, 28, 37, 29, 36, 30, 35, 31, 34, 32, 33
 // Deletion order (reverse of fill): 33, 32, 34, 31, 35, 30, 36, 29, 37, 28, 38
-const CDR1_CONFIG: RenumberConfig = RenumberConfig::palindromic(
+const CDR1_CONFIG: NumberingConfig = NumberingConfig::palindromic(
     &[27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
     &[33, 32, 34, 31, 35, 30, 36, 29, 37, 28, 38],
     32,
@@ -37,7 +44,7 @@ const CDR1_CONFIG: RenumberConfig = RenumberConfig::palindromic(
 // CDR2: positions 56-65 (10 base), deletions from center outward, insertions at 60/61
 // Fill order: 56, 65, 57, 64, 58, 63, 59, 62, 60, 61
 // Deletion order (reverse of fill): 61, 60, 62, 59, 63, 58, 64, 57, 65
-const CDR2_CONFIG: RenumberConfig = RenumberConfig::palindromic(
+const CDR2_CONFIG: NumberingConfig = NumberingConfig::palindromic(
     &[56, 57, 58, 59, 60, 61, 62, 63, 64, 65],
     &[61, 60, 62, 59, 63, 58, 64, 57, 65],
     60,
@@ -47,7 +54,7 @@ const CDR2_CONFIG: RenumberConfig = RenumberConfig::palindromic(
 // CDR3: positions 105-117 (13 base), deletions from center outward, insertions at 111/112
 // Fill order: 105, 117, 106, 116, 107, 115, 108, 114, 109, 113, 110, 112, 111
 // Deletion order (reverse of fill): 111, 112, 110, 113, 109, 114, 108, 115, 107, 116, 106, 117
-const CDR3_CONFIG: RenumberConfig = RenumberConfig::palindromic(
+const CDR3_CONFIG: NumberingConfig = NumberingConfig::palindromic(
     &[
         105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
     ],
