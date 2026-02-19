@@ -67,9 +67,9 @@ const LCDR2_CONFIG: NumberingConfig = NumberingConfig::sequential(&[51, 52], 52,
 
 // CDR3: positions 89-97, insertions at 95, delete backward from 95
 const LCDR3_CONFIG: NumberingConfig = NumberingConfig::sequential(
-    &[90, 91, 92, 93, 94, 95, 96],
+    &[89, 90, 91, 92, 93, 94, 95, 96],
     95,
-    Some(&[95, 94, 93, 92, 91, 90]),
+    Some(&[95, 94, 93, 92, 91, 90, 89]),
 );
 
 pub const KABAT_LIGHT_REGIONS: &[NumberingRegion] = &[
@@ -80,8 +80,8 @@ pub const KABAT_LIGHT_REGIONS: &[NumberingRegion] = &[
     NumberingRegion::offset(66, 72, 53),
     NumberingRegion::offset(74, 79, 60),
     NumberingRegion::with_config(80, 82, NumberingConfig::sequential(&[66], 66, None)),
-    NumberingRegion::offset(83, 105, 67),
-    NumberingRegion::with_config(106, 116, LCDR3_CONFIG),
+    NumberingRegion::offset(83, 104, 67),
+    NumberingRegion::with_config(105, 116, LCDR3_CONFIG),
     NumberingRegion::offset(117, 127, 97),
 ];
 
