@@ -22,11 +22,6 @@ pub fn get_imgt_numbering(alignment: &Alignment) -> Vec<Position> {
     apply_numbering(&alignment.positions, IMGT_REGIONS)
 }
 
-/// Get IMGT numbering from aligned positions directly
-pub fn number_imgt(aligned_positions: &[AlignedPosition]) -> Vec<Position> {
-    apply_numbering(aligned_positions, IMGT_REGIONS)
-}
-
 // =============================================================================
 // CDR Numbering Configurations
 // =============================================================================
