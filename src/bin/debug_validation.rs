@@ -2,7 +2,7 @@
 
 use immunum2::annotator::Annotator;
 use immunum2::types::{Chain, Scheme};
-use immunum2::validation::{load_validation_csv, validate_entry};
+use immunum2::validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
 use immunum2::Position;
 use std::env;
 use std::path::PathBuf;
@@ -272,7 +272,14 @@ fn main() {
             }
         };
 
-        debug_entry(entry, &annotator, scheme, csv_filename);
+        let result = match validate_entry(entry, &annotator, scheme) {
+            Ok(r) => r,
+            Err(err) => {
+                eprintln!("Error validating entry: {}", err);
+                process::exit(1);
+            }
+        };
+        debug_entry(entry, &result, scheme, csv_filename);
     } else {
         // Show all imperfect entries
         let mut imperfect_count = 0;
@@ -288,7 +295,7 @@ fn main() {
             // Check if not perfect (has incorrect or missing positions)
             if result.incorrect_positions > 0 || result.missing_positions > 0 {
                 imperfect_count += 1;
-                debug_entry(entry, &annotator, scheme, csv_filename);
+                debug_entry(entry, &result, scheme, csv_filename);
                 println!("\n");
             }
         }
@@ -307,29 +314,11 @@ fn main() {
 }
 
 fn debug_entry(
-    entry: &immunum2::validation::ValidationEntry,
-    annotator: &Annotator,
+    entry: &ValidationEntry,
+    result: &ValidationResult,
     scheme: Scheme,
     csv_filename: &str,
 ) {
-    // Validate and get results
-    let result = match validate_entry(entry, annotator, scheme) {
-        Ok(r) => r,
-        Err(err) => {
-            eprintln!("Error validating entry: {}", err);
-            return;
-        }
-    };
-
-    let numbering = match annotator.annotate(&entry.sequence) {
-        Ok(r) => r.numbering(scheme),
-        Err(err) => {
-            eprintln!("Error annotating sequence: {}", err);
-            return;
-        }
-    };
-
-    // Print results
     println!("{}", "=".repeat(80));
     println!("File: {}", csv_filename);
     println!("Header: {}", entry.header);
@@ -350,7 +339,7 @@ fn debug_entry(
     print_alignment_comparison(
         &entry.sequence,
         &entry.expected_positions,
-        &numbering,
+        &result.numbering,
         scheme,
     );
 }

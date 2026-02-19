@@ -74,6 +74,7 @@ pub struct ValidationResult {
     pub header: String,
     pub sequence: String,
     pub detected_chain: Chain,
+    pub numbering: Vec<Position>,
     pub total_positions: usize,
     pub correct_positions: usize,
     pub incorrect_positions: usize,
@@ -230,6 +231,7 @@ pub fn validate_entry(
         header: entry.header.clone(),
         sequence: entry.sequence.clone(),
         detected_chain: result.chain,
+        numbering,
         total_positions,
         correct_positions,
         incorrect_positions,
@@ -435,21 +437,21 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_validate_igk_kabat_sequences() {
-    //     validate_chain_sequences_with_scheme(
-    //         Chain::IGK,
-    //         "fixtures/validation/ab_K_kabat.csv",
-    //         Scheme::Kabat,
-    //     );
-    // }
+    #[test]
+    fn test_validate_igk_kabat_sequences() {
+        validate_chain_sequences_with_scheme(
+            Chain::IGK,
+            "fixtures/validation/ab_K_kabat.csv",
+            Scheme::Kabat,
+        );
+    }
 
-    // #[test]
-    // fn test_validate_igl_kabat_sequences() {
-    //     validate_chain_sequences_with_scheme(
-    //         Chain::IGL,
-    //         "fixtures/validation/ab_L_kabat.csv",
-    //         Scheme::Kabat,
-    //     );
-    // }
+    #[test]
+    fn test_validate_igl_kabat_sequences() {
+        validate_chain_sequences_with_scheme(
+            Chain::IGL,
+            "fixtures/validation/ab_L_kabat.csv",
+            Scheme::Kabat,
+        );
+    }
 }
