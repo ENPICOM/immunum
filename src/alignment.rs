@@ -67,8 +67,8 @@ pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
 
     // Initialize first row and column for semi-global alignment
     // Allow query to start anywhere without penalty (gaps at start of query are free)
-    for j in 1..=cons_len {
-        dp[0][j] = Cell {
+    for cell in dp[0].iter_mut().take(cons_len + 1).skip(1) {
+        *cell = Cell {
             score: 0.0, // No penalty for skipping consensus positions at start
             direction: Direction::GapInQuery,
         };
@@ -123,9 +123,9 @@ pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
     let mut best_score = dp[query_len][cons_len].score;
 
     // Check last row: query fully used, allow trailing gaps in consensus
-    for j in 0..cons_len {
-        if dp[query_len][j].score > best_score {
-            best_score = dp[query_len][j].score;
+    for (j, cell) in dp[query_len].iter().enumerate().take(cons_len) {
+        if cell.score > best_score {
+            best_score = cell.score;
             best_i = query_len;
             best_j = j;
         }
