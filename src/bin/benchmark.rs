@@ -77,11 +77,12 @@ fn print_benchmark_report(
     println!();
     print_metrics_table(kabat_metrics);
 
-    println!("## Quality Thresholds");
+    println!("## Metrics");
     println!();
-    println!("The test suite enforces these minimum thresholds:");
-    println!("- **Perfect sequence accuracy**: ≥99% (sequences with 100% correct positions)");
-    println!("- **Overall position accuracy**: ≥99% (all positions across all sequences)");
+    println!("- **Perfect %**: share of sequences where every residue position matches the reference exactly.");
+    println!("- **Overall Accuracy**: fraction of individual residue positions that match across all sequences.");
+    println!();
+    println!("The test suite enforces minimum thresholds of ≥99% for both metrics.");
     println!();
 
     println!("## Workflow");
@@ -97,18 +98,16 @@ fn print_benchmark_report(
 }
 
 fn print_metrics_table(metrics: &[ChainMetrics]) {
-    println!("| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy | Correct Positions | Total Positions |");
-    println!("|-------|-----------------|-------------------|-----------|------------------|-------------------|-----------------|");
+    println!("| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy |");
+    println!("|-------|-----------------|-------------------|-----------|------------------|");
     for m in metrics {
         println!(
-            "| {:5} | {:15} | {:17} | {:8.2}% | {:15.2}% | {:17} | {:15} |",
+            "| {:5} | {:15} | {:17} | {:8.2}% | {:15.2}% |",
             m.chain.to_string(),
             m.total_sequences,
             m.perfect_sequences,
             m.perfect_percentage(),
             m.overall_accuracy(),
-            m.correct_positions,
-            m.total_positions
         );
     }
     println!();

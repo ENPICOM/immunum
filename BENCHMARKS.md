@@ -4,33 +4,34 @@ This file tracks accuracy metrics across all supported chains. Metrics are gener
 
 **Last Updated**: 2026-02-20
 
-**Execution Time**: 1.66s
+**Execution Time**: 1.54s
 
 ## IMGT Summary
 
-| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy | Correct Positions | Total Positions |
-|-------|-----------------|-------------------|-----------|------------------|-------------------|-----------------|
-| IGH   |            2452 |              2449 |    99.88% |           99.99% |            295875 |          295901 |
-| IGK   |            1485 |              1480 |    99.66% |           99.98% |            160921 |          160947 |
-| IGL   |             371 |               369 |    99.46% |           99.99% |             40288 |           40293 |
-| TRA   |             865 |               761 |    87.98% |           99.36% |             94829 |           95438 |
-| TRB   |             934 |               904 |    96.79% |           99.70% |            105008 |          105325 |
-| TRG   |              25 |                25 |   100.00% |          100.00% |              2799 |            2799 |
-| TRD   |              23 |                23 |   100.00% |          100.00% |              2622 |            2622 |
+| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy |
+|-------|-----------------|-------------------|-----------|------------------|
+| IGH   |            2452 |              2449 |    99.88% |           99.99% |
+| IGK   |            1485 |              1480 |    99.66% |           99.98% |
+| IGL   |             371 |               369 |    99.46% |           99.99% |
+| TRA   |             865 |               761 |    87.98% |           99.36% |
+| TRB   |             934 |               904 |    96.79% |           99.70% |
+| TRG   |              25 |                25 |   100.00% |          100.00% |
+| TRD   |              23 |                23 |   100.00% |          100.00% |
 
 ## Kabat Summary
 
-| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy | Correct Positions | Total Positions |
-|-------|-----------------|-------------------|-----------|------------------|-------------------|-----------------|
-| IGH   |            2452 |              2449 |    99.88% |           99.99% |            295876 |          295901 |
-| IGK   |            1485 |              1478 |    99.53% |           99.98% |            160920 |          160947 |
-| IGL   |             371 |               369 |    99.46% |           99.99% |             40288 |           40293 |
+| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy |
+|-------|-----------------|-------------------|-----------|------------------|
+| IGH   |            2452 |              2449 |    99.88% |           99.99% |
+| IGK   |            1485 |              1478 |    99.53% |           99.98% |
+| IGL   |             371 |               369 |    99.46% |           99.99% |
 
-## Quality Thresholds
+## Metrics
 
-The test suite enforces these minimum thresholds:
-- **Perfect sequence accuracy**: ≥99% (sequences with 100% correct positions)
-- **Overall position accuracy**: ≥99% (all positions across all sequences)
+- **Perfect %**: share of sequences where every residue position matches the reference exactly.
+- **Overall Accuracy**: fraction of individual residue positions that match across all sequences.
+
+The test suite enforces minimum thresholds of ≥99% for both metrics.
 
 ## Workflow
 
