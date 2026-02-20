@@ -33,7 +33,7 @@
 - **error.rs**: Error types using thiserror
 - **scoring.rs**: Position-specific scoring matrices loaded from build-time generated JSON
 - **alignment.rs**: Needleman-Wunsch semi-global alignment with IMGT-aware region numbering
-- **imgt.rs**: IMGT numbering rules for CDR1/2/3 with palindromic insertions
+- **imgt.rs**: IMGT numbering rules for CDR1/2/3 with symmetric insertions
 - **annotator.rs**: High-level API for sequence annotation with auto chain detection
 - **consensus.rs**: Consensus sequence parsing and representation
 - **validation.rs**: Validation framework comparing numbering against test datasets

@@ -2,11 +2,11 @@
 
 This file tracks accuracy metrics across all supported chains. Metrics are generated from validation datasets and updated via `cargo run --release --bin benchmark`.
 
-**Last Updated**: 2026-02-10
+**Last Updated**: 2026-02-20
 
-**Execution Time**: 0.96s
+**Execution Time**: 1.66s
 
-## Overall Summary
+## IMGT Summary
 
 | Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy | Correct Positions | Total Positions |
 |-------|-----------------|-------------------|-----------|------------------|-------------------|-----------------|
@@ -17,6 +17,14 @@ This file tracks accuracy metrics across all supported chains. Metrics are gener
 | TRB   |             934 |               904 |    96.79% |           99.70% |            105008 |          105325 |
 | TRG   |              25 |                25 |   100.00% |          100.00% |              2799 |            2799 |
 | TRD   |              23 |                23 |   100.00% |          100.00% |              2622 |            2622 |
+
+## Kabat Summary
+
+| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy | Correct Positions | Total Positions |
+|-------|-----------------|-------------------|-----------|------------------|-------------------|-----------------|
+| IGH   |            2452 |              2449 |    99.88% |           99.99% |            295876 |          295901 |
+| IGK   |            1485 |              1478 |    99.53% |           99.98% |            160920 |          160947 |
+| IGL   |             371 |               369 |    99.46% |           99.99% |             40288 |           40293 |
 
 ## Quality Thresholds
 

@@ -1,62 +1,56 @@
-use crate::alignment::{AlignedPosition, Alignment};
+use crate::alignment::Alignment;
 use crate::numbering::apply_numbering;
-use crate::types::{NumberingRegion, Position, NumberingConfig};
+use crate::types::{NumberingRule, Position};
+use crate::Insertion;
 
 // =============================================================================
-// IMGT Chain Numbering Configuration
+// IMGT Chain Numbering Rules (same for all chain types)
 // =============================================================================
 
-/// IMGT numbering regions (same for all chain types)
-pub const IMGT_REGIONS: &[NumberingRegion] = &[
-    NumberingRegion::offset(1, 26, 1),                   // FR1
-    NumberingRegion::with_config(27, 38, CDR1_CONFIG),   // CDR1
-    NumberingRegion::offset(39, 55, 39),                 // FR2
-    NumberingRegion::with_config(56, 65, CDR2_CONFIG),   // CDR2
-    NumberingRegion::offset(66, 104, 66),                // FR3
-    NumberingRegion::with_config(105, 117, CDR3_CONFIG), // CDR3
-    NumberingRegion::offset(118, 128, 118),              // FR4
+pub const IMGT_RULES: &[NumberingRule] = &[
+    NumberingRule::fr(1, 26),
+    NumberingRule::variable(
+        27,
+        38,
+        27,
+        38,
+        &[33, 32, 34, 31, 35, 30, 36, 29, 37, 28, 38],
+        Insertion::Symmetric {
+            left: 32,
+            right: 33,
+        },
+    ),
+    NumberingRule::fr(39, 55),
+    NumberingRule::variable(
+        56,
+        65,
+        56,
+        65,
+        &[61, 60, 62, 59, 63, 58, 64, 57, 65],
+        Insertion::Symmetric {
+            left: 60,
+            right: 61,
+        },
+    ),
+    NumberingRule::fr(66, 104),
+    NumberingRule::variable(
+        105,
+        117,
+        105,
+        117,
+        &[111, 112, 110, 113, 109, 114, 108, 115, 107, 116, 106, 117],
+        Insertion::Symmetric {
+            left: 111,
+            right: 112,
+        },
+    ),
+    NumberingRule::fr(118, 128),
 ];
 
 /// Get IMGT-specific numbering: FR regions from alignment, CDR regions from IMGT rules
 pub fn get_imgt_numbering(alignment: &Alignment) -> Vec<Position> {
-    apply_numbering(&alignment.positions, IMGT_REGIONS)
+    apply_numbering(&alignment.positions, IMGT_RULES)
 }
-
-// =============================================================================
-// CDR Numbering Configurations
-// =============================================================================
-
-// CDR1: positions 27-38 (12 base), deletions from center outward, insertions at 32/33
-// Fill order: 27, 38, 28, 37, 29, 36, 30, 35, 31, 34, 32, 33
-// Deletion order (reverse of fill): 33, 32, 34, 31, 35, 30, 36, 29, 37, 28, 38
-const CDR1_CONFIG: NumberingConfig = NumberingConfig::palindromic(
-    &[27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
-    &[33, 32, 34, 31, 35, 30, 36, 29, 37, 28, 38],
-    32,
-    33,
-);
-
-// CDR2: positions 56-65 (10 base), deletions from center outward, insertions at 60/61
-// Fill order: 56, 65, 57, 64, 58, 63, 59, 62, 60, 61
-// Deletion order (reverse of fill): 61, 60, 62, 59, 63, 58, 64, 57, 65
-const CDR2_CONFIG: NumberingConfig = NumberingConfig::palindromic(
-    &[56, 57, 58, 59, 60, 61, 62, 63, 64, 65],
-    &[61, 60, 62, 59, 63, 58, 64, 57, 65],
-    60,
-    61,
-);
-
-// CDR3: positions 105-117 (13 base), deletions from center outward, insertions at 111/112
-// Fill order: 105, 117, 106, 116, 107, 115, 108, 114, 109, 113, 110, 112, 111
-// Deletion order (reverse of fill): 111, 112, 110, 113, 109, 114, 108, 115, 107, 116, 106, 117
-const CDR3_CONFIG: NumberingConfig = NumberingConfig::palindromic(
-    &[
-        105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
-    ],
-    &[111, 112, 110, 113, 109, 114, 108, 115, 107, 116, 106, 117],
-    111,
-    112,
-);
 
 #[cfg(test)]
 mod tests {
@@ -65,6 +59,7 @@ mod tests {
 
     #[test]
     fn test_cdr1_numbering() {
+        let rule = &IMGT_RULES[1]; // CDR1
         for (length, output_strings) in vec![
             (2, vec!["27", "38"]),
             (3, vec!["27", "28", "38"]),
@@ -93,7 +88,7 @@ mod tests {
                     "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38",
                 ],
             ),
-            // Palindromic insertions: first goes to right (33A), pattern: 32A, 33A, 33
+            // Symmetric insertions: first goes to right (33A), pattern: 32A, 33A, 33
             (
                 13,
                 vec![
@@ -122,7 +117,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = number_with_config(length, &CDR1_CONFIG);
+            let positions = number_with_config(length, rule);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);
@@ -131,6 +126,7 @@ mod tests {
 
     #[test]
     fn test_cdr2_numbering() {
+        let rule = &IMGT_RULES[3]; // CDR2
         for (length, output_strings) in vec![
             (2, vec!["56", "65"]),
             (3, vec!["56", "57", "65"]),
@@ -187,7 +183,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = number_with_config(length, &CDR2_CONFIG);
+            let positions = number_with_config(length, rule);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);
@@ -196,6 +192,7 @@ mod tests {
 
     #[test]
     fn test_cdr3_numbering() {
+        let rule = &IMGT_RULES[5]; // CDR3
         for (length, output_strings) in vec![
             (2, vec!["105", "117"]),
             (3, vec!["105", "106", "117"]),
@@ -305,7 +302,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = number_with_config(length, &CDR3_CONFIG);
+            let positions = number_with_config(length, rule);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);

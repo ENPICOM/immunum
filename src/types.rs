@@ -165,133 +165,104 @@ impl FromStr for Position {
     }
 }
 
-/// How insertions are handled when sequence length > base positions
-#[derive(Debug, Clone, Copy)]
-pub enum InsertionStyle {
-    /// All insertions after a single position: 100A, 100B, 100C (Kabat style)
-    AfterPosition(u8),
-    /// Insertions split between two positions palindromically: 111A, 112A, 111B, 112B (IMGT style)
-    Palindromic { left: u8, right: u8 },
-}
-
-/// Configuration for CDR-style numbering with insertions and deletions
-#[derive(Debug, Clone, Copy)]
-pub struct NumberingConfig {
-    /// Base positions to use (in order)
-    pub base_positions: &'static [u8],
-    /// Order to delete positions when len < base (None = delete from end)
-    pub deletion_order: Option<&'static [u8]>,
-    /// How to handle insertions
-    pub insertion_style: InsertionStyle,
-}
-
-impl NumberingConfig {
-    /// Create a config for sequential (Kabat-style) numbering
-    pub const fn sequential(
-        base_positions: &'static [u8],
-        insertion_pos: u8,
-        deletion_order: Option<&'static [u8]>,
-    ) -> Self {
-        Self {
-            base_positions,
-            deletion_order,
-            insertion_style: InsertionStyle::AfterPosition(insertion_pos),
-        }
-    }
-
-    /// Create a config for palindromic (IMGT-style) numbering
-    pub const fn palindromic(
-        base_positions: &'static [u8],
-        deletion_order: &'static [u8],
-        insertion_left: u8,
-        insertion_right: u8,
-    ) -> Self {
-        Self {
-            base_positions,
-            deletion_order: Some(deletion_order),
-            insertion_style: InsertionStyle::Palindromic {
-                left: insertion_left,
-                right: insertion_right,
-            },
-        }
-    }
-}
-
 /// Functional regions in a numbered sequence
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Region {
-    /// Framework region 1
     FR1,
-    /// Complementarity-determining region 1
     CDR1,
-    /// Framework region 2
     FR2,
-    /// Complementarity-determining region 2
     CDR2,
-    /// Framework region 3
     FR3,
-    /// Complementarity-determining region 3
     CDR3,
-    /// Framework region 4
     FR4,
-}
-
-/// How to number a region in the output scheme
-#[derive(Debug, Clone, Copy)]
-pub enum NumberingRegionType {
-    /// Simple offset: src_pos - src_start + dst_start
-    Offset { src_start: u8, dst_start: u8 },
-    /// Numbering with insertions/deletions using NumberingConfig
-    WithConfig(NumberingConfig),
-}
-
-/// A region definition for numbering conversion
-///
-/// Maps a range of positions to output positions using either
-/// simple offset arithmetic or full numbering with insertions/deletions.
-#[derive(Debug, Clone, Copy)]
-pub struct NumberingRegion {
-    /// Start position (inclusive)
-    pub start: u8,
-    /// End position (inclusive)
-    pub end: u8,
-    /// How to number this region
-    pub region_type: NumberingRegionType,
-}
-
-impl NumberingRegion {
-    /// Create an offset-based region (for framework regions)
-    pub const fn offset(src_start: u8, src_end: u8, dst_start: u8) -> Self {
-        Self {
-            start: src_start,
-            end: src_end,
-            region_type: NumberingRegionType::Offset {
-                src_start,
-                dst_start,
-            },
-        }
-    }
-
-    /// Create a region with full numbering config (for CDR regions)
-    pub const fn with_config(src_start: u8, src_end: u8, config: NumberingConfig) -> Self {
-        Self {
-            start: src_start,
-            end: src_end,
-            region_type: NumberingRegionType::WithConfig(config),
-        }
-    }
-
-    /// Check if a position falls within this region
-    #[inline]
-    pub const fn contains(&self, pos: u8) -> bool {
-        pos >= self.start && pos <= self.end
-    }
 }
 
 impl fmt::Display for Region {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
+}
+
+/// A rule mapping a range of alignment positions to numbering positions
+///
+/// Defines how to handle insertions and deletions when the alignment length doesn't match the numbering range.
+#[derive(Debug, Clone, Copy)]
+pub struct NumberingRule {
+    /// First alignment position (inclusive)
+    pub align_start: u8,
+    /// Last alignment position (inclusive)
+    pub align_end: u8,
+    /// First numbering position (inclusive)
+    pub num_start: u8,
+    /// Last numbering position (inclusive)
+    pub num_end: u8,
+    /// Order to delete positions when alignment is shorter than numbering range (for variable regions)
+    pub deletion_order: &'static [u8],
+    /// How to handle insertions when alignment is longer than numbering range (for variable regions)
+    pub insertion: Insertion,
+}
+
+impl NumberingRule {
+    /// Framework-like region with direct 1:1 mapping (alignment positions equal numbering positions)
+    pub const fn fr(start: u8, end: u8) -> Self {
+        Self {
+            align_start: start,
+            align_end: end,
+            num_start: start,
+            num_end: end,
+            deletion_order: &[],
+            insertion: Insertion::None,
+        }
+    }
+
+    /// Framework region with simple offset mapping (alignment positions map to numbering positions with a fixed offset)
+    pub const fn offset(align_start: u8, align_end: u8, offset: i8) -> Self {
+        let num_start = (align_start as i16 + offset as i16) as u8;
+        Self {
+            align_start,
+            align_end,
+            num_start,
+            num_end: num_start + (align_end - align_start),
+            deletion_order: &[],
+            insertion: Insertion::None,
+        }
+    }
+
+    /// Variable region: CDR or other variable length region with custom deletion/insertion rules
+    /// and explicit align and numbering ranges
+    pub const fn variable(
+        align_start: u8,
+        align_end: u8,
+        num_start: u8,
+        num_end: u8,
+        deletion_order: &'static [u8],
+        insertion: Insertion,
+    ) -> Self {
+        Self {
+            align_start,
+            align_end,
+            num_start,
+            num_end,
+            deletion_order,
+            insertion,
+        }
+    }
+
+    /// Check if a position falls within this rule's source range
+    #[inline]
+    pub const fn contains(&self, pos: u8) -> bool {
+        pos >= self.align_start && pos <= self.align_end
+    }
+}
+/// How insertions are handled when a variable region exceeds its base length
+#[derive(Debug, Clone, Copy)]
+pub enum Insertion {
+    /// Simple offset arithmetic — no insertions possible (framework regions)
+    None,
+    /// All insertions after a single position: 35A, 35B, 35C (Kabat style)
+    Sequential(u8),
+    /// Insertions split symmetrically between two positions: 111A, 112A, 111B, 112B (IMGT style)
+    Symmetric { left: u8, right: u8 },
 }
 
 #[cfg(test)]

@@ -1,14 +1,14 @@
 //! Generate validation benchmark report
 
 use chrono::Local;
-use immunum2::types::Chain;
-use immunum2::validation::{validate_chain, ChainMetrics};
+use immunum2::types::{Chain, Scheme};
+use immunum2::validation::{validate_chain_with_scheme, ChainMetrics};
 use std::path::PathBuf;
 
 fn main() {
     let start_time = Local::now();
 
-    let chains = vec![
+    let imgt_chains = vec![
         (Chain::IGH, "fixtures/validation/ab_H_imgt.csv"),
         (Chain::IGK, "fixtures/validation/ab_K_imgt.csv"),
         (Chain::IGL, "fixtures/validation/ab_L_imgt.csv"),
@@ -18,34 +18,40 @@ fn main() {
         (Chain::TRD, "fixtures/validation/tcr_D_imgt.csv"),
     ];
 
-    let mut all_metrics = Vec::new();
+    let kabat_chains = vec![
+        (Chain::IGH, "fixtures/validation/ab_H_kabat.csv"),
+        (Chain::IGK, "fixtures/validation/ab_K_kabat.csv"),
+        (Chain::IGL, "fixtures/validation/ab_L_kabat.csv"),
+    ];
 
-    // Collect metrics for each chain
-    for (chain, csv_path) in &chains {
+    let imgt_metrics = collect_metrics(&imgt_chains, Scheme::IMGT);
+    let kabat_metrics = collect_metrics(&kabat_chains, Scheme::Kabat);
+
+    let end_time = Local::now();
+    let elapsed = end_time.signed_duration_since(start_time);
+
+    print_benchmark_report(&imgt_metrics, &kabat_metrics, &end_time, elapsed);
+}
+
+fn collect_metrics(chains: &[(Chain, &str)], scheme: Scheme) -> Vec<ChainMetrics> {
+    let mut all_metrics = Vec::new();
+    for (chain, csv_path) in chains {
         let path = PathBuf::from(csv_path);
         if !path.exists() {
             eprintln!("Warning: Skipping {} - file not found: {}", chain, csv_path);
             continue;
         }
-
-        match validate_chain(*chain, csv_path) {
+        match validate_chain_with_scheme(*chain, csv_path, scheme, None) {
             Ok(metrics) => all_metrics.push(metrics),
-            Err(e) => {
-                eprintln!("Error validating {}: {}", chain, e);
-                continue;
-            }
+            Err(e) => eprintln!("Error validating {}: {}", chain, e),
         }
     }
-
-    let end_time = Local::now();
-    let elapsed = end_time.signed_duration_since(start_time);
-
-    // Generate report
-    print_benchmark_report(&all_metrics, &end_time, elapsed);
+    all_metrics
 }
 
 fn print_benchmark_report(
-    metrics: &[ChainMetrics],
+    imgt_metrics: &[ChainMetrics],
+    kabat_metrics: &[ChainMetrics],
     timestamp: &chrono::DateTime<Local>,
     elapsed: chrono::Duration,
 ) {
@@ -63,26 +69,14 @@ fn print_benchmark_report(
     );
     println!();
 
-    // Overall summary table
-    println!("## Overall Summary");
+    println!("## IMGT Summary");
     println!();
-    println!("| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy | Correct Positions | Total Positions |");
-    println!("|-------|-----------------|-------------------|-----------|------------------|-------------------|-----------------|");
+    print_metrics_table(imgt_metrics);
 
-    for m in metrics {
-        println!(
-            "| {:5} | {:15} | {:17} | {:8.2}% | {:15.2}% | {:17} | {:15} |",
-            m.chain.to_string(),
-            m.total_sequences,
-            m.perfect_sequences,
-            m.perfect_percentage(),
-            m.overall_accuracy(),
-            m.correct_positions,
-            m.total_positions
-        );
-    }
-
+    println!("## Kabat Summary");
     println!();
+    print_metrics_table(kabat_metrics);
+
     println!("## Quality Thresholds");
     println!();
     println!("The test suite enforces these minimum thresholds:");
@@ -100,4 +94,22 @@ fn print_benchmark_report(
     println!("# Generate updated benchmark report (release mode for accurate timing)");
     println!("cargo run --quiet --release --bin benchmark > BENCHMARKS.md");
     println!("```");
+}
+
+fn print_metrics_table(metrics: &[ChainMetrics]) {
+    println!("| Chain | Total Sequences | Perfect Sequences | Perfect % | Overall Accuracy | Correct Positions | Total Positions |");
+    println!("|-------|-----------------|-------------------|-----------|------------------|-------------------|-----------------|");
+    for m in metrics {
+        println!(
+            "| {:5} | {:15} | {:17} | {:8.2}% | {:15.2}% | {:17} | {:15} |",
+            m.chain.to_string(),
+            m.total_sequences,
+            m.perfect_sequences,
+            m.perfect_percentage(),
+            m.overall_accuracy(),
+            m.correct_positions,
+            m.total_positions
+        );
+    }
+    println!();
 }

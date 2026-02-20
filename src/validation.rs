@@ -101,6 +101,7 @@ impl ValidationResult {
 #[derive(Debug, Clone)]
 pub struct ChainMetrics {
     pub chain: Chain,
+    pub scheme: Scheme,
     pub csv_path: String,
     pub total_sequences: usize,
     pub perfect_sequences: usize,
@@ -109,9 +110,10 @@ pub struct ChainMetrics {
 }
 
 impl ChainMetrics {
-    pub fn new(chain: Chain, csv_path: String) -> Self {
+    pub fn new(chain: Chain, scheme: Scheme, csv_path: String) -> Self {
         Self {
             chain,
+            scheme,
             csv_path,
             total_sequences: 0,
             perfect_sequences: 0,
@@ -161,7 +163,7 @@ pub fn validate_chain_with_scheme(
     let entries = load_validation_csv(&path)?;
     let annotator = Annotator::new(&[chain], scheme)?;
 
-    let mut metrics = ChainMetrics::new(chain, csv_path.to_string());
+    let mut metrics = ChainMetrics::new(chain, scheme, csv_path.to_string());
 
     for entry in entries.iter() {
         // Apply species filter if provided

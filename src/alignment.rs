@@ -1,7 +1,6 @@
 //! Sequence alignment using Needleman-Wunsch algorithm
 
 use crate::error::{Error, Result};
-use crate::numbering::{imgt::get_imgt_numbering, kabat::get_kabat_numbering};
 use crate::scoring::PositionScores;
 
 /// Direction in the alignment traceback matrix
@@ -217,6 +216,7 @@ fn traceback(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::imgt::get_imgt_numbering;
     use crate::scoring::ScoringMatrix;
     use crate::Chain;
 
