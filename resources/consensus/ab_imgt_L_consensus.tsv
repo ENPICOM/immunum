@@ -1,120 +1,120 @@
-position	consensus_aas	frequencies	occupancy	max_freq	entropy	conservation_class	region	allows_insertion
-1	Q,S,N	0.650,0.186,0.079	0.462	0.650	1.637	rare	FR1	false
-2	S,Y,A,F,L	0.424,0.201,0.172,0.055,0.055	0.807	0.424	2.368	variable	FR1	false
-3	V,A,E	0.629,0.160,0.138	0.963	0.629	1.656	variable	FR1	false
-4	L,V	0.821,0.179	0.990	0.821	0.679	conserved	FR1	false
-5	T	0.974	0.997	0.974	0.226	highly_conserved	FR1	false
-6	Q	1.000	0.995	1.000	-0.000	highly_conserved	FR1	false
-7	P,E,S	0.742,0.185,0.055	1.000	0.742	1.131	conserved	FR1	false
-8	P,S,A	0.572,0.193,0.131	1.000	0.572	1.858	variable	FR1	false
-9	S,A	0.799,0.162	1.000	0.799	0.921	conserved	FR1	false
-11	V,A,L	0.650,0.180,0.170	1.000	0.650	1.284	variable	FR1	false
-12	S,T	0.843,0.157	1.000	0.843	0.626	conserved	FR1	false
-13	G,V,T,A,E	0.379,0.256,0.144,0.133,0.052	1.000	0.379	2.255	variable	FR1	false
-14	S,A,T	0.512,0.345,0.131	1.000	0.512	1.507	variable	FR1	false
-15	P,L	0.883,0.115	1.000	0.883	0.540	conserved	FR1	false
-16	G	0.984	1.000	0.984	0.136	highly_conserved	FR1	false
-17	Q,E,K	0.700,0.154,0.065	1.000	0.700	1.478	variable	FR1	false
-18	T,S,R,K	0.457,0.219,0.178,0.128	1.000	0.457	1.960	variable	FR1	false
-19	V,A,I	0.621,0.230,0.149	1.000	0.621	1.323	variable	FR1	false
-20	T,R,S	0.718,0.162,0.063	1.000	0.718	1.348	conserved	FR1	false
-21	I,L	0.775,0.204	1.000	0.775	0.886	conserved	FR1	false
-22	S,T	0.587,0.392	1.000	0.587	1.134	variable	FR1	false
-23	C	1.000	1.000	1.000	-0.000	highly_conserved	FR1	false
-24	S,T,R,G	0.392,0.282,0.167,0.094	1.000	0.392	2.197	variable	FR1	false
-25	G,S	0.757,0.157	1.000	0.757	1.136	conserved	FR1	false
-26	S,T,D,N	0.507,0.188,0.151,0.094	1.000	0.507	2.100	variable	FR1	false
-27	S,T,N,K	0.550,0.178,0.139,0.055	0.997	0.550	2.054	variable	CDR1	false
-28	S,G,L,I	0.462,0.207,0.136,0.100	0.995	0.462	2.252	variable	CDR1	false
-29	N,D,A,G	0.339,0.168,0.155,0.149	0.979	0.339	2.788	variable	CDR1	false
-30	I,V	0.493,0.411	0.736	0.493	1.557	variable	CDR1	false
-31	G,T	0.496,0.418	0.368	0.496	1.536	rare	CDR1	false
-35	G,T,A,S	0.535,0.223,0.112,0.082	0.702	0.535	1.871	variable	CDR1	false
-36	S,N,Y,D,G,T	0.347,0.160,0.144,0.096,0.067,0.051	0.979	0.347	2.927	variable	CDR1	false
-37	N,K,Y	0.529,0.166,0.121	0.992	0.529	2.340	variable	CDR1	false
-38	Y,S,F,T	0.522,0.144,0.094,0.079	0.995	0.522	2.410	variable	CDR1	false
-39	V,A	0.697,0.235	1.000	0.697	1.218	variable	FR2	false
-40	S,N,H,Y	0.423,0.209,0.151,0.076	1.000	0.423	2.499	variable	FR2	false
-41	W	1.000	1.000	1.000	-0.000	highly_conserved	FR2	false
-42	Y,V	0.815,0.144	1.000	0.815	0.904	conserved	FR2	false
-43	Q	0.971	1.000	0.971	0.229	highly_conserved	FR2	false
-44	Q,E	0.762,0.146	1.000	0.762	1.245	conserved	FR2	false
-45	K,L,H,R,F	0.355,0.209,0.164,0.107,0.055	1.000	0.355	2.626	variable	FR2	false
-46	P	0.932	1.000	0.932	0.439	highly_conserved	FR2	false
-47	G,D	0.812,0.144	1.000	0.812	0.910	conserved	FR2	false
-48	Q,K,T,H,S	0.251,0.235,0.227,0.141,0.055	1.000	0.251	2.587	variable	FR2	false
-49	A,L,S	0.692,0.136,0.084	1.000	0.692	1.545	variable	FR2	false
-50	P,F	0.849,0.149	1.000	0.849	0.632	conserved	FR2	false
-51	K,T,V,R	0.486,0.191,0.180,0.052	1.000	0.486	2.150	variable	FR2	false
-52	L,G,V	0.679,0.149,0.068	1.000	0.679	1.619	variable	FR2	false
-53	L,V,M,I	0.554,0.290,0.086,0.070	1.000	0.554	1.565	variable	FR2	false
-54	I,V,M	0.796,0.089,0.055	1.000	0.796	1.134	conserved	FR2	false
-55	Y,G,F	0.713,0.141,0.057	1.000	0.713	1.510	conserved	FR2	false
-56	D,G,E,R,Q	0.282,0.230,0.191,0.060,0.055	1.000	0.282	2.923	variable	CDR2	false
-57	D,N,V,T,K	0.295,0.232,0.170,0.149,0.057	1.000	0.295	2.674	variable	CDR2	false
-58	K,S,R,Q	0.600,0.267,0.067,0.067	0.039	0.600	1.472	rare	CDR2	false
-59	D	1.000	0.039	1.000	-0.000	rare	CDR2	false
-63	G,S	0.867,0.133	0.039	0.867	0.567	rare	CDR2	false
-64	S	1.000	0.039	1.000	-0.000	rare	CDR2	false
-65	N,S,T,D	0.496,0.225,0.089,0.081	1.000	0.496	2.259	variable	CDR2	false
-66	K,N,Q,D	0.290,0.274,0.136,0.091	1.000	0.290	2.805	variable	FR3	false
-67	R	0.935	1.000	0.935	0.485	highly_conserved	FR3	false
-68	P,A	0.762,0.144	1.000	0.762	1.242	conserved	FR3	false
-69	S,P	0.809,0.149	1.000	0.809	0.870	conserved	FR3	false
-70	G	0.966	1.000	0.966	0.276	highly_conserved	FR3	false
-71	V,I	0.577,0.392	1.000	0.577	1.177	variable	FR3	false
-72	P,S	0.822,0.178	1.000	0.822	0.675	conserved	FR3	false
-74	D,E,A,N	0.527,0.172,0.146,0.089	1.000	0.527	2.058	variable	FR3	false
-75	R	0.992	1.000	0.992	0.073	highly_conserved	FR3	false
-76	F	0.990	1.000	0.990	0.092	highly_conserved	FR3	false
-77	S	0.984	1.000	0.984	0.116	highly_conserved	FR3	false
-78	G	0.961	1.000	0.961	0.252	highly_conserved	FR3	false
-79	S	0.990	1.000	0.990	0.099	highly_conserved	FR3	false
-80	K,L,N,S	0.514,0.154,0.154,0.057	1.000	0.514	2.214	variable	FR3	false
-81	D	1.000	0.047	1.000	-0.000	rare	FR3	false
-82	S,R,A,T	0.667,0.167,0.111,0.056	0.047	0.667	1.405	rare	FR3	false
-83	S,I	0.838,0.141	0.997	0.838	0.766	conserved	FR3	false
-84	G	0.893	1.000	0.893	0.669	conserved	FR3	false
-85	N,T,D	0.460,0.326,0.117	1.000	0.460	1.935	variable	FR3	false
-86	S,T,K	0.384,0.358,0.157	1.000	0.384	2.063	variable	FR3	false
-87	A	0.950	1.000	0.950	0.352	highly_conserved	FR3	false
-88	S,T,A	0.486,0.303,0.157	1.000	0.486	1.747	variable	FR3	false
-89	L	1.000	1.000	1.000	-0.000	highly_conserved	FR3	false
-90	T,A,G	0.634,0.256,0.055	1.000	0.634	1.475	variable	FR3	false
-91	I	0.948	1.000	0.948	0.328	highly_conserved	FR3	false
-92	S,T	0.648,0.313	1.000	0.648	1.203	variable	FR3	false
-93	G,R	0.846,0.091	1.000	0.846	0.878	conserved	FR3	false
-94	L,A,V,T	0.569,0.209,0.097,0.086	1.000	0.569	1.781	variable	FR3	false
-95	Q,E,R	0.783,0.091,0.068	1.000	0.783	1.162	conserved	FR3	false
-96	A,T,S,P	0.389,0.305,0.185,0.086	1.000	0.389	2.016	variable	FR3	false
-97	E,G	0.695,0.209	1.000	0.695	1.346	variable	FR3	false
-98	D	1.000	1.000	1.000	-0.000	highly_conserved	FR3	false
-99	E	0.969	1.000	0.969	0.201	highly_conserved	FR3	false
-100	A	0.937	1.000	0.937	0.411	highly_conserved	FR3	false
-101	D,I,E	0.700,0.162,0.063	1.000	0.700	1.545	variable	FR3	false
-102	Y	1.000	1.000	1.000	-0.000	highly_conserved	FR3	false
-103	Y,F	0.768,0.193	1.000	0.768	0.956	conserved	FR3	false
-104	C	1.000	1.000	1.000	-0.000	highly_conserved	FR3	false
-105	A,Q,S,G	0.366,0.243,0.149,0.107	1.000	0.366	2.602	variable	CDR3	false
-106	S,A,L,T,V	0.381,0.164,0.159,0.157,0.128	1.000	0.381	2.264	variable	CDR3	false
-107	W,Y	0.590,0.227	1.000	0.590	1.934	variable	CDR3	false
-108	D,Y,T,A	0.608,0.128,0.089,0.065	1.000	0.608	2.103	variable	CDR3	false
-109	S,D,G,T	0.444,0.197,0.093,0.080	0.982	0.444	2.620	variable	CDR3	false
-110	S,I	0.711,0.063	0.496	0.711	1.790	rare	CDR3	false
-111	K,T,R,G,L	0.700,0.100,0.100,0.050,0.050	0.052	0.700	1.457	rare	CDR3	true
-112	L,G,E,S	0.328,0.250,0.172,0.109	0.167	0.328	2.434	rare	CDR3	true
-113	S,L,T,N,G	0.302,0.247,0.098,0.073,0.062	0.718	0.302	3.010	variable	CDR3	false
-114	N,S,R,D,G,T	0.275,0.238,0.079,0.073,0.060,0.052	0.997	0.275	3.230	variable	CDR3	false
-115	H,G,T,A,S,D,N,V	0.204,0.146,0.097,0.094,0.084,0.060,0.057,0.052	1.000	0.204	3.619	variable	CDR3	false
-116	W,V,Y,L,R,S,F	0.272,0.180,0.110,0.078,0.065,0.063,0.057	1.000	0.272	3.334	variable	CDR3	false
-117	V,I,L	0.802,0.084,0.078	1.000	0.802	1.095	conserved	CDR3	false
-118	F	1.000	1.000	1.000	-0.000	highly_conserved	FR4	false
-119	G	1.000	1.000	1.000	-0.000	highly_conserved	FR4	false
-120	G,T,S	0.770,0.159,0.052	1.000	0.770	1.069	conserved	FR4	false
-121	G	1.000	1.000	1.000	-0.000	highly_conserved	FR4	false
-122	T	0.997	1.000	0.997	0.026	highly_conserved	FR4	false
-123	K,R	0.838,0.070	1.000	0.838	0.997	conserved	FR4	false
-124	L,V	0.739,0.258	1.000	0.739	0.849	conserved	FR4	false
-125	T	0.945	1.000	0.945	0.416	highly_conserved	FR4	false
-126	V	0.971	1.000	0.971	0.225	highly_conserved	FR4	false
-127	L	0.922	0.974	0.922	0.590	highly_conserved	FR4	false
+position	consensus_aas	frequencies	occupancy	region	allows_insertion
+1	Q,S,N	0.650,0.186,0.079	0.462	FR1	false
+2	S,Y,A,F,L	0.424,0.201,0.172,0.055,0.055	0.807	FR1	false
+3	V,A,E	0.629,0.160,0.138	0.963	FR1	false
+4	L,V	0.821,0.179	0.990	FR1	false
+5	T	0.974	0.997	FR1	false
+6	Q	1.000	0.995	FR1	false
+7	P,E,S	0.742,0.185,0.055	1.000	FR1	false
+8	P,S,A	0.572,0.193,0.131	1.000	FR1	false
+9	S,A	0.799,0.162	1.000	FR1	false
+11	V,A,L	0.650,0.180,0.170	1.000	FR1	false
+12	S,T	0.843,0.157	1.000	FR1	false
+13	G,V,T,A,E	0.379,0.256,0.144,0.133,0.052	1.000	FR1	false
+14	S,A,T	0.512,0.345,0.131	1.000	FR1	false
+15	P,L	0.883,0.115	1.000	FR1	false
+16	G	0.984	1.000	FR1	false
+17	Q,E,K	0.700,0.154,0.065	1.000	FR1	false
+18	T,S,R,K	0.457,0.219,0.178,0.128	1.000	FR1	false
+19	V,A,I	0.621,0.230,0.149	1.000	FR1	false
+20	T,R,S	0.718,0.162,0.063	1.000	FR1	false
+21	I,L	0.775,0.204	1.000	FR1	false
+22	S,T	0.587,0.392	1.000	FR1	false
+23	C	1.000	1.000	FR1	false
+24	S,T,R,G	0.392,0.282,0.167,0.094	1.000	FR1	false
+25	G,S	0.757,0.157	1.000	FR1	false
+26	S,T,D,N	0.507,0.188,0.151,0.094	1.000	FR1	false
+27	S,T,N,K	0.550,0.178,0.139,0.055	0.997	CDR1	false
+28	S,G,L,I	0.462,0.207,0.136,0.100	0.995	CDR1	false
+29	N,D,A,G	0.339,0.168,0.155,0.149	0.979	CDR1	false
+30	I,V	0.493,0.411	0.736	CDR1	false
+31	G,T	0.496,0.418	0.368	CDR1	false
+35	G,T,A,S	0.535,0.223,0.112,0.082	0.702	CDR1	false
+36	S,N,Y,D,G,T	0.347,0.160,0.144,0.096,0.067,0.051	0.979	CDR1	false
+37	N,K,Y	0.529,0.166,0.121	0.992	CDR1	false
+38	Y,S,F,T	0.522,0.144,0.094,0.079	0.995	CDR1	false
+39	V,A	0.697,0.235	1.000	FR2	false
+40	S,N,H,Y	0.423,0.209,0.151,0.076	1.000	FR2	false
+41	W	1.000	1.000	FR2	false
+42	Y,V	0.815,0.144	1.000	FR2	false
+43	Q	0.971	1.000	FR2	false
+44	Q,E	0.762,0.146	1.000	FR2	false
+45	K,L,H,R,F	0.355,0.209,0.164,0.107,0.055	1.000	FR2	false
+46	P	0.932	1.000	FR2	false
+47	G,D	0.812,0.144	1.000	FR2	false
+48	Q,K,T,H,S	0.251,0.235,0.227,0.141,0.055	1.000	FR2	false
+49	A,L,S	0.692,0.136,0.084	1.000	FR2	false
+50	P,F	0.849,0.149	1.000	FR2	false
+51	K,T,V,R	0.486,0.191,0.180,0.052	1.000	FR2	false
+52	L,G,V	0.679,0.149,0.068	1.000	FR2	false
+53	L,V,M,I	0.554,0.290,0.086,0.070	1.000	FR2	false
+54	I,V,M	0.796,0.089,0.055	1.000	FR2	false
+55	Y,G,F	0.713,0.141,0.057	1.000	FR2	false
+56	D,G,E,R,Q	0.282,0.230,0.191,0.060,0.055	1.000	CDR2	false
+57	D,N,V,T,K	0.295,0.232,0.170,0.149,0.057	1.000	CDR2	false
+58	K,S,R,Q	0.600,0.267,0.067,0.067	0.039	CDR2	false
+59	D	1.000	0.039	CDR2	false
+63	G,S	0.867,0.133	0.039	CDR2	false
+64	S	1.000	0.039	CDR2	false
+65	N,S,T,D	0.496,0.225,0.089,0.081	1.000	CDR2	false
+66	K,N,Q,D	0.290,0.274,0.136,0.091	1.000	FR3	false
+67	R	0.935	1.000	FR3	false
+68	P,A	0.762,0.144	1.000	FR3	false
+69	S,P	0.809,0.149	1.000	FR3	false
+70	G	0.966	1.000	FR3	false
+71	V,I	0.577,0.392	1.000	FR3	false
+72	P,S	0.822,0.178	1.000	FR3	false
+74	D,E,A,N	0.527,0.172,0.146,0.089	1.000	FR3	false
+75	R	0.992	1.000	FR3	false
+76	F	0.990	1.000	FR3	false
+77	S	0.984	1.000	FR3	false
+78	G	0.961	1.000	FR3	false
+79	S	0.990	1.000	FR3	false
+80	K,L,N,S	0.514,0.154,0.154,0.057	1.000	FR3	false
+81	D	1.000	0.047	FR3	false
+82	S,R,A,T	0.667,0.167,0.111,0.056	0.047	FR3	false
+83	S,I	0.838,0.141	0.997	FR3	false
+84	G	0.893	1.000	FR3	false
+85	N,T,D	0.460,0.326,0.117	1.000	FR3	false
+86	S,T,K	0.384,0.358,0.157	1.000	FR3	false
+87	A	0.950	1.000	FR3	false
+88	S,T,A	0.486,0.303,0.157	1.000	FR3	false
+89	L	1.000	1.000	FR3	false
+90	T,A,G	0.634,0.256,0.055	1.000	FR3	false
+91	I	0.948	1.000	FR3	false
+92	S,T	0.648,0.313	1.000	FR3	false
+93	G,R	0.846,0.091	1.000	FR3	false
+94	L,A,V,T	0.569,0.209,0.097,0.086	1.000	FR3	false
+95	Q,E,R	0.783,0.091,0.068	1.000	FR3	false
+96	A,T,S,P	0.389,0.305,0.185,0.086	1.000	FR3	false
+97	E,G	0.695,0.209	1.000	FR3	false
+98	D	1.000	1.000	FR3	false
+99	E	0.969	1.000	FR3	false
+100	A	0.937	1.000	FR3	false
+101	D,I,E	0.700,0.162,0.063	1.000	FR3	false
+102	Y	1.000	1.000	FR3	false
+103	Y,F	0.768,0.193	1.000	FR3	false
+104	C	1.000	1.000	FR3	false
+105	A,Q,S,G	0.366,0.243,0.149,0.107	1.000	CDR3	false
+106	S,A,L,T,V	0.381,0.164,0.159,0.157,0.128	1.000	CDR3	false
+107	W,Y	0.590,0.227	1.000	CDR3	false
+108	D,Y,T,A	0.608,0.128,0.089,0.065	1.000	CDR3	false
+109	S,D,G,T	0.444,0.197,0.093,0.080	0.982	CDR3	false
+110	S,I	0.711,0.063	0.496	CDR3	false
+111	K,T,R,G,L	0.700,0.100,0.100,0.050,0.050	0.052	CDR3	true
+112	L,G,E,S	0.328,0.250,0.172,0.109	0.167	CDR3	true
+113	S,L,T,N,G	0.302,0.247,0.098,0.073,0.062	0.718	CDR3	false
+114	N,S,R,D,G,T	0.275,0.238,0.079,0.073,0.060,0.052	0.997	CDR3	false
+115	H,G,T,A,S,D,N,V	0.204,0.146,0.097,0.094,0.084,0.060,0.057,0.052	1.000	CDR3	false
+116	W,V,Y,L,R,S,F	0.272,0.180,0.110,0.078,0.065,0.063,0.057	1.000	CDR3	false
+117	V,I,L	0.802,0.084,0.078	1.000	CDR3	false
+118	F	1.000	1.000	FR4	false
+119	G	1.000	1.000	FR4	false
+120	G,T,S	0.770,0.159,0.052	1.000	FR4	false
+121	G	1.000	1.000	FR4	false
+122	T	0.997	1.000	FR4	false
+123	K,R	0.838,0.070	1.000	FR4	false
+124	L,V	0.739,0.258	1.000	FR4	false
+125	T	0.945	1.000	FR4	false
+126	V	0.971	1.000	FR4	false
+127	L	0.922	0.974	FR4	false

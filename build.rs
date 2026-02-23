@@ -149,7 +149,6 @@ struct PositionData {
     position: u32,
     aa_frequencies: Vec<(char, f32)>,
     occupancy: f32,
-    conservation_class: String,
     region: String,
     allows_insertion: bool,
 }
@@ -163,7 +162,7 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
 
     for line in lines {
         let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() < 9 {
+        if parts.len() < 6 {
             continue;
         }
 
@@ -177,9 +176,8 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
         let aas_field = parts[1];
         let freq_field = parts[2];
         let occupancy: f32 = parts[3].parse().unwrap_or(1.0);
-        let conservation_class = parts[6].to_string();
-        let region = parts[7].to_string();
-        let allows_insertion: bool = parts[8] == "true";
+        let region = parts[4].to_string();
+        let allows_insertion: bool = parts[5] == "true";
 
         let aas: Vec<&str> = aas_field.split(',').collect();
         let freqs: Vec<f32> = freq_field
@@ -203,7 +201,7 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
             position,
             aa_frequencies,
             occupancy,
-            conservation_class,
+
             region,
             allows_insertion,
         });
@@ -226,10 +224,15 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
         }
 
         // Calculate gap penalties with region-specific and conservation-based penalties
+        let max_freq = pos_data
+            .aa_frequencies
+            .first()
+            .map(|(_, f)| *f)
+            .unwrap_or(0.0);
         let (gap_penalty, insertion_penalty) = calculate_gap_penalties(
             pos_data.occupancy,
+            max_freq,
             &pos_data.region,
-            &pos_data.conservation_class,
             pos_data.allows_insertion,
         );
 
@@ -288,8 +291,8 @@ fn calculate_position_scores(aa_frequencies: &[(char, f32)]) -> [f32; 20] {
 /// In a CDR the gap penalty is always much lower than a FR region
 fn calculate_gap_penalties(
     occupancy: f32,
+    max_freq: f32,
     region: &str,
-    conservation_class: &str,
     allows_insertion: bool,
 ) -> (f32, f32) {
     let is_cdr = matches!(region, "CDR1" | "CDR2" | "CDR3");
@@ -303,10 +306,12 @@ fn calculate_gap_penalties(
 
     // Conservation multiplier: increase penalty significantly for conserved positions
     // This forces the alignment to respect conserved anchor points in FR regions
-    let conservation_multiplier = match conservation_class {
-        "highly_conserved" => HIGHLY_CONSERVED_MULTIPLIER,
-        "conserved" => CONSERVED_MULTIPLIER,
-        _ => VARIABLE_MULTIPLIER,
+    let conservation_multiplier = if occupancy >= 0.5 && max_freq >= 0.9 {
+        HIGHLY_CONSERVED_MULTIPLIER
+    } else if occupancy >= 0.5 && max_freq >= 0.7 {
+        CONSERVED_MULTIPLIER
+    } else {
+        VARIABLE_MULTIPLIER
     };
 
     // Gap penalty: scale by occupancy and conservation
