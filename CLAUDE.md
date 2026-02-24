@@ -64,7 +64,7 @@ Validation datasets with expected IMGT numbering for testing:
 Consensus sequences with amino acid frequencies, conservation scores, and penalties:
 - **ab_imgt_{H,K,L}_consensus.tsv**: IMGT antibody consensus sequences
 - **tcr_imgt_{A,B,D,G}_consensus.tsv**: IMGT TCR consensus sequences
-- Format: position, amino acids, frequencies, occupancy, gaps, penalties, conservation class, region, allows_insertion
+- Format: position, consensus_aas, frequencies, occupancy, region
 
 ## Python Scripts (`scripts/`)
 

@@ -18,7 +18,9 @@ const VARIABLE_MULTIPLIER: f32 = 1.0;
 
 const NO_INSERTION_PENALTY: f32 = -50.0;
 const CDR_INSERTION_PENALTY: f32 = -3.0;
-const FR_INSERTION_PENALTY: f32 = -15.0;
+
+// IMGT CDR center positions where insertions are absorbed
+const CDR_CENTER_POSITIONS: &[u32] = &[32, 33, 60, 61, 111, 112];
 
 // BLOSUM62 matrix (20x20 for standard amino acids)
 const BLOSUM62: [[i8; 20]; 20] = [
@@ -150,7 +152,6 @@ struct PositionData {
     aa_frequencies: Vec<(char, f32)>,
     occupancy: f32,
     region: String,
-    allows_insertion: bool,
 }
 
 fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
@@ -162,7 +163,7 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
 
     for line in lines {
         let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() < 6 {
+        if parts.len() < 5 {
             continue;
         }
 
@@ -177,7 +178,6 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
         let freq_field = parts[2];
         let occupancy: f32 = parts[3].parse().unwrap_or(1.0);
         let region = parts[4].to_string();
-        let allows_insertion: bool = parts[5] == "true";
 
         let aas: Vec<&str> = aas_field.split(',').collect();
         let freqs: Vec<f32> = freq_field
@@ -201,9 +201,7 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
             position,
             aa_frequencies,
             occupancy,
-
             region,
-            allows_insertion,
         });
     }
 
@@ -230,10 +228,10 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
             .map(|(_, f)| *f)
             .unwrap_or(0.0);
         let (gap_penalty, insertion_penalty) = calculate_gap_penalties(
+            pos_data.position,
             pos_data.occupancy,
             max_freq,
             &pos_data.region,
-            pos_data.allows_insertion,
         );
 
         position_scores.push(PositionScores {
@@ -287,13 +285,13 @@ fn calculate_position_scores(aa_frequencies: &[(char, f32)]) -> [f32; 20] {
 
 /// Return the calculated gap penalty and insertion penalty.
 /// Gap penalty reduced in low occupancy positions, but increased in highly conserved positions.
-/// Insertion penalty should be very high in places that dont allow insertions
-/// In a CDR the gap penalty is always much lower than a FR region
+/// Insertion penalty is permissive only at CDR center positions where length variation is absorbed.
+/// In a CDR the gap penalty is always much lower than a FR region.
 fn calculate_gap_penalties(
+    position: u32,
     occupancy: f32,
     max_freq: f32,
     region: &str,
-    allows_insertion: bool,
 ) -> (f32, f32) {
     let is_cdr = matches!(region, "CDR1" | "CDR2" | "CDR3");
 
@@ -319,13 +317,12 @@ fn calculate_gap_penalties(
     // High conservation -> more negative (less permissive)
     let gap_penalty = base_gap_penalty * occupancy * conservation_multiplier;
 
-    // Insertion penalty: very high when not allowed, moderate in CDRs, high in FRs
-    let insertion_penalty = if !allows_insertion {
-        NO_INSERTION_PENALTY
-    } else if is_cdr {
+    // Insertion penalty: permissive at CDR center positions, harsh everywhere else
+    let is_cdr_center = is_cdr && CDR_CENTER_POSITIONS.contains(&position);
+    let insertion_penalty = if is_cdr_center {
         CDR_INSERTION_PENALTY
     } else {
-        FR_INSERTION_PENALTY
+        NO_INSERTION_PENALTY
     };
 
     (gap_penalty, insertion_penalty)
