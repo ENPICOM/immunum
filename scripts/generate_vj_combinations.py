@@ -165,18 +165,34 @@ def main() -> None:
         help="Minimum percent identity to keep a sequence (default: 0.7)",
     )
     args = parser.parse_args()
+    generate_vj_combinations(
+        v_fasta=args.v_fasta,
+        j_fasta=args.j_fasta,
+        output_dir=args.output_dir,
+        include_pseudo=args.include_pseudo,
+        min_identity=args.min_identity,
+    )
 
-    allowed_func = None if args.include_pseudo else {"F"}
 
-    v_by_chain = parse_genes(args.v_fasta, translate_v, allowed_func)
-    j_by_chain = parse_genes(args.j_fasta, translate_j, allowed_func)
+def generate_vj_combinations(
+    v_fasta: Path,
+    j_fasta: Path,
+    output_dir: Path,
+    include_pseudo: bool = False,
+    min_identity: float = 0.7,
+) -> None:
+
+    allowed_func = None if include_pseudo else {"F"}
+
+    v_by_chain = parse_genes(v_fasta, translate_v, allowed_func)
+    j_by_chain = parse_genes(j_fasta, translate_j, allowed_func)
 
     common_chains = sorted(set(v_by_chain) & set(j_by_chain))
     if not common_chains:
         print("No matching chains found between V and J files.")
         return
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     for chain in common_chains:
         v_genes, j_genes = v_by_chain[chain], j_by_chain[chain]
@@ -189,10 +205,10 @@ def main() -> None:
         )
 
         print("  Numbering with ANARCI...")
-        gapped = number_sequences(combos, chain, min_identity=args.min_identity)
+        gapped = number_sequences(combos, chain, min_identity=min_identity)
         print(f"  {len(gapped)} sequences numbered successfully")
 
-        out_path = args.output_dir / f"{chain}_VJ_combinations.fasta"
+        out_path = output_dir / f"{chain}_VJ_combinations.fasta"
         with open(out_path, "w") as f:
             for gene in gapped:
                 f.write(f">{gene.name}\n{gene.protein}\n")

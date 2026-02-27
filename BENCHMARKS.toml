@@ -1,17 +1,17 @@
 last_updated = "2026-02-27"
-execution_time_secs = 1.74
+execution_time_secs = 2.15
 
 [imgt.IGH]
 total_sequences = 2452
-perfect_sequences = 2450
-perfect_pct = 99.92
+perfect_sequences = 2449
+perfect_pct = 99.88
 overall_accuracy = 100.0
 
 [imgt.IGK]
 total_sequences = 1485
-perfect_sequences = 1478
-perfect_pct = 99.53
-overall_accuracy = 99.98
+perfect_sequences = 1481
+perfect_pct = 99.73
+overall_accuracy = 99.99
 
 [imgt.IGL]
 total_sequences = 371
@@ -21,15 +21,15 @@ overall_accuracy = 99.99
 
 [imgt.TRA]
 total_sequences = 865
-perfect_sequences = 761
-perfect_pct = 87.98
-overall_accuracy = 99.4
+perfect_sequences = 763
+perfect_pct = 88.21
+overall_accuracy = 99.49
 
 [imgt.TRB]
 total_sequences = 934
 perfect_sequences = 911
 perfect_pct = 97.54
-overall_accuracy = 99.8
+overall_accuracy = 99.79
 
 [imgt.TRD]
 total_sequences = 23
@@ -39,9 +39,9 @@ overall_accuracy = 100.0
 
 [imgt.TRG]
 total_sequences = 25
-perfect_sequences = 25
-perfect_pct = 100.0
-overall_accuracy = 100.0
+perfect_sequences = 24
+perfect_pct = 96.0
+overall_accuracy = 99.96
 
 [kabat.IGH]
 total_sequences = 2452
@@ -49,8 +49,14 @@ perfect_sequences = 2449
 perfect_pct = 99.88
 overall_accuracy = 100.0
 
+[kabat.IGK]
+total_sequences = 1485
+perfect_sequences = 1480
+perfect_pct = 99.66
+overall_accuracy = 99.99
+
 [kabat.IGL]
 total_sequences = 371
-perfect_sequences = 329
-perfect_pct = 88.68
-overall_accuracy = 99.69
+perfect_sequences = 369
+perfect_pct = 99.46
+overall_accuracy = 99.99

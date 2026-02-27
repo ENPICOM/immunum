@@ -123,12 +123,10 @@ def generate_from_csv(input_path: Path, output_path: Path) -> None:
 def generate_from_fasta(input_paths: list[Path], output_path: Path) -> None:
     """Generate consensus from one or more IMGT-aligned FASTA files."""
     dfs = []
-    for path in input_paths:
-        print(f"  Loading {path}")
-        df = load_aligned_fasta(path)
-        print(f"  {len(df)} sequences")
+    for input_path in input_paths:
+        df = load_aligned_fasta(input_path)
+        print(f"  {len(df)} sequences from {input_path}")
         dfs.append(df)
-
     df = pd.concat(dfs, ignore_index=True)
     print(f"  Total: {len(df)} sequences")
 
@@ -147,7 +145,7 @@ def main() -> None:
     fasta_parser = subparsers.add_parser(
         "fasta", help="From IMGT-aligned FASTA file(s)"
     )
-    fasta_parser.add_argument("input", type=Path, nargs="+", help="Input FASTA file(s)")
+    fasta_parser.add_argument("input", type=Path, help="Input FASTA file")
     fasta_parser.add_argument("output", type=Path, help="Output consensus CSV file")
 
     args = parser.parse_args()
