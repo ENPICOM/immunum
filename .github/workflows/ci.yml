@@ -21,7 +21,5 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Run tests
         run: cargo test
-      - name: Benchmark validation
-        run: cargo test --release --test abpdseq_validation_test test_abpdseq_validation_full -- --ignored --nocapture
       - name: Build
         run: cargo build

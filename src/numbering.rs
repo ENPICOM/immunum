@@ -1,0 +1,168 @@
+pub mod imgt;
+pub mod kabat;
+
+use crate::alignment::AlignedPosition;
+use crate::types::{Insertion, NumberingRule, Position};
+
+/// Apply numbering directly to alignment results using numbering rules
+///
+/// Processes alignment in two phases:
+/// 1. Extract consensus positions from alignment (skipping gaps)
+/// 2. Apply rule-based numbering scheme
+pub fn apply_numbering(
+    aligned_positions: &[AlignedPosition],
+    rules: &[NumberingRule],
+) -> Vec<Position> {
+    let consensus_positions = extract_consensus_positions(aligned_positions);
+    number_by_rules(&consensus_positions, rules)
+}
+
+/// Extract consensus position for each residue from alignment
+///
+/// Returns a position for each residue (non-gap) in the alignment.
+/// Insertions inherit the position of the preceding aligned residue.
+pub(crate) fn extract_consensus_positions(aligned: &[AlignedPosition]) -> Vec<u8> {
+    let mut positions = Vec::with_capacity(aligned.len());
+    let mut last_pos: u8 = 0;
+
+    for ap in aligned {
+        match ap {
+            AlignedPosition::QueryGap => {} // No residue, skip
+            AlignedPosition::Aligned(pos) => {
+                positions.push(*pos);
+                last_pos = *pos;
+            }
+            AlignedPosition::Insertion => {
+                positions.push(last_pos); // Inherit from previous
+            }
+        }
+    }
+
+    positions
+}
+
+/// Apply rule-based numbering to consensus positions
+fn number_by_rules(consensus_positions: &[u8], rules: &[NumberingRule]) -> Vec<Position> {
+    let mut numbered_positions = Vec::with_capacity(consensus_positions.len());
+    let mut idx = 0;
+
+    for rule in rules {
+        let rule_start = idx;
+
+        // Find all positions belonging to this rule's source range
+        while idx < consensus_positions.len() && rule.contains(consensus_positions[idx]) {
+            idx += 1;
+        }
+
+        let rule_len = idx - rule_start;
+        if rule_len == 0 {
+            continue;
+        }
+
+        match rule.insertion {
+            Insertion::None => {
+                numbered_positions.extend(number_with_offset(
+                    &consensus_positions[rule_start..idx],
+                    rule.align_start,
+                    rule.num_start,
+                ));
+            }
+            _ => {
+                numbered_positions.extend(number_with_config(rule_len, rule));
+            }
+        }
+    }
+
+    numbered_positions
+}
+
+/// Apply offset numbering to a region, handling insertions
+fn number_with_offset(positions: &[u8], align_start: u8, num_start: u8) -> Vec<Position> {
+    let mut result = Vec::with_capacity(positions.len());
+    let mut last_align_pos: Option<u8> = None;
+    let mut insertion_count = 0u8;
+
+    for &pos in positions {
+        if Some(pos) == last_align_pos {
+            // Same position as previous = insertion
+            insertion_count += 1;
+            let dst_pos = pos.wrapping_sub(align_start).wrapping_add(num_start);
+            result.push(Position::with_insertion(
+                dst_pos,
+                (b'A' + insertion_count - 1) as char,
+            ));
+        } else {
+            // New position
+            let dst_pos = pos.wrapping_sub(align_start).wrapping_add(num_start);
+            result.push(Position::new(dst_pos));
+            last_align_pos = Some(pos);
+            insertion_count = 0;
+        }
+    }
+
+    result
+}
+
+/// Generate positions for a CDR region based on its length and rule
+///
+/// Handles both deletions (len < base range) and insertions (len > base range).
+pub fn number_with_config(len: usize, rule: &NumberingRule) -> Vec<Position> {
+    if len == 0 {
+        return Vec::new();
+    }
+
+    let base_len = (rule.num_end - rule.num_start + 1) as usize;
+    let mut result = Vec::with_capacity(len);
+
+    if len <= base_len {
+        // Deletions: select which base positions to keep
+        let to_remove = base_len - len;
+
+        // Build a mask of positions to skip
+        let skip_set: &[u8] = &rule.deletion_order[..to_remove];
+        for pos in rule.num_start..=rule.num_end {
+            if !skip_set.contains(&pos) {
+                result.push(Position::new(pos));
+            }
+        }
+    } else {
+        // Insertions: all base positions plus extra with letters
+        let extra = len - base_len;
+
+        match rule.insertion {
+            Insertion::Sequential(insertion_pos) => {
+                for pos in rule.num_start..=rule.num_end {
+                    result.push(Position::new(pos));
+                    if pos == insertion_pos {
+                        for i in 0..extra {
+                            result.push(Position::with_insertion(pos, (b'A' + i as u8) as char));
+                        }
+                    }
+                }
+            }
+            Insertion::Symmetric { left, right } => {
+                let insertions_left = extra / 2;
+                let insertions_right = extra.div_ceil(2);
+
+                for pos in rule.num_start..=rule.num_end {
+                    if pos == left {
+                        result.push(Position::new(pos));
+                        // Left insertions: A, B, C...
+                        for i in 0..insertions_left {
+                            result.push(Position::with_insertion(left, (b'A' + i as u8) as char));
+                        }
+                        // Right insertions: ...B, A (reverse order)
+                        for i in (0..insertions_right).rev() {
+                            result.push(Position::with_insertion(right, (b'A' + i as u8) as char));
+                        }
+                    } else {
+                        result.push(Position::new(pos));
+                    }
+                }
+            }
+            Insertion::None => unreachable!("offset rules handled separately"),
+        }
+    }
+
+    result
+}
