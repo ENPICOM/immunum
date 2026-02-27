@@ -2,9 +2,7 @@
 
 use immunum::annotator::Annotator;
 use immunum::types::{Chain, Scheme};
-use immunum::validation::{
-    load_validation_csv, validate_entry, ValidationEntry, ValidationResult,
-};
+use immunum::validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
 use immunum::Position;
 use std::env;
 use std::path::PathBuf;
