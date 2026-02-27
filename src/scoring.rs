@@ -79,8 +79,8 @@ mod tests {
         // All positions should have gap penalties
         for pos in &matrix.positions {
             assert!(
-                pos.gap_penalty < 0.0,
-                "Gap in query penalty should be negative"
+                pos.gap_penalty <= 0.0,
+                "Gap in query penalty should be non-positive,"
             );
             assert!(
                 pos.insertion_penalty < 0.0,

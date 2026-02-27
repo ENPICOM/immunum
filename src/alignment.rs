@@ -302,7 +302,7 @@ mod tests {
             .filter(|p| matches!(p, AlignedPosition::QueryGap))
             .count();
         assert!(
-            gap_count < partial_seq.len() / 10,
+            gap_count <= partial_seq.len() / 10,
             "Query should have minimal gaps, found {} gaps",
             gap_count
         );

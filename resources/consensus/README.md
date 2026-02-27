@@ -11,13 +11,13 @@ The script takes IMGT-numbered sequences (from CSV or IMGT-aligned FASTA) and co
 3. **Region assignment** — maps each position to its IMGT region (FR1–FR4, CDR1–CDR3)
 4. **End cleaning** (optional) — removes gap entries at sequence edges and renormalizes frequencies to occupancy 1.0
 
-## Output format (TSV)
+## Output format (CSV)
 
 | Column          | Description                                        |
 |-----------------|----------------------------------------------------|
 | `position`      | IMGT position number                               |
-| `consensus_aas` | Comma-separated AAs sorted by frequency descending |
-| `frequencies`   | Corresponding frequencies                          |
+| `consensus_aas` | Pipe-separated AAs sorted by frequency descending  |
+| `frequencies`   | Corresponding pipe-separated frequencies           |
 | `occupancy`     | Fraction of sequences with a residue here          |
 | `region`        | IMGT region (FR1, CDR1, FR2, CDR2, FR3, CDR3, FR4)|
 
@@ -27,5 +27,3 @@ We currently have consensus files from two sources:
 - **RepSeqIO**: derived from IMGT-aligned RepSeqIO germline genes (version 1.9)
 
 Scripts to generate these files are in the scripts/ directory, and can be generate with any raw fasta receptors, separate V and J gene files, or prenumbered IMGT-aligned fasta files. The script will automatically assign IMGT positions and regions, and compute the consensus statistics.
-
-# TODO move script to this repo

@@ -94,7 +94,7 @@ fn main() {
     let matrix_out = Path::new(&out_dir).join("matrices");
     fs::create_dir_all(&matrix_out).unwrap();
 
-    // Map of chain names to their TSV files
+    // Map of chain names to their CSV files
     let chains = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"];
 
     // let consensus_source = "pdb";
@@ -102,22 +102,22 @@ fn main() {
     let consensus_source = "repseqio";
 
     for chain in &chains {
-        let tsv_path = Path::new(&manifest_dir)
+        let csv_path = Path::new(&manifest_dir)
             .join("resources")
             .join("consensus")
             .join(consensus_source)
-            .join(format!("{}.tsv", chain));
+            .join(format!("{}.csv", chain));
 
-        println!("cargo:rerun-if-changed={}", tsv_path.display());
+        println!("cargo:rerun-if-changed={}", csv_path.display());
 
-        if !tsv_path.exists() {
-            eprintln!("Warning: {} not found, skipping", tsv_path.display());
+        if !csv_path.exists() {
+            eprintln!("Warning: {} not found, skipping", csv_path.display());
             continue;
         }
 
-        // Read and process TSV
-        let content = fs::read_to_string(&tsv_path).unwrap();
-        let positions = process_consensus_tsv(&content);
+        // Read and process CSV
+        let content = fs::read_to_string(&csv_path).unwrap();
+        let positions = process_consensus_csv(&content);
 
         // Generate JSON scoring matrix
         let output_path = matrix_out.join(format!("{}.json", chain));
@@ -151,7 +151,7 @@ struct PositionData {
     region: String,
 }
 
-fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
+fn process_consensus_csv(content: &str) -> Vec<PositionData> {
     let mut positions = Vec::new();
 
     let mut lines = content.lines();
@@ -159,7 +159,7 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
     lines.next();
 
     for line in lines {
-        let parts: Vec<&str> = line.split('\t').collect();
+        let parts: Vec<&str> = line.split(',').collect();
         if parts.len() < 5 {
             continue;
         }
@@ -176,9 +176,9 @@ fn process_consensus_tsv(content: &str) -> Vec<PositionData> {
         let occupancy: f32 = parts[3].parse().unwrap_or(1.0);
         let region = parts[4].to_string();
 
-        let aas: Vec<&str> = aas_field.split(',').collect();
+        let aas: Vec<&str> = aas_field.split('|').collect();
         let freqs: Vec<f32> = freq_field
-            .split(',')
+            .split('|')
             .filter_map(|s| s.parse().ok())
             .collect();
 

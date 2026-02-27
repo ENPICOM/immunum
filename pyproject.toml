@@ -1,19 +1,15 @@
 [project]
-name = "immunum2"
+name = "immunum"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "anarci",
-    "antpack==0.3.8.6",
-    "biopython",
-    "pandas",
-    "mypy",
-    "pandas-stubs",
-    "matplotlib",
-    "seaborn",
-]
 
-[tool.uv.sources]
-anarci = { path = "data/anarci-1.3-py3-none-any.whl" }
+[dependency-groups]
+dev = [
+    "antpack==0.3.8",
+    "pandas>=2.3.3",
+    "pandas-stubs>=2.3.3.251219",
+    "ruff>=0.15.4",
+    "ty>=0.0.19",
+]

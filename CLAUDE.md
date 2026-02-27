@@ -44,7 +44,7 @@
 - **benchmark.rs**: Generate validation metrics report (writes BENCHMARKS.toml, prints deltas)
 
 ### Build System
-- **build.rs**: Compile-time generation of scoring matrices from TSV consensus files with region-aware gap/insertion penalties
+- **build.rs**: Compile-time generation of scoring matrices from CSV consensus files with region-aware gap/insertion penalties
   - Penalty constants at top of file for easy tuning
   - Uses BLOSUM62 for amino acid substitution scores
 
@@ -62,15 +62,15 @@ Validation datasets with expected IMGT numbering for testing:
 
 ### Resources (`resources/consensus/`)
 Consensus sequences with amino acid frequencies, conservation scores, and penalties:
-- **ab_imgt_{H,K,L}_consensus.tsv**: IMGT antibody consensus sequences
-- **tcr_imgt_{A,B,D,G}_consensus.tsv**: IMGT TCR consensus sequences
+- **{IGH,IGK,IGL}.csv**: IMGT antibody consensus sequences
+- **{TRA,TRB,TRG,TRD}.csv**: IMGT TCR consensus sequences
 - Format: position, consensus_aas, frequencies, occupancy, region
 
 ## Python Scripts (`scripts/`)
 
 ### Data Processing
 - **number_test_sequences.py**: Process FASTA files with AntPack/ANARCI, generate numbered CSV validation files
-- **generate_consensus.py**: Generate consensus TSV files from numbered sequences with conservation metrics
+- **generate_consensus.py**: Generate consensus CSV files from numbered sequences with conservation metrics
 
 ### Analysis
 - **analyze_sequences.py**: Analyze numbered sequences, generate statistics and plots for CDR/FR regions
