@@ -196,9 +196,10 @@ pub fn validate_entry(
 
     if numbering.len() != entry.sequence.len() {
         return Err(Error::AlignmentError(format!(
-            "Numbering length {} doesn't match sequence length {}",
+            "Numbering length {} doesn't match sequence length {}. Alignment: {:?}",
             numbering.len(),
-            entry.sequence.len()
+            entry.sequence.len(),
+            result.alignment,
         )));
     }
 
@@ -267,13 +268,40 @@ mod tests {
     }
 
     /// Helper function to validate all sequences for a given chain with IMGT scheme
-    fn validate_chain_sequences(chain: Chain, csv_path: &str) {
-        validate_chain_sequences_filtered(chain, csv_path, Scheme::IMGT, Some("human"), &[]);
+    fn validate_chain_sequences(
+        chain: Chain,
+        csv_path: &str,
+        min_perfect_pct: f64,
+        min_overall_accuracy: f64,
+    ) {
+        validate_chain_sequences_filtered(
+            chain,
+            csv_path,
+            Scheme::IMGT,
+            None,
+            &[],
+            min_perfect_pct,
+            min_overall_accuracy,
+        );
     }
 
     /// Helper function to validate all sequences for a given chain with a specific scheme
-    fn validate_chain_sequences_with_scheme(chain: Chain, csv_path: &str, scheme: Scheme) {
-        validate_chain_sequences_filtered(chain, csv_path, scheme, Some("human"), &[]);
+    fn validate_chain_sequences_with_scheme(
+        chain: Chain,
+        csv_path: &str,
+        scheme: Scheme,
+        min_perfect_pct: f64,
+        min_overall_accuracy: f64,
+    ) {
+        validate_chain_sequences_filtered(
+            chain,
+            csv_path,
+            scheme,
+            None,
+            &[],
+            min_perfect_pct,
+            min_overall_accuracy,
+        );
     }
 
     /// Helper function to validate sequences with species filter and header exclusions
@@ -283,6 +311,8 @@ mod tests {
         scheme: Scheme,
         species_filter: Option<&str>,
         exclude_headers: &[&str],
+        min_perfect_pct: f64,
+        min_overall_accuracy: f64,
     ) {
         let path = PathBuf::from(csv_path);
         if !path.exists() {
@@ -376,66 +406,67 @@ mod tests {
             overall_accuracy * 100.0
         );
 
-        // Require at least 99% sequence accuracy
         assert!(
-            perfect_percentage >= 0.99,
-            "{} Sequence accuracy {:.2}% is below 99% threshold",
+            perfect_percentage >= min_perfect_pct,
+            "{} Sequence accuracy {:.2}% is below {:.0}% threshold",
             chain,
-            perfect_percentage
+            perfect_percentage * 100.0,
+            min_perfect_pct * 100.0
         );
 
-        // Require at least 99% overall accuracy
         assert!(
-            overall_accuracy >= 0.99,
-            "{} overall accuracy {:.2}% is below 95% threshold",
+            overall_accuracy >= min_overall_accuracy,
+            "{} overall accuracy {:.2}% is below {:.0}% threshold",
             chain,
-            overall_accuracy * 100.0
+            overall_accuracy * 100.0,
+            min_overall_accuracy * 100.0
         );
     }
 
     #[test]
     fn test_validate_igh_sequences() {
-        validate_chain_sequences(Chain::IGH, "fixtures/validation/ab_H_imgt.csv");
+        validate_chain_sequences(Chain::IGH, "fixtures/validation/ab_H_imgt.csv", 0.99, 0.99);
     }
 
     #[test]
     fn test_validate_igk_sequences() {
-        validate_chain_sequences(Chain::IGK, "fixtures/validation/ab_K_imgt.csv");
+        validate_chain_sequences(Chain::IGK, "fixtures/validation/ab_K_imgt.csv", 0.99, 0.99);
     }
 
     #[test]
     fn test_validate_igl_sequences() {
-        validate_chain_sequences(Chain::IGL, "fixtures/validation/ab_L_imgt.csv");
+        validate_chain_sequences(Chain::IGL, "fixtures/validation/ab_L_imgt.csv", 0.99, 0.99);
     }
 
-    // #[test]
-    // fn test_validate_tra_sequences() {
-    //     validate_chain_sequences(Chain::TRA, "fixtures/validation/tcr_A_imgt.csv");
-    // }
+    #[test]
+    fn test_validate_tra_sequences() {
+        validate_chain_sequences(Chain::TRA, "fixtures/validation/tcr_A_imgt.csv", 0.99, 0.99);
+    }
 
-    // #[test]
-    // fn test_validate_trb_sequences() {
-    //     validate_chain_sequences(Chain::TRB, "fixtures/validation/tcr_B_imgt.csv");
-    // }
+    #[test]
+    fn test_validate_trb_sequences() {
+        validate_chain_sequences(Chain::TRB, "fixtures/validation/tcr_B_imgt.csv", 0.99, 0.99);
+    }
 
     #[test]
     fn test_validate_trg_sequences() {
-        validate_chain_sequences(Chain::TRG, "fixtures/validation/tcr_G_imgt.csv");
+        validate_chain_sequences(Chain::TRG, "fixtures/validation/tcr_G_imgt.csv", 0.99, 0.99);
     }
 
     #[test]
     fn test_validate_trd_sequences() {
-        validate_chain_sequences(Chain::TRD, "fixtures/validation/tcr_D_imgt.csv");
+        validate_chain_sequences(Chain::TRD, "fixtures/validation/tcr_D_imgt.csv", 0.99, 0.99);
     }
 
     // Kabat validation tests
     #[test]
     fn test_validate_igh_kabat_sequences() {
-        // Exclude sequences that currently fail IMGT validation
         validate_chain_sequences_with_scheme(
             Chain::IGH,
             "fixtures/validation/ab_H_kabat.csv",
             Scheme::Kabat,
+            0.99,
+            0.99,
         );
     }
 
@@ -445,6 +476,8 @@ mod tests {
             Chain::IGK,
             "fixtures/validation/ab_K_kabat.csv",
             Scheme::Kabat,
+            0.99,
+            0.99,
         );
     }
 
@@ -454,6 +487,8 @@ mod tests {
             Chain::IGL,
             "fixtures/validation/ab_L_kabat.csv",
             Scheme::Kabat,
+            0.99,
+            0.99,
         );
     }
 }

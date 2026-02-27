@@ -1,11 +1,11 @@
 //! Debug tool for validation alignment visualization
 
-use immunum2::annotator::Annotator;
-use immunum2::types::{Chain, Scheme};
-use immunum2::validation::{
+use immunum::annotator::Annotator;
+use immunum::types::{Chain, Scheme};
+use immunum::validation::{
     load_validation_csv, validate_entry, ValidationEntry, ValidationResult,
 };
-use immunum2::Position;
+use immunum::Position;
 use std::env;
 use std::path::PathBuf;
 use std::process;

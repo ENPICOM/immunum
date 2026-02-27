@@ -1,8 +1,8 @@
 //! Speed benchmark for annotation throughput
 
-use immunum2::types::Chain;
-use immunum2::validation::load_validation_csv;
-use immunum2::{Annotator, Scheme};
+use immunum::types::Chain;
+use immunum::validation::load_validation_csv;
+use immunum::{Annotator, Scheme};
 use std::path::Path;
 use std::time::Instant;
 

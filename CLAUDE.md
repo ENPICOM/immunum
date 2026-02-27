@@ -15,10 +15,10 @@
   - `cargo test` - Verify all tests pass
 
 - **Validation Benchmarks**: Track accuracy metrics
-  - `cargo run --quiet --release --bin benchmark > BENCHMARKS.md` - Update validation metrics
+  - `cargo run --release --bin benchmark` - Update validation metrics (writes BENCHMARKS.toml, prints deltas)
   - Always use `--release` for accurate execution time measurements
-  - Commit updated BENCHMARKS.md when making improvements to alignment/scoring
-  - See BENCHMARKS.md for current accuracy across all chains
+  - Commit updated BENCHMARKS.toml when making improvements to alignment/scoring
+  - See BENCHMARKS.toml for current accuracy across all chains
 
 - **Best Practices**:
   - Only create the code needed in the moment
@@ -41,7 +41,7 @@
 ### Binaries (`src/bin/`, `src/main.rs`)
 - **main.rs**: Example CLI demonstrating annotator usage
 - **debug_validation.rs**: Debug tool for visualizing alignment mismatches with expected vs actual positions
-- **benchmark.rs**: Generate validation metrics report (outputs to BENCHMARKS.md)
+- **benchmark.rs**: Generate validation metrics report (writes BENCHMARKS.toml, prints deltas)
 
 ### Build System
 - **build.rs**: Compile-time generation of scoring matrices from TSV consensus files with region-aware gap/insertion penalties

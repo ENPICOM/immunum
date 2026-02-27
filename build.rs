@@ -10,7 +10,7 @@ const AMINO_ACIDS: &[u8] = b"ACDEFGHIKLMNPQRSTVWY";
 // Gap and insertion penalty constants
 // These control how the alignment algorithm handles gaps and insertions
 const CDR_BASE_GAP_PENALTY: f32 = -6.0;
-const FR_BASE_GAP_PENALTY: f32 = -20.0;
+const FR_BASE_GAP_PENALTY: f32 = -12.0;
 
 const HIGHLY_CONSERVED_MULTIPLIER: f32 = 3.0;
 const CONSERVED_MULTIPLIER: f32 = 2.0;
@@ -95,21 +95,18 @@ fn main() {
     fs::create_dir_all(&matrix_out).unwrap();
 
     // Map of chain names to their TSV files
-    let chains = [
-        ("IGH", "ab_imgt_H_consensus.tsv"),
-        ("IGK", "ab_imgt_K_consensus.tsv"),
-        ("IGL", "ab_imgt_L_consensus.tsv"),
-        ("TRA", "tcr_imgt_A_consensus.tsv"),
-        ("TRB", "tcr_imgt_B_consensus.tsv"),
-        ("TRG", "tcr_imgt_G_consensus.tsv"),
-        ("TRD", "tcr_imgt_D_consensus.tsv"),
-    ];
+    let chains = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"];
 
-    for (chain, tsv_file) in &chains {
+    // let consensus_source = "pdb";
+    // let consensus_source = "imgt";
+    let consensus_source = "repseqio";
+
+    for chain in &chains {
         let tsv_path = Path::new(&manifest_dir)
             .join("resources")
             .join("consensus")
-            .join(tsv_file);
+            .join(consensus_source)
+            .join(format!("{}.tsv", chain));
 
         println!("cargo:rerun-if-changed={}", tsv_path.display());
 

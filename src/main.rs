@@ -1,4 +1,4 @@
-use immunum2::{Annotator, Chain};
+use immunum::{Annotator, Chain};
 
 const ALL_CHAINS: &[Chain] = &[
     Chain::IGH,
@@ -11,10 +11,10 @@ const ALL_CHAINS: &[Chain] = &[
 ];
 
 fn main() {
-    println!("Immunum2 - Antibody and TCR Numbering Tool\n");
+    println!("immunum - Antibody and TCR Numbering Tool\n");
 
     // Create annotator with all chain types for auto-detection
-    let annotator = match Annotator::new(ALL_CHAINS, immunum2::Scheme::IMGT) {
+    let annotator = match Annotator::new(ALL_CHAINS, immunum::Scheme::IMGT) {
         Ok(a) => a,
         Err(e) => {
             eprintln!("Error creating annotator: {}", e);
@@ -46,7 +46,7 @@ fn main() {
                 println!("Confidence: {:.2}", result.confidence);
                 println!("Alignment score: {:.2}", result.alignment.score);
 
-                let numbering = result.numbering(immunum2::Scheme::IMGT);
+                let numbering = result.numbering(immunum::Scheme::IMGT);
                 println!("\nNumbering (first 10 positions):");
                 for (i, (aa, pos)) in sequence.chars().zip(numbering.iter()).take(10).enumerate() {
                     println!("  {}: {} -> {}", i + 1, aa, pos);

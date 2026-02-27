@@ -1,8 +1,8 @@
-//! Error types for Immunum2
+//! Error types for immunum
 
 use thiserror::Error;
 
-/// Result type alias for Immunum2 operations
+/// Result type alias for immunum operations
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors that can occur during sequence numbering and alignment

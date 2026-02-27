@@ -1,4 +1,4 @@
-//! Immunum2 - High-performance antibody and TCR sequence numbering
+//! immunum - High-performance antibody and TCR sequence numbering
 //!
 //! This library provides tools for aligning immunoglobulin (antibody) and
 //! T-cell receptor sequences to consensus sequences and numbering them
