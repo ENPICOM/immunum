@@ -4,7 +4,7 @@ use crate::alignment::{align, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::{imgt::get_imgt_numbering, kabat::get_kabat_numbering};
 use crate::scoring::ScoringMatrix;
-use crate::types::{Chain, Position, Scheme};
+use crate::types::{Chain, Position, Scheme, TCR_CHAINS};
 
 /// Result of annotating a sequence with chain detection
 #[derive(Debug, Clone)]
@@ -35,7 +35,7 @@ pub struct Annotator {
 impl Annotator {
     pub fn new(chains: &[Chain], scheme: Scheme) -> Result<Self> {
         // Validate: Kabat only supported for antibody chains
-        if scheme == Scheme::Kabat && chains.iter().any(|c| c.is_tcr()) {
+        if scheme == Scheme::Kabat && chains.iter().any(|c| TCR_CHAINS.contains(c)) {
             return Err(Error::InvalidScheme(
                 "Kabat scheme only supported for antibody chains (IGH, IGK, IGL)".to_string(),
             ));
@@ -94,16 +94,7 @@ impl Annotator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const ALL_CHAINS: &[Chain] = &[
-        Chain::IGH,
-        Chain::IGK,
-        Chain::IGL,
-        Chain::TRA,
-        Chain::TRB,
-        Chain::TRG,
-        Chain::TRD,
-    ];
+    use crate::types::ALL_CHAINS;
 
     #[test]
     fn test_create_annotator() {
