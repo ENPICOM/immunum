@@ -45,6 +45,66 @@ for (aa, pos) in sequence.chars().zip(numbering.iter()) {
 }
 ```
 
+## CLI
+
+```bash
+immunum number [OPTIONS] [INPUT] [OUTPUT]
+```
+
+### Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`) | `imgt` |
+| `-c, --chain` | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig` |
+| `-f, --format` | Output format: `tsv`, `json`, `jsonl` | `tsv` |
+
+### Input
+
+Accepts a raw sequence, a FASTA file, or stdin (auto-detected):
+
+```bash
+immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS
+immunum number sequences.fasta
+cat sequences.fasta | immunum number
+immunum number - < sequences.fasta
+```
+
+### Output
+
+Writes to stdout by default, or to a file if a second positional argument is given:
+
+```bash
+immunum number sequences.fasta results.tsv
+immunum number -f json sequences.fasta results.json
+```
+
+### Examples
+
+```bash
+# Kabat scheme, JSON output
+immunum number -s kabat -f json EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS
+
+# All chains (antibody + TCR), JSONL output
+immunum number -c all -f jsonl sequences.fasta
+
+# TCR sequences only, save to file
+immunum number -c tcr tcr_sequences.fasta output.tsv
+
+# Extract sequences from a TSV column and pipe in (see fixtures/ig.tsv)
+tail -n +2 fixtures/ig.tsv | cut -f2 | immunum number
+awk -F'\t' 'NR==1{for(i=1;i<=NF;i++) if($i=="sequence") c=i} NR>1{print $c}' fixtures/ig.tsv | immunum number
+
+# Filter TSV output to CDR3 positions (111-128 in IMGT)
+immunum number sequences.fasta | awk -F'\t' '$4 >= 111 && $4 <= 128'
+
+# Filter to heavy chain results only
+immunum number -c all sequences.fasta | awk -F'\t' 'NR==1 || $2=="H"'
+
+# Extract CDR3 sequences with jq
+immunum number -f json sequences.fasta | jq '[.[] | {id: .sequence_id, numbering}]'
+```
+
 ## Development
 
 The project follows a test-driven development workflow.
@@ -65,20 +125,29 @@ cargo run --release --bin benchmark
 
 ```
 src/
+├── main.rs          # CLI binary (immunum number ...)
 ├── lib.rs           # Public API
 ├── annotator.rs     # Sequence annotation and chain detection
 ├── alignment.rs     # Needleman-Wunsch semi-global alignment
-├── numbering/       # Scheme-specific numbering logic
-│   ├── imgt.rs
-│   └── kabat.rs
+├── io.rs            # Input parsing (FASTA, raw) and output formatting (TSV, JSON, JSONL)
+├── numbering.rs     # Numbering module entry point
+├── numbering/
+│   ├── imgt.rs      # IMGT numbering rules
+│   └── kabat.rs     # Kabat numbering rules
 ├── scoring.rs       # PSSM and scoring matrices
 ├── types.rs         # Core domain types (Chain, Scheme, Position)
 ├── validation.rs    # Validation utilities
-└── error.rs         # Error types
+├── error.rs         # Error types
+└── bin/
+    ├── benchmark.rs       # Validation metrics report
+    ├── debug_validation.rs # Alignment mismatch visualization
+    └── speed_benchmark.rs  # Performance benchmarks
 resources/
 └── consensus/       # Consensus sequence CSVs (compiled into scoring matrices)
 fixtures/
-└── validation/      # ANARCI-numbered reference datasets
+├── validation/      # ANARCI-numbered reference datasets
+├── ig.fasta         # Example antibody sequences
+└── ig.tsv           # Example TSV input
 scripts/             # Python tooling for generating consensus data
 ```
 

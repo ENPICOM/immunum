@@ -118,10 +118,14 @@ fn read_auto(reader: impl BufRead) -> Result<Vec<Record>, String> {
     if lines[0].starts_with('>') {
         read_fasta(io::Cursor::new(lines.join("\n")))
     } else {
-        Ok(vec![Record {
-            id: "seq_1".to_string(),
-            sequence: lines.concat(),
-        }])
+        Ok(lines
+            .into_iter()
+            .enumerate()
+            .map(|(i, seq)| Record {
+                id: format!("seq_{}", i + 1),
+                sequence: seq,
+            })
+            .collect())
     }
 }
 

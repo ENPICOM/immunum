@@ -14,13 +14,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Number immune receptor sequences
+    /// Number sequences using a specified scheme and chain type
     Number(NumberArgs),
 }
 
 #[derive(Args)]
 struct NumberArgs {
-    /// Input: sequence string, FASTA file path, or "-" for stdin (default)
+    /// Input sequence string, FASTA file path, or "-" for stdin (default)
     input: Option<String>,
     /// Output file path (default: stdout)
     output: Option<String>,
