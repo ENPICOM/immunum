@@ -318,7 +318,6 @@ mod tests {
         assert!("111AB".parse::<Position>().is_err());
     }
 
-
     #[test]
     fn test_parse_chain_spec_groups() {
         let ig = Chain::parse_chain_spec("ig").unwrap();

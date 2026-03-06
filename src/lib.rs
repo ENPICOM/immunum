@@ -22,5 +22,7 @@ pub use annotator::{AnnotationResult, Annotator};
 pub use error::{Error, Result};
 pub use io::{read_fasta, read_input, NumberedRecord, OutputFormat, Record};
 pub use scoring::ScoringMatrix;
-pub use types::{Chain, Insertion, NumberingRule, Position, Region, Scheme, ALL_CHAINS, IG_CHAINS, TCR_CHAINS};
+pub use types::{
+    Chain, Insertion, NumberingRule, Position, Region, Scheme, ALL_CHAINS, IG_CHAINS, TCR_CHAINS,
+};
 pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};

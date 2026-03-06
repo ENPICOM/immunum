@@ -89,8 +89,7 @@ pub fn read_input(input: Option<&str>) -> Result<Vec<Record>, String> {
         Some(s) => {
             let path = Path::new(s);
             if path.exists() {
-                let file =
-                    File::open(path).map_err(|e| format!("cannot open '{}': {}", s, e))?;
+                let file = File::open(path).map_err(|e| format!("cannot open '{}': {}", s, e))?;
                 read_auto(BufReader::new(file))
             } else {
                 Ok(vec![Record {
@@ -138,7 +137,7 @@ pub fn read_fasta(reader: impl BufRead) -> Result<Vec<Record>, String> {
     for line in reader.lines() {
         let line = line.map_err(|e| format!("read error: {}", e))?;
         let line = line.trim_end();
-        if line.starts_with('>') {
+        if let Some(header) = line.strip_prefix('>') {
             if !current_id.is_empty() && !current_seq.is_empty() {
                 records.push(Record {
                     id: current_id,
@@ -146,7 +145,7 @@ pub fn read_fasta(reader: impl BufRead) -> Result<Vec<Record>, String> {
                 });
                 current_seq = String::new();
             }
-            current_id = line[1..]
+            current_id = header
                 .split_whitespace()
                 .next()
                 .unwrap_or("unknown")
@@ -182,8 +181,7 @@ pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Res
 /// Write records as a JSON array
 pub fn write_json(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     let json_records: Vec<serde_json::Value> = records.iter().map(record_to_json).collect();
-    serde_json::to_writer_pretty(&mut *writer, &json_records)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    serde_json::to_writer_pretty(&mut *writer, &json_records).map_err(io::Error::other)?;
     writeln!(writer)?;
     Ok(())
 }
@@ -192,8 +190,7 @@ pub fn write_json(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Re
 pub fn write_jsonl(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     for rec in records {
         let json = record_to_json(rec);
-        serde_json::to_writer(&mut *writer, &json)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        serde_json::to_writer(&mut *writer, &json).map_err(io::Error::other)?;
         writeln!(writer)?;
     }
     Ok(())
