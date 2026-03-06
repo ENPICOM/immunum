@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["master"]
   pull_request:
-    branches: ["master"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,7 +16,7 @@ jobs:
       - name: Format Check
         run: cargo fmt --all --check
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Run tests
         run: cargo test
       - name: Build
