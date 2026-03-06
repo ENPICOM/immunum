@@ -4,23 +4,58 @@ use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
+use strum_macros::{Display, EnumString};
 
-/// Chain types for immunoglobulins and T-cell receptors
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Chain {
-    /// Immunoglobulin Heavy chain
+    #[strum(
+        serialize = "IGH",
+        serialize = "H",
+        serialize = "heavy",
+        ascii_case_insensitive
+    )]
     IGH,
-    /// Immunoglobulin Kappa light chain
+    #[strum(
+        serialize = "IGK",
+        serialize = "K",
+        serialize = "kappa",
+        ascii_case_insensitive
+    )]
     IGK,
-    /// Immunoglobulin Lambda light chain
+    #[strum(
+        serialize = "IGL",
+        serialize = "L",
+        serialize = "lambda",
+        ascii_case_insensitive
+    )]
     IGL,
-    /// T-cell receptor Alpha chain
+    #[strum(
+        serialize = "TRA",
+        serialize = "A",
+        serialize = "alpha",
+        ascii_case_insensitive
+    )]
     TRA,
-    /// T-cell receptor Beta chain
+    #[strum(
+        serialize = "TRB",
+        serialize = "B",
+        serialize = "beta",
+        ascii_case_insensitive
+    )]
     TRB,
-    /// T-cell receptor Gamma chain
+    #[strum(
+        serialize = "TRG",
+        serialize = "G",
+        serialize = "gamma",
+        ascii_case_insensitive
+    )]
     TRG,
-    /// T-cell receptor Delta chain
+    #[strum(
+        serialize = "TRD",
+        serialize = "D",
+        serialize = "delta",
+        ascii_case_insensitive
+    )]
     TRD,
 }
 
@@ -36,54 +71,15 @@ impl Chain {
     }
 }
 
-impl fmt::Display for Chain {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl FromStr for Chain {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_uppercase().as_str() {
-            "IGH" | "H" => Ok(Chain::IGH),
-            "IGK" | "K" => Ok(Chain::IGK),
-            "IGL" | "L" => Ok(Chain::IGL),
-            "TRA" | "A" => Ok(Chain::TRA),
-            "TRB" | "B" => Ok(Chain::TRB),
-            "TRG" | "G" => Ok(Chain::TRG),
-            "TRD" | "D" => Ok(Chain::TRD),
-            _ => Err(Error::InvalidChain(s.to_string())),
-        }
-    }
-}
-
 /// Numbering schemes for output
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Scheme {
     /// IMGT numbering (canonical internal representation)
+    #[strum(serialize = "IMGT", ascii_case_insensitive)]
     IMGT,
     /// Kabat numbering (derived from IMGT)
+    #[strum(serialize = "Kabat", ascii_case_insensitive)]
     Kabat,
-}
-
-impl fmt::Display for Scheme {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl FromStr for Scheme {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_uppercase().as_str() {
-            "IMGT" => Ok(Scheme::IMGT),
-            "KABAT" => Ok(Scheme::Kabat),
-            _ => Err(Error::InvalidScheme(s.to_string())),
-        }
-    }
 }
 
 /// Position in a numbered sequence
