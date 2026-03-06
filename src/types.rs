@@ -10,49 +10,49 @@ use strum_macros::{Display, EnumString};
 pub enum Chain {
     #[strum(
         serialize = "IGH",
-        serialize = "H",
+        to_string = "H",
         serialize = "heavy",
         ascii_case_insensitive
     )]
     IGH,
     #[strum(
         serialize = "IGK",
-        serialize = "K",
+        to_string = "K",
         serialize = "kappa",
         ascii_case_insensitive
     )]
     IGK,
     #[strum(
         serialize = "IGL",
-        serialize = "L",
+        to_string = "L",
         serialize = "lambda",
         ascii_case_insensitive
     )]
     IGL,
     #[strum(
         serialize = "TRA",
-        serialize = "A",
+        to_string = "A",
         serialize = "alpha",
         ascii_case_insensitive
     )]
     TRA,
     #[strum(
         serialize = "TRB",
-        serialize = "B",
+        to_string = "B",
         serialize = "beta",
         ascii_case_insensitive
     )]
     TRB,
     #[strum(
         serialize = "TRG",
-        serialize = "G",
+        to_string = "G",
         serialize = "gamma",
         ascii_case_insensitive
     )]
     TRG,
     #[strum(
         serialize = "TRD",
-        serialize = "D",
+        to_string = "D",
         serialize = "delta",
         ascii_case_insensitive
     )]
@@ -75,10 +75,10 @@ impl Chain {
 #[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Scheme {
     /// IMGT numbering (canonical internal representation)
-    #[strum(serialize = "IMGT", ascii_case_insensitive)]
+    #[strum(to_string = "IMGT", serialize = "i", ascii_case_insensitive)]
     IMGT,
     /// Kabat numbering (derived from IMGT)
-    #[strum(serialize = "Kabat", ascii_case_insensitive)]
+    #[strum(to_string = "Kabat", serialize = "k", ascii_case_insensitive)]
     Kabat,
 }
 
