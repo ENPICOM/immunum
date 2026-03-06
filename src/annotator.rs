@@ -1,13 +1,17 @@
 //! High-level API for sequence annotation and chain detection
-
 use crate::alignment::{align, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::{imgt::get_imgt_numbering, kabat::get_kabat_numbering};
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme};
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 /// Result of annotating a sequence with chain detection
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnnotationResult {
     /// Detected chain type
     pub chain: Chain,
@@ -28,6 +32,8 @@ impl AnnotationResult {
 }
 
 /// Annotator for numbering sequences
+#[cfg_attr(feature = "python", pyclass)]
+#[derive(Serialize, Deserialize)]
 pub struct Annotator {
     matrices: Vec<(Chain, ScoringMatrix)>,
 }

@@ -1,0 +1,70 @@
+version: "3"
+
+tasks:
+    build:
+        cmds:
+            - uv sync --all-extras --all-groups --dev --compile-bytecode
+            - pre-commit install
+
+    reinstall:
+        cmds:
+            - uv sync --reinstall
+
+    build-ci:
+        cmd: uv sync --locked --all-extras --all-groups --dev
+
+    build-badges:
+        cmd: uv sync --locked --only-group dev
+
+    check:
+        aliases: [c]
+        cmd: uv run pytest -n  $(( $(nproc) - 2 )) -q --show-capture=no --disable-warnings --tb=no {{.CLI_ARGS}}
+
+    test:
+        aliases: [t]
+        cmd: uv run pytest -m "not property" -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
+
+    lint:
+        cmd: uv run ruff check --config pyproject.toml
+
+    check-types:
+        cmds:
+            - uv run ty check --project .
+            - uv run pyrefly check -j 0
+            - 'git grep "# type: ignore\s*$" src/** && (echo -e "\033[31mBlanket ignores are not allowed\033[0m"; exit 1) || exit 0'
+
+    format:
+        aliases: [f]
+        cmds:
+            - cargo fmt
+            - ruff check --fix --config pyproject.toml
+            - ruff format --config pyproject.toml
+
+    coverage:
+        aliases: [cov]
+        cmds:
+            - uv run coverage run -m pytest --show-capture=no --disable-warnings --tb=no
+            - uv run coverage report -m
+
+    pysentry:
+        cmds:
+            - uv run pysentry-rs --all-extras .
+
+    default:
+        cmds:
+            - task --list-all
+
+    build-maturin:
+        cmds:
+            - uv tool run maturin develop -r -m ./Cargo.toml
+
+    ci:
+        cmds:
+            - task: build-ci
+            - task: lint
+            - task: check-types
+            - task: pysentry
+            - task: build-maturin
+            - task: coverage
+            - task: test-all
+            - task: benchmark-ci

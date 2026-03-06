@@ -1,7 +1,12 @@
 //! Sequence alignment using Needleman-Wunsch algorithm
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::{Error, Result};
 use crate::scoring::PositionScores;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
 /// Direction in the alignment traceback matrix
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,14 +17,15 @@ enum Direction {
 }
 
 /// Represents a position in the alignment result
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlignedPosition {
     /// Gap in query (query has no residue here, consensus does)
-    QueryGap,
+    QueryGap(),
     /// Aligned to consensus position N
     Aligned(u8),
     /// Insertion in query (query has residue, consensus doesn't)
-    Insertion,
+    Insertion(),
 }
 
 /// Cell in the dynamic programming matrix
@@ -30,7 +36,8 @@ struct Cell {
 }
 
 /// Result of aligning a sequence to a consensus
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Alignment {
     /// Alignment score
     pub score: f32,
@@ -169,7 +176,7 @@ fn traceback(
     query_len: usize,
     cons_len: usize,
 ) -> Vec<AlignedPosition> {
-    let mut aligned_positions = Vec::new();
+    let mut aligned_positions: Vec<AlignedPosition> = Vec::new();
 
     let mut i = query_len;
     let mut j = cons_len;
@@ -179,7 +186,7 @@ fn traceback(
     if i < query_total_len {
         // Add remaining query residues as insertions at the end
         for _ in i..query_total_len {
-            aligned_positions.push(AlignedPosition::Insertion);
+            aligned_positions.push(AlignedPosition::Insertion());
         }
     }
 
@@ -191,11 +198,11 @@ fn traceback(
                 j -= 1;
             }
             Direction::GapInQuery => {
-                aligned_positions.push(AlignedPosition::QueryGap);
+                aligned_positions.push(AlignedPosition::QueryGap());
                 j -= 1;
             }
             Direction::GapInConsensus => {
-                aligned_positions.push(AlignedPosition::Insertion);
+                aligned_positions.push(AlignedPosition::Insertion());
                 i -= 1;
             }
         }
@@ -203,7 +210,7 @@ fn traceback(
 
     // Handle unaligned prefix of query
     while i > 0 {
-        aligned_positions.push(AlignedPosition::Insertion);
+        aligned_positions.push(AlignedPosition::Insertion());
         i -= 1;
     }
 
@@ -299,7 +306,7 @@ mod tests {
         let gap_count = result
             .positions
             .iter()
-            .filter(|p| matches!(p, AlignedPosition::QueryGap))
+            .filter(|p| matches!(p, AlignedPosition::QueryGap()))
             .count();
         assert!(
             gap_count <= partial_seq.len() / 10,
