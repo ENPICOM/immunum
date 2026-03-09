@@ -112,11 +112,15 @@ def load_aligned_fasta(filepath: Path) -> pd.DataFrame:
     return pd.DataFrame(rows).fillna("")
 
 
-def generate_from_csv(input_path: Path, output_path: Path) -> None:
+def generate_from_csv(input_paths: list[Path], output_path: Path) -> None:
     """Generate consensus from a numbered CSV file."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df = pd.read_csv(input_path, dtype=str).fillna("")
-    print(f"  {len(df)} sequences from {input_path}")
+    dfs = []
+    for input_path in input_paths:
+        df = pd.read_csv(input_path, dtype=str).fillna("")
+        print(f"  {len(df)} sequences from {input_path}")
+        dfs.append(df)
+    df = pd.concat(dfs, ignore_index=True)
     build_consensus(df, output_path)
 
 
@@ -139,13 +143,15 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     csv_parser = subparsers.add_parser("csv", help="From a numbered CSV file")
-    csv_parser.add_argument("input", type=Path, help="Input numbered CSV file")
+    csv_parser.add_argument(
+        "input", type=Path, nargs="+", help="Input numbered CSV files"
+    )
     csv_parser.add_argument("output", type=Path, help="Output consensus CSV file")
 
     fasta_parser = subparsers.add_parser(
         "fasta", help="From IMGT-aligned FASTA file(s)"
     )
-    fasta_parser.add_argument("input", type=Path, help="Input FASTA file")
+    fasta_parser.add_argument("input", type=Path, nargs="+", help="Input FASTA files")
     fasta_parser.add_argument("output", type=Path, help="Output consensus CSV file")
 
     args = parser.parse_args()

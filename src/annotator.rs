@@ -5,6 +5,7 @@ use crate::numbering::apply_numbering;
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme, TCR_CHAINS};
 
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 

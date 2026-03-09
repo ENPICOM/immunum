@@ -268,12 +268,10 @@ mod tests {
         min_perfect_pct: f64,
         min_overall_accuracy: f64,
     ) {
-        validate_chain_sequences_filtered(
+        validate_chain_sequences_with_scheme(
             chain,
             csv_path,
             Scheme::IMGT,
-            None,
-            &[],
             min_perfect_pct,
             min_overall_accuracy,
         );
@@ -284,27 +282,6 @@ mod tests {
         chain: Chain,
         csv_path: &str,
         scheme: Scheme,
-        min_perfect_pct: f64,
-        min_overall_accuracy: f64,
-    ) {
-        validate_chain_sequences_filtered(
-            chain,
-            csv_path,
-            scheme,
-            None,
-            &[],
-            min_perfect_pct,
-            min_overall_accuracy,
-        );
-    }
-
-    /// Helper function to validate sequences with species filter and header exclusions
-    fn validate_chain_sequences_filtered(
-        chain: Chain,
-        csv_path: &str,
-        scheme: Scheme,
-        species_filter: Option<&str>,
-        exclude_headers: &[&str],
         min_perfect_pct: f64,
         min_overall_accuracy: f64,
     ) {
@@ -323,18 +300,6 @@ mod tests {
         let mut failures = Vec::new();
 
         for entry in entries.iter() {
-            // Skip excluded sequences
-            if exclude_headers.iter().any(|h| entry.header.contains(h)) {
-                continue;
-            }
-
-            // Apply species filter if provided
-            if let Some(species) = species_filter {
-                if !entry.species.eq_ignore_ascii_case(species) {
-                    continue;
-                }
-            }
-
             let result = validate_entry(entry, &annotator).unwrap();
 
             total_sequences += 1;

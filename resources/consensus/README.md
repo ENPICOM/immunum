@@ -22,8 +22,4 @@ The script takes IMGT-numbered sequences (from CSV or IMGT-aligned FASTA) and co
 | `region`        | IMGT region (FR1, CDR1, FR2, CDR2, FR3, CDR3, FR4)|
 
 ## Source
-We currently have consensus files from two sources:
-- **PDB**: derived from IMGT-aligned PDB structures that are validated by crystal structure: http://www.abybank.org/sacs/ (4399 IG sequences) and https://opig.stats.ox.ac.uk/webapps/stcrdab-stcrpred (1847 TCR sequences).
-- **RepSeqIO**: derived from IMGT-aligned RepSeqIO germline genes (version 1.9)
-
-Scripts to generate these files are in the scripts/ directory, and can be generate with any raw fasta receptors, separate V and J gene files, or prenumbered IMGT-aligned fasta files. The script will automatically assign IMGT positions and regions, and compute the consensus statistics.
+derived from IMGT-aligned RepSeqIO (version 1.9) germline Human and Mouse VJ genes.

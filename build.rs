@@ -87,6 +87,15 @@ const BLOSUM62: [[i8; 20]; 20] = [
 ];
 
 fn main() {
+    // Set rpath to Python's lib dir so cargo test can find libpython
+    // see https://github.com/astral-sh/uv/issues/11006
+    #[cfg(feature = "python")]
+    if cfg!(unix) {
+        if let Some(lib_dir) = &pyo3_build_config::get().lib_dir {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir);
+        }
+    }
+
     let out_dir = env::var("OUT_DIR").unwrap();
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
 
@@ -97,15 +106,10 @@ fn main() {
     // Map of chain names to their CSV files
     let chains = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"];
 
-    // let consensus_source = "pdb";
-    // let consensus_source = "imgt";
-    let consensus_source = "repseqio";
-
     for chain in &chains {
         let csv_path = Path::new(&manifest_dir)
             .join("resources")
             .join("consensus")
-            .join(consensus_source)
             .join(format!("{}.csv", chain));
 
         println!("cargo:rerun-if-changed={}", csv_path.display());

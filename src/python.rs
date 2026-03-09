@@ -1,12 +1,11 @@
+use postcard::{from_bytes, to_allocvec};
 use std::str::FromStr;
 
-use serde::{Deserialize, Serialize};
-
-use postcard::{from_bytes, to_allocvec};
 use pyo3::prelude::*;
 
 use crate::annotator::{Annotator, NumberingResult};
 use crate::types::{Chain, Scheme};
+use serde::{Deserialize, Serialize};
 
 #[pymethods]
 impl Annotator {
@@ -17,7 +16,7 @@ impl Annotator {
         let parsed_chains = chains
             .iter()
             .map(|chain| {
-                Chain::from_str(&chain).map_err(|_| {
+                Chain::from_str(chain).map_err(|_| {
                     PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                         "Invalid chain: {}",
                         chain
@@ -28,13 +27,12 @@ impl Annotator {
         let parsed_scheme = Scheme::from_str(&scheme).map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid scheme: {}", scheme))
         })?;
-        let annotator =
-            Annotator::new(parsed_chains.as_slice(), parsed_scheme.clone()).map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Failed to initialize annotator: {}",
-                    e
-                ))
-            })?;
+        let annotator = Annotator::new(parsed_chains.as_slice(), parsed_scheme).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Failed to initialize annotator: {}",
+                e
+            ))
+        })?;
 
         Ok(annotator)
     }

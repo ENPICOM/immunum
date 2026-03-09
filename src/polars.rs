@@ -37,8 +37,7 @@ impl serde::Serialize for Annotator {
     where
         S: serde::Serializer,
     {
-        let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
-        let bytes = to_allocvec(&wrapper.inner).map_err(serde::ser::Error::custom)?;
+        let bytes = to_allocvec(&self).map_err(serde::ser::Error::custom)?;
         serializer.serialize_bytes(&bytes)
     }
 }
@@ -63,14 +62,9 @@ impl<'de> serde::Deserialize<'de> for Annotator {
             where
                 E: serde::de::Error,
             {
-                let wrapper: AnnotatorSerializationWrapper =
-                    from_bytes(v).map_err(serde::de::Error::custom)?;
+                let annotator: Annotator = from_bytes(v).map_err(serde::de::Error::custom)?;
 
-                Ok(Annotator {
-                    matrices: wrapper.inner.matrices,
-                    scheme: wrapper.inner.scheme,
-                    chains: wrapper.inner.chains,
-                })
+                Ok(annotator)
             }
 
             fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
