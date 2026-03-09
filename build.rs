@@ -105,7 +105,6 @@ fn main() {
     // Map of chain names to their CSV files
     let chains = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"];
 
-
     for chain in &chains {
         let csv_path = Path::new(&manifest_dir)
             .join("resources")
