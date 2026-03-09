@@ -1,4 +1,4 @@
-# pydantic-core does the same: https://github.com/pydantic/pydantic-core/blob/main/.cargo/config.toml
+# see https://pyo3.rs/main/building-and-distribution#macos
 
 [target.x86_64-apple-darwin]
 rustflags = [
