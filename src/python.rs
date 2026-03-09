@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use postcard::{from_bytes, to_allocvec};
 use pyo3::prelude::*;
 
-use crate::annotator::{AnnotationResult, Annotator};
+use crate::annotator::{Annotator, NumberingResult};
 use crate::types::{Chain, Scheme};
 
 #[pymethods]
@@ -40,9 +40,9 @@ impl Annotator {
     }
 
     #[pyo3(signature = (sequence))]
-    pub fn _annotate(&self, sequence: &str) -> PyResult<AnnotationResult> {
+    pub fn _number(&self, sequence: &str) -> PyResult<NumberingResult> {
         let result = self
-            .annotate(sequence)
+            .number(sequence)
             .map_err(|_| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                     "Invalid sequence: {}",

@@ -6,3 +6,4 @@ wasm_build
 /.claude
 
 node_modules
+.coverage

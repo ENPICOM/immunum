@@ -116,6 +116,7 @@ pub enum Scheme {
 
 /// Position in a numbered sequence
 /// Can be a simple number or a number with an insertion letter (e.g., "111A")
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {
     /// The numeric part of the position (max 128 for IMGT)

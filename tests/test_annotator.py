@@ -70,6 +70,6 @@ class TestAnnotatorInit:
         with pytest.raises(ValueError):
             immunum_rs.Annotator(chains, scheme)
 
-    def test_annotate(self, annotator):
+    def test_number(self, annotator):
         seq = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
-        annotator._annotate(seq)
+        annotator._number(seq)
