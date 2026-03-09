@@ -1,15 +1,76 @@
+[build-system]
+requires = ["maturin>=1.10.2,<2.0", "polars>=1.8.2"]
+build-backend = "maturin"
+
 [project]
 name = "immunum"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0"
+description = "Flexible and fast antibody sequence annotation in Rust with python bindings"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12, <3.14"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = []
+
+
+[tool.maturin]
+module-name = "immunum._internal"
+features = ["python"]
+
 
 [dependency-groups]
 dev = [
     "antpack==0.3.8",
-    "pandas>=2.3.3",
+    "coverage>=7.10.6",
+    "go-task-bin>=3.44.1",
+    "hypothesis>=6.151.9",
     "pandas-stubs>=2.3.3.251219",
+    "pandas>=2.3.3",
+    "pre-commit>=4.3.0",
+    "pyrefly>=0.53.0",
+    "pyright>=1.1.408",
+    "pysentry-rs>=0.3.10",
+    "pytest-xdist>=3.8.0",
+    "pytest>=8.4.2",
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
+
+[tool.uv]
+default-groups = ["dev"]
+cache-keys = [
+    { file = "./Cargo.toml" },
+    { file = "./**/*.rs" },
+]
+
+[tool.uv.workspace]
+members = ["."]
+
+[tool.pyrefly]
+project-includes = ["**/*.py*"]
+project-excludes = [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/*venv/**/*",
+    "**/.[!/.]*/**/*",
+    "scripts/*"
+]
+
+[tool.uv.sources]
+immunum-rs = { workspace = true }
+
+
+[tool.coverage.report]
+exclude_also = [
+    'no cover: start(?s:.)*?no cover: stop',
+    "def __repr__",
+    "@abstract",
+]
+fail_under = 0
+
+[tool.coverage.run]
+omit = ["/tmp/*"]
+include = ["src/**", "tests/**"]

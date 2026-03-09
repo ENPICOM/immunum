@@ -26,3 +26,15 @@ pub use types::{
     Chain, Insertion, NumberingRule, Position, Region, Scheme, ALL_CHAINS, IG_CHAINS, TCR_CHAINS,
 };
 pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
+
+#[cfg(feature = "python")]
+mod python;
+use pyo3::prelude::*;
+
+#[cfg(feature = "python")]
+#[pymodule]
+fn _internal(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add_class::<annotator::Annotator>()?;
+    Ok(())
+}

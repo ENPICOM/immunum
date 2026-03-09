@@ -1,13 +1,16 @@
 //! High-level API for sequence annotation and chain detection
-
 use crate::alignment::{align, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::apply_numbering;
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme, TCR_CHAINS};
 
+use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
+
 /// Result of numbering a sequence
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NumberingResult {
     /// Detected chain type
     pub chain: Chain,
@@ -24,6 +27,8 @@ pub struct NumberingResult {
 }
 
 /// Annotator for numbering sequences
+#[cfg_attr(feature = "python", pyclass)]
+#[derive(Serialize, Deserialize)]
 pub struct Annotator {
     matrices: Vec<(Chain, ScoringMatrix)>,
     scheme: Scheme,
@@ -31,6 +36,10 @@ pub struct Annotator {
 
 impl Annotator {
     pub fn new(chains: &[Chain], scheme: Scheme) -> Result<Self> {
+        if chains.is_empty() {
+            return Err(Error::InvalidChain("chains cannot be empty".to_string()));
+        }
+
         // Validate: Kabat only supported for antibody chains
         if scheme == Scheme::Kabat && chains.iter().any(|c| TCR_CHAINS.contains(c)) {
             return Err(Error::InvalidScheme(

@@ -33,12 +33,12 @@ pub(crate) fn extract_consensus_positions(aligned: &[AlignedPosition]) -> Vec<u8
 
     for ap in aligned {
         match ap {
-            AlignedPosition::QueryGap => {} // No residue, skip
+            AlignedPosition::QueryGap() => {} // No residue, skip
             AlignedPosition::Aligned(pos) => {
                 positions.push(*pos);
                 last_pos = *pos;
             }
-            AlignedPosition::Insertion => {
+            AlignedPosition::Insertion() => {
                 positions.push(last_pos); // Inherit from previous
             }
         }

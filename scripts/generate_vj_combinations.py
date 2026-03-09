@@ -181,7 +181,6 @@ def generate_vj_combinations(
     include_pseudo: bool = False,
     min_identity: float = 0.7,
 ) -> None:
-
     allowed_func = None if include_pseudo else {"F"}
 
     v_by_chain = parse_genes(v_fasta, translate_v, allowed_func)

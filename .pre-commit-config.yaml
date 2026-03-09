@@ -1,0 +1,13 @@
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v5.0.0
+      hooks:
+          - id: trailing-whitespace # Removes trailing spaces
+          - id: end-of-file-fixer # Ensures newline at EOF
+          - id: check-yaml # Validates YAML files
+    - repo: local
+      hooks:
+          - id: task-format
+            name: task-format
+            entry: python -c 'import os; os.system("task format")'
+            language: python

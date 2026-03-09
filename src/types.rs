@@ -6,6 +6,10 @@ use std::fmt;
 use std::str::FromStr;
 use strum_macros::{Display, EnumString};
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Chain {
     #[strum(
@@ -99,6 +103,7 @@ impl Chain {
 }
 
 /// Numbering schemes for output
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Scheme {
     /// IMGT numbering (canonical internal representation)
@@ -111,6 +116,7 @@ pub enum Scheme {
 
 /// Position in a numbered sequence
 /// Can be a simple number or a number with an insertion letter (e.g., "111A")
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {
     /// The numeric part of the position (max 128 for IMGT)
