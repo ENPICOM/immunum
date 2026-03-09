@@ -52,4 +52,49 @@ impl Annotator {
             .unwrap();
         Ok(result)
     }
+
+    pub fn __setstate__(
+        &mut self,
+        state: &pyo3::Bound<'_, pyo3::types::PyBytes>,
+    ) -> pyo3::PyResult<()> {
+        let wrapper: AnnotatorSerializationWrapper = from_bytes(state.as_bytes()).unwrap();
+        self.matrices = wrapper.inner.matrices;
+        self.scheme = wrapper.inner.scheme;
+        Ok(())
+    }
+
+    pub fn __getstate__<'py>(
+        &self,
+        py: pyo3::Python<'py>,
+    ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyBytes>> {
+        let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
+        Ok(pyo3::types::PyBytes::new(
+            py,
+            &to_allocvec(&wrapper.inner).unwrap(),
+        ))
+    }
+    pub fn __getnewargs__(&self) -> pyo3::PyResult<(Vec<String>, String)> {
+        let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
+        Ok((wrapper.inner.chains.clone(),))
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct AnnotatorSerializationWrapper {
+    inner: Annotator,
+}
+
+impl AnnotatorSerializationWrapper {
+    fn from_annotator(annotator: &Annotator) -> Self {
+        AnnotatorSerializationWrapper {
+            inner: annotator.clone(),
+        }
+    }
+}
+
+#[pymodule]
+fn _internal(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add_class::<Annotator>()?;
+    Ok(())
 }

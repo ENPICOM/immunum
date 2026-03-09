@@ -28,10 +28,10 @@ pub struct NumberingResult {
 
 /// Annotator for numbering sequences
 #[cfg_attr(feature = "python", pyclass)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Annotator {
-    matrices: Vec<(Chain, ScoringMatrix)>,
-    scheme: Scheme,
+    pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
+    pub(crate) scheme: Scheme,
 }
 
 impl Annotator {
