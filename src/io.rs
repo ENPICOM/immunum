@@ -52,6 +52,47 @@ impl OutputFormat {
             Self::Jsonl => write_jsonl(writer, records),
         }
     }
+
+    /// Write format header (e.g. TSV column names, JSON array opening)
+    pub fn write_header(&self, writer: &mut impl Write) -> io::Result<()> {
+        match self {
+            Self::Tsv => writeln!(writer, "sequence_id\tchain\tscheme\tposition\tresidue"),
+            Self::Json => writeln!(writer, "["),
+            Self::Jsonl => Ok(()),
+        }
+    }
+
+    /// Write a single numbered record
+    pub fn write_record(
+        &self,
+        writer: &mut impl Write,
+        record: &NumberedRecord,
+        index: usize,
+    ) -> io::Result<()> {
+        match self {
+            Self::Tsv => write_tsv_record(writer, record),
+            Self::Json => {
+                if index > 0 {
+                    writeln!(writer, ",")?;
+                }
+                let json = record_to_json(record);
+                serde_json::to_writer_pretty(&mut *writer, &json).map_err(io::Error::other)
+            }
+            Self::Jsonl => {
+                let json = record_to_json(record);
+                serde_json::to_writer(&mut *writer, &json).map_err(io::Error::other)?;
+                writeln!(writer)
+            }
+        }
+    }
+
+    /// Write format footer (e.g. JSON array closing)
+    pub fn write_footer(&self, writer: &mut impl Write) -> io::Result<()> {
+        match self {
+            Self::Json => writeln!(writer, "\n]"),
+            _ => Ok(()),
+        }
+    }
 }
 
 /// Read input records: auto-detects FASTA file, stdin, or raw sequence string
@@ -142,13 +183,19 @@ pub fn read_fasta(reader: impl BufRead) -> Result<Vec<Record>, String> {
 pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     writeln!(writer, "sequence_id\tchain\tscheme\tposition\tresidue")?;
     for rec in records {
-        for (pos, ch) in rec.result.positions.iter().zip(rec.sequence.chars()) {
-            writeln!(
-                writer,
-                "{}\t{}\t{}\t{}\t{}",
-                rec.id, rec.result.chain, rec.result.scheme, pos, ch
-            )?;
-        }
+        write_tsv_record(writer, rec)?;
+    }
+    Ok(())
+}
+
+/// Write a single record in TSV format (without header)
+fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result<()> {
+    for (pos, ch) in rec.result.positions.iter().zip(rec.sequence.chars()) {
+        writeln!(
+            writer,
+            "{}\t{}\t{}\t{}\t{}",
+            rec.id, rec.result.chain, rec.result.scheme, pos, ch
+        )?;
     }
     Ok(())
 }
