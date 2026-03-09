@@ -55,9 +55,10 @@ impl Annotator {
         &mut self,
         state: &pyo3::Bound<'_, pyo3::types::PyBytes>,
     ) -> pyo3::PyResult<()> {
-        let wrapper: AnnotatorSerializationWrapper = from_bytes(state.as_bytes()).unwrap();
-        self.matrices = wrapper.inner.matrices;
-        self.scheme = wrapper.inner.scheme;
+        let annotator: Annotator = from_bytes(state.as_bytes()).unwrap();
+        self.matrices = annotator.matrices;
+        self.scheme = annotator.scheme;
+        self.chains = annotator.chains;
         Ok(())
     }
 
@@ -65,37 +66,17 @@ impl Annotator {
         &self,
         py: pyo3::Python<'py>,
     ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyBytes>> {
-        let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
-        Ok(pyo3::types::PyBytes::new(
-            py,
-            &to_allocvec(&wrapper.inner).unwrap(),
-        ))
+        Ok(pyo3::types::PyBytes::new(py, &to_allocvec(&self).unwrap()))
     }
     pub fn __getnewargs__(&self) -> pyo3::PyResult<(Vec<String>, String)> {
-        let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
         Ok((
-            wrapper
-                .inner
-                .chains
+            self.chains
                 .clone()
                 .iter()
                 .map(move |s| s.to_string())
                 .collect(),
-            wrapper.inner.scheme.to_string(),
+            self.scheme.to_string(),
         ))
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub(crate) struct AnnotatorSerializationWrapper {
-    pub(crate) inner: Annotator,
-}
-
-impl AnnotatorSerializationWrapper {
-    pub(crate) fn from_annotator(annotator: &Annotator) -> Self {
-        AnnotatorSerializationWrapper {
-            inner: annotator.clone(),
-        }
     }
 }
 

@@ -11,28 +11,16 @@ static ALLOC: PolarsAllocator = PolarsAllocator::new();
 
 #[derive(Serialize, Deserialize)]
 struct NumberKwargs {
-    chains: Vec<String>,
-    scheme: String,
+    annotator: Annotator,
 }
 
 #[polars_expr(output_type=Int64)]
 fn numbering_end_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
-    let chains: Vec<Chain> = kwargs
-        .chains
-        .iter()
-        .map(|s| Chain::from_str(s))
-        .collect::<Result<_, _>>()
-        .map_err(|e| PolarsError::ComputeError(e.to_string().into()))?;
-    let scheme = Scheme::from_str(&kwargs.scheme)
-        .map_err(|e| PolarsError::ComputeError(e.to_string().into()))?;
-    let annotator = Annotator::new(&chains, scheme)
-        .map_err(|e| PolarsError::ComputeError(e.to_string().into()))?;
-
     let ca = inputs[0].str()?;
     let mut builder = PrimitiveChunkedBuilder::<Int64Type>::new(ca.name().clone(), ca.len());
     ca.into_iter().for_each(|opt_v: Option<&str>| match opt_v {
         None => builder.append_null(),
-        Some(value) => match annotator.number(value) {
+        Some(value) => match kwargs.annotator.number(value) {
             Ok(result) => builder.append_value(result.end as i64),
             Err(_) => builder.append_null(),
         },

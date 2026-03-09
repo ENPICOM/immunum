@@ -21,8 +21,5 @@ def numbering_end_expr(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr
         plugin_path=LIB,
         function_name="numbering_end_expr",
         is_elementwise=True,
-        kwargs={
-            "chains": [str(c) for c in annotator.chains],
-            "scheme": str(annotator.scheme),
-        },
+        kwargs={"annotator": annotator},
     )
