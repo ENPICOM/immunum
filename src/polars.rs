@@ -3,13 +3,41 @@ use polars::prelude::*;
 use postcard::{from_bytes, to_allocvec};
 use pyo3_polars::derive::polars_expr;
 use pyo3_polars::PolarsAllocator;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[global_allocator]
 static ALLOC: PolarsAllocator = PolarsAllocator::new();
 
+fn deserialize_annotator_from_bytes<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<Annotator, D::Error> {
+    struct BytesVisitor;
+    impl<'de> serde::de::Visitor<'de> for BytesVisitor {
+        type Value = Vec<u8>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "byte array")
+        }
+        fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<Vec<u8>, E> {
+            Ok(v.to_vec())
+        }
+        fn visit_byte_buf<E: serde::de::Error>(self, v: Vec<u8>) -> Result<Vec<u8>, E> {
+            Ok(v)
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Vec<u8>, A::Error> {
+            let mut bytes = Vec::new();
+            while let Some(b) = seq.next_element::<u8>()? {
+                bytes.push(b);
+            }
+            Ok(bytes)
+        }
+    }
+    let bytes = d.deserialize_bytes(BytesVisitor)?;
+    postcard::from_bytes(&bytes).map_err(serde::de::Error::custom)
+}
+
 #[derive(Serialize, Deserialize)]
 struct NumberKwargs {
+    #[serde(deserialize_with = "deserialize_annotator_from_bytes")]
     annotator: Annotator,
 }
 

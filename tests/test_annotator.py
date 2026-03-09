@@ -1,11 +1,13 @@
 import immunum
 import pytest
 import pickle
+import polars as pl
 
 
 ALL_CHAINS = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
 AB_CHAINS = ["IGH", "IGK", "IGL"]
 TCR_CHAINS = ["TRA", "TRB", "TRG", "TRD"]
+SEQ = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
 
 
 @pytest.fixture(
@@ -71,11 +73,14 @@ class TestAnnotatorInit:
         with pytest.raises(ValueError):
             immunum.Annotator(chains, scheme)
 
-    def test_number_smoke(self, annotator):
-        seq = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
+    def test_number_smoke(self, annotator, seq=SEQ):
         annotator.number(seq)
 
-    def test_pickle(self, annotator):
-        seq = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
+    def test_pickle(self, annotator, seq=SEQ):
         re_annotator = pickle.loads(pickle.dumps(annotator))
         re_annotator.number(seq)
+
+    def test_polars_smoke(self, annotator, seq=SEQ):
+        df = pl.DataFrame({"sequence": [seq]})
+        res = df.select(immunum.numbering_end_expr(pl.col("seq"), annotator=annotator))
+        assert res.get_column("seq").to_list()[0] == 124

@@ -7,7 +7,7 @@ default-run = "immunum"
 [features]
 default = ["python"]
 python = ["dep:pyo3", "dep:postcard", "dep:pyo3-build-config"]
-polars = ["dep:polars", "dep:polars-arrow", "dep:pyo3-polars"]
+polars = ["dep:polars", "dep:polars-arrow", "dep:pyo3-polars", "dep:postcard"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
