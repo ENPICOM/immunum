@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.10.2,<2.0", "polars>=1.8.2"]
+requires = ["maturin>=1.10.2,<2.0", "polars>1.30.0"]
 build-backend = "maturin"
 
 [project]
@@ -22,6 +22,7 @@ features = ["python"]
 
 
 [dependency-groups]
+polars = ["polars>1.30.0"]
 dev = [
     "antpack==0.3.8",
     "coverage>=7.10.6",
@@ -41,10 +42,7 @@ dev = [
 
 [tool.uv]
 default-groups = ["dev"]
-cache-keys = [
-    { file = "./Cargo.toml" },
-    { file = "./**/*.rs" },
-]
+cache-keys = [{ file = "./Cargo.toml" }, { file = "./**/*.rs" }]
 
 [tool.uv.workspace]
 members = ["."]
@@ -56,7 +54,7 @@ project-excludes = [
     "**/__pycache__",
     "**/*venv/**/*",
     "**/.[!/.]*/**/*",
-    "scripts/*"
+    "scripts/*",
 ]
 
 [tool.uv.sources]
