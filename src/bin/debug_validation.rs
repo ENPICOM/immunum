@@ -272,7 +272,7 @@ fn main() {
             }
         };
 
-        let result = match validate_entry(entry, &annotator, scheme) {
+        let result = match validate_entry(entry, &annotator) {
             Ok(r) => r,
             Err(err) => {
                 eprintln!("Error validating entry: {}", err);
@@ -284,7 +284,7 @@ fn main() {
         // Show all imperfect entries
         let mut imperfect_count = 0;
         for entry in &entries {
-            let result = match validate_entry(entry, &annotator, scheme) {
+            let result = match validate_entry(entry, &annotator) {
                 Ok(r) => r,
                 Err(err) => {
                     eprintln!("Error validating entry '{}': {}", entry.header, err);

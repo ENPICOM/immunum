@@ -16,6 +16,7 @@ thiserror = "2.0"
 chrono = "0.4"
 strum = "0.27"
 strum_macros = "0.27"
+clap = { version = "4.5.60", features = ["derive"] }
 
 pyo3 = { version = "0.25.0", features = [
     "abi3-py39",
@@ -31,6 +32,11 @@ pyo3-polars = { version = "0.24.0", features = [
     "dtype-array",
 ], optional = true }
 
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
 
 [build-dependencies]
 serde = { version = "1.0", features = ["derive"] }

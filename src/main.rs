@@ -1,61 +1,93 @@
-use immunum::{Annotator, Chain};
+use std::fs::File;
+use std::io::{self, BufWriter, IsTerminal, Write};
+use std::str::FromStr;
 
-const ALL_CHAINS: &[Chain] = &[
-    Chain::IGH,
-    Chain::IGK,
-    Chain::IGL,
-    Chain::TRA,
-    Chain::TRB,
-    Chain::TRG,
-    Chain::TRD,
-];
+use clap::{Args, Parser, Subcommand};
+use immunum::{Annotator, Chain, NumberedRecord, OutputFormat, Scheme};
 
-fn main() {
-    println!("immunum - Antibody and TCR Numbering Tool\n");
+#[derive(Parser)]
+#[command(name = "immunum", about = "Immune receptor sequence numbering")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
 
-    // Create annotator with all chain types for auto-detection
-    let annotator = match Annotator::new(ALL_CHAINS, immunum::Scheme::IMGT) {
-        Ok(a) => a,
-        Err(e) => {
-            eprintln!("Error creating annotator: {}", e);
-            return;
+#[derive(Subcommand)]
+enum Commands {
+    /// Number sequences using a specified scheme and chain type
+    Number(NumberArgs),
+}
+
+#[derive(Args)]
+struct NumberArgs {
+    /// Input sequence string, FASTA file path, or "-" for stdin (default)
+    input: Option<String>,
+    /// Output file path (default: stdout)
+    output: Option<String>,
+    /// Numbering scheme: imgt (i), kabat (k)
+    #[arg(short, long, default_value = "imgt")]
+    scheme: String,
+    /// Chain filter: h,k,l,a,b,g,d or groups: ig, tcr, all
+    #[arg(short, long, default_value = "ig")]
+    chain: String,
+    /// Output format: tsv, json, jsonl
+    #[arg(short, long, default_value = "tsv")]
+    format: String,
+}
+
+fn run_number(args: &NumberArgs) -> Result<(), String> {
+    if args.input.is_none() && io::stdin().is_terminal() {
+        return Err(
+            "no input provided. Usage: immunum number <sequence|file.fasta> or pipe via stdin"
+                .to_string(),
+        );
+    }
+
+    let scheme =
+        Scheme::from_str(&args.scheme).map_err(|_| format!("unknown scheme '{}'", args.scheme))?;
+    let chains = Chain::parse_chain_spec(&args.chain).map_err(|e| e.to_string())?;
+    let format = OutputFormat::from_str(&args.format)?;
+    let annotator = Annotator::new(&chains, scheme)
+        .map_err(|e| format!("failed to create annotator: {}", e))?;
+
+    let records = immunum::read_input(args.input.as_deref())?;
+
+    let mut numbered: Vec<NumberedRecord> = Vec::new();
+    for rec in records {
+        let result = annotator
+            .number(&rec.sequence)
+            .map_err(|e| format!("failed to number '{}': {}", rec.id, e))?;
+        numbered.push(NumberedRecord {
+            id: rec.id,
+            sequence: rec.sequence,
+            result,
+        });
+    }
+
+    let stdout = io::stdout();
+    let mut writer: BufWriter<Box<dyn Write>> = match &args.output {
+        Some(path) => {
+            let file =
+                File::create(path).map_err(|e| format!("cannot create '{}': {}", path, e))?;
+            BufWriter::new(Box::new(file))
         }
+        None => BufWriter::new(Box::new(stdout.lock())),
     };
 
-    println!("Loaded annotator with {} chain types\n", ALL_CHAINS.len());
+    format
+        .write(&mut writer, &numbered)
+        .map_err(|e| format!("write error: {}", e))?;
 
-    // Test sequences
-    let test_sequences = vec![
-        (
-            "IGH",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN",
-        ),
-        (
-            "IGK",
-            "DIQMTQSPSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQSYSTPLTFGGGTKVEIK",
-        ),
-    ];
+    Ok(())
+}
 
-    for (expected, sequence) in test_sequences {
-        println!("Sequence: {}... (len={})", &sequence[..40], sequence.len());
-        println!("Expected chain: {}\n", expected);
-
-        match annotator.annotate(sequence) {
-            Ok(result) => {
-                println!("Detected chain: {}", result.chain);
-                println!("Confidence: {:.2}", result.confidence);
-                println!("Alignment score: {:.2}", result.alignment.score);
-
-                let numbering = result.numbering(immunum::Scheme::IMGT);
-                println!("\nNumbering (first 10 positions):");
-                for (i, (aa, pos)) in sequence.chars().zip(numbering.iter()).take(10).enumerate() {
-                    println!("  {}: {} -> {}", i + 1, aa, pos);
-                }
-                println!("\n{}\n", "=".repeat(60));
-            }
-            Err(e) => {
-                eprintln!("Error annotating sequence: {}\n", e);
-            }
-        }
+fn main() {
+    let cli = Cli::parse();
+    let result = match &cli.command {
+        Commands::Number(args) => run_number(args),
+    };
+    if let Err(e) = result {
+        eprintln!("error: {}", e);
+        std::process::exit(1);
     }
 }

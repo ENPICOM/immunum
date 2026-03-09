@@ -223,7 +223,6 @@ fn traceback(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::imgt::get_imgt_numbering;
     use crate::scoring::ScoringMatrix;
     use crate::Chain;
 
@@ -244,49 +243,10 @@ mod tests {
     }
 
     #[test]
-    fn test_numbering() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        let sequence =
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
-
-        let result = align(sequence, &matrix.positions).unwrap();
-        let numbering = get_imgt_numbering(&result);
-
-        assert_eq!(numbering.len(), sequence.len());
-        assert!(numbering[0].number > 0);
-    }
-
-    #[test]
     fn test_empty_sequence() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let result = align("", &matrix.positions);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_numbering_length_matches_sequence() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-
-        // Test with different sequences
-        let sequences = vec![
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN",
-            "QVQLQQSGAELMKPGASVKISCKATGYTFSSYWIEWVKQRPGHGLEWIGEILPGSGSTNY",
-            "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAR",
-        ];
-
-        for seq in sequences {
-            let result = align(seq, &matrix.positions).unwrap();
-            let numbering = get_imgt_numbering(&result);
-
-            assert_eq!(
-                numbering.len(),
-                seq.len(),
-                "Numbering length {} doesn't match sequence length {} for sequence starting with {}",
-                numbering.len(),
-                seq.len(),
-                &seq[..20.min(seq.len())]
-            );
-        }
     }
 
     #[test]

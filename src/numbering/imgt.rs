@@ -1,6 +1,4 @@
-use crate::alignment::Alignment;
-use crate::numbering::apply_numbering;
-use crate::types::{NumberingRule, Position};
+use crate::types::NumberingRule;
 use crate::Insertion;
 
 // =============================================================================
@@ -47,15 +45,10 @@ pub const IMGT_RULES: &[NumberingRule] = &[
     NumberingRule::fr(118, 128),
 ];
 
-/// Get IMGT-specific numbering: FR regions from alignment, CDR regions from IMGT rules
-pub fn get_imgt_numbering(alignment: &Alignment) -> Vec<Position> {
-    apply_numbering(&alignment.positions, IMGT_RULES)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbering::number_with_config;
+    use crate::numbering::number_with_rules;
 
     #[test]
     fn test_cdr1_numbering() {
@@ -117,7 +110,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = number_with_config(length, rule);
+            let positions = number_with_rules(length, rule);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);
@@ -183,7 +176,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = number_with_config(length, rule);
+            let positions = number_with_rules(length, rule);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);
@@ -302,7 +295,7 @@ mod tests {
                 ],
             ),
         ] {
-            let positions = number_with_config(length, rule);
+            let positions = number_with_rules(length, rule);
             assert_eq!(positions.len(), length);
             let pos_strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
             assert_eq!(pos_strings, output_strings, "Failed for length {}", length);

@@ -14,64 +14,91 @@ use pyo3::prelude::*;
 pub enum Chain {
     #[strum(
         serialize = "IGH",
-        serialize = "H",
+        to_string = "H",
         serialize = "heavy",
         ascii_case_insensitive
     )]
     IGH,
     #[strum(
         serialize = "IGK",
-        serialize = "K",
+        to_string = "K",
         serialize = "kappa",
         ascii_case_insensitive
     )]
     IGK,
     #[strum(
         serialize = "IGL",
-        serialize = "L",
+        to_string = "L",
         serialize = "lambda",
         ascii_case_insensitive
     )]
     IGL,
     #[strum(
         serialize = "TRA",
-        serialize = "A",
+        to_string = "A",
         serialize = "alpha",
         ascii_case_insensitive
     )]
     TRA,
     #[strum(
         serialize = "TRB",
-        serialize = "B",
+        to_string = "B",
         serialize = "beta",
         ascii_case_insensitive
     )]
     TRB,
     #[strum(
         serialize = "TRG",
-        serialize = "G",
+        to_string = "G",
         serialize = "gamma",
         ascii_case_insensitive
     )]
     TRG,
     #[strum(
         serialize = "TRD",
-        serialize = "D",
+        to_string = "D",
         serialize = "delta",
         ascii_case_insensitive
     )]
     TRD,
 }
 
-impl Chain {
-    /// Returns true if this is an immunoglobulin chain
-    pub fn is_immunoglobulin(&self) -> bool {
-        matches!(self, Chain::IGH | Chain::IGK | Chain::IGL)
-    }
+/// All chain variants
+pub const ALL_CHAINS: &[Chain] = &[
+    Chain::IGH,
+    Chain::IGK,
+    Chain::IGL,
+    Chain::TRA,
+    Chain::TRB,
+    Chain::TRG,
+    Chain::TRD,
+];
 
-    /// Returns true if this is a T-cell receptor chain
-    pub fn is_tcr(&self) -> bool {
-        matches!(self, Chain::TRA | Chain::TRB | Chain::TRG | Chain::TRD)
+/// All immunoglobulin chains
+pub const IG_CHAINS: &[Chain] = &[Chain::IGH, Chain::IGK, Chain::IGL];
+
+/// All T-cell receptor chains
+pub const TCR_CHAINS: &[Chain] = &[Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD];
+
+impl Chain {
+    /// Parse a chain spec string: group aliases (ig, tcr, all) or comma-separated chains
+    pub fn parse_chain_spec(s: &str) -> Result<Vec<Chain>> {
+        match s.to_lowercase().as_str() {
+            "all" => Ok(ALL_CHAINS.to_vec()),
+            "ig" => Ok(IG_CHAINS.to_vec()),
+            "tcr" => Ok(TCR_CHAINS.to_vec()),
+            _ => s
+                .split(',')
+                .map(|c| {
+                    Chain::from_str(c.trim()).map_err(|_| {
+                        Error::InvalidChain(format!(
+                            "unknown chain '{}' (options: h,k,l,a,b,g,d,ig,tcr,all)",
+                            c.trim()
+                        ))
+                    })
+                })
+                .collect(),
+        }
     }
 }
 
@@ -80,10 +107,10 @@ impl Chain {
 #[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Scheme {
     /// IMGT numbering (canonical internal representation)
-    #[strum(serialize = "IMGT", ascii_case_insensitive)]
+    #[strum(to_string = "IMGT", serialize = "i", ascii_case_insensitive)]
     IMGT,
     /// Kabat numbering (derived from IMGT)
-    #[strum(serialize = "Kabat", ascii_case_insensitive)]
+    #[strum(to_string = "Kabat", serialize = "k", ascii_case_insensitive)]
     Kabat,
 }
 
@@ -273,8 +300,9 @@ mod tests {
     #[test]
     fn test_chain_parsing() {
         assert_eq!("IGH".parse::<Chain>().unwrap(), Chain::IGH);
-        assert_eq!("H".parse::<Chain>().unwrap(), Chain::IGH);
         assert_eq!("igh".parse::<Chain>().unwrap(), Chain::IGH);
+        assert_eq!("H".parse::<Chain>().unwrap(), Chain::IGH);
+        assert_eq!("heavy".parse::<Chain>().unwrap(), Chain::IGH);
         assert_eq!("TRA".parse::<Chain>().unwrap(), Chain::TRA);
         assert_eq!("A".parse::<Chain>().unwrap(), Chain::TRA);
         assert!("invalid".parse::<Chain>().is_err());
@@ -296,16 +324,25 @@ mod tests {
     }
 
     #[test]
-    fn test_position_display() {
-        assert_eq!(Position::new(111).to_string(), "111");
-        assert_eq!(Position::with_insertion(111, 'A').to_string(), "111A");
+    fn test_parse_chain_spec_groups() {
+        let ig = Chain::parse_chain_spec("ig").unwrap();
+        assert_eq!(ig, vec![Chain::IGH, Chain::IGK, Chain::IGL]);
+
+        let tcr = Chain::parse_chain_spec("tcr").unwrap();
+        assert_eq!(tcr, vec![Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD]);
+
+        let all = Chain::parse_chain_spec("all").unwrap();
+        assert_eq!(all.len(), 7);
     }
 
     #[test]
-    fn test_chain_types() {
-        assert!(Chain::IGH.is_immunoglobulin());
-        assert!(!Chain::IGH.is_tcr());
-        assert!(Chain::TRA.is_tcr());
-        assert!(!Chain::TRA.is_immunoglobulin());
+    fn test_parse_chain_spec_csv() {
+        let chains = Chain::parse_chain_spec("h,k,l").unwrap();
+        assert_eq!(chains, vec![Chain::IGH, Chain::IGK, Chain::IGL]);
+    }
+
+    #[test]
+    fn test_parse_chain_spec_invalid() {
+        assert!(Chain::parse_chain_spec("xyz").is_err());
     }
 }
