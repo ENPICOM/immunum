@@ -5,7 +5,6 @@ use pyo3::prelude::*;
 
 use crate::annotator::{Annotator, NumberingResult};
 use crate::types::{Chain, Scheme};
-use serde::{Deserialize, Serialize};
 
 #[pymethods]
 impl Annotator {
@@ -68,6 +67,7 @@ impl Annotator {
     ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::types::PyBytes>> {
         Ok(pyo3::types::PyBytes::new(py, &to_allocvec(&self).unwrap()))
     }
+
     pub fn __getnewargs__(&self) -> pyo3::PyResult<(Vec<String>, String)> {
         Ok((
             self.chains
@@ -75,7 +75,7 @@ impl Annotator {
                 .iter()
                 .map(move |s| s.to_string())
                 .collect(),
-            self.scheme.to_string(),
+            self.scheme.to_string().clone(),
         ))
     }
 }
