@@ -29,6 +29,7 @@ pub use validation::{load_validation_csv, validate_entry, ValidationEntry, Valid
 
 #[cfg(feature = "python")]
 mod python;
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 #[cfg(feature = "python")]
