@@ -19,21 +19,18 @@ fn main() {
     let annotator =
         Annotator::new(&[Chain::IGH], Scheme::IMGT).expect("Failed to create annotator");
 
-    // Warm up cache by annotating 100 sequences first (to load scoring matrices, etc.)
+    // Warm up by numbering 100 sequences first (to load scoring matrices, etc.)
     for seq in sequences.iter().take(100) {
-        let _ = annotator.annotate(seq);
+        let _ = annotator.number(seq);
     }
 
     // Benchmark
     let start = Instant::now();
 
     for seq in &sequences {
-        // annotate and number the output alignment with imgt scheme
-        match annotator.annotate(seq) {
-            Ok(result) => {
-                let _ = result.numbering(Scheme::IMGT);
-            }
-            Err(e) => eprintln!("Failed to annotate sequence: {}", e),
+        match annotator.number(seq) {
+            Ok(_) => {}
+            Err(e) => eprintln!("Failed to number sequence: {}", e),
         }
     }
 

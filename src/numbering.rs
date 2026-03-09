@@ -2,18 +2,24 @@ pub mod imgt;
 pub mod kabat;
 
 use crate::alignment::AlignedPosition;
-use crate::types::{Insertion, NumberingRule, Position};
+use crate::imgt::IMGT_RULES;
+use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
+use crate::types::{Chain, Insertion, NumberingRule, Position, Scheme};
 
-/// Apply numbering directly to alignment results using numbering rules
-///
-/// Processes alignment in two phases:
-/// 1. Extract consensus positions from alignment (skipping gaps)
-/// 2. Apply rule-based numbering scheme
+/// Apply a numbering scheme to aligned positions
 pub fn apply_numbering(
     aligned_positions: &[AlignedPosition],
-    rules: &[NumberingRule],
+    scheme: Scheme,
+    chain: Chain,
 ) -> Vec<Position> {
     let consensus_positions = extract_consensus_positions(aligned_positions);
+
+    let rules = match (scheme, chain) {
+        (Scheme::IMGT, _) => IMGT_RULES,
+        (Scheme::Kabat, Chain::IGH) => KABAT_HEAVY_RULES,
+        (Scheme::Kabat, Chain::IGK) | (Scheme::Kabat, Chain::IGL) => KABAT_LIGHT_RULES,
+        _ => unreachable!("invalid scheme/chain combination should be prevented by Annotator"),
+    };
     number_by_rules(&consensus_positions, rules)
 }
 
@@ -68,7 +74,7 @@ fn number_by_rules(consensus_positions: &[u8], rules: &[NumberingRule]) -> Vec<P
                 ));
             }
             _ => {
-                numbered_positions.extend(number_with_config(rule_len, rule));
+                numbered_positions.extend(number_with_rules(rule_len, rule));
             }
         }
     }
@@ -103,10 +109,10 @@ fn number_with_offset(positions: &[u8], align_start: u8, num_start: u8) -> Vec<P
     result
 }
 
-/// Generate positions for a CDR region based on its length and rule
+/// Generate positions for a CDR-like region based on its length and rules
 ///
 /// Handles both deletions (len < base range) and insertions (len > base range).
-pub fn number_with_config(len: usize, rule: &NumberingRule) -> Vec<Position> {
+pub fn number_with_rules(len: usize, rule: &NumberingRule) -> Vec<Position> {
     if len == 0 {
         return Vec::new();
     }

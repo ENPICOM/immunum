@@ -7,6 +7,7 @@
 pub mod alignment;
 pub mod annotator;
 pub mod error;
+pub mod io;
 pub mod numbering;
 pub mod scoring;
 pub mod types;
@@ -17,8 +18,11 @@ pub use numbering::imgt;
 pub use numbering::kabat;
 
 pub use alignment::{align, Alignment};
-pub use annotator::{AnnotationResult, Annotator};
+pub use annotator::{Annotator, NumberingResult};
 pub use error::{Error, Result};
+pub use io::{read_fasta, read_input, NumberedRecord, OutputFormat, Record};
 pub use scoring::ScoringMatrix;
-pub use types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
+pub use types::{
+    Chain, Insertion, NumberingRule, Position, Region, Scheme, ALL_CHAINS, IG_CHAINS, TCR_CHAINS,
+};
 pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};

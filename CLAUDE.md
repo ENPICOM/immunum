@@ -9,7 +9,7 @@
   - Use `cargo test` to run all tests
   - Use `cargo test --lib <module>::tests::<test_name>` for specific tests
 
-- **Code Quality**: Run before committing
+- **Code Quality**: Always run at the end of task
   - `cargo fmt` - Auto-format code
   - `cargo clippy` - Lint and catch common mistakes
   - `cargo test` - Verify all tests pass
@@ -33,15 +33,18 @@
 - **error.rs**: Error types using thiserror
 - **scoring.rs**: Position-specific scoring matrices loaded from build-time generated JSON
 - **alignment.rs**: Needleman-Wunsch semi-global alignment with IMGT-aware region numbering
-- **imgt.rs**: IMGT numbering rules for CDR1/2/3 with symmetric insertions
+- **numbering.rs**: Numbering module entry point
+- **numbering/imgt.rs**: IMGT numbering rules for CDR1/2/3 with symmetric insertions
+- **numbering/kabat.rs**: Kabat numbering rules
 - **annotator.rs**: High-level API for sequence annotation with auto chain detection
-- **consensus.rs**: Consensus sequence parsing and representation
+- **io.rs**: Input parsing (FASTA, raw sequences) and output formatting (TSV, JSON, JSONL)
 - **validation.rs**: Validation framework comparing numbering against test datasets
 
 ### Binaries (`src/bin/`, `src/main.rs`)
-- **main.rs**: Example CLI demonstrating annotator usage
+- **main.rs**: CLI binary (`immunum number` command with scheme/chain/format options)
 - **debug_validation.rs**: Debug tool for visualizing alignment mismatches with expected vs actual positions
 - **benchmark.rs**: Generate validation metrics report (writes BENCHMARKS.toml, prints deltas)
+- **speed_benchmark.rs**: Performance benchmarks
 
 ### Build System
 - **build.rs**: Compile-time generation of scoring matrices from CSV consensus files with region-aware gap/insertion penalties
