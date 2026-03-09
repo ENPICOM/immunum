@@ -22,7 +22,7 @@ tasks:
 
     test:
         aliases: [t]
-        cmd: uv run pytest -m "not property" -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
+        cmd: uv run pytest -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
 
     lint:
         cmd: uv run ruff check --config pyproject.toml
