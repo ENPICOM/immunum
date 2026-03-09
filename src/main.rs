@@ -53,16 +53,15 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
     let records = immunum::read_input(args.input.as_deref())?;
 
     let mut numbered: Vec<NumberedRecord> = Vec::new();
-    for rec in &records {
+    for rec in records {
         let result = annotator
-            .annotate(&rec.sequence)
-            .map_err(|e| format!("failed to annotate '{}': {}", rec.id, e))?;
-        numbered.push(NumberedRecord::from_annotation(
-            rec.id.clone(),
-            &rec.sequence,
-            &result,
-            scheme,
-        ));
+            .number(&rec.sequence)
+            .map_err(|e| format!("failed to number '{}': {}", rec.id, e))?;
+        numbered.push(NumberedRecord {
+            id: rec.id,
+            sequence: rec.sequence,
+            result,
+        });
     }
 
     let stdout = io::stdout();

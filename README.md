@@ -34,13 +34,12 @@ let annotator = Annotator::new(
 
 let sequence = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
-let alignment = annotator.annotate(sequence).unwrap();
+let result = annotator.number(sequence).unwrap();
 
-println!("Chain: {}", alignment.chain);        // IGH
-println!("Confidence: {:.2}", alignment.confidence);
+println!("Chain: {}", result.chain);        // IGH
+println!("Confidence: {:.2}", result.confidence);
 
-let numbering = alignment.numbering(Scheme::IMGT);
-for (aa, pos) in sequence.chars().zip(numbering.iter()) {
+for (aa, pos) in sequence.chars().zip(result.positions.iter()) {
     println!("{} -> {}", aa, pos);
 }
 ```

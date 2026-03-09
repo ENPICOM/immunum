@@ -1,7 +1,6 @@
 //! Input parsing and output formatting for sequence records
 
-use crate::annotator::AnnotationResult;
-use crate::types::{Chain, Scheme};
+use crate::annotator::NumberingResult;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
@@ -13,35 +12,11 @@ pub struct Record {
     pub sequence: String,
 }
 
-/// An annotated record ready for output
+/// A numbered record: input record paired with its numbering result
 pub struct NumberedRecord {
     pub id: String,
-    pub chain: Chain,
-    pub scheme: Scheme,
-    pub numbering: Vec<(String, char)>,
-}
-
-impl NumberedRecord {
-    /// Build from an annotation result, pairing positions with sequence characters
-    pub fn from_annotation(
-        id: String,
-        sequence: &str,
-        result: &AnnotationResult,
-        scheme: Scheme,
-    ) -> Self {
-        let positions = result.numbering(scheme);
-        let numbering = positions
-            .iter()
-            .zip(sequence.chars())
-            .map(|(pos, ch)| (pos.to_string(), ch))
-            .collect();
-        Self {
-            id,
-            chain: result.chain,
-            scheme,
-            numbering,
-        }
-    }
+    pub sequence: String,
+    pub result: NumberingResult,
 }
 
 /// Output format
@@ -69,8 +44,12 @@ impl FromStr for OutputFormat {
 }
 
 impl OutputFormat {
-    /// Write records in this format
-    pub fn write(&self, writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
+    /// Write numbered records in this format
+    pub fn write(
+        &self,
+        writer: &mut impl Write,
+        records: &[NumberedRecord],
+    ) -> io::Result<()> {
         match self {
             Self::Tsv => write_tsv(writer, records),
             Self::Json => write_json(writer, records),
@@ -167,11 +146,11 @@ pub fn read_fasta(reader: impl BufRead) -> Result<Vec<Record>, String> {
 pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     writeln!(writer, "sequence_id\tchain\tscheme\tposition\tresidue")?;
     for rec in records {
-        for (pos, res) in &rec.numbering {
+        for (pos, ch) in rec.result.positions.iter().zip(rec.sequence.chars()) {
             writeln!(
                 writer,
                 "{}\t{}\t{}\t{}\t{}",
-                rec.id, rec.chain, rec.scheme, pos, res
+                rec.id, rec.result.chain, rec.result.scheme, pos, ch
             )?;
         }
     }
@@ -198,15 +177,17 @@ pub fn write_jsonl(writer: &mut impl Write, records: &[NumberedRecord]) -> io::R
 
 fn record_to_json(rec: &NumberedRecord) -> serde_json::Value {
     let numbering: serde_json::Map<String, serde_json::Value> = rec
-        .numbering
+        .result
+        .positions
         .iter()
-        .map(|(pos, res)| (pos.clone(), serde_json::Value::String(res.to_string())))
+        .zip(rec.sequence.chars())
+        .map(|(pos, ch)| (pos.to_string(), serde_json::Value::String(ch.to_string())))
         .collect();
 
     serde_json::json!({
         "sequence_id": rec.id,
-        "chain": rec.chain.to_string(),
-        "scheme": rec.scheme.to_string(),
+        "chain": rec.result.chain.to_string(),
+        "scheme": rec.result.scheme.to_string(),
         "numbering": numbering,
     })
 }
@@ -214,7 +195,19 @@ fn record_to_json(rec: &NumberedRecord) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{Chain, Position, Scheme};
     use std::io::Cursor;
+
+    fn simple_test_result(positions: Vec<Position>) -> NumberingResult {
+        NumberingResult {
+            chain: Chain::IGH,
+            scheme: Scheme::IMGT,
+            positions,
+            start: 0,
+            end: 0,
+            confidence: 1.0,
+        }
+    }
 
     #[test]
     fn test_read_fasta_single() {
@@ -245,11 +238,20 @@ mod tests {
 
     #[test]
     fn test_write_tsv() {
+        let result = simple_test_result(vec![
+            Position {
+                number: 1,
+                insertion: None,
+            },
+            Position {
+                number: 2,
+                insertion: None,
+            },
+        ]);
         let records = vec![NumberedRecord {
             id: "s1".to_string(),
-            chain: Chain::IGH,
-            scheme: Scheme::IMGT,
-            numbering: vec![("1".to_string(), 'E'), ("2".to_string(), 'V')],
+            sequence: "EV".to_string(),
+            result,
         }];
         let mut buf = Vec::new();
         write_tsv(&mut buf, &records).unwrap();
@@ -262,11 +264,14 @@ mod tests {
 
     #[test]
     fn test_write_jsonl() {
+        let result = simple_test_result(vec![Position {
+            number: 1,
+            insertion: None,
+        }]);
         let records = vec![NumberedRecord {
             id: "s1".to_string(),
-            chain: Chain::IGH,
-            scheme: Scheme::IMGT,
-            numbering: vec![("1".to_string(), 'E')],
+            sequence: "E".to_string(),
+            result,
         }];
         let mut buf = Vec::new();
         write_jsonl(&mut buf, &records).unwrap();
@@ -278,11 +283,14 @@ mod tests {
 
     #[test]
     fn test_write_json() {
+        let result = simple_test_result(vec![Position {
+            number: 1,
+            insertion: None,
+        }]);
         let records = vec![NumberedRecord {
             id: "s1".to_string(),
-            chain: Chain::IGH,
-            scheme: Scheme::IMGT,
-            numbering: vec![("1".to_string(), 'E')],
+            sequence: "E".to_string(),
+            result,
         }];
         let mut buf = Vec::new();
         write_json(&mut buf, &records).unwrap();

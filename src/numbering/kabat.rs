@@ -4,9 +4,7 @@
 //! - Insertions: all at a single position (35A, 35B, 35C, ...)
 //! - Deletions: from end or a custom order
 
-use crate::alignment::Alignment;
-use crate::numbering::apply_numbering;
-use crate::types::{Chain, NumberingRule, Position};
+use crate::types::NumberingRule;
 use crate::Insertion;
 
 // =============================================================================
@@ -80,13 +78,3 @@ pub const KABAT_LIGHT_RULES: &[NumberingRule] = &[
     ),
     NumberingRule::offset(117, 127, -20),
 ];
-
-/// Get Kabat-specific numbering: FR regions mapped from alignment, CDR regions from Kabat rules
-pub fn get_kabat_numbering(alignment: &Alignment, chain: Chain) -> Vec<Position> {
-    match chain {
-        Chain::IGH => apply_numbering(&alignment.positions, KABAT_HEAVY_RULES),
-        Chain::IGK => apply_numbering(&alignment.positions, KABAT_LIGHT_RULES),
-        Chain::IGL => apply_numbering(&alignment.positions, KABAT_LIGHT_RULES),
-        _ => panic!("Kabat numbering only supported for antibody chains"),
-    }
-}

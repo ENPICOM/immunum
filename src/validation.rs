@@ -173,7 +173,7 @@ pub fn validate_chain_with_scheme(
             }
         }
 
-        let result = validate_entry(entry, &annotator, scheme)?;
+        let result = validate_entry(entry, &annotator)?;
         metrics.add_result(&result);
     }
 
@@ -181,25 +181,19 @@ pub fn validate_chain_with_scheme(
 }
 
 /// Validate a single entry against the annotator
-pub fn validate_entry(
-    entry: &ValidationEntry,
-    annotator: &Annotator,
-    scheme: Scheme,
-) -> Result<ValidationResult> {
-    // Annotate the sequence
-    let result = annotator.annotate(&entry.sequence)?;
-    let numbering = result.numbering(scheme);
+pub fn validate_entry(entry: &ValidationEntry, annotator: &Annotator) -> Result<ValidationResult> {
+    // Number the sequence
+    let result = annotator.number(&entry.sequence)?;
 
     // The expected_positions are already aligned to the sequence (no gaps)
     // Each entry is (Position, amino_acid) for each residue
     // Numbering should match 1:1 with the sequence length
 
-    if numbering.len() != entry.sequence.len() {
+    if result.positions.len() != entry.sequence.len() {
         return Err(Error::AlignmentError(format!(
-            "Numbering length {} doesn't match sequence length {}. Alignment: {:?}",
-            numbering.len(),
+            "Numbering length {} doesn't match sequence length {}",
+            result.positions.len(),
             entry.sequence.len(),
-            result.alignment,
         )));
     }
 
@@ -216,7 +210,7 @@ pub fn validate_entry(
     }
 
     // Compare positions
-    for (idx, actual_pos) in numbering.iter().enumerate() {
+    for (idx, actual_pos) in result.positions.iter().enumerate() {
         if let Some(&expected_pos) = expected_by_idx.get(&idx) {
             if actual_pos == expected_pos {
                 correct_positions += 1;
@@ -234,7 +228,7 @@ pub fn validate_entry(
         header: entry.header.clone(),
         sequence: entry.sequence.clone(),
         detected_chain: result.chain,
-        numbering,
+        numbering: result.positions,
         total_positions,
         correct_positions,
         incorrect_positions,
@@ -341,7 +335,7 @@ mod tests {
                 }
             }
 
-            let result = validate_entry(entry, &annotator, scheme).unwrap();
+            let result = validate_entry(entry, &annotator).unwrap();
 
             total_sequences += 1;
             total_positions += result.total_positions;

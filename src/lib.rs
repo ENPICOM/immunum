@@ -18,7 +18,7 @@ pub use numbering::imgt;
 pub use numbering::kabat;
 
 pub use alignment::{align, Alignment};
-pub use annotator::{AnnotationResult, Annotator};
+pub use annotator::{Annotator, NumberingResult};
 pub use error::{Error, Result};
 pub use io::{read_fasta, read_input, NumberedRecord, OutputFormat, Record};
 pub use scoring::ScoringMatrix;
