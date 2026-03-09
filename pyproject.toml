@@ -3,7 +3,7 @@ requires = ["maturin>=1.10.2,<2.0", "polars>=1.8.2"]
 build-backend = "maturin"
 
 [project]
-name = "immunum-rs"
+name = "immunum"
 version = "1.0.0"
 description = "Flexible and fast antibody sequence annotation in Rust with python bindings"
 readme = "README.md"
@@ -17,7 +17,7 @@ dependencies = []
 
 
 [tool.maturin]
-module-name = "immunum_rs._internal"
+module-name = "immunum._internal"
 features = ["python"]
 
 

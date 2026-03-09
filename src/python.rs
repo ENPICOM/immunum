@@ -39,7 +39,7 @@ impl Annotator {
         Ok(annotator)
     }
 
-    #[pyo3(signature = (sequence))]
+    #[pyo3(signature = (sequence), name = "number")]
     pub fn _number(&self, sequence: &str) -> PyResult<NumberingResult> {
         let result = self
             .number(sequence)

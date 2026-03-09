@@ -157,7 +157,7 @@ wheels = [
 ]
 
 [[package]]
-name = "immunum-rs"
+name = "immunum"
 version = "1.0.0"
 source = { editable = "." }
 

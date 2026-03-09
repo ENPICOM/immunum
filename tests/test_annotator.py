@@ -1,4 +1,4 @@
-import immunum_rs
+import immunum
 import pytest
 
 
@@ -36,7 +36,7 @@ TCR_CHAINS = ["TRA", "TRB", "TRG", "TRD"]
 )
 def annotator(request):
     chains, scheme = request.param
-    return immunum_rs.Annotator(chains, scheme)
+    return immunum.Annotator(chains, scheme)
 
 
 class TestAnnotatorInit:
@@ -56,7 +56,7 @@ class TestAnnotatorInit:
         with pytest.raises(
             ValueError, match="Kabat scheme only supported for antibody chains"
         ):
-            immunum_rs.Annotator(chains, scheme)
+            immunum.Annotator(chains, scheme)
 
     @pytest.mark.parametrize(
         "chains,scheme",
@@ -68,8 +68,8 @@ class TestAnnotatorInit:
     )
     def test_invalid_args_raise(self, chains, scheme):
         with pytest.raises(ValueError):
-            immunum_rs.Annotator(chains, scheme)
+            immunum.Annotator(chains, scheme)
 
     def test_number(self, annotator):
         seq = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
-        annotator._number(seq)
+        annotator.number(seq)
