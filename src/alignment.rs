@@ -10,10 +10,27 @@ use pyo3::prelude::*;
 
 /// Direction in the alignment traceback matrix
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 enum Direction {
-    Match,
-    GapInQuery,
-    GapInConsensus,
+    Match = 0,
+    GapInQuery = 1,
+    GapInConsensus = 2,
+}
+
+impl Direction {
+    #[inline(always)]
+    fn as_u8(self) -> u8 {
+        self as u8
+    }
+
+    #[inline(always)]
+    fn from_u8(v: u8) -> Self {
+        match v {
+            0 => Direction::Match,
+            1 => Direction::GapInQuery,
+            _ => Direction::GapInConsensus,
+        }
+    }
 }
 
 /// Represents a position in the alignment result
@@ -26,13 +43,6 @@ pub enum AlignedPosition {
     Aligned(u8),
     /// Insertion in query (query has residue, consensus doesn't)
     Insertion(),
-}
-
-/// Cell in the dynamic programming matrix
-#[derive(Debug, Clone)]
-struct Cell {
-    score: f32,
-    direction: Direction,
 }
 
 /// Result of aligning a sequence to a consensus
@@ -49,91 +59,128 @@ pub struct Alignment {
     pub end_pos: u8,
 }
 
-/// Align a query sequence to a scoring matrix using Needleman-Wunsch
-pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
-    let query = query.to_uppercase();
-    let query_bytes: Vec<u8> = query.bytes().collect();
+/// Reusable buffer for alignment DP matrix to avoid repeated allocation
+pub struct AlignBuffer {
+    dp_scores: Vec<f32>,
+    dp_traceback: Vec<u8>,
+}
+
+impl Default for AlignBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AlignBuffer {
+    pub fn new() -> Self {
+        Self {
+            dp_scores: Vec::new(),
+            dp_traceback: Vec::new(),
+        }
+    }
+
+    fn ensure_capacity(&mut self, total: usize) {
+        if self.dp_scores.len() < total {
+            self.dp_scores.resize(total, 0.0);
+            self.dp_traceback.resize(total, 0);
+        }
+    }
+}
+
+
+
+/// Performs semi-global Needleman-Wunsch alignment of a query amino acid sequence
+/// against position-specific scoring matrices derived from consensus sequences.
+///
+/// Leading/trailing gaps in the consensus are free (semi-global), but the full query
+/// is consumed to prevent long CDR3 loops from being treated as trailing gaps.
+/// Returns the optimal [`Alignment`] with scored positions, or an error if the sequence is empty.
+pub fn align(
+    query: &str,
+    positions: &[PositionScores],
+    align_buffer: &mut AlignBuffer,
+) -> Result<Alignment> {
+    let query_bytes = query.as_bytes();
     let query_len = query_bytes.len();
     let cons_len = positions.len();
+    let stride = cons_len + 1;
 
     if query_len == 0 {
         return Err(Error::InvalidSequence("empty sequence".to_string()));
     }
 
-    // Initialize DP matrix
-    let mut dp = vec![
-        vec![
-            Cell {
-                score: 0.0,
-                direction: Direction::Match,
-            };
-            cons_len + 1
-        ];
-        query_len + 1
-    ];
+    // Reuse buffer, growing only if needed
+    let total = (query_len + 1) * stride;
+    align_buffer.ensure_capacity(total);
+    let dp_scores = &mut align_buffer.dp_scores[..total];
+    let dp_traceback = &mut align_buffer.dp_traceback[..total];
 
-    // Initialize first row and column for semi-global alignment
-    // Allow query to start anywhere without penalty (gaps at start of query are free)
-    for cell in dp[0].iter_mut().take(cons_len + 1).skip(1) {
-        *cell = Cell {
-            score: 0.0, // No penalty for skipping consensus positions at start
-            direction: Direction::GapInQuery,
-        };
+    // Initialize first row: all zeros for scores, gaps in query are free (semi-global)
+    dp_scores[0] = 0.0;
+    dp_traceback[0] = Direction::Match.as_u8();
+    for j in 1..stride {
+        dp_scores[j] = 0.0;
+        dp_traceback[j] = Direction::GapInQuery.as_u8();
     }
 
-    // Allow consensus to start anywhere without penalty (gaps at start of consensus are free)
-    for row in dp.iter_mut().take(query_len + 1).skip(1) {
-        row[0] = Cell {
-            score: 0.0, // No penalty for query starting before consensus
-            direction: Direction::GapInConsensus,
-        };
+    // Initialize first column: gaps in consensus are free (semi-global)
+    for i in 1..=query_len {
+        dp_scores[i * stride] = 0.0;
+        dp_traceback[i * stride] = Direction::GapInConsensus.as_u8();
     }
 
     // Fill DP matrix
+    // SAFETY: All indices are within bounds due to loop structure:
+    // - i ranges 1..=query_len, j ranges 1..=cons_len
+    // - dp_scores/dp_traceback have size (query_len+1) * stride where stride = cons_len+1
+    // - max index = query_len * stride + cons_len = total - 1
     for i in 1..=query_len {
-        let query_aa = query_bytes[i - 1] as char;
+        let aa = unsafe { *query_bytes.get_unchecked(i - 1) }.to_ascii_uppercase();
+        let curr_row = i * stride;
+        let prev_row = curr_row - stride;
 
         for j in 1..=cons_len {
-            let cons_pos = &positions[j - 1];
+            let cons_pos = unsafe { positions.get_unchecked(j - 1) };
 
-            // Match/mismatch score
-            let match_score = cons_pos.scores.get(&query_aa).copied().unwrap_or(-4.0);
-            let from_match = dp[i - 1][j - 1].score + match_score;
+            // Match/mismatch score using direct array index
+            let match_score = cons_pos.score_for(aa);
+            let from_match = unsafe { *dp_scores.get_unchecked(prev_row + j - 1) } + match_score;
 
             // Gap in query (skip consensus position)
-            let from_gap_query = dp[i][j - 1].score + cons_pos.gap_penalty;
+            let from_gap_query =
+                unsafe { *dp_scores.get_unchecked(curr_row + j - 1) } + cons_pos.gap_penalty;
 
             // Gap in consensus (insertion in query sequence)
-            let from_gap_cons = dp[i - 1][j].score + cons_pos.insertion_penalty;
+            let from_gap_cons =
+                unsafe { *dp_scores.get_unchecked(prev_row + j) } + cons_pos.insertion_penalty;
 
             // Choose best
             let (best_score, best_dir) =
                 if from_match >= from_gap_query && from_match >= from_gap_cons {
-                    (from_match, Direction::Match)
+                    (from_match, Direction::Match.as_u8())
                 } else if from_gap_query >= from_gap_cons {
-                    (from_gap_query, Direction::GapInQuery)
+                    (from_gap_query, Direction::GapInQuery.as_u8())
                 } else {
-                    (from_gap_cons, Direction::GapInConsensus)
+                    (from_gap_cons, Direction::GapInConsensus.as_u8())
                 };
 
-            dp[i][j] = Cell {
-                score: best_score,
-                direction: best_dir,
-            };
+            unsafe {
+                *dp_scores.get_unchecked_mut(curr_row + j) = best_score;
+                *dp_traceback.get_unchecked_mut(curr_row + j) = best_dir;
+            }
         }
     }
 
     // Find best ending position for semi-global alignment
     // Force full query consumption to prevent long CDR3s from being treated as trailing sequence
-    let mut best_i = query_len;
+    let last_row = query_len * stride;
     let mut best_j = cons_len;
-    let mut best_score = dp[query_len][cons_len].score;
+    let mut best_score = dp_scores[last_row + cons_len];
 
     // Check last row: query fully used, allow trailing gaps in consensus
-    for (j, cell) in dp[query_len].iter().enumerate().take(cons_len) {
-        if cell.score > best_score {
-            best_score = cell.score;
-            best_i = query_len;
+    for j in 0..cons_len {
+        if dp_scores[last_row + j] > best_score {
+            best_score = dp_scores[last_row + j];
             best_j = j;
         }
     }
@@ -142,7 +189,14 @@ pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
     // This prevents long CDR3 regions from being incorrectly treated as unaligned trailing sequence.
     // The query must align through its full length, but the consensus can have trailing gaps.
 
-    let aligned_positions = traceback(&dp, &query_bytes, positions, best_i, best_j);
+    let aligned_positions = build_traceback(
+        dp_traceback,
+        stride,
+        query_bytes,
+        positions,
+        query_len,
+        best_j,
+    );
 
     // Find start and end positions from aligned consensus positions
     let start_pos = aligned_positions
@@ -169,31 +223,33 @@ pub fn align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
     })
 }
 
-fn traceback(
-    dp: &[Vec<Cell>],
-    _query: &[u8],
-    positions: &[PositionScores],
-    query_len: usize,
-    cons_len: usize,
+fn build_traceback(
+    dp_traceback: &[u8],
+    stride: usize,
+    query_bytes: &[u8],
+    consensus_positions: &[PositionScores],
+    query_end: usize,
+    cons_end: usize,
 ) -> Vec<AlignedPosition> {
     let mut aligned_positions: Vec<AlignedPosition> = Vec::new();
 
-    let mut i = query_len;
-    let mut j = cons_len;
+    let mut i = query_end;
+    let mut j = cons_end;
 
     // For semi-global alignment, handle unaligned suffix of query
-    let query_total_len = _query.len();
-    if i < query_total_len {
+    if i < query_bytes.len() {
         // Add remaining query residues as insertions at the end
-        for _ in i..query_total_len {
+        for _ in i..query_bytes.len() {
             aligned_positions.push(AlignedPosition::Insertion());
         }
     }
 
     while i > 0 && j > 0 {
-        match dp[i][j].direction {
+        match Direction::from_u8(dp_traceback[i * stride + j]) {
             Direction::Match => {
-                aligned_positions.push(AlignedPosition::Aligned(positions[j - 1].position));
+                aligned_positions.push(AlignedPosition::Aligned(
+                    consensus_positions[j - 1].position,
+                ));
                 i -= 1;
                 j -= 1;
             }
@@ -226,6 +282,10 @@ mod tests {
     use crate::scoring::ScoringMatrix;
     use crate::Chain;
 
+    fn test_align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
+        let mut buf = AlignBuffer::new();
+        align(query, positions, &mut buf)
+    }
     #[test]
     fn test_align_simple() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
@@ -234,7 +294,7 @@ mod tests {
         let sequence =
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
-        let result = align(sequence, &matrix.positions).unwrap();
+        let result = test_align(sequence, &matrix.positions).unwrap();
 
         // Alignment should produce a score (may be negative for partial sequences)
         assert!(!result.positions.is_empty());
@@ -245,7 +305,7 @@ mod tests {
     #[test]
     fn test_empty_sequence() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        let result = align("", &matrix.positions);
+        let result = test_align("", &matrix.positions);
         assert!(result.is_err());
     }
 
@@ -255,7 +315,7 @@ mod tests {
 
         // A sequence starting from middle of framework should align without heavy penalty
         let partial_seq = "GLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
-        let result = align(partial_seq, &matrix.positions).unwrap();
+        let result = test_align(partial_seq, &matrix.positions).unwrap();
 
         // Should have a reasonable score (not heavily penalized for missing start)
         assert!(
@@ -281,7 +341,7 @@ mod tests {
 
         // A sequence ending in middle should align without heavy penalty
         let partial_seq = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVS";
-        let result = align(partial_seq, &matrix.positions).unwrap();
+        let result = test_align(partial_seq, &matrix.positions).unwrap();
 
         // Should have a reasonable score
         assert!(
@@ -296,7 +356,7 @@ mod tests {
 
         // A small fragment from the middle should align
         let fragment = "GLEWVSAISKSGGSTYY";
-        let result = align(fragment, &matrix.positions).unwrap();
+        let result = test_align(fragment, &matrix.positions).unwrap();
 
         // Should align without extreme penalties for missing ends
         assert!(

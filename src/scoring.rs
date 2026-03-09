@@ -3,7 +3,9 @@
 use crate::error::{Error, Result};
 use crate::types::Chain;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+/// Default score for unknown amino acids
+const DEFAULT_SCORE: f32 = -4.0;
 
 /// A position-specific scoring matrix for a chain type
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,12 +19,27 @@ pub struct ScoringMatrix {
 pub struct PositionScores {
     /// IMGT position number
     pub position: u8,
-    /// Scores for each amino acid at this position
-    pub scores: HashMap<char, f32>,
+    /// Scores indexed by (amino_acid_byte - b'A'), 26 slots for A-Z
+    /// Non-amino-acid letters default to DEFAULT_SCORE
+    pub scores: [f32; 26],
     /// Penalty for gap in query sequence (skipping this consensus position)
     pub gap_penalty: f32,
     /// Penalty for gap in consensus (insertion in query at this position)
     pub insertion_penalty: f32,
+}
+
+impl PositionScores {
+    /// Get score for an amino acid byte (must be uppercase A-Z)
+    #[inline(always)]
+    pub fn score_for(&self, aa: u8) -> f32 {
+        let idx = aa.wrapping_sub(b'A') as usize;
+        if idx < 26 {
+            // SAFETY: idx is guaranteed < 26, which is the array length
+            unsafe { *self.scores.get_unchecked(idx) }
+        } else {
+            DEFAULT_SCORE
+        }
+    }
 }
 
 impl ScoringMatrix {
@@ -95,9 +112,10 @@ mod tests {
 
         // Check that scores are in reasonable range (BLOSUM62 range is roughly -4 to 11)
         for pos in &matrix.positions {
-            for (aa, score) in &pos.scores {
+            for (i, &score) in pos.scores.iter().enumerate() {
+                let aa = (b'A' + i as u8) as char;
                 assert!(
-                    *score >= -10.0 && *score <= 15.0,
+                    score >= -10.0 && score <= 15.0,
                     "Score for {} at position {} is out of range: {}",
                     aa,
                     pos.position,
