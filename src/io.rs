@@ -45,11 +45,7 @@ impl FromStr for OutputFormat {
 
 impl OutputFormat {
     /// Write numbered records in this format
-    pub fn write(
-        &self,
-        writer: &mut impl Write,
-        records: &[NumberedRecord],
-    ) -> io::Result<()> {
+    pub fn write(&self, writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
         match self {
             Self::Tsv => write_tsv(writer, records),
             Self::Json => write_json(writer, records),
