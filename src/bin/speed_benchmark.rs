@@ -18,27 +18,26 @@ fn main() {
     let chains = [Chain::IGH, Chain::IGK, Chain::IGL];
     let annotator = Annotator::new(&chains, Scheme::IMGT).expect("Failed to create annotator");
 
-    // Benchmark over multiple rounds
-    let mut timings = Vec::with_capacity(ROUNDS);
+    // Warmup round: populate buffers and CPU caches
     let mut success = 0usize;
     let mut failed = 0usize;
+    print!("  warmup...");
+    for seq in &sequences {
+        match annotator.number(seq) {
+            Ok(_) => success += 1,
+            Err(_) => failed += 1,
+        }
+    }
+    println!(" done");
+
+    // Benchmark over multiple rounds
+    let mut timings = Vec::with_capacity(ROUNDS);
 
     for round in 0..ROUNDS {
         let start = Instant::now();
 
         for seq in &sequences {
-            match annotator.number(seq) {
-                Ok(_) => {
-                    if round == 0 {
-                        success += 1;
-                    }
-                }
-                Err(_) => {
-                    if round == 0 {
-                        failed += 1;
-                    }
-                }
-            }
+            let _ = annotator.number(seq);
         }
 
         let elapsed = start.elapsed();
