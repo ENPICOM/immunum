@@ -40,6 +40,10 @@ pub struct Annotator {
 
 impl Annotator {
     pub fn new(chains: &[Chain], scheme: Scheme) -> Result<Self> {
+        if chains.is_empty() {
+            return Err(Error::InvalidChain("chains cannot be empty".to_string()));
+        }
+
         // Validate: Kabat only supported for antibody chains
         if scheme == Scheme::Kabat && chains.iter().any(|c| c.is_tcr()) {
             return Err(Error::InvalidScheme(

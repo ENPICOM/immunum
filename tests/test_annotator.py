@@ -53,11 +53,10 @@ class TestAnnotatorInit:
         ],
     )
     def test_kabat_tcr_raises(self, chains, scheme):
-        if scheme.lower() == "kabat" and set(chains).issubset({"IGH", "IGL", "IGK"}):
-            with pytest.raises(
-                Exception, match="Kabat scheme only supported for antibody chains"
-            ):
-                immunum_rs.Annotator(chains, scheme)
+        with pytest.raises(
+            ValueError, match="Kabat scheme only supported for antibody chains"
+        ):
+            immunum_rs.Annotator(chains, scheme)
 
     @pytest.mark.parametrize(
         "chains,scheme",
@@ -68,9 +67,9 @@ class TestAnnotatorInit:
         ],
     )
     def test_invalid_args_raise(self, chains, scheme):
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             immunum_rs.Annotator(chains, scheme)
 
-    def test_annotate(self):
+    def test_annotate(self, annotator):
         seq = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
         annotator._annotate(seq)
