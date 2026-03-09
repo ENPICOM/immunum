@@ -25,13 +25,12 @@ impl Annotator {
         let parsed_scheme = Scheme::from_str(&scheme).map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid scheme: {}", scheme))
         })?;
-        let annotator =
-            Annotator::new(parsed_chains.as_slice(), parsed_scheme).map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Failed to initialize annotator: {}",
-                    e
-                ))
-            })?;
+        let annotator = Annotator::new(parsed_chains.as_slice(), parsed_scheme).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Failed to initialize annotator: {}",
+                e
+            ))
+        })?;
 
         Ok(annotator)
     }
