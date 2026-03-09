@@ -105,15 +105,11 @@ fn main() {
     // Map of chain names to their CSV files
     let chains = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"];
 
-    // let consensus_source = "pdb";
-    // let consensus_source = "imgt";
-    let consensus_source = "repseqio";
 
     for chain in &chains {
         let csv_path = Path::new(&manifest_dir)
             .join("resources")
             .join("consensus")
-            .join(consensus_source)
             .join(format!("{}.csv", chain));
 
         println!("cargo:rerun-if-changed={}", csv_path.display());
