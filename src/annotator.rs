@@ -27,11 +27,12 @@ pub struct NumberingResult {
 }
 
 /// Annotator for numbering sequences
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Annotator {
     pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
     pub(crate) scheme: Scheme,
+    pub(crate) chains: Vec<Chain>,
 }
 
 impl Annotator {
@@ -53,7 +54,11 @@ impl Annotator {
             matrices.push((chain, matrix));
         }
 
-        Ok(Self { matrices, scheme })
+        Ok(Self {
+            matrices: matrices,
+            scheme: scheme,
+            chains: chains.to_vec(),
+        })
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
