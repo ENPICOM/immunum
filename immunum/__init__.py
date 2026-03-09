@@ -15,11 +15,11 @@ if TYPE_CHECKING:
 LIB = Path(__file__).parent
 
 
-def number_expr(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
+def numbering_end_expr(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
-        function_name="number_expr",
+        function_name="numbering_end_expr",
         is_elementwise=True,
         kwargs={"annotator": annotator},
     )

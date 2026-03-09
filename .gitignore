@@ -7,3 +7,4 @@ wasm_build
 
 node_modules
 .coverage
+.vscode

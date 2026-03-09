@@ -108,55 +108,56 @@ fn _internal(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-// the code below has been taken from: https://github.com/MarcoGorelli/polars-plugins-tutorial/issues/75
-impl serde::Serialize for Annotator {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
-        let bytes = to_allocvec(&wrapper.inner).map_err(serde::ser::Error::custom)?;
-        serializer.serialize_bytes(&bytes)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Annotator {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct FieldVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for FieldVisitor {
-            type Value = Annotator;
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(concat!(
-                    "a byte array containing bincode-serialized ",
-                    stringify!(Encoder),
-                    " data"
-                ))
-            }
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                let wrapper: AnnotatorSerializationWrapper =
-                    from_bytes(v).map_err(serde::de::Error::custom)?;
-
-                Ok(Annotator {
-                    matrices: wrapper.inner.matrices,
-                    scheme: wrapper.inner.scheme,
-                    chains: wrapper.inner.chains,
-                })
-            }
-
-            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                self.visit_bytes(&v)
-            }
-        }
-        deserializer.deserialize_bytes(FieldVisitor)
-    }
-}
+// // the code below has been taken from: https://github.com/MarcoGorelli/polars-plugins-tutorial/issues/75
+// impl serde::Serialize for Annotator {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
+//         let bytes = to_allocvec(&wrapper.inner).map_err(serde::ser::Error::custom)?;
+//         serializer.serialize_bytes(&bytes)
+//     }
+// }
+//
+// impl<'de> serde::Deserialize<'de> for Annotator {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         struct FieldVisitor;
+//
+//         impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+//             type Value = Annotator;
+//             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+//                 formatter.write_str(concat!(
+//                     "a byte array containing bincode-serialized ",
+//                     stringify!(Encoder),
+//                     " data"
+//                 ))
+//             }
+//             fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+//             where
+//                 E: serde::de::Error,
+//             {
+//                 let wrapper: AnnotatorSerializationWrapper =
+//                     from_bytes(v).map_err(serde::de::Error::custom)?;
+//
+//                 Ok(Annotator {
+//                     matrices: wrapper.inner.matrices,
+//                     scheme: wrapper.inner.scheme,
+//                     chains: wrapper.inner.chains,
+//                 })
+//             }
+//
+//             fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+//             where
+//                 E: serde::de::Error,
+//             {
+//                 self.visit_bytes(&v)
+//             }
+//         }
+//         deserializer.deserialize_bytes(FieldVisitor)
+//     }
+// }
+//
