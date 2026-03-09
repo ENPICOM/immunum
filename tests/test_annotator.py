@@ -1,5 +1,6 @@
 import immunum
 import pytest
+import pickle
 
 
 ALL_CHAINS = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
@@ -70,6 +71,11 @@ class TestAnnotatorInit:
         with pytest.raises(ValueError):
             immunum.Annotator(chains, scheme)
 
-    def test_number(self, annotator):
+    def test_number_smoke(self, annotator):
         seq = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
         annotator.number(seq)
+
+    def test_pickle(self, annotator):
+        seq = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
+        re_annotator = pickle.loads(pickle.dumps(annotator))
+        re_annotator.number(seq)

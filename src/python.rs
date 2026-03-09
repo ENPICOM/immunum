@@ -76,7 +76,13 @@ impl Annotator {
     pub fn __getnewargs__(&self) -> pyo3::PyResult<(Vec<String>, String)> {
         let wrapper = AnnotatorSerializationWrapper::from_annotator(self);
         Ok((
-            wrapper.inner.chains.clone().as_slice(),
+            wrapper
+                .inner
+                .chains
+                .clone()
+                .iter()
+                .map(move |s| s.to_string())
+                .collect(),
             wrapper.inner.scheme.to_string(),
         ))
     }

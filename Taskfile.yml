@@ -20,9 +20,19 @@ tasks:
         aliases: [c]
         cmd: uv run pytest -n  $(( $(nproc) - 2 )) -q --show-capture=no --disable-warnings --tb=no {{.CLI_ARGS}}
 
+    test-python:
+        aliases: [tp]
+        cmd: uv run pytest -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
+
+    test-rust:
+        aliases: [tr]
+        cmd: cargo test --all-features
+
     test:
         aliases: [t]
-        cmd: uv run pytest -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
+        cmds:
+            - task test-rust
+            - task test-python
 
     lint:
         cmd: uv run ruff check --config pyproject.toml
