@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.12', '3.13']
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
@@ -67,7 +67,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --features python -i python${{ matrix.python-version }}
+          args: --profile dist-release --features python -i python${{ matrix.python-version }}
           sccache: 'true'
 
       - name: Upload wheels
@@ -83,7 +83,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
 
@@ -96,7 +96,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: aarch64
-          args: --release --features python -i python${{ matrix.python-version }}
+          args: --profile dist-release --features python -i python${{ matrix.python-version }}
           sccache: 'true'
 
       - name: Upload wheels
@@ -151,7 +151,7 @@ jobs:
             --notes "Python wheels for immunum v$VERSION
 
           Built for:
-          - Python 3.11, 3.12, 3.13
+          - Python 3.12, 3.13
           - Linux x86_64 (manylinux)
           - Linux aarch64/ARM64 (manylinux)
           - macOS Apple Silicon (M1/M2/M3)
