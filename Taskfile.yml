@@ -19,7 +19,7 @@ tasks:
 
     test-python:
         aliases: [tp]
-        cmd: uv run pytest -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
+        cmd: uv run pytest -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
 
     test-rust:
         aliases: [tr]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import tomllib
+import rtoml
 from pathlib import Path
 
 import pytest
@@ -30,8 +30,8 @@ VALIDATION_FIXTURES = [
 
 def get_benchmark_threshold(benchmark_key: str) -> float:
     """Return the known perfect_pct from BENCHMARKS.toml for the given key."""
-    with open(BENCHMARKS, "rb") as f:
-        data = tomllib.load(f)
+    with open(BENCHMARKS) as f:
+        data = rtoml.load(f)
     section, chain = benchmark_key.split(".")
     return data[section][chain]["perfect_pct"]
 
