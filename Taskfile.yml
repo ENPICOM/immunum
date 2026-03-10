@@ -63,7 +63,7 @@ tasks:
     build-maturin:
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
-            - uv tool run maturin develop --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            - uv tool run maturin develop --uv --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     build-maturin-dist:
         cmds:
