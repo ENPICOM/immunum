@@ -1,4 +1,4 @@
-use crate::annotator::Annotator;
+use crate::{annotator::Annotator, Chain, Scheme};
 use polars::prelude::*;
 use pyo3_polars::derive::polars_expr;
 use pyo3_polars::PolarsAllocator;
@@ -40,21 +40,6 @@ struct NumberKwargs {
     annotator: Annotator,
 }
 
-#[polars_expr(output_type=Int64)]
-fn numbering_end_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
-    let ca = inputs[0].str()?;
-    let mut builder = PrimitiveChunkedBuilder::<Int64Type>::new(ca.name().clone(), ca.len());
-    ca.into_iter().for_each(|opt_v: Option<&str>| match opt_v {
-        None => builder.append_null(),
-        Some(value) => match kwargs.annotator.number(value) {
-            Ok(result) => builder.append_value(result.end as i64),
-            Err(_) => builder.append_null(),
-        },
-    });
-
-    Ok(builder.finish().into_series())
-}
-
 fn numbering_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
     let fields = vec![
         Field::new("chain".into(), DataType::String),
@@ -72,7 +57,7 @@ fn numbering_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
 }
 
 #[polars_expr(output_type_func=numbering_struct_output)]
-fn numbering_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
+fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
     let ca = inputs[0].str()?;
     let len = ca.len();
     let mut chain_builder = StringChunkedBuilder::new("chain".into(), len);
@@ -89,6 +74,66 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResul
                 residues_builder.append_null();
             }
             Some(value) => match kwargs.annotator.number(value) {
+                Err(_) => {
+                    chain_builder.append_null();
+                    scheme_builder.append_null();
+                    positions_builder.append_null();
+                    residues_builder.append_null();
+                }
+                Ok(result) => {
+                    chain_builder.append_value(result.chain.to_string());
+                    scheme_builder.append_value(result.scheme.to_string());
+                    let (positions, residues): (Vec<String>, Vec<String>) = result
+                        .positions
+                        .iter()
+                        .zip(value.chars())
+                        .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
+                        .unzip();
+                    positions_builder.append_series(&Series::new("".into(), positions))?;
+                    residues_builder.append_series(&Series::new("".into(), residues))?;
+                }
+            },
+        }
+        Ok(())
+    })?;
+
+    let fields = [
+        chain_builder.finish().into_series(),
+        scheme_builder.finish().into_series(),
+        positions_builder.finish().into_series(),
+        residues_builder.finish().into_series(),
+    ];
+    StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
+}
+
+#[derive(Serialize, Deserialize)]
+struct NumberFuncKwargs {
+    chains: Vec<Chain>,
+    scheme: Scheme,
+}
+
+#[polars_expr(output_type_func=numbering_struct_output)]
+fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsResult<Series> {
+    let ca = inputs[0].str()?;
+    let len = ca.len();
+    let mut chain_builder = StringChunkedBuilder::new("chain".into(), len);
+    let mut scheme_builder = StringChunkedBuilder::new("scheme".into(), len);
+    let mut positions_builder = ListStringChunkedBuilder::new("positions".into(), len, len);
+    let mut residues_builder = ListStringChunkedBuilder::new("residues".into(), len, len);
+    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme) {
+        Ok(a) => a,
+        Err(e) => polars_bail!(InvalidOperation: "{}", e),
+    };
+
+    ca.into_iter().try_for_each(|opt_v| -> PolarsResult<()> {
+        match opt_v {
+            None => {
+                chain_builder.append_null();
+                scheme_builder.append_null();
+                positions_builder.append_null();
+                residues_builder.append_null();
+            }
+            Some(value) => match annotator.number(value) {
                 Err(_) => {
                     chain_builder.append_null();
                     scheme_builder.append_null();

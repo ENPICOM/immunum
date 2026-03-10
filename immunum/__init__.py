@@ -15,21 +15,21 @@ if TYPE_CHECKING:
 LIB = Path(__file__).parent
 
 
-def numbering_end_expr(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
+def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
-        function_name="numbering_end_expr",
+        function_name="numbering_class_struct_expr",
         is_elementwise=True,
         kwargs={"annotator": annotator},
     )
 
 
-def numbering_struct_expr(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
+def number(expr: IntoExprColumn, *, chains: list[str], scheme: str) -> pl.Expr:
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
         function_name="numbering_struct_expr",
         is_elementwise=True,
-        kwargs={"annotator": annotator},
+        kwargs={"chains": chains, "scheme": scheme},
     )
