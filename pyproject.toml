@@ -67,7 +67,7 @@ exclude_also = [
     "def __repr__",
     "@abstract",
 ]
-fail_under = 0
+fail_under = 90
 
 [tool.coverage.run]
 omit = ["/tmp/*"]
