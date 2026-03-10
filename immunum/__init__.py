@@ -23,3 +23,13 @@ def numbering_end_expr(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr
         is_elementwise=True,
         kwargs={"annotator": annotator},
     )
+
+
+def numbering_struct_expr(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
+    return register_plugin_function(
+        args=[expr],
+        plugin_path=LIB,
+        function_name="numbering_struct_expr",
+        is_elementwise=True,
+        kwargs={"annotator": annotator},
+    )

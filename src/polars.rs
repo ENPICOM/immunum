@@ -54,3 +54,69 @@ fn numbering_end_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<S
 
     Ok(builder.finish().into_series())
 }
+
+fn numbering_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
+    let fields = vec![
+        Field::new("chain".into(), DataType::String),
+        Field::new("scheme".into(), DataType::String),
+        Field::new(
+            "positions".into(),
+            DataType::List(Box::new(DataType::String)),
+        ),
+        Field::new(
+            "residues".into(),
+            DataType::List(Box::new(DataType::String)),
+        ),
+    ];
+    Ok(Field::new("numbering".into(), DataType::Struct(fields)))
+}
+
+#[polars_expr(output_type_func=numbering_struct_output)]
+fn numbering_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
+    let ca = inputs[0].str()?;
+    let len = ca.len();
+    let mut chain_builder = StringChunkedBuilder::new("chain".into(), len);
+    let mut scheme_builder = StringChunkedBuilder::new("scheme".into(), len);
+    let mut positions_builder = ListStringChunkedBuilder::new("positions".into(), len, len);
+    let mut residues_builder = ListStringChunkedBuilder::new("residues".into(), len, len);
+
+    ca.into_iter().try_for_each(|opt_v| -> PolarsResult<()> {
+        match opt_v {
+            None => {
+                chain_builder.append_null();
+                scheme_builder.append_null();
+                positions_builder.append_null();
+                residues_builder.append_null();
+            }
+            Some(value) => match kwargs.annotator.number(value) {
+                Err(_) => {
+                    chain_builder.append_null();
+                    scheme_builder.append_null();
+                    positions_builder.append_null();
+                    residues_builder.append_null();
+                }
+                Ok(result) => {
+                    chain_builder.append_value(&result.chain.to_string());
+                    scheme_builder.append_value(&result.scheme.to_string());
+                    let (positions, residues): (Vec<String>, Vec<String>) = result
+                        .positions
+                        .iter()
+                        .zip(value.chars())
+                        .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
+                        .unzip();
+                    positions_builder.append_series(&Series::new("".into(), positions))?;
+                    residues_builder.append_series(&Series::new("".into(), residues))?;
+                }
+            },
+        }
+        Ok(())
+    })?;
+
+    let fields = vec![
+        chain_builder.finish().into_series(),
+        scheme_builder.finish().into_series(),
+        positions_builder.finish().into_series(),
+        residues_builder.finish().into_series(),
+    ];
+    StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
+}

@@ -66,7 +66,7 @@ tasks:
 
     build-maturin:
         cmds:
-            - uv run maturin develop -r -m ./Cargo.toml {{.CLI_ARGS}}
+            - uv tool run maturin develop -r -m ./Cargo.toml {{.CLI_ARGS}}
 
     ci:
         cmds:
