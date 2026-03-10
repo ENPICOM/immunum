@@ -42,7 +42,7 @@ tasks:
     format:
         aliases: [f]
         cmds:
-            - cargo fmt
+            - cargo fmt --all --check
             - ruff check --fix --config pyproject.toml
             - ruff format --config pyproject.toml
 
@@ -63,7 +63,11 @@ tasks:
     build-maturin:
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
-            - uv tool run maturin develop --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            - uv tool run maturin develop --profile release --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+
+    build-maturin-dist:
+        cmds:
+            - uv tool run maturin develop --profile dist-release --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     ci:
         cmds:
