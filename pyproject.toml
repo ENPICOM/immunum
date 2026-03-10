@@ -32,7 +32,6 @@ dev = [
     "pandas>=2.3.3",
     "pre-commit>=4.3.0",
     "pyrefly>=0.53.0",
-    "pyright>=1.1.408",
     "pysentry-rs>=0.3.10",
     "pytest-benchmark>=5.2.3",
     "pytest-xdist>=3.8.0",
