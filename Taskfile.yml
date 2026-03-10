@@ -13,9 +13,6 @@ tasks:
     build-ci:
         cmd: uv sync --locked --all-extras --all-groups --dev
 
-    build-badges:
-        cmd: uv sync --locked --only-group dev
-
     check:
         aliases: [c]
         cmd: uv run pytest -n  $(( $(nproc) - 2 )) -q --show-capture=no --disable-warnings --tb=no {{.CLI_ARGS}}
@@ -42,6 +39,7 @@ tasks:
             - uv run ty check --project .
             - uv run pyrefly check -j 0
             - 'git grep "# type: ignore\s*$" src/** && (echo -e "\033[31mBlanket ignores are not allowed\033[0m"; exit 1) || exit 0'
+            - cargo clippy --all-targets  --all-features -- -D warnings
 
     format:
         aliases: [f]

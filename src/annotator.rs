@@ -56,8 +56,8 @@ impl Annotator {
         }
 
         Ok(Self {
-            matrices: matrices,
-            scheme: scheme,
+            matrices,
+            scheme,
             chains: chains.to_vec(),
         })
     }

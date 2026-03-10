@@ -96,8 +96,8 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResul
                     residues_builder.append_null();
                 }
                 Ok(result) => {
-                    chain_builder.append_value(&result.chain.to_string());
-                    scheme_builder.append_value(&result.scheme.to_string());
+                    chain_builder.append_value(result.chain.to_string());
+                    scheme_builder.append_value(result.scheme.to_string());
                     let (positions, residues): (Vec<String>, Vec<String>) = result
                         .positions
                         .iter()
@@ -112,7 +112,7 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResul
         Ok(())
     })?;
 
-    let fields = vec![
+    let fields = [
         chain_builder.finish().into_series(),
         scheme_builder.finish().into_series(),
         positions_builder.finish().into_series(),
