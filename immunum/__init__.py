@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING  # noqa: F401
 import polars as pl
 from polars.plugins import register_plugin_function
 
-from immunum._internal import Annotator  # type: ignore # noqa: F401
+from immunum._internal import Annotator  # noqa: F401
 
 if TYPE_CHECKING:
     from immunum.typing import IntoExprColumn

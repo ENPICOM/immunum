@@ -32,14 +32,12 @@ tasks:
             - task test-python
 
     lint:
-        cmd: uv run ruff check --config pyproject.toml
-
-    check-types:
         cmds:
+            - cargo clippy --all-targets  --all-features -- -D warnings
+            - uv run ruff check --config pyproject.toml
             - uv run ty check --project .
             - uv run pyrefly check -j 0
             - 'git grep "# type: ignore\s*$" src/** && (echo -e "\033[31mBlanket ignores are not allowed\033[0m"; exit 1) || exit 0'
-            - cargo clippy --all-targets  --all-features -- -D warnings
 
     format:
         aliases: [f]
@@ -64,15 +62,13 @@ tasks:
 
     build-maturin:
         cmds:
-            - uv tool run maturin develop -r -m ./Cargo.toml {{.CLI_ARGS}}
+            # important to use `uv tool`` and not `uv run` since it's another environment
+            - uv tool run maturin develop --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     ci:
         cmds:
             - task: build-ci
             - task: lint
-            - task: check-types
             - task: pysentry
             - task: build-maturin
             - task: coverage
-            - task: test-all
-            - task: benchmark-ci
