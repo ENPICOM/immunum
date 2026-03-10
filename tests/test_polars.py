@@ -114,8 +114,6 @@ class TestPolarsNumber:
 class TestValidationFixtures:
     def test_accuracy(self, stem, chains, scheme, benchmark_key):
         csv_path = FIXTURES / f"{stem}.csv"
-        if not csv_path.exists():
-            pytest.skip(f"fixture not found: {csv_path}")
         mismatches, total = compare_fixture(csv_path, chains, scheme)
         perfect = total - mismatches
         perfect_pct = 100 * perfect / total
