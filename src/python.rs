@@ -2,8 +2,9 @@ use postcard::{from_bytes, to_allocvec};
 use std::str::FromStr;
 
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use crate::annotator::{Annotator, NumberingResult};
+use crate::annotator::Annotator;
 use crate::types::{Chain, Scheme};
 
 #[pymethods]
@@ -37,17 +38,27 @@ impl Annotator {
     }
 
     #[pyo3(signature = (sequence), name = "number")]
-    pub fn _number(&self, sequence: &str) -> PyResult<NumberingResult> {
-        let result = self
-            .number(sequence)
-            .map_err(|_| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid sequence: {}",
-                    sequence
-                ))
-            })
-            .unwrap();
-        Ok(result)
+    pub fn _number<'py>(&self, py: Python<'py>, sequence: &str) -> PyResult<Bound<'py, PyDict>> {
+        let result = self.number(sequence).map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid sequence: {}",
+                sequence
+            ))
+        })?;
+
+        let (positions, residues): (Vec<String>, Vec<String>) = result
+            .positions
+            .iter()
+            .zip(sequence.chars())
+            .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
+            .unzip();
+
+        let dict = PyDict::new(py);
+        dict.set_item("chain", result.chain.to_string())?;
+        dict.set_item("scheme", result.scheme.to_string())?;
+        dict.set_item("positions", positions)?;
+        dict.set_item("residues", residues)?;
+        Ok(dict)
     }
 
     pub fn __setstate__(

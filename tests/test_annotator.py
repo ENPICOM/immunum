@@ -1,13 +1,15 @@
 import immunum
 import pytest
 import pickle
-import polars as pl
 
 
 ALL_CHAINS = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
 AB_CHAINS = ["IGH", "IGK", "IGL"]
 TCR_CHAINS = ["TRA", "TRB", "TRG", "TRD"]
 SEQ = "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA"
+IGH_SEQ = (
+    "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN"
+)
 
 
 @pytest.fixture(
@@ -81,13 +83,30 @@ class TestAnnotatorInit:
         re_annotator.number(seq)
 
 
-class TestPolarsPlugin:
-    def test_polars_smoke(self, annotator, seq=SEQ):
-        df = pl.DataFrame({"seq": [seq]})
-        res = df.select(immunum.numbering_method(pl.col("seq"), annotator=annotator))
-        assert res.get_column("seq").to_list()[0] > 120
+class TestNumbering:
+    def test_number_igh_sequence(self):
+        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
+        result = annotator.number(IGH_SEQ)
+        assert result["chain"] == "H"
+        assert result["scheme"] == "IMGT"
+        assert len(result["positions"]) == len(IGH_SEQ)
+        assert len(result["residues"]) == len(IGH_SEQ)
+        assert result["residues"] == list(IGH_SEQ)
 
-    def test_polars_smoke(self, annotator, seq=SEQ):
-        df = pl.DataFrame({"seq": [seq]})
-        res = df.select(immunum.numbering_method(pl.col("seq"), annotator=annotator))
-        assert res.get_column("seq").to_list()[0] > 120
+    def test_number_with_single_chain(self):
+        annotator = immunum.Annotator(["IGH"], "IMGT")
+        result = annotator.number(IGH_SEQ)
+        assert result["chain"] == "H"
+
+    def test_empty_sequence_raises(self):
+        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
+        with pytest.raises(ValueError):
+            annotator.number("")
+
+    def test_number_result_keys(self, annotator):
+        result = annotator.number(SEQ)
+        assert set(result.keys()) == {"chain", "scheme", "positions", "residues"}
+
+    def test_positions_and_residues_same_length(self, annotator):
+        result = annotator.number(SEQ)
+        assert len(result["positions"]) == len(result["residues"]) == len(SEQ)

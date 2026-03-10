@@ -1,4 +1,12 @@
+from typing import TypedDict
+
 __version__: str
+
+class NumberingResult(TypedDict):
+    chain: str
+    scheme: str
+    positions: list[str]
+    residues: list[str]
 
 class Annotator:
     def __init__(
@@ -6,3 +14,4 @@ class Annotator:
         chains: list[str],
         scheme: str,
     ): ...
+    def number(self, sequence: str) -> NumberingResult: ...
