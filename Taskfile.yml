@@ -75,4 +75,5 @@ tasks:
             - task: lint
             - task: pysentry
             - task: build-maturin
+            - task: test
             - task: coverage
