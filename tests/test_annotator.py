@@ -105,8 +105,18 @@ class TestNumbering:
 
     def test_number_result_keys(self, annotator):
         result = annotator.number(SEQ)
-        assert set(result.keys()) == {"chain", "scheme", "positions", "residues"}
+        assert set(result.keys()) == {
+            "chain",
+            "scheme",
+            "positions",
+            "residues",
+            "confidence",
+        }
 
     def test_positions_and_residues_same_length(self, annotator):
         result = annotator.number(SEQ)
         assert len(result["positions"]) == len(result["residues"]) == len(SEQ)
+
+    def test_confidence_is_float(self, annotator):
+        result = annotator.number(SEQ)
+        assert isinstance(result["confidence"], float)

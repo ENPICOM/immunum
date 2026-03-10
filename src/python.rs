@@ -58,6 +58,7 @@ impl Annotator {
         dict.set_item("scheme", result.scheme.to_string())?;
         dict.set_item("positions", positions)?;
         dict.set_item("residues", residues)?;
+        dict.set_item("confidence", result.confidence)?;
         Ok(dict)
     }
 

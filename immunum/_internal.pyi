@@ -7,6 +7,7 @@ class NumberingResult(TypedDict):
     scheme: str
     positions: list[str]
     residues: list[str]
+    confidence: float
 
 class Annotator:
     def __init__(
