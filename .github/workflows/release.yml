@@ -4,11 +4,11 @@ on:
   push:
     branches: [master]
     paths:
-      - 'Cargo.toml'
-  workflow_dispatch:  # Allow manual triggering for testing
+      - "Cargo.toml"
+  workflow_dispatch: # Allow manual triggering for testing
 
 permissions:
-  contents: write  # Required for creating releases
+  contents: write # Required for creating releases
 
 jobs:
   check-version:
@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for tag checking
+          fetch-depth: 0 # Fetch all history for tag checking
 
       - name: Get version from Cargo.toml
         id: get_version
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +68,7 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: auto
           args: --profile dist-release --features python -i python${{ matrix.python-version }}
-          sccache: 'true'
+          sccache: "true"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -83,7 +83,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -97,7 +97,7 @@ jobs:
         with:
           target: aarch64
           args: --profile dist-release --features python -i python${{ matrix.python-version }}
-          sccache: 'true'
+          sccache: "true"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -151,7 +151,7 @@ jobs:
             --notes "Python wheels for immunum v$VERSION
 
           Built for:
-          - Python 3.12, 3.13
+          - Python 3.10, 3.11, 3.12, 3.13
           - Linux x86_64 (manylinux)
           - Linux aarch64/ARM64 (manylinux)
           - macOS Apple Silicon (M1/M2/M3)

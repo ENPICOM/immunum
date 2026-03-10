@@ -63,7 +63,7 @@ tasks:
     build-maturin:
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
-            - uv tool run maturin develop --profile release --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            - uv tool run maturin develop --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     build-maturin-dist:
         cmds:
@@ -75,5 +75,7 @@ tasks:
             - task: lint
             - task: pysentry
             - task: build-maturin
+              vars:
+                  PROFILE: "{{.PROFILE}}"
             - task: test
             - task: coverage
