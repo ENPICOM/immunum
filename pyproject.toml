@@ -61,6 +61,9 @@ project-excludes = [
 immunum-rs = { workspace = true }
 
 
+[tool.pytest.ini_options]
+markers = ["slow: mark test as slow (requires full validation fixtures)"]
+
 [tool.coverage.report]
 exclude_also = [
     'no cover: start(?s:.)*?no cover: stop',
