@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.10.2,<2.0", "polars>=1.8.2"]
+requires = ["maturin>=1.10.2,<2.0", "polars>1.30.0"]
 build-backend = "maturin"
 
 [project]
@@ -7,7 +7,7 @@ name = "immunum"
 version = "1.0.0"
 description = "Flexible and fast antibody sequence annotation in Rust with python bindings"
 readme = "README.md"
-requires-python = ">=3.12, <3.14"
+requires-python = ">=3.10, <3.14"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -18,10 +18,11 @@ dependencies = []
 
 [tool.maturin]
 module-name = "immunum._internal"
-features = ["python"]
+features = ["python", "polars"]
 
 
 [dependency-groups]
+polars = ["polars>1.30.0"]
 dev = [
     "antpack==0.3.8",
     "coverage>=7.10.6",
@@ -31,20 +32,18 @@ dev = [
     "pandas>=2.3.3",
     "pre-commit>=4.3.0",
     "pyrefly>=0.53.0",
-    "pyright>=1.1.408",
     "pysentry-rs>=0.3.10",
+    "pytest-benchmark>=5.2.3",
     "pytest-xdist>=3.8.0",
     "pytest>=8.4.2",
+    "rtoml>=0.13.0",
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
 
 [tool.uv]
 default-groups = ["dev"]
-cache-keys = [
-    { file = "./Cargo.toml" },
-    { file = "./**/*.rs" },
-]
+cache-keys = [{ file = "./Cargo.toml" }, { file = "./**/*.rs" }]
 
 [tool.uv.workspace]
 members = ["."]
@@ -56,12 +55,15 @@ project-excludes = [
     "**/__pycache__",
     "**/*venv/**/*",
     "**/.[!/.]*/**/*",
-    "scripts/*"
+    "scripts/*",
 ]
 
 [tool.uv.sources]
 immunum-rs = { workspace = true }
 
+
+[tool.pytest.ini_options]
+markers = ["slow: mark test as slow (requires full validation fixtures)"]
 
 [tool.coverage.report]
 exclude_also = [
@@ -69,7 +71,7 @@ exclude_also = [
     "def __repr__",
     "@abstract",
 ]
-fail_under = 0
+fail_under = 90
 
 [tool.coverage.run]
 omit = ["/tmp/*"]

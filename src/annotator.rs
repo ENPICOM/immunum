@@ -30,12 +30,26 @@ pub struct NumberingResult {
 }
 
 /// Annotator for numbering sequences
-#[cfg_attr(feature = "python", pyclass(unsendable))]
+#[cfg_attr(feature = "python", pyclass(unsendable, module = "immunum._internal"))]
+#[derive(Serialize, Deserialize)]
 pub struct Annotator {
-    matrices: Vec<(Chain, ScoringMatrix)>,
-    scheme: Scheme,
+    pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
+    pub(crate) scheme: Scheme,
+    pub(crate) chains: Vec<Chain>,
     /// Reusable alignment buffer to avoid per-alignment allocation
+    #[serde(skip)]
     align_buf: RefCell<AlignBuffer>,
+}
+
+impl Clone for Annotator {
+    fn clone(&self) -> Self {
+        Self {
+            matrices: self.matrices.clone(),
+            scheme: self.scheme,
+            chains: self.chains.clone(),
+            align_buf: RefCell::new(AlignBuffer::new()),
+        }
+    }
 }
 
 impl Annotator {
@@ -60,6 +74,7 @@ impl Annotator {
         Ok(Self {
             matrices,
             scheme,
+            chains: chains.to_vec(),
             align_buf: RefCell::new(AlignBuffer::new()),
         })
     }

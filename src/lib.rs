@@ -27,15 +27,8 @@ pub use types::{
 };
 pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
 
-#[cfg(feature = "python")]
+#[cfg(any(feature = "python", feature = "polars"))]
 mod python;
-#[cfg(feature = "python")]
-use pyo3::prelude::*;
 
-#[cfg(feature = "python")]
-#[pymodule]
-fn _internal(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
-    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add_class::<annotator::Annotator>()?;
-    Ok(())
-}
+#[cfg(feature = "polars")]
+mod polars;

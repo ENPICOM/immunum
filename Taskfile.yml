@@ -13,24 +13,28 @@ tasks:
     build-ci:
         cmd: uv sync --locked --all-extras --all-groups --dev
 
-    build-badges:
-        cmd: uv sync --locked --only-group dev
-
     check:
         aliases: [c]
         cmd: uv run pytest -n  $(( $(nproc) - 2 )) -q --show-capture=no --disable-warnings --tb=no {{.CLI_ARGS}}
 
+    test-python:
+        aliases: [tp]
+        cmd: uv run pytest -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
+
+    test-rust:
+        aliases: [tr]
+        cmd: cargo test --all-features
+
     test:
         aliases: [t]
         cmds:
-            - uv run pytest -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
-            - cargo test --all-targets --all-features
+            - task test-rust
+            - task test-python
 
     lint:
-        cmd: uv run ruff check --config pyproject.toml
-
-    check-types:
         cmds:
+            - cargo clippy --all-targets  --all-features -- -D warnings
+            - uv run ruff check --config pyproject.toml
             - uv run ty check --project .
             - uv run pyrefly check -j 0
             - 'git grep "# type: ignore\s*$" src/** && (echo -e "\033[31mBlanket ignores are not allowed\033[0m"; exit 1) || exit 0'
@@ -38,7 +42,7 @@ tasks:
     format:
         aliases: [f]
         cmds:
-            - cargo fmt
+            - cargo fmt --all --check
             - ruff check --fix --config pyproject.toml
             - ruff format --config pyproject.toml
 
@@ -58,15 +62,20 @@ tasks:
 
     build-maturin:
         cmds:
-            - uv tool run maturin develop -r -m ./Cargo.toml
+            # important to use `uv tool`` and not `uv run` since it's another environment
+            - uv tool run maturin develop --uv --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+
+    build-maturin-dist:
+        cmds:
+            - uv tool run maturin develop --profile dist-release --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     ci:
         cmds:
             - task: build-ci
             - task: lint
-            - task: check-types
             - task: pysentry
             - task: build-maturin
+              vars:
+                  PROFILE: "{{.PROFILE}}"
+            - task: test
             - task: coverage
-            - task: test-all
-            - task: benchmark-ci
