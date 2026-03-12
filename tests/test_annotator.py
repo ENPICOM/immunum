@@ -123,7 +123,7 @@ class TestNumbering:
 
     def test_segmentation(self, annotator):
         result = annotator.segment(SEQ)
-        assert set(result) == {"CDR{i}" for i in (1, 2, 3)} | {
+        assert set(result.as_dict()) == {"CDR{i}" for i in (1, 2, 3)} | {
             "FR{i}" for i in (1, 2, 3, 4)
         } | {"Prefix", "Postfix"}
         assert result == immunum.SegmenationResult(
