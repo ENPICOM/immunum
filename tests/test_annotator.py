@@ -120,3 +120,22 @@ class TestNumbering:
     def test_confidence_is_float(self, annotator):
         result = annotator.number(SEQ)
         assert isinstance(result["confidence"], float)
+
+    def test_segmentation(self, annotator):
+        result = annotator.segment(SEQ)
+        assert set(result) == {"CDR{i}" for i in (1, 2, 3)} | {
+            "FR{i}" for i in (1, 2, 3, 4)
+        } | {"Prefix", "Postfix"}
+        assert result == immunum.SegmenationResult(
+            {
+                "fr1": "ELVMTQSPSSLSASVGDRVNIACRAS",
+                "cdr1": "QGISSA",
+                "fr2": "LAWYQQKPGKAPRLLIY",
+                "cdr2": "DAS",
+                "fr3": "NLESGVPSRFSGSGSGTDFTLTISSLQPEDFAIYYC",
+                "cdr3": "QQFNSYPLTFG",
+                "fr4": "GGTKVEIKRTV",
+                "prefix": "",
+                "postfix": "",
+            }
+        )

@@ -36,7 +36,7 @@ pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
 /// All keys are always present, with empty strings for absent regions.
 pub fn segment(positions: &[Position], sequence: &str, scheme: Scheme) -> HashMap<String, String> {
     let mut segments: HashMap<String, String> = [
-        "Prefix", "FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4", "Postfix",
+        "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix",
     ]
     .iter()
     .map(|&s| (s.to_string(), String::new()))
@@ -48,7 +48,7 @@ pub fn segment(positions: &[Position], sequence: &str, scheme: Scheme) -> HashMa
             None if position.number == 0 => "Prefix".to_string(),
             None => "Postfix".to_string(),
         };
-        segments.get_mut(&key).unwrap().push(ch);
+        segments.get_mut(&key.to_lowercase()).unwrap().push(ch);
     }
 
     segments
