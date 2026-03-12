@@ -56,6 +56,9 @@ tasks:
         cmds:
             - uv run pysentry-rs --all-extras .
 
+    docs:
+        cmd: uv run --no-project --group docs mkdocs serve
+
     default:
         cmds:
             - task --list-all

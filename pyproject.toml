@@ -23,6 +23,15 @@ features = ["python", "polars"]
 
 [dependency-groups]
 polars = ["polars>1.30.0"]
+docs = [
+    "markdown-exec[ansi]",
+    "mkdocs",
+    "mkdocs-autorefs",
+    "mkdocs-macros-plugin",
+    "mkdocs-material",
+    "mkdocs-simple-hooks",
+    "mkdocstrings[python]",
+]
 dev = [
     "antpack==0.3.8",
     "coverage>=7.10.6",
