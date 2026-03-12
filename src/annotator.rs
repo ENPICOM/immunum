@@ -28,7 +28,10 @@ pub struct NumberingResult {
 }
 
 /// Annotator for numbering sequences
-#[cfg_attr(feature = "python", pyclass(get_all, module = "immunum._internal"))]
+#[cfg_attr(
+    feature = "python",
+    pyclass(name = "_Annotator", get_all, module = "immunum._internal")
+)]
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Annotator {
     pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,

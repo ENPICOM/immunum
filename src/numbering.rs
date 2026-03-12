@@ -1,10 +1,58 @@
 pub mod imgt;
 pub mod kabat;
 
+use std::collections::HashMap;
+
 use crate::alignment::AlignedPosition;
 use crate::imgt::IMGT_RULES;
 use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
-use crate::types::{Chain, Insertion, NumberingRule, Position, Scheme};
+use crate::types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
+
+/// Get the region for a position number under the given scheme, or None if outside numbered range
+pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
+    match (scheme, pos) {
+        (Scheme::IMGT, 1..=26) => Some(Region::FR1),
+        (Scheme::IMGT, 27..=38) => Some(Region::CDR1),
+        (Scheme::IMGT, 39..=55) => Some(Region::FR2),
+        (Scheme::IMGT, 56..=65) => Some(Region::CDR2),
+        (Scheme::IMGT, 66..=104) => Some(Region::FR3),
+        (Scheme::IMGT, 105..=117) => Some(Region::CDR3),
+        (Scheme::IMGT, 118..=128) => Some(Region::FR4),
+        (Scheme::Kabat, 1..=25) => Some(Region::FR1),
+        (Scheme::Kabat, 26..=35) => Some(Region::CDR1),
+        (Scheme::Kabat, 36..=50) => Some(Region::FR2),
+        (Scheme::Kabat, 51..=57) => Some(Region::CDR2),
+        (Scheme::Kabat, 58..=92) => Some(Region::FR3),
+        (Scheme::Kabat, 93..=100) => Some(Region::CDR3),
+        (Scheme::Kabat, 101..=113) => Some(Region::FR4),
+        _ => None,
+    }
+}
+
+/// Segment a numbered sequence into its constituent regions
+///
+/// Returns a HashMap with keys for all Region variants plus "Prefix" and "Postfix".
+/// Prefix collects residues before the numbered region, Postfix those after.
+/// All keys are always present, with empty strings for absent regions.
+pub fn segment(positions: &[Position], sequence: &str, scheme: Scheme) -> HashMap<String, String> {
+    let mut segments: HashMap<String, String> = [
+        "Prefix", "FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4", "Postfix",
+    ]
+    .iter()
+    .map(|&s| (s.to_string(), String::new()))
+    .collect();
+
+    for (position, ch) in positions.iter().zip(sequence.chars()) {
+        let key = match region_for_position(position.number, scheme) {
+            Some(region) => region.to_string(),
+            None if position.number == 0 => "Prefix".to_string(),
+            None => "Postfix".to_string(),
+        };
+        segments.get_mut(&key).unwrap().push(ch);
+    }
+
+    segments
+}
 
 /// Apply a numbering scheme to aligned positions
 pub fn apply_numbering(

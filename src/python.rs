@@ -1,10 +1,12 @@
 use postcard::{from_bytes, to_allocvec};
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::annotator::Annotator;
+use crate::numbering::segment;
 use crate::types::{Chain, Scheme};
 
 #[pymethods]
@@ -46,19 +48,36 @@ impl Annotator {
             ))
         })?;
 
-        let (positions, residues): (Vec<String>, Vec<String>) = result
+        let numbering: HashMap<String, String> = result
             .positions
             .iter()
             .zip(sequence.chars())
             .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
-            .unzip();
+            .collect();
 
         let dict = PyDict::new(py);
         dict.set_item("chain", result.chain.to_string())?;
         dict.set_item("scheme", result.scheme.to_string())?;
-        dict.set_item("positions", positions)?;
-        dict.set_item("residues", residues)?;
         dict.set_item("confidence", result.confidence)?;
+        dict.set_item("numbering", numbering)?;
+        Ok(dict)
+    }
+
+    #[pyo3(signature = (sequence), name = "segment")]
+    pub fn _segment<'py>(&self, py: Python<'py>, sequence: &str) -> PyResult<Bound<'py, PyDict>> {
+        let result = self.number(sequence).map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid sequence: {}",
+                sequence
+            ))
+        })?;
+
+        let segments = segment(&result.positions, sequence, result.scheme);
+
+        let dict = PyDict::new(py);
+        for (region, seq) in segments {
+            dict.set_item(region, seq)?;
+        }
         Ok(dict)
     }
 
