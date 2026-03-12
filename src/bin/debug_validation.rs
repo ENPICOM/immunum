@@ -244,7 +244,7 @@ fn main() {
     println!("DEBUG VALIDATION ALIGNMENT");
 
     // Create annotator with the selected scheme
-    let mut annotator = match Annotator::new(&[chain], scheme) {
+    let annotator = match Annotator::new(&[chain], scheme) {
         Ok(a) => a,
         Err(err) => {
             eprintln!("Error creating annotator: {}", err);
@@ -272,7 +272,7 @@ fn main() {
             }
         };
 
-        let result = match validate_entry(entry, &mut annotator) {
+        let result = match validate_entry(entry, &annotator) {
             Ok(r) => r,
             Err(err) => {
                 eprintln!("Error validating entry: {}", err);
@@ -284,7 +284,7 @@ fn main() {
         // Show all imperfect entries
         let mut imperfect_count = 0;
         for entry in &entries {
-            let result = match validate_entry(entry, &mut annotator) {
+            let result = match validate_entry(entry, &annotator) {
                 Ok(r) => r,
                 Err(err) => {
                     eprintln!("Error validating entry '{}': {}", entry.header, err);

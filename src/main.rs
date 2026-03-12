@@ -47,7 +47,7 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
         Scheme::from_str(&args.scheme).map_err(|_| format!("unknown scheme '{}'", args.scheme))?;
     let chains = Chain::parse_chain_spec(&args.chain).map_err(|e| e.to_string())?;
     let format = OutputFormat::from_str(&args.format)?;
-    let mut annotator = Annotator::new(&chains, scheme)
+    let annotator = Annotator::new(&chains, scheme)
         .map_err(|e| format!("failed to create annotator: {}", e))?;
 
     let records = immunum::read_input(args.input.as_deref())?;

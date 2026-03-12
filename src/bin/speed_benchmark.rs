@@ -16,7 +16,7 @@ fn main() {
     let sequences: Vec<String> = records.into_iter().map(|r| r.sequence).collect();
 
     let chains = [Chain::IGH, Chain::IGK, Chain::IGL];
-    let mut annotator = Annotator::new(&chains, Scheme::IMGT).expect("Failed to create annotator");
+    let annotator = Annotator::new(&chains, Scheme::IMGT).expect("Failed to create annotator");
 
     // Warmup round: populate buffers and CPU caches
     let mut success = 0usize;

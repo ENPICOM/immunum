@@ -1,4 +1,6 @@
 //! High-level API for sequence annotation and chain detection
+use std::cell::RefCell;
+
 use crate::alignment::{align, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::apply_numbering;
@@ -28,12 +30,12 @@ pub struct NumberingResult {
 }
 
 /// Annotator for numbering sequences
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct Annotator {
     matrices: Vec<(Chain, ScoringMatrix)>,
     scheme: Scheme,
     /// Reusable alignment buffer to avoid per-alignment allocation
-    align_buf: AlignBuffer,
+    align_buf: RefCell<AlignBuffer>,
 }
 
 impl Annotator {
@@ -58,12 +60,12 @@ impl Annotator {
         Ok(Self {
             matrices,
             scheme,
-            align_buf: AlignBuffer::new(),
+            align_buf: RefCell::new(AlignBuffer::new()),
         })
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
-    pub fn number(&mut self, sequence: &str) -> Result<NumberingResult> {
+    pub fn number(&self, sequence: &str) -> Result<NumberingResult> {
         if sequence.is_empty() {
             return Err(Error::InvalidSequence("empty sequence".to_string()));
         }
@@ -86,11 +88,12 @@ impl Annotator {
     /// If multiple chains were provided during initialization, this will align to all
     /// of them and return the best match. If only one chain was provided, it will
     /// align to that chain directly.
-    pub fn get_best_alignment(&mut self, sequence: &str) -> Result<(Chain, Alignment)> {
+    pub fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
+        let mut buf = self.align_buf.borrow_mut();
         // Align to all loaded chain types and find best match by raw alignment score
         let mut best: Option<(Chain, Alignment)> = None;
         for (chain, matrix) in &self.matrices {
-            if let Ok(alignment) = align(sequence, &matrix.positions, Some(&mut self.align_buf)) {
+            if let Ok(alignment) = align(sequence, &matrix.positions, Some(&mut *buf)) {
                 let is_better = match &best {
                     Some((_, prev)) => alignment.score > prev.score,
                     None => true,
@@ -123,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_number_igh_sequence() {
-        let mut annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
 
         // Known IGH sequence
         let sequence =
@@ -140,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_number_with_single_chain() {
-        let mut annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT).unwrap();
         let sequence =
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
@@ -150,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_empty_sequence() {
-        let mut annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
         let result = annotator.number("");
         assert!(result.is_err());
     }
