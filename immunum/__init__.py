@@ -47,5 +47,5 @@ class Annotator:
     def number(self, sequence: str) -> NumberingResult:
         return NumberingResult(**self._annotator.number(sequence))
 
-    def segment(self, sequence: str) -> NumberingResult:
+    def segment(self, sequence: str) -> SegmenationResult:
         return SegmenationResult(**self._annotator.segment(sequence))

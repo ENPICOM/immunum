@@ -174,7 +174,9 @@ class TestPolarsNumberingMethod:
         from immunum import Annotator
 
         annotator = Annotator(["IGH"], "IMGT")
-        expr = imp.numbering_method(polars.col("sequence"), annotator=annotator)
+        expr = imp.numbering_method(
+            polars.col("sequence"), annotator=annotator._annotator
+        )
         assert isinstance(expr, polars.Expr)
 
     def test_numbering_method_on_dataframe(self):
