@@ -75,6 +75,7 @@ tasks:
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
             - uv tool run maturin develop --uv --features "python,polars" --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            - uv sync --all-extras --all-groups --dev --compile-bytecode
 
     ci:
         cmds:
