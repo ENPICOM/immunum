@@ -13,13 +13,15 @@ tasks:
     build-ci:
         cmd: uv sync --locked --all-extras --all-groups --dev
 
-    check:
-        aliases: [c]
-        cmd: uv run pytest -n  $(( $(nproc) - 2 )) -q --show-capture=no --disable-warnings --tb=no {{.CLI_ARGS}}
-
     test-python:
+        deps: [build-python]
         aliases: [tp]
-        cmd: uv run pytest -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
+        cmd: uv run pytest {docs,tests/test_python.py} -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
+
+    test-polars:
+        deps: [build-polars]
+        aliases: [tp]
+        cmd: uv run pytest tests/test_polars.py -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
 
     test-rust:
         aliases: [tr]
@@ -30,6 +32,7 @@ tasks:
         cmds:
             - task test-rust
             - task test-python
+            - task: test-polars
 
     lint:
         cmds:
@@ -63,21 +66,22 @@ tasks:
         cmds:
             - task --list-all
 
-    build-maturin:
+    build-python:
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
-            - uv tool run maturin develop --uv --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            - uv tool run maturin develop --uv --features python --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
-    build-maturin-dist:
+    build-polars:
         cmds:
-            - uv tool run maturin develop --profile dist-release --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            # important to use `uv tool`` and not `uv run` since it's another environment
+            - uv tool run maturin develop --uv --features "python,polars" --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     ci:
         cmds:
             - task: build-ci
             - task: lint
             - task: pysentry
-            - task: build-maturin
+            - task: test
               vars:
                   PROFILE: "{{.PROFILE}}"
             - task: test

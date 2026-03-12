@@ -52,6 +52,7 @@ nav:
       - Overview: usage/index.md
   - API Reference:
       - api/index.md
+      - Annotator: api/annotator.md
 
 extra_css:
   - stylesheets/extra.css
@@ -59,6 +60,14 @@ extra_css:
 plugins:
   - search:
       lang: en
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: false
+            show_root_heading: true
+            docstring_style: google
 
 markdown_extensions:
   - pymdownx.highlight:
