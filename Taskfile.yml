@@ -93,3 +93,4 @@ tasks:
                   PROFILE: "{{.PROFILE}}"
             - task: test
             - task: coverage
+            - task: docs-build
