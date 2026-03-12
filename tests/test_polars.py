@@ -183,9 +183,9 @@ class TestPolarsNumberingMethod:
         annotator = Annotator(["IGH"], "IMGT")
         df = polars.DataFrame({"sequence": [IGH_SEQ]})
         result = df.select(
-            imp.numbering_method(polars.col("sequence"), annotator=annotator).alias(
-                "numbered"
-            )
+            imp.numbering_method(
+                polars.col("sequence"), annotator=annotator._annotator
+            ).alias("numbered")
         )
         assert "numbered" in result.columns
         assert result.height == 1
@@ -196,9 +196,9 @@ class TestPolarsNumberingMethod:
         annotator = Annotator(["IGH"], "IMGT")
         df = polars.DataFrame({"sequence": [IGH_SEQ]})
         result = df.select(
-            imp.numbering_method(polars.col("sequence"), annotator=annotator).alias(
-                "numbered"
-            )
+            imp.numbering_method(
+                polars.col("sequence"), annotator=annotator._annotator
+            ).alias("numbered")
         ).unnest("numbered")
         assert "chain" in result.columns
         assert "scheme" in result.columns

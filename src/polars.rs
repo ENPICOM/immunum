@@ -131,12 +131,7 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
         }
     }
 
-    let inner_dtype = DataType::Struct(vec![
-        Field::new("position".into(), DataType::String),
-        Field::new("residue".into(), DataType::String),
-    ]);
-    let mut numbering_builder =
-        AnonymousListBuilder::new("numbering".into(), len, Some(inner_dtype));
+    let mut numbering_builder = AnonymousListBuilder::new("numbering".into(), len, None);
     for opt_s in &row_structs {
         match opt_s {
             None => numbering_builder.append_null(),
