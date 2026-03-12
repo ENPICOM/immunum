@@ -119,7 +119,7 @@ mod tests {
             for (i, &score) in pos.scores.iter().enumerate() {
                 let aa = (b'A' + i as u8) as char;
                 assert!(
-                    score >= -10.0 && score <= 15.0,
+                    (-10.0..=15.0).contains(&score),
                     "Score for {} at position {} is out of range: {}",
                     aa,
                     pos.position,
