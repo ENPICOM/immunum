@@ -25,7 +25,7 @@ features = ["python", "polars"]
 polars = ["polars>1.30.0"]
 docs = [
     "markdown-exec[ansi]",
-    "mkdocs",
+    "mkdocs<2.0",
     "mkdocs-autorefs",
     "mkdocs-macros-plugin",
     "mkdocs-material",

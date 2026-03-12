@@ -428,7 +428,7 @@ dev = [
 ]
 docs = [
     { name = "markdown-exec", extras = ["ansi"] },
-    { name = "mkdocs" },
+    { name = "mkdocs", specifier = "<2.0" },
     { name = "mkdocs-autorefs" },
     { name = "mkdocs-macros-plugin" },
     { name = "mkdocs-material" },
