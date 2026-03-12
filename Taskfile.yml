@@ -59,8 +59,14 @@ tasks:
         cmds:
             - uv run pysentry-rs --all-extras .
 
-    docs:
+    docs-serve:
         cmd: uv run --no-project --group docs mkdocs serve
+
+    docs:
+        cmd: task docs-serve
+
+    docs-build:
+        cmd: uv run --no-project --group docs mkdocs build {{.CLI_ARGS}}
 
     default:
         cmds:
