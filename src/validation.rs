@@ -161,7 +161,7 @@ pub fn validate_chain_with_scheme(
 ) -> Result<ChainMetrics> {
     let path = std::path::PathBuf::from(csv_path);
     let entries = load_validation_csv(&path)?;
-    let annotator = Annotator::new(&[chain], scheme)?;
+    let mut annotator = Annotator::new(&[chain], scheme)?;
 
     let mut metrics = ChainMetrics::new(chain, scheme, csv_path.to_string());
 
@@ -173,7 +173,7 @@ pub fn validate_chain_with_scheme(
             }
         }
 
-        let result = validate_entry(entry, &annotator)?;
+        let result = validate_entry(entry, &mut annotator)?;
         metrics.add_result(&result);
     }
 
@@ -181,7 +181,10 @@ pub fn validate_chain_with_scheme(
 }
 
 /// Validate a single entry against the annotator
-pub fn validate_entry(entry: &ValidationEntry, annotator: &Annotator) -> Result<ValidationResult> {
+pub fn validate_entry(
+    entry: &ValidationEntry,
+    annotator: &mut Annotator,
+) -> Result<ValidationResult> {
     // Number the sequence
     let result = annotator.number(&entry.sequence)?;
 
@@ -291,7 +294,7 @@ mod tests {
         }
 
         let entries = load_validation_csv(&path).unwrap();
-        let annotator = Annotator::new(&[chain], scheme).unwrap();
+        let mut annotator = Annotator::new(&[chain], scheme).unwrap();
 
         let mut total_sequences = 0;
         let mut perfect_sequences = 0;
@@ -300,7 +303,7 @@ mod tests {
         let mut failures = Vec::new();
 
         for entry in entries.iter() {
-            let result = validate_entry(entry, &annotator).unwrap();
+            let result = validate_entry(entry, &mut annotator).unwrap();
 
             total_sequences += 1;
             total_positions += result.total_positions;

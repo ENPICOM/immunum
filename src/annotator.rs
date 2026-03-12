@@ -4,7 +4,6 @@ use crate::error::{Error, Result};
 use crate::numbering::apply_numbering;
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme, TCR_CHAINS};
-use std::sync::Mutex;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -34,7 +33,7 @@ pub struct Annotator {
     matrices: Vec<(Chain, ScoringMatrix)>,
     scheme: Scheme,
     /// Reusable alignment buffer to avoid per-alignment allocation
-    align_buf: Mutex<AlignBuffer>,
+    align_buf: AlignBuffer,
 }
 
 impl Annotator {
@@ -59,12 +58,12 @@ impl Annotator {
         Ok(Self {
             matrices,
             scheme,
-            align_buf: Mutex::new(AlignBuffer::new()),
+            align_buf: AlignBuffer::new(),
         })
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
-    pub fn number(&self, sequence: &str) -> Result<NumberingResult> {
+    pub fn number(&mut self, sequence: &str) -> Result<NumberingResult> {
         if sequence.is_empty() {
             return Err(Error::InvalidSequence("empty sequence".to_string()));
         }
@@ -87,12 +86,11 @@ impl Annotator {
     /// If multiple chains were provided during initialization, this will align to all
     /// of them and return the best match. If only one chain was provided, it will
     /// align to that chain directly.
-    pub fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
-        let mut buf = self.align_buf.lock().unwrap();
+    pub fn get_best_alignment(&mut self, sequence: &str) -> Result<(Chain, Alignment)> {
         // Align to all loaded chain types and find best match by raw alignment score
         let mut best: Option<(Chain, Alignment)> = None;
         for (chain, matrix) in &self.matrices {
-            if let Ok(alignment) = align(sequence, &matrix.positions, &mut buf) {
+            if let Ok(alignment) = align(sequence, &matrix.positions, Some(&mut self.align_buf)) {
                 let is_better = match &best {
                     Some((_, prev)) => alignment.score > prev.score,
                     None => true,
@@ -125,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_number_igh_sequence() {
-        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let mut annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
 
         // Known IGH sequence
         let sequence =
@@ -142,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_number_with_single_chain() {
-        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT).unwrap();
+        let mut annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT).unwrap();
         let sequence =
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
@@ -152,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_empty_sequence() {
-        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let mut annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
         let result = annotator.number("");
         assert!(result.is_err());
     }

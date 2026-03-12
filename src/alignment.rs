@@ -87,8 +87,6 @@ impl AlignBuffer {
     }
 }
 
-
-
 /// Performs semi-global Needleman-Wunsch alignment of a query amino acid sequence
 /// against position-specific scoring matrices derived from consensus sequences.
 ///
@@ -98,7 +96,7 @@ impl AlignBuffer {
 pub fn align(
     query: &str,
     positions: &[PositionScores],
-    align_buffer: &mut AlignBuffer,
+    align_buffer: Option<&mut AlignBuffer>,
 ) -> Result<Alignment> {
     let query_bytes = query.as_bytes();
     let query_len = query_bytes.len();
@@ -109,11 +107,21 @@ pub fn align(
         return Err(Error::InvalidSequence("empty sequence".to_string()));
     }
 
+    // Use provided buffer or allocate a local one
+    let mut local_buf;
+    let buf = match align_buffer {
+        Some(buf) => buf,
+        None => {
+            local_buf = AlignBuffer::new();
+            &mut local_buf
+        }
+    };
+
     // Reuse buffer, growing only if needed
     let total = (query_len + 1) * stride;
-    align_buffer.ensure_capacity(total);
-    let dp_scores = &mut align_buffer.dp_scores[..total];
-    let dp_traceback = &mut align_buffer.dp_traceback[..total];
+    buf.ensure_capacity(total);
+    let dp_scores = &mut buf.dp_scores[..total];
+    let dp_traceback = &mut buf.dp_traceback[..total];
 
     // Initialize first row: all zeros for scores, gaps in query are free (semi-global)
     dp_scores[0] = 0.0;
@@ -275,8 +283,7 @@ mod tests {
     use crate::Chain;
 
     fn test_align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
-        let mut buf = AlignBuffer::new();
-        align(query, positions, &mut buf)
+        align(query, positions, None)
     }
     #[test]
     fn test_align_simple() {

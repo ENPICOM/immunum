@@ -22,7 +22,9 @@ tasks:
 
     test:
         aliases: [t]
-        cmd: uv run pytest -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
+        cmds:
+            - uv run pytest -n  $(( $(nproc) - 2 )) {{.CLI_ARGS}}
+            - cargo test --all-targets --all-features
 
     lint:
         cmd: uv run ruff check --config pyproject.toml

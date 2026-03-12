@@ -36,7 +36,7 @@ impl Annotator {
     }
 
     #[pyo3(signature = (sequence), name = "number")]
-    pub fn _number(&self, sequence: &str) -> PyResult<NumberingResult> {
+    pub fn _number(&mut self, sequence: &str) -> PyResult<NumberingResult> {
         let result = self
             .number(sequence)
             .map_err(|_| {
