@@ -11,7 +11,7 @@ except ImportError as e:
         "polars is required to use immunum.polars. Install it with: pip install polars"
     ) from e
 
-from immunum._internal import Annotator  # noqa: F401
+from immunum._internal import _Annotator  # noqa: F401
 
 if TYPE_CHECKING:
     from immunum.typing import IntoExprColumn
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 LIB = Path(__file__).parent
 
 
-def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
+def numbering_method(expr: IntoExprColumn, *, annotator: _Annotator) -> pl.Expr:
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
@@ -35,6 +35,16 @@ def number(expr: IntoExprColumn, *, chains: list[str], scheme: str) -> pl.Expr:
         args=[expr],
         plugin_path=LIB,
         function_name="numbering_struct_expr",
+        is_elementwise=True,
+        kwargs={"chains": chains, "scheme": scheme},
+    )
+
+
+def segment(expr: IntoExprColumn, *, chains: list[str], scheme: str) -> pl.Expr:
+    return register_plugin_function(
+        args=[expr],
+        plugin_path=LIB,
+        function_name="segmentation_struct_expr",
         is_elementwise=True,
         kwargs={"chains": chains, "scheme": scheme},
     )

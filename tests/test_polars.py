@@ -124,6 +124,51 @@ class TestValidationFixtures:
         )
 
 
+class TestPolarsSegment:
+    def test_segment_returns_expr(self):
+        expr = imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT")
+        assert isinstance(expr, polars.Expr)
+
+    def test_segment_on_dataframe(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        result = df.select(
+            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "segmented"
+            )
+        )
+        assert "segmented" in result.columns
+        assert result.height == 1
+
+    def test_segment_struct_fields(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        result = df.select(
+            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "segmented"
+            )
+        ).unnest("segmented")
+        expected_fields = {
+            "fr1",
+            "fr2",
+            "fr3",
+            "fr4",
+            "cdr1",
+            "cdr2",
+            "cdr3",
+            "prefix",
+            "postfix",
+        }
+        assert expected_fields.issubset(set(result.columns))
+
+    def test_segment_multiple_sequences(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ, SEQ]})
+        result = df.select(
+            imp.segment(
+                polars.col("sequence"), chains=["IGH", "IGK", "IGL"], scheme="IMGT"
+            ).alias("segmented")
+        )
+        assert result.height == 2
+
+
 class TestPolarsNumberingMethod:
     def test_numbering_method_returns_expr(self):
         from immunum import Annotator
@@ -144,3 +189,18 @@ class TestPolarsNumberingMethod:
         )
         assert "numbered" in result.columns
         assert result.height == 1
+
+    def test_numbering_method_struct_fields(self):
+        from immunum import Annotator
+
+        annotator = Annotator(["IGH"], "IMGT")
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        result = df.select(
+            imp.numbering_method(polars.col("sequence"), annotator=annotator).alias(
+                "numbered"
+            )
+        ).unnest("numbered")
+        assert "chain" in result.columns
+        assert "scheme" in result.columns
+        assert "confidence" in result.columns
+        assert "numbering" in result.columns

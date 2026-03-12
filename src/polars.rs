@@ -1,4 +1,5 @@
 use crate::{annotator::Annotator, numbering::segment, Chain, Scheme};
+use polars::chunked_array::builder::AnonymousListBuilder;
 use polars::prelude::*;
 use pyo3_polars::derive::polars_expr;
 use pyo3_polars::PolarsAllocator;
@@ -48,6 +49,23 @@ struct NumberFuncKwargs {
 
 // ── Numbering ────────────────────────────────────────────────────────────────
 
+fn numbering_class_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
+    let inner_fields = vec![
+        Field::new("position".into(), DataType::String),
+        Field::new("residue".into(), DataType::String),
+    ];
+    let fields = vec![
+        Field::new("chain".into(), DataType::String),
+        Field::new("scheme".into(), DataType::String),
+        Field::new("confidence".into(), DataType::Float32),
+        Field::new(
+            "numbering".into(),
+            DataType::List(Box::new(DataType::Struct(inner_fields))),
+        ),
+    ];
+    Ok(Field::new("numbering".into(), DataType::Struct(fields)))
+}
+
 fn numbering_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
     let fields = vec![
         Field::new("chain".into(), DataType::String),
@@ -64,52 +82,78 @@ fn numbering_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
     Ok(Field::new("numbering".into(), DataType::Struct(fields)))
 }
 
-#[polars_expr(output_type_func=numbering_struct_output)]
+#[polars_expr(output_type_func=numbering_class_struct_output)]
 fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
     let ca = inputs[0].str()?;
     let len = ca.len();
-    let mut chain_builder = StringChunkedBuilder::new("chain".into(), len);
-    let mut scheme_builder = StringChunkedBuilder::new("scheme".into(), len);
-    let mut positions_builder = ListStringChunkedBuilder::new("positions".into(), len, len);
-    let mut residues_builder = ListStringChunkedBuilder::new("residues".into(), len, len);
 
-    ca.into_iter().try_for_each(|opt_v| -> PolarsResult<()> {
+    // Collect per-row data; row_structs holds owned Series to keep them alive
+    // while AnonymousListBuilder borrows them.
+    let mut chain_vec: Vec<Option<String>> = Vec::with_capacity(len);
+    let mut scheme_vec: Vec<Option<String>> = Vec::with_capacity(len);
+    let mut confidence_vec: Vec<Option<f32>> = Vec::with_capacity(len);
+    let mut row_structs: Vec<Option<Series>> = Vec::with_capacity(len);
+
+    for opt_v in ca.into_iter() {
         match opt_v {
             None => {
-                chain_builder.append_null();
-                scheme_builder.append_null();
-                positions_builder.append_null();
-                residues_builder.append_null();
+                chain_vec.push(None);
+                scheme_vec.push(None);
+                confidence_vec.push(None);
+                row_structs.push(None);
             }
             Some(value) => match kwargs.annotator.number(value) {
                 Err(_) => {
-                    chain_builder.append_null();
-                    scheme_builder.append_null();
-                    positions_builder.append_null();
-                    residues_builder.append_null();
+                    chain_vec.push(None);
+                    scheme_vec.push(None);
+                    confidence_vec.push(None);
+                    row_structs.push(None);
                 }
                 Ok(result) => {
-                    chain_builder.append_value(result.chain.to_string());
-                    scheme_builder.append_value(result.scheme.to_string());
+                    chain_vec.push(Some(result.chain.to_string()));
+                    scheme_vec.push(Some(result.scheme.to_string()));
+                    confidence_vec.push(Some(result.confidence));
                     let (positions, residues): (Vec<String>, Vec<String>) = result
                         .positions
                         .iter()
                         .zip(value.chars())
                         .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                         .unzip();
-                    positions_builder.append_series(&Series::new("".into(), positions))?;
-                    residues_builder.append_series(&Series::new("".into(), residues))?;
+                    let n = positions.len();
+                    let pos_series = Series::new("position".into(), positions);
+                    let res_series = Series::new("residue".into(), residues);
+                    let row_struct =
+                        StructChunked::from_series("".into(), n, [pos_series, res_series].iter())?
+                            .into_series();
+                    row_structs.push(Some(row_struct));
                 }
             },
         }
-        Ok(())
-    })?;
+    }
+
+    let inner_dtype = DataType::Struct(vec![
+        Field::new("position".into(), DataType::String),
+        Field::new("residue".into(), DataType::String),
+    ]);
+    let mut numbering_builder =
+        AnonymousListBuilder::new("numbering".into(), len, Some(inner_dtype));
+    for opt_s in &row_structs {
+        match opt_s {
+            None => numbering_builder.append_null(),
+            Some(s) => numbering_builder.append_series(s)?,
+        }
+    }
+
+    let chain_series = Series::new("chain".into(), chain_vec);
+    let scheme_series = Series::new("scheme".into(), scheme_vec);
+    let confidence_series = Series::new("confidence".into(), confidence_vec);
+    let numbering_series = numbering_builder.finish().into_series();
 
     let fields = [
-        chain_builder.finish().into_series(),
-        scheme_builder.finish().into_series(),
-        positions_builder.finish().into_series(),
-        residues_builder.finish().into_series(),
+        chain_series,
+        scheme_series,
+        confidence_series,
+        numbering_series,
     ];
     StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
 }
