@@ -34,8 +34,7 @@ impl PositionScores {
     pub fn score_for(&self, aa: u8) -> f32 {
         let idx = aa.wrapping_sub(b'A') as usize;
         if idx < 26 {
-            // SAFETY: idx is guaranteed < 26, which is the array length
-            unsafe { *self.scores.get_unchecked(idx) }
+            self.scores[idx]
         } else {
             DEFAULT_SCORE
         }

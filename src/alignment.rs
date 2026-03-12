@@ -130,29 +130,23 @@ pub fn align(
     }
 
     // Fill DP matrix
-    // SAFETY: All indices are within bounds due to loop structure:
-    // - i ranges 1..=query_len, j ranges 1..=cons_len
-    // - dp_scores/dp_traceback have size (query_len+1) * stride where stride = cons_len+1
-    // - max index = query_len * stride + cons_len = total - 1
     for i in 1..=query_len {
-        let aa = unsafe { *query_bytes.get_unchecked(i - 1) }.to_ascii_uppercase();
+        let aa = query_bytes[i - 1].to_ascii_uppercase();
         let curr_row = i * stride;
         let prev_row = curr_row - stride;
 
         for j in 1..=cons_len {
-            let cons_pos = unsafe { positions.get_unchecked(j - 1) };
+            let cons_pos = &positions[j - 1];
 
             // Match/mismatch score using direct array index
             let match_score = cons_pos.score_for(aa);
-            let from_match = unsafe { *dp_scores.get_unchecked(prev_row + j - 1) } + match_score;
+            let from_match = dp_scores[prev_row + j - 1] + match_score;
 
             // Gap in query (skip consensus position)
-            let from_gap_query =
-                unsafe { *dp_scores.get_unchecked(curr_row + j - 1) } + cons_pos.gap_penalty;
+            let from_gap_query = dp_scores[curr_row + j - 1] + cons_pos.gap_penalty;
 
             // Gap in consensus (insertion in query sequence)
-            let from_gap_cons =
-                unsafe { *dp_scores.get_unchecked(prev_row + j) } + cons_pos.insertion_penalty;
+            let from_gap_cons = dp_scores[prev_row + j] + cons_pos.insertion_penalty;
 
             // Choose best
             let (best_score, best_dir) =
@@ -164,10 +158,8 @@ pub fn align(
                     (from_gap_cons, Direction::GapInConsensus.as_u8())
                 };
 
-            unsafe {
-                *dp_scores.get_unchecked_mut(curr_row + j) = best_score;
-                *dp_traceback.get_unchecked_mut(curr_row + j) = best_dir;
-            }
+            dp_scores[curr_row + j] = best_score;
+            dp_traceback[curr_row + j] = best_dir;
         }
     }
 
