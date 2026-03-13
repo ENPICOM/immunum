@@ -25,7 +25,6 @@ features = ["python", "polars"]
 [dependency-groups]
 polars = ["polars>1.30.0"]
 dev = [
-    "antpack==0.3.8",
     "coverage>=7.10.6",
     "go-task-bin>=3.44.1",
     "hypothesis>=6.151.9",
@@ -41,6 +40,8 @@ dev = [
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
+benchmark = ["antpack~=0.2.7", "biopython>=1.86"]
+
 
 [tool.uv]
 default-groups = ["dev"]

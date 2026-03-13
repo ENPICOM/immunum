@@ -56,6 +56,14 @@ tasks:
         cmds:
             - uv run pysentry-rs --all-extras .
 
+    benchmark-comparison:
+        desc: "Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)"
+        cmd: uv run --group benchmark pytest tests/bench_comparison.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+
+    benchmark-speed:
+        desc: "Speed benchmark for immunum polars across all chain/scheme fixtures"
+        cmd: uv run pytest tests/bench_polars.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+
     default:
         cmds:
             - task --list-all
