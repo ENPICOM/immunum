@@ -415,3 +415,164 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
     ];
     StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }
+
+// ── Segmentation ─────────────────────────────────────────────────────────────
+
+fn segmentation_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
+    let fields = vec![
+        Field::new("prefix".into(), DataType::String),
+        Field::new("fr1".into(), DataType::String),
+        Field::new("cdr1".into(), DataType::String),
+        Field::new("fr2".into(), DataType::String),
+        Field::new("cdr2".into(), DataType::String),
+        Field::new("fr3".into(), DataType::String),
+        Field::new("cdr3".into(), DataType::String),
+        Field::new("fr4".into(), DataType::String),
+        Field::new("postfix".into(), DataType::String),
+    ];
+    Ok(Field::new("segmentation".into(), DataType::Struct(fields)))
+}
+
+#[polars_expr(output_type_func=segmentation_struct_output)]
+fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
+    let ca = inputs[0].str()?;
+    let len = ca.len();
+    let mut prefix_b = StringChunkedBuilder::new("prefix".into(), len);
+    let mut fr1_b = StringChunkedBuilder::new("fr1".into(), len);
+    let mut cdr1_b = StringChunkedBuilder::new("cdr1".into(), len);
+    let mut fr2_b = StringChunkedBuilder::new("fr2".into(), len);
+    let mut cdr2_b = StringChunkedBuilder::new("cdr2".into(), len);
+    let mut fr3_b = StringChunkedBuilder::new("fr3".into(), len);
+    let mut cdr3_b = StringChunkedBuilder::new("cdr3".into(), len);
+    let mut fr4_b = StringChunkedBuilder::new("fr4".into(), len);
+    let mut postfix_b = StringChunkedBuilder::new("postfix".into(), len);
+
+    ca.into_iter().try_for_each(|opt_v| -> PolarsResult<()> {
+        match opt_v {
+            None => {
+                prefix_b.append_null();
+                fr1_b.append_null();
+                cdr1_b.append_null();
+                fr2_b.append_null();
+                cdr2_b.append_null();
+                fr3_b.append_null();
+                cdr3_b.append_null();
+                fr4_b.append_null();
+                postfix_b.append_null();
+            }
+            Some(value) => match kwargs.annotator.number(value) {
+                Err(_) => {
+                    prefix_b.append_null();
+                    fr1_b.append_null();
+                    cdr1_b.append_null();
+                    fr2_b.append_null();
+                    cdr2_b.append_null();
+                    fr3_b.append_null();
+                    cdr3_b.append_null();
+                    fr4_b.append_null();
+                    postfix_b.append_null();
+                }
+                Ok(result) => {
+                    let s = segment(&result.positions, value, result.scheme);
+                    prefix_b.append_value(s.get("prefix").map(|v| v.as_str()).unwrap_or(""));
+                    fr1_b.append_value(s.get("fr1").map(|v| v.as_str()).unwrap_or(""));
+                    cdr1_b.append_value(s.get("cdr1").map(|v| v.as_str()).unwrap_or(""));
+                    fr2_b.append_value(s.get("fr2").map(|v| v.as_str()).unwrap_or(""));
+                    cdr2_b.append_value(s.get("cdr2").map(|v| v.as_str()).unwrap_or(""));
+                    fr3_b.append_value(s.get("fr3").map(|v| v.as_str()).unwrap_or(""));
+                    cdr3_b.append_value(s.get("cdr3").map(|v| v.as_str()).unwrap_or(""));
+                    fr4_b.append_value(s.get("fr4").map(|v| v.as_str()).unwrap_or(""));
+                    postfix_b.append_value(s.get("postfix").map(|v| v.as_str()).unwrap_or(""));
+                }
+            },
+        }
+        Ok(())
+    })?;
+
+    let fields = [
+        prefix_b.finish().into_series(),
+        fr1_b.finish().into_series(),
+        cdr1_b.finish().into_series(),
+        fr2_b.finish().into_series(),
+        cdr2_b.finish().into_series(),
+        fr3_b.finish().into_series(),
+        cdr3_b.finish().into_series(),
+        fr4_b.finish().into_series(),
+        postfix_b.finish().into_series(),
+    ];
+    StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
+}
+
+#[polars_expr(output_type_func=segmentation_struct_output)]
+fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsResult<Series> {
+    let ca = inputs[0].str()?;
+    let len = ca.len();
+    let mut prefix_b = StringChunkedBuilder::new("prefix".into(), len);
+    let mut fr1_b = StringChunkedBuilder::new("fr1".into(), len);
+    let mut cdr1_b = StringChunkedBuilder::new("cdr1".into(), len);
+    let mut fr2_b = StringChunkedBuilder::new("fr2".into(), len);
+    let mut cdr2_b = StringChunkedBuilder::new("cdr2".into(), len);
+    let mut fr3_b = StringChunkedBuilder::new("fr3".into(), len);
+    let mut cdr3_b = StringChunkedBuilder::new("cdr3".into(), len);
+    let mut fr4_b = StringChunkedBuilder::new("fr4".into(), len);
+    let mut postfix_b = StringChunkedBuilder::new("postfix".into(), len);
+    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme) {
+        Ok(a) => a,
+        Err(e) => polars_bail!(InvalidOperation: "{}", e),
+    };
+
+    ca.into_iter().try_for_each(|opt_v| -> PolarsResult<()> {
+        match opt_v {
+            None => {
+                prefix_b.append_null();
+                fr1_b.append_null();
+                cdr1_b.append_null();
+                fr2_b.append_null();
+                cdr2_b.append_null();
+                fr3_b.append_null();
+                cdr3_b.append_null();
+                fr4_b.append_null();
+                postfix_b.append_null();
+            }
+            Some(value) => match annotator.number(value) {
+                Err(_) => {
+                    prefix_b.append_null();
+                    fr1_b.append_null();
+                    cdr1_b.append_null();
+                    fr2_b.append_null();
+                    cdr2_b.append_null();
+                    fr3_b.append_null();
+                    cdr3_b.append_null();
+                    fr4_b.append_null();
+                    postfix_b.append_null();
+                }
+                Ok(result) => {
+                    let s = segment(&result.positions, value, result.scheme);
+                    prefix_b.append_value(s.get("prefix").map(|v| v.as_str()).unwrap_or(""));
+                    fr1_b.append_value(s.get("fr1").map(|v| v.as_str()).unwrap_or(""));
+                    cdr1_b.append_value(s.get("cdr1").map(|v| v.as_str()).unwrap_or(""));
+                    fr2_b.append_value(s.get("fr2").map(|v| v.as_str()).unwrap_or(""));
+                    cdr2_b.append_value(s.get("cdr2").map(|v| v.as_str()).unwrap_or(""));
+                    fr3_b.append_value(s.get("fr3").map(|v| v.as_str()).unwrap_or(""));
+                    cdr3_b.append_value(s.get("cdr3").map(|v| v.as_str()).unwrap_or(""));
+                    fr4_b.append_value(s.get("fr4").map(|v| v.as_str()).unwrap_or(""));
+                    postfix_b.append_value(s.get("postfix").map(|v| v.as_str()).unwrap_or(""));
+                }
+            },
+        }
+        Ok(())
+    })?;
+
+    let fields = [
+        prefix_b.finish().into_series(),
+        fr1_b.finish().into_series(),
+        cdr1_b.finish().into_series(),
+        fr2_b.finish().into_series(),
+        cdr2_b.finish().into_series(),
+        fr3_b.finish().into_series(),
+        cdr3_b.finish().into_series(),
+        fr4_b.finish().into_series(),
+        postfix_b.finish().into_series(),
+    ];
+    StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
+}
