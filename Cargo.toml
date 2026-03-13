@@ -7,7 +7,7 @@ default-run = "immunum"
 [features]
 default = ["python"]
 python = ["dep:pyo3", "dep:postcard", "dep:pyo3-build-config"]
-polars = ["dep:polars", "dep:polars-arrow", "dep:pyo3-polars", "dep:postcard"]
+polars = ["dep:polars", "dep:polars-arrow", "dep:polars-core", "dep:pyo3-polars", "dep:postcard"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -26,6 +26,7 @@ pyo3 = { version = "0.25.0", features = [
 postcard = { version = "=1.1.3", features = ["alloc"], optional = true }
 
 polars = { version = "0.51.0", default-features = false, optional = true }
+polars-core = { version = "0.51.0", default-features = false, optional = true }
 polars-arrow = { version = "0.51.0", default-features = false, optional = true }
 pyo3-polars = { version = "0.24.0", features = [
     "derive",
