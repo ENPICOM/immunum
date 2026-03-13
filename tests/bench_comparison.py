@@ -265,7 +265,6 @@ def test_anarci(benchmark, sample_seqs, sample_gt):
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
-@pytest.mark.skip
 def test_anarci_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("anarci")
     result = benchmark.pedantic(
