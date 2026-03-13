@@ -1,12 +1,6 @@
 # Annotator
 
-::: immunum._internal.Annotator
-    options:
-      show_root_heading: false
-
-## NumberingResult
-
-::: immunum._internal.NumberingResult
+::: immunum._internal._Annotator
     options:
       show_root_heading: false
 
@@ -20,8 +14,6 @@ result = annotator.number(
     "EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYWMSWVRQAPGKGLEWVANIKQDGSEKYYVDSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCARDSGYGAMDYWGQGTLVTVSS"
 )
 
-assert result["chain"] == "H"
-assert result["scheme"] == "IMGT"
-assert isinstance(result["positions"], list)
-assert isinstance(result["confidence"], float)
+assert result.chain == "H"
+assert result.scheme == "IMGT"
 ```
