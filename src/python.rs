@@ -1,5 +1,4 @@
 use postcard::{from_bytes, to_allocvec};
-use std::collections::HashMap;
 use std::str::FromStr;
 
 use pyo3::prelude::*;
@@ -48,12 +47,10 @@ impl Annotator {
             ))
         })?;
 
-        let numbering: HashMap<String, String> = result
-            .positions
-            .iter()
-            .zip(sequence.chars())
-            .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
-            .collect();
+        let numbering = PyDict::new(py);
+        for (pos, ch) in result.positions.iter().zip(sequence.chars()) {
+            numbering.set_item(pos.to_string(), ch.to_string())?;
+        }
 
         let dict = PyDict::new(py);
         dict.set_item("chain", result.chain.to_string())?;
