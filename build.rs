@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -143,7 +142,7 @@ struct ScoringMatrix {
 #[derive(Serialize, Deserialize)]
 struct PositionScores {
     position: u32,
-    scores: HashMap<char, f32>,
+    scores: [f32; 26],
     gap_penalty: f32,
     insertion_penalty: f32,
 }
@@ -213,13 +212,13 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
     let mut position_scores = Vec::new();
 
     for pos_data in positions {
-        // Calculate scores for all 20 amino acids
-        let scores_array = calculate_position_scores(&pos_data.aa_frequencies);
+        // Calculate scores for all 20 amino acids into a [f32; 26] array
+        let scores_20 = calculate_position_scores(&pos_data.aa_frequencies);
 
-        // Convert to HashMap for JSON
-        let mut scores = HashMap::new();
+        // Map 20 amino acid scores into 26-slot array indexed by (byte - b'A')
+        let mut scores = [-4.0f32; 26];
         for (i, &aa_byte) in AMINO_ACIDS.iter().enumerate() {
-            scores.insert(aa_byte as char, scores_array[i]);
+            scores[(aa_byte - b'A') as usize] = scores_20[i];
         }
 
         // Calculate gap penalties with region-specific and conservation-based penalties

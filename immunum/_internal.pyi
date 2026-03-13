@@ -20,7 +20,7 @@ class NumberingResult(TypedDict):
     residues: list[str]
     confidence: float
 
-class Annotator:
+class _Annotator:
     """Annotates antibody and TCR sequences with IMGT or Kabat position numbers.
 
     Wraps the Rust alignment engine. Create one instance per chain/scheme
@@ -32,7 +32,7 @@ class Annotator:
         chains: list[str],
         scheme: str,
     ) -> None:
-        """Create an Annotator for the given chains and numbering scheme.
+        """Create an _Annotator for the given chains and numbering scheme.
 
         Args:
             chains: Chain types to consider during auto-detection.

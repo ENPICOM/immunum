@@ -87,36 +87,25 @@ class TestNumbering:
     def test_number_igh_sequence(self):
         annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
         result = annotator.number(IGH_SEQ)
-        assert result["chain"] == "H"
-        assert result["scheme"] == "IMGT"
-        assert len(result["positions"]) == len(IGH_SEQ)
-        assert len(result["residues"]) == len(IGH_SEQ)
-        assert result["residues"] == list(IGH_SEQ)
+        assert result.chain == "H"
+        assert result.scheme == "IMGT"
 
     def test_number_with_single_chain(self):
         annotator = immunum.Annotator(["IGH"], "IMGT")
         result = annotator.number(IGH_SEQ)
-        assert result["chain"] == "H"
+        assert result.chain == "H"
 
     def test_empty_sequence_raises(self):
         annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
         with pytest.raises(ValueError):
             annotator.number("")
 
-    def test_number_result_keys(self, annotator):
-        result = annotator.number(SEQ)
-        assert set(result.keys()) == {
-            "chain",
-            "scheme",
-            "positions",
-            "residues",
-            "confidence",
-        }
-
-    def test_positions_and_residues_same_length(self, annotator):
-        result = annotator.number(SEQ)
-        assert len(result["positions"]) == len(result["residues"]) == len(SEQ)
-
     def test_confidence_is_float(self, annotator):
         result = annotator.number(SEQ)
-        assert isinstance(result["confidence"], float)
+        assert isinstance(result.confidence, float)
+
+    def test_segmentation(self, annotator):
+        result = annotator.segment(SEQ)
+        assert set(result.as_dict()) == {f"cdr{i}" for i in (1, 2, 3)} | {
+            f"fr{i}" for i in (1, 2, 3, 4)
+        } | {"prefix", "postfix"}

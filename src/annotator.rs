@@ -1,5 +1,7 @@
 //! High-level API for sequence annotation and chain detection
-use crate::alignment::{align, Alignment};
+use std::cell::RefCell;
+
+use crate::alignment::{align, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::apply_numbering;
 use crate::scoring::ScoringMatrix;
@@ -28,12 +30,29 @@ pub struct NumberingResult {
 }
 
 /// Annotator for numbering sequences
-#[cfg_attr(feature = "python", pyclass(get_all, module = "immunum._internal"))]
-#[derive(Clone, Serialize, Deserialize)]
+#[cfg_attr(
+    feature = "python",
+    pyclass(name = "_Annotator", module = "immunum._internal", unsendable)
+)]
+#[derive(Serialize, Deserialize)]
 pub struct Annotator {
     pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
     pub(crate) scheme: Scheme,
     pub(crate) chains: Vec<Chain>,
+    /// Reusable alignment buffer to avoid per-alignment allocation
+    #[serde(skip)]
+    align_buf: RefCell<AlignBuffer>,
+}
+
+impl Clone for Annotator {
+    fn clone(&self) -> Self {
+        Self {
+            matrices: self.matrices.clone(),
+            scheme: self.scheme,
+            chains: self.chains.clone(),
+            align_buf: RefCell::new(AlignBuffer::new()),
+        }
+    }
 }
 
 impl Annotator {
@@ -59,6 +78,7 @@ impl Annotator {
             matrices,
             scheme,
             chains: chains.to_vec(),
+            align_buf: RefCell::new(AlignBuffer::new()),
         })
     }
 
@@ -87,20 +107,21 @@ impl Annotator {
     /// of them and return the best match. If only one chain was provided, it will
     /// align to that chain directly.
     pub fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
+        let mut buf = self.align_buf.borrow_mut();
         // Align to all loaded chain types and find best match by raw alignment score
-        self.matrices
-            .iter()
-            .filter_map(|(chain, matrix)| {
-                align(sequence, &matrix.positions)
-                    .ok()
-                    .map(|alignment| (*chain, alignment))
-            })
-            .max_by(|(_, a1), (_, a2)| {
-                a1.score
-                    .partial_cmp(&a2.score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
+        let mut best: Option<(Chain, Alignment)> = None;
+        for (chain, matrix) in &self.matrices {
+            if let Ok(alignment) = align(sequence, &matrix.positions, Some(&mut *buf)) {
+                let is_better = match &best {
+                    Some((_, prev)) => alignment.score > prev.score,
+                    None => true,
+                };
+                if is_better {
+                    best = Some((*chain, alignment));
+                }
+            }
+        }
+        best.ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
     }
 }
 
