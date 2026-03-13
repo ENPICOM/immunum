@@ -1,7 +1,7 @@
 """
 Comparison benchmark: immunum vs antpack vs anarci.
 
-Speed: 1000 IGH sequences timed via pytest-benchmark (3 rounds).
+Speed: 10000 IGH sequences timed via pytest-benchmark (3 rounds).
 Correctness: residue-level accuracy per IMGT region embedded in benchmark.extra_info.
 
 Run with:
@@ -11,6 +11,8 @@ Run with:
 
 from __future__ import annotations
 
+import multiprocessing
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +20,7 @@ import polars
 import pytest
 
 import immunum.polars as imp
+from immunum._internal import Annotator
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "validation"
 FIXTURE = FIXTURES / "ab_H_imgt.csv"
@@ -81,13 +84,30 @@ def _correctness(
 # ---------------------------------------------------------------------------
 
 
-def _run_immunum(df: polars.DataFrame) -> list[dict[str, str]]:
+def _run_immunum_multithreaded(df: polars.DataFrame) -> list[dict[str, str]]:
     result = df.select(
-        imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias("n")
+        imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT")
+        .alias("n")
+        .struct.unnest()
     )
+
+    out = [
+        {"positions": pos, "residues": res}
+        for pos, res in zip(
+            result.get_column("positions").to_list(),
+            result.get_column("residues").to_list(),
+        )
+    ]
+
+    return out
+
+
+def _run_immunum_singlethreaded(
+    sequences: list[tuple[str, str]], annotator: Annotator
+) -> list[dict[str, str]]:
     out = []
-    for row in result.iter_rows(named=True):
-        n = row["n"]
+    for _header, seq in sequences:
+        n = annotator.number(seq)
         out.append(dict(zip(n["positions"], n["residues"])))
     return out
 
@@ -110,6 +130,28 @@ def _run_antpack(
     return results
 
 
+def _antpack_worker(
+    sequences_chunk: list[tuple[str, str]],
+) -> list[Optional[dict[str, str]]]:
+    from antpack import SingleChainAnnotator  # type: ignore
+
+    annotator = SingleChainAnnotator(["H"], scheme="imgt")
+    return _run_antpack(sequences_chunk, annotator)
+
+
+def _run_antpack_parallel(
+    sequences: list[tuple[str, str]],
+) -> list[Optional[dict[str, str]]]:
+    ncpu = os.cpu_count() or 1
+    chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
+    chunks = [
+        sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
+    ]
+    with multiprocessing.Pool(ncpu) as pool:
+        results = pool.map(_antpack_worker, chunks)
+    return [item for chunk_result in results for item in chunk_result]
+
+
 def _run_anarci(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, str]]]:
     from anarci import anarci  # type: ignore
 
@@ -126,6 +168,25 @@ def _run_anarci(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, str
                 d[str(num) + (ins.strip() if ins.strip() else "")] = aa
         results.append(d)
     return results
+
+
+def _anarci_worker(
+    sequences_chunk: list[tuple[str, str]],
+) -> list[Optional[dict[str, str]]]:
+    return _run_anarci(sequences_chunk)
+
+
+def _run_anarci_parallel(
+    sequences: list[tuple[str, str]],
+) -> list[Optional[dict[str, str]]]:
+    ncpu = os.cpu_count() or 1
+    chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
+    chunks = [
+        sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
+    ]
+    with multiprocessing.Pool(ncpu) as pool:
+        results = pool.map(_anarci_worker, chunks)
+    return [item for chunk_result in results for item in chunk_result]
 
 
 # ---------------------------------------------------------------------------
@@ -159,8 +220,21 @@ def sample_gt(sample_df: polars.DataFrame) -> list[dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 
-def test_immunum(benchmark, sample_df, sample_gt):
-    result = benchmark.pedantic(_run_immunum, args=(sample_df,), rounds=3, iterations=1)
+def test_immunum_multithreaded(benchmark, sample_df, sample_gt):
+    result = benchmark.pedantic(
+        _run_immunum_multithreaded, args=(sample_df,), rounds=3, iterations=1
+    )
+    benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
+def test_immunum_singlethreaded(benchmark, sample_seqs, sample_gt):
+    annotator = Annotator(chains=["IGH"], scheme="IMGT")
+    result = benchmark.pedantic(
+        _run_immunum_singlethreaded,
+        args=(sample_seqs, annotator),
+        rounds=3,
+        iterations=1,
+    )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
@@ -175,9 +249,26 @@ def test_antpack(benchmark, sample_seqs, sample_gt):
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
+def test_antpack_parallel(benchmark, sample_seqs, sample_gt):
+    pytest.importorskip("antpack")
+    result = benchmark.pedantic(
+        _run_antpack_parallel, args=(sample_seqs,), rounds=3, iterations=1
+    )
+    benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
 def test_anarci(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("anarci")
     result = benchmark.pedantic(
         _run_anarci, args=(sample_seqs,), rounds=3, iterations=1
+    )
+    benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
+@pytest.mark.skip
+def test_anarci_parallel(benchmark, sample_seqs, sample_gt):
+    pytest.importorskip("anarci")
+    result = benchmark.pedantic(
+        _run_anarci_parallel, args=(sample_seqs,), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
