@@ -1,37 +1,13 @@
 //! Debug tool for validation alignment visualization
 
 use immunum::annotator::Annotator;
+use immunum::numbering::region_for_position;
 use immunum::types::{Chain, Scheme};
 use immunum::validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
 use immunum::Position;
 use std::env;
 use std::path::PathBuf;
 use std::process;
-
-/// Get region boundaries for a given scheme (start, end) for each region
-/// Returns: (FR1, CDR1, FR2, CDR2, FR3, CDR3, FR4)
-fn get_region_boundaries(scheme: Scheme) -> [(&'static str, u8, u8); 7] {
-    match scheme {
-        Scheme::IMGT => [
-            ("FR1", 1, 26),
-            ("CDR1", 27, 38),
-            ("FR2", 39, 55),
-            ("CDR2", 56, 65),
-            ("FR3", 66, 104),
-            ("CDR3", 105, 117),
-            ("FR4", 118, 128),
-        ],
-        Scheme::Kabat => [
-            ("FR1", 1, 25),
-            ("CDR1", 26, 35),
-            ("FR2", 36, 50),
-            ("CDR2", 51, 57),
-            ("FR3", 58, 92),
-            ("CDR3", 93, 100),
-            ("FR4", 101, 113),
-        ],
-    }
-}
 
 fn print_usage() {
     eprintln!("Usage: debug-validation <CHAIN> [SCHEME] [HEADER]");
@@ -47,17 +23,6 @@ fn print_usage() {
     eprintln!("  debug-validation TRA imgt 1AC6_A");
     eprintln!("  debug-validation IGH kabat");
     eprintln!("  debug-validation IGH kabat \"5ijv_F|Heavy|F\"");
-}
-
-/// Get the region name for a position number given the scheme
-fn get_region_for_position(pos_num: u8, scheme: Scheme) -> &'static str {
-    let boundaries = get_region_boundaries(scheme);
-    for (name, start, end) in boundaries {
-        if pos_num >= start && pos_num <= end {
-            return name;
-        }
-    }
-    "?"
 }
 
 /// Print alignment comparison between expected and actual positions
@@ -98,7 +63,7 @@ pub fn print_alignment_comparison(
         match_line.clear();
         region_line.clear();
 
-        let mut prev_region = "";
+        let mut prev_region = String::new();
 
         for i in chunk_start..chunk_end {
             let aa = sequence.chars().nth(i).unwrap_or('?');
@@ -113,17 +78,22 @@ pub fn print_alignment_comparison(
 
             // Determine region from expected position (or actual if no expected)
             let current_region = if let Some(pos) = expected_pos {
-                get_region_for_position(pos.number, scheme)
+                region_for_position(pos.number, scheme)
+                    .map(|r| r.to_string())
+                    .unwrap_or_else(|| "?".to_string())
             } else if let Some(pos) = actual_pos {
-                get_region_for_position(pos.number, scheme)
+                region_for_position(pos.number, scheme)
+                    .map(|r| r.to_string())
+                    .unwrap_or_else(|| "?".to_string())
             } else {
-                "?"
+                "?".to_string()
             };
 
             // Show region name at boundaries, otherwise fill with dashes
             let region_str = if current_region != prev_region {
+                let label = current_region.clone();
                 prev_region = current_region;
-                format!("<{:<width$}", current_region, width = max_pos_width - 1)
+                format!("<{:<width$}", label, width = max_pos_width - 1)
             } else {
                 format!("{:-<width$}", "", width = max_pos_width)
             };

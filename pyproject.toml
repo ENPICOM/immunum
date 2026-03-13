@@ -19,6 +19,7 @@ dependencies = []
 [tool.maturin]
 module-name = "immunum._internal"
 features = ["python", "polars"]
+# features = ["python"]
 
 
 [dependency-groups]
