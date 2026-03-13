@@ -10,3 +10,4 @@ node_modules
 .vscode
 immunum/libimmunum.dylib.dSYM/
 site
+.task

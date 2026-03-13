@@ -16,15 +16,39 @@ tasks:
     test-python:
         deps: [build-python]
         aliases: [tp]
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - pyproject.toml
+            - resources/**/*
+            - tests/test_python.py
+            - docs/**/*.md
         cmd: uv run pytest {docs,tests/test_python.py} -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
 
     test-polars:
         deps: [build-polars]
         aliases: [tp]
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - pyproject.toml
+            - resources/**/*
+            - tests/test_polars.py
         cmd: uv run pytest tests/test_polars.py -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
 
     test-rust:
         aliases: [tr]
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - resources/**/*
+            - tests/cli.rs
         cmd: cargo test --all-features
 
     test:
@@ -73,11 +97,25 @@ tasks:
             - task --list-all
 
     build-python:
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - pyproject.toml
+            - resources/**/*
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
             - uv tool run maturin develop --uv --features python --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     build-polars:
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - pyproject.toml
+            - resources/**/*
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
             - uv tool run maturin develop --uv --features "python,polars" --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
