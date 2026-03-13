@@ -77,3 +77,9 @@ fail_under = 90
 [tool.coverage.run]
 omit = ["/tmp/*"]
 include = ["src/**", "tests/**"]
+
+[tool.pysentry.sources]
+enabled = ["pypa", "pypi", "osv"]
+
+[tool.pysentry.defaults]
+fail_on = "high"

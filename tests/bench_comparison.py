@@ -133,7 +133,7 @@ def _run_antpack(
 def _antpack_worker(
     sequences_chunk: list[tuple[str, str]],
 ) -> list[Optional[dict[str, str]]]:
-    from antpack import SingleChainAnnotator  # type: ignore
+    from antpack import SingleChainAnnotator
 
     annotator = SingleChainAnnotator(["H"], scheme="imgt")
     return _run_antpack(sequences_chunk, annotator)
@@ -153,7 +153,7 @@ def _run_antpack_parallel(
 
 
 def _run_anarci(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, str]]]:
-    from anarci import anarci  # type: ignore
+    from anarci import anarci  # type: ignore[missing-import]
 
     numbered_list, _, _ = anarci(sequences, scheme="imgt", allow={"H"}, ncpu=1)
     results: list[Optional[dict[str, str]]] = []
@@ -240,7 +240,7 @@ def test_immunum_singlethreaded(benchmark, sample_seqs, sample_gt):
 
 def test_antpack(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("antpack")
-    from antpack import SingleChainAnnotator  # type: ignore
+    from antpack import SingleChainAnnotator
 
     annotator = SingleChainAnnotator(["H"], scheme="imgt")
     result = benchmark.pedantic(
