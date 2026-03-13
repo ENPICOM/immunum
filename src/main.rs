@@ -52,18 +52,6 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
 
     let records = immunum::read_input(args.input.as_deref())?;
 
-    let mut numbered: Vec<NumberedRecord> = Vec::new();
-    for rec in records {
-        let result = annotator
-            .number(&rec.sequence)
-            .map_err(|e| format!("failed to number '{}': {}", rec.id, e))?;
-        numbered.push(NumberedRecord {
-            id: rec.id,
-            sequence: rec.sequence,
-            result,
-        });
-    }
-
     let stdout = io::stdout();
     let mut writer: BufWriter<Box<dyn Write>> = match &args.output {
         Some(path) => {
@@ -75,7 +63,25 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
     };
 
     format
-        .write(&mut writer, &numbered)
+        .write_header(&mut writer)
+        .map_err(|e| format!("write error: {}", e))?;
+
+    for (i, rec) in records.into_iter().enumerate() {
+        let result = annotator
+            .number(&rec.sequence)
+            .map_err(|e| format!("failed to number '{}': {}", rec.id, e))?;
+        let numbered = NumberedRecord {
+            id: rec.id,
+            sequence: rec.sequence,
+            result,
+        };
+        format
+            .write_record(&mut writer, &numbered, i)
+            .map_err(|e| format!("write error: {}", e))?;
+    }
+
+    format
+        .write_footer(&mut writer)
         .map_err(|e| format!("write error: {}", e))?;
 
     Ok(())
