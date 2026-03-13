@@ -195,7 +195,7 @@ impl FromStr for Position {
 }
 
 /// Functional regions in a numbered sequence
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, EnumString, Display)]
 pub enum Region {
     FR1,
     CDR1,
@@ -204,12 +204,6 @@ pub enum Region {
     FR3,
     CDR3,
     FR4,
-}
-
-impl fmt::Display for Region {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 /// A rule mapping a range of alignment positions to numbering positions

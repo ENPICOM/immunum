@@ -9,10 +9,11 @@ class NumberingResult(TypedDict):
     residues: list[str]
     confidence: float
 
-class Annotator:
+class _Annotator:
     def __init__(
         self,
         chains: list[str],
         scheme: str,
     ): ...
-    def number(self, sequence: str) -> NumberingResult: ...
+    def number(self, sequence: str): ...
+    def segment(self, sequence: str): ...
