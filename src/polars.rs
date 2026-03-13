@@ -1,6 +1,8 @@
 use crate::{annotator::Annotator, numbering::segment, Chain, Scheme};
 use polars::chunked_array::builder::AnonymousListBuilder;
 use polars::prelude::*;
+use polars_core::utils::rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use polars_core::POOL;
 use pyo3_polars::derive::polars_expr;
 use pyo3_polars::PolarsAllocator;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -150,53 +152,63 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
         confidence_series,
         numbering_series,
     ];
-    StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
+    StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }
 
 #[polars_expr(output_type_func=numbering_struct_output)]
 fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsResult<Series> {
     let ca = inputs[0].str()?;
     let len = ca.len();
-    let mut chain_builder = StringChunkedBuilder::new("chain".into(), len);
-    let mut scheme_builder = StringChunkedBuilder::new("scheme".into(), len);
-    let mut positions_builder = ListStringChunkedBuilder::new("positions".into(), len, len);
-    let mut residues_builder = ListStringChunkedBuilder::new("residues".into(), len, len);
+    let name = ca.name().clone();
     let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme) {
         Ok(a) => a,
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
 
-    ca.into_iter().try_for_each(|opt_v| -> PolarsResult<()> {
-        match opt_v {
+    let values: Vec<Option<&str>> = ca.into_iter().collect();
+    let results: Vec<Option<(String, String, Vec<String>, Vec<String>)>> = POOL.install(|| {
+        values
+            .par_iter()
+            .map_with(annotator, |ann, opt_v| {
+                let value = (*opt_v)?;
+                let result = ann.number(value).ok()?;
+                let (positions, residues): (Vec<String>, Vec<String>) = result
+                    .positions
+                    .iter()
+                    .zip(value.chars())
+                    .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
+                    .unzip();
+                Some((
+                    result.chain.to_string(),
+                    result.scheme.to_string(),
+                    positions,
+                    residues,
+                ))
+            })
+            .collect()
+    });
+
+    let mut chain_builder = StringChunkedBuilder::new("chain".into(), len);
+    let mut scheme_builder = StringChunkedBuilder::new("scheme".into(), len);
+    let mut positions_builder = ListStringChunkedBuilder::new("positions".into(), len, len);
+    let mut residues_builder = ListStringChunkedBuilder::new("residues".into(), len, len);
+
+    for row in results {
+        match row {
             None => {
                 chain_builder.append_null();
                 scheme_builder.append_null();
                 positions_builder.append_null();
                 residues_builder.append_null();
             }
-            Some(value) => match annotator.number(value) {
-                Err(_) => {
-                    chain_builder.append_null();
-                    scheme_builder.append_null();
-                    positions_builder.append_null();
-                    residues_builder.append_null();
-                }
-                Ok(result) => {
-                    chain_builder.append_value(result.chain.to_string());
-                    scheme_builder.append_value(result.scheme.to_string());
-                    let (positions, residues): (Vec<String>, Vec<String>) = result
-                        .positions
-                        .iter()
-                        .zip(value.chars())
-                        .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
-                        .unzip();
-                    positions_builder.append_series(&Series::new("".into(), positions))?;
-                    residues_builder.append_series(&Series::new("".into(), residues))?;
-                }
-            },
+            Some((chain, scheme, positions, residues)) => {
+                chain_builder.append_value(&chain);
+                scheme_builder.append_value(&scheme);
+                positions_builder.append_series(&Series::new("".into(), positions))?;
+                residues_builder.append_series(&Series::new("".into(), residues))?;
+            }
         }
-        Ok(())
-    })?;
+    }
 
     let fields = [
         chain_builder.finish().into_series(),
@@ -204,7 +216,7 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
         positions_builder.finish().into_series(),
         residues_builder.finish().into_series(),
     ];
-    StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
+    StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }
 
 // ── Segmentation ─────────────────────────────────────────────────────────────
