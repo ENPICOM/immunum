@@ -165,8 +165,9 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
 
+    type ResultType = Vec<Option<(String, String, Vec<String>, Vec<String>)>>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
-    let results: Vec<Option<(String, String, Vec<String>, Vec<String>)>> = POOL.install(|| {
+    let results: ResultType = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
