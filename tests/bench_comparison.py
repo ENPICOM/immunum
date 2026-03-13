@@ -20,7 +20,7 @@ import polars
 import pytest
 
 import immunum.polars as imp
-from immunum._internal import Annotator
+from immunum import Annotator
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "validation"
 FIXTURE = FIXTURES / "ab_H_imgt.csv"
@@ -108,7 +108,7 @@ def _run_immunum_singlethreaded(
     out = []
     for _header, seq in sequences:
         n = annotator.number(seq)
-        out.append(dict(zip(n["positions"], n["residues"])))
+        out.append(n.numbering)
     return out
 
 
