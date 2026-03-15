@@ -39,7 +39,12 @@ dev = [
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
-benchmark = ["anarcii>=2.0.5", "antpack~=0.2.7", "biopython>=1.86"]
+benchmark = [
+    "anarcii>=2.0.5",
+    "antpack~=0.2.7",
+    "biopython>=1.86",
+    "typer>=0.24.1",
+]
 
 
 [tool.uv]

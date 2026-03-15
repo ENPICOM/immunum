@@ -11,13 +11,17 @@ Run with:
 
 from __future__ import annotations
 
+import math
 import multiprocessing
 import os
+import signal
+import time
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Any, Optional
 
 import polars
 import pytest
+import typer
 
 import immunum.polars as imp
 from immunum import Annotator
@@ -92,7 +96,7 @@ def _run_immunum_multithreaded(df: polars.DataFrame) -> list[dict[str, str]]:
     )
 
     out = [
-        {"positions": pos, "residues": res}
+        dict(zip(pos, res))
         for pos, res in zip(
             result.get_column("positions").to_list(),
             result.get_column("residues").to_list(),
@@ -359,3 +363,163 @@ def test_anarcii2_parallel(benchmark, sample_seqs, sample_gt):
         _run_anarcii2_parallel, args=(sample_seqs,), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
+# ---------------------------------------------------------------------------
+# CLI entrypoint
+# ---------------------------------------------------------------------------
+
+BENCHMARK_SIZES = [100, 1_000, 10_000, 100_000]
+_REGIONS = ["FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4", "overall"]
+_COL_W = [26, 5, 9] + [7] * len(_REGIONS)  # tool, round, time_s, regions
+
+app = typer.Typer()
+
+
+def _table_header() -> None:
+    headers = ["tool", "round", "time_s"] + _REGIONS
+    typer.echo("  ".join(h.ljust(w) for h, w in zip(headers, _COL_W)))
+    typer.echo("  ".join("-" * w for w in _COL_W))
+
+
+def _table_row(tool: str, r: int, elapsed: float, correctness: dict) -> None:
+    vals = [tool, str(r), f"{elapsed:.3f}s"] + [
+        f"{correctness[reg]:.2f}" for reg in _REGIONS
+    ]
+    typer.echo("  ".join(v.ljust(w) for v, w in zip(vals, _COL_W)))
+
+
+def _parse_duration(s: str) -> float:
+    """Parse human-readable duration string to seconds (e.g. '1h', '30m', '90s')."""
+    s = s.strip()
+    if s.endswith("h"):
+        return float(s[:-1]) * 3600
+    if s.endswith("m"):
+        return float(s[:-1]) * 60
+    if s.endswith("s"):
+        return float(s[:-1])
+    return float(s)
+
+
+def _timed(fn: Any, args: tuple, timeout_s: float) -> tuple[float, Any]:
+    def _handler(signum: int, frame: Any) -> None:
+        raise TimeoutError
+
+    old = signal.signal(signal.SIGALRM, _handler)
+    signal.alarm(math.ceil(timeout_s))
+    try:
+        t0 = time.perf_counter()
+        result = fn(*args)
+        elapsed = time.perf_counter() - t0
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+    return elapsed, result
+
+
+@app.command()
+def main(
+    fixture: Annotated[Path, typer.Option(help="Input fixture CSV")] = FIXTURE,
+    output: Annotated[Path, typer.Option(help="Output file (.csv or .parquet)")] = Path(
+        "benchmark_results.csv"
+    ),
+    rounds: Annotated[int, typer.Option(help="Repeats per tool/size")] = 3,
+    sizes: Annotated[
+        Optional[list[int]], typer.Option(help="Sample sizes (repeatable)")
+    ] = None,
+    timeout: Annotated[
+        str, typer.Option(help="Per-function timeout (e.g. 1h, 30m, 90s)")
+    ] = "1h",
+) -> None:
+    timeout_s = _parse_duration(timeout)
+    run_sizes = sizes or BENCHMARK_SIZES
+    df_full = polars.read_csv(fixture, infer_schema=False)
+    rows: list[dict] = []
+
+    for size in run_sizes:
+        typer.echo(f"\n=== size={size} ===")
+        _table_header()
+        df = df_full.sample(n=size, seed=SEED, with_replacement=True)
+        seqs = list(zip(df["header"].to_list(), df["sequence"].to_list()))
+        position_cols = [c for c in df.columns if c not in META_COLS]
+        gt = [
+            {pos: row[pos] for pos in position_cols if row[pos]}
+            for row in df.iter_rows(named=True)
+        ]
+
+        runners: list[tuple[str, Any, tuple]] = [
+            ("immunum_multithreaded", _run_immunum_multithreaded, (df,)),
+            (
+                "immunum_singlethreaded",
+                _run_immunum_singlethreaded,
+                (seqs, Annotator(chains=["IGH"], scheme="IMGT")),
+            ),
+        ]
+
+        try:
+            from antpack import SingleChainAnnotator  # type: ignore[import]
+
+            annotator = SingleChainAnnotator(["H"], scheme="imgt")
+            runners += [
+                ("antpack", _run_antpack, (seqs, annotator)),
+                ("antpack_parallel", _run_antpack_parallel, (seqs,)),
+            ]
+        except ImportError:
+            typer.echo("  antpack not installed, skipping")
+
+        try:
+            import anarci as _anarci_mod  # type: ignore[import]  # noqa: F401
+
+            anarci_kw: dict = {"scheme": "imgt", "allow": {"H"}, "ncpu": 1}
+            runners += [
+                ("anarci", _run_anarci, (seqs, anarci_kw)),
+                ("anarci_parallel", _run_anarci_parallel, (seqs,)),
+            ]
+        except ImportError:
+            typer.echo("  anarci not installed, skipping")
+
+        try:
+            from anarcii import Anarcii  # type: ignore[import]
+
+            model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
+            runners += [
+                ("anarcii2", _run_anarcii2, (seqs, model)),
+                ("anarcii2_parallel", _run_anarcii2_parallel, (seqs,)),
+            ]
+        except ImportError:
+            typer.echo("  anarcii not installed, skipping")
+
+        for name, fn, args in runners:
+            for r in range(rounds):
+                try:
+                    elapsed, result = _timed(fn, args, timeout_s)
+                except TimeoutError:
+                    vals = (
+                        [name, str(r)]
+                        + [f"TIMEOUT (>{timeout})"]
+                        + [""] * (len(_COL_W) - 3)
+                    )
+                    typer.echo("  ".join(v.ljust(w) for v, w in zip(vals, _COL_W)))
+                    break
+                correctness = _correctness(result, gt)
+                rows.append(
+                    {
+                        "tool": name,
+                        "sample_size": size,
+                        "round": r,
+                        "time_s": elapsed,
+                        **correctness,
+                    }
+                )
+                _table_row(name, r, elapsed, correctness)
+
+    result_df = polars.DataFrame(rows)
+    if str(output).endswith(".parquet"):
+        result_df.write_parquet(output)
+    else:
+        result_df.write_csv(output)
+    typer.echo(f"\nSaved {len(rows)} rows to {output}")
+
+
+if __name__ == "__main__":
+    app()
