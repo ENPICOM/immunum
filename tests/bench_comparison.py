@@ -189,6 +189,52 @@ def _run_anarci_parallel(
     return [item for chunk_result in results for item in chunk_result]
 
 
+def _run_anarcii2(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, str]]]:
+    from anarcii import Anarcii  # type: ignore[missing-import]
+
+    model = Anarcii(seq_type="antibody", mode="accuracy")
+    numbered_list = model.number(sequences)
+    results: list[Optional[dict[str, str]]] = []
+    items = numbered_list.values() if isinstance(numbered_list, dict) else numbered_list
+    for numbered in items:
+        if (
+            numbered is None
+            or numbered.get("error")
+            or numbered.get("chain_type") != "H"
+        ):
+            results.append(None)
+            continue
+        numbering = numbered.get("numbering")
+        if not numbering:
+            results.append(None)
+            continue
+        d = {}
+        for (num, ins), aa in numbering:
+            if aa != "-":
+                d[str(num) + (ins.strip() if ins.strip() else "")] = aa
+        results.append(d)
+    return results
+
+
+def _anarcii2_worker(
+    sequences_chunk: list[tuple[str, str]],
+) -> list[Optional[dict[str, str]]]:
+    return _run_anarcii2(sequences_chunk)
+
+
+def _run_anarcii2_parallel(
+    sequences: list[tuple[str, str]],
+) -> list[Optional[dict[str, str]]]:
+    ncpu = os.cpu_count() or 1
+    chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
+    chunks = [
+        sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
+    ]
+    with multiprocessing.Pool(ncpu) as pool:
+        results = pool.map(_anarcii2_worker, chunks)
+    return [item for chunk_result in results for item in chunk_result]
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -269,5 +315,21 @@ def test_anarci_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("anarci")
     result = benchmark.pedantic(
         _run_anarci_parallel, args=(sample_seqs,), rounds=3, iterations=1
+    )
+    benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
+def test_anarcii2(benchmark, sample_seqs, sample_gt):
+    pytest.importorskip("anarcii")
+    result = benchmark.pedantic(
+        _run_anarcii2, args=(sample_seqs,), rounds=3, iterations=1
+    )
+    benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
+def test_anarcii2_parallel(benchmark, sample_seqs, sample_gt):
+    pytest.importorskip("anarcii")
+    result = benchmark.pedantic(
+        _run_anarcii2_parallel, args=(sample_seqs,), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
