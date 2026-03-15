@@ -152,10 +152,12 @@ def _run_antpack_parallel(
     return [item for chunk_result in results for item in chunk_result]
 
 
-def _run_anarci(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, str]]]:
+def _run_anarci(
+    sequences: list[tuple[str, str]], kwargs: dict
+) -> list[Optional[dict[str, str]]]:
     from anarci import anarci  # type: ignore[missing-import]
 
-    numbered_list, _, _ = anarci(sequences, scheme="imgt", allow={"H"}, ncpu=1)
+    numbered_list, _, _ = anarci(sequences, **kwargs)
     results: list[Optional[dict[str, str]]] = []
     for numbered in numbered_list:
         if not numbered:
@@ -173,7 +175,7 @@ def _run_anarci(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, str
 def _anarci_worker(
     sequences_chunk: list[tuple[str, str]],
 ) -> list[Optional[dict[str, str]]]:
-    return _run_anarci(sequences_chunk)
+    return _run_anarci(sequences_chunk, {"scheme": "imgt", "allow": {"H"}, "ncpu": 1})
 
 
 def _run_anarci_parallel(
@@ -189,10 +191,9 @@ def _run_anarci_parallel(
     return [item for chunk_result in results for item in chunk_result]
 
 
-def _run_anarcii2(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, str]]]:
-    from anarcii import Anarcii  # type: ignore[missing-import]
-
-    model = Anarcii(seq_type="antibody", mode="accuracy")
+def _run_anarcii2(
+    sequences: list[tuple[str, str]], model
+) -> list[Optional[dict[str, str]]]:
     numbered_list = model.number(sequences)
     results: list[Optional[dict[str, str]]] = []
     items = numbered_list.values() if isinstance(numbered_list, dict) else numbered_list
@@ -219,7 +220,10 @@ def _run_anarcii2(sequences: list[tuple[str, str]]) -> list[Optional[dict[str, s
 def _anarcii2_worker(
     sequences_chunk: list[tuple[str, str]],
 ) -> list[Optional[dict[str, str]]]:
-    return _run_anarcii2(sequences_chunk)
+    from anarcii import Anarcii  # type: ignore[missing-import]
+
+    model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
+    return _run_anarcii2(sequences_chunk, model)
 
 
 def _run_anarcii2_parallel(
@@ -240,9 +244,9 @@ def _run_anarcii2_parallel(
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture(scope="module")
-def sample_df() -> polars.DataFrame:
-    return polars.read_csv(FIXTURE, infer_schema=False).sample(
+@pytest.fixture(scope="module", params=[FIXTURE])
+def sample_df(request) -> polars.DataFrame:
+    return polars.read_csv(request.param, infer_schema=False).sample(
         n=SAMPLE_SIZE, seed=SEED, with_replacement=True
     )
 
@@ -261,6 +265,35 @@ def sample_gt(sample_df: polars.DataFrame) -> list[dict[str, str]]:
     ]
 
 
+@pytest.fixture(scope="module", params=[{"scheme": "imgt", "allow": {"H"}, "ncpu": 1}])
+def anarci_kwargs(request) -> dict:
+    pytest.importorskip("anarci")
+    return request.param
+
+
+@pytest.fixture(scope="module", params=[{"chains": ["IGH"], "scheme": "IMGT"}])
+def immunum_annotator(request) -> Annotator:
+    return Annotator(**request.param)
+
+
+@pytest.fixture(
+    scope="module", params=[{"seq_type": "antibody", "mode": "speed", "ncpu": 1}]
+)
+def anarcii2_annotator(request):
+    pytest.importorskip("anarcii")
+    from anarcii import Anarcii  # type: ignore[missing-import]
+
+    return Anarcii(**request.param)
+
+
+@pytest.fixture(scope="module", params=[{"chains": ["H"], "scheme": "imgt"}])
+def antpack_annotator(request):
+    pytest.importorskip("antpack")
+    from antpack import SingleChainAnnotator
+
+    return SingleChainAnnotator(**request.param)
+
+
 # ---------------------------------------------------------------------------
 # Benchmarks (speed + correctness embedded in extra_info)
 # ---------------------------------------------------------------------------
@@ -273,24 +306,19 @@ def test_immunum_multithreaded(benchmark, sample_df, sample_gt):
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
-def test_immunum_singlethreaded(benchmark, sample_seqs, sample_gt):
-    annotator = Annotator(chains=["IGH"], scheme="IMGT")
+def test_immunum_singlethreaded(benchmark, sample_seqs, sample_gt, immunum_annotator):
     result = benchmark.pedantic(
         _run_immunum_singlethreaded,
-        args=(sample_seqs, annotator),
+        args=(sample_seqs, immunum_annotator),
         rounds=3,
         iterations=1,
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
-def test_antpack(benchmark, sample_seqs, sample_gt):
-    pytest.importorskip("antpack")
-    from antpack import SingleChainAnnotator
-
-    annotator = SingleChainAnnotator(["H"], scheme="imgt")
+def test_antpack(benchmark, sample_seqs, sample_gt, antpack_annotator):
     result = benchmark.pedantic(
-        _run_antpack, args=(sample_seqs, annotator), rounds=3, iterations=1
+        _run_antpack, args=(sample_seqs, antpack_annotator), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
@@ -303,10 +331,9 @@ def test_antpack_parallel(benchmark, sample_seqs, sample_gt):
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
-def test_anarci(benchmark, sample_seqs, sample_gt):
-    pytest.importorskip("anarci")
+def test_anarci(benchmark, sample_seqs, sample_gt, anarci_kwargs):
     result = benchmark.pedantic(
-        _run_anarci, args=(sample_seqs,), rounds=3, iterations=1
+        _run_anarci, args=(sample_seqs, anarci_kwargs), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
@@ -319,10 +346,9 @@ def test_anarci_parallel(benchmark, sample_seqs, sample_gt):
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
-def test_anarcii2(benchmark, sample_seqs, sample_gt):
-    pytest.importorskip("anarcii")
+def test_anarcii2(benchmark, sample_seqs, sample_gt, anarcii2_annotator):
     result = benchmark.pedantic(
-        _run_anarcii2, args=(sample_seqs,), rounds=3, iterations=1
+        _run_anarcii2, args=(sample_seqs, anarcii2_annotator), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
