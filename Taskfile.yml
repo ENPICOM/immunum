@@ -60,9 +60,30 @@ tasks:
         desc: "Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)"
         cmd: uv run --group benchmark pytest tests/bench_comparison.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
 
-    benchmark-speed:
+    benchmark-speed-polars:
         desc: "Speed benchmark for immunum polars across all chain/scheme fixtures"
         cmd: uv run pytest tests/bench_polars.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+
+    benchmark-accuracy:
+        desc: "Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)"
+        cmds:
+            - |
+                for f in fixtures/validation/*_imgt.csv; do
+                  base=$(basename "$f" .csv)
+                  chain=$(echo "$base" | cut -d_ -f2)
+                  uv run --group benchmark python tests/bench_comparison.py \
+                    --chain "$chain" \
+                    --sizes 1000 --rounds 7 \
+                    --output "./resources/benchmark_results/results_${base}.csv" \
+                    --timeout 1m
+                done
+
+    benchmark-speed:
+        desc: "Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)"
+        cmd: |
+            uv run --group benchmark python tests/bench_comparison.py \
+              --sizes 100 --sizes 1000 --sizes 10000 --sizes 100000 --sizes 1000000 \
+              --rounds 7 --output ./resources/benchmark_results/results_speed.csv --timeout 10m
 
     default:
         cmds:
