@@ -112,6 +112,13 @@ def _correctness(
 def _run_immunum_multithreaded(
     df: polars.DataFrame, chains: list[str], scheme: str
 ) -> list[dict[str, str]]:
+    match scheme:
+        case "IMGT":
+            scheme = "IMGT"
+        case "KABAT":
+            scheme = "Kabat"
+        case _:
+            raise ValueError(f"Invalid {scheme=}")
     result = df.select(
         imp.number(polars.col("sequence"), chains=chains, scheme=scheme)
         .alias("n")
@@ -508,10 +515,12 @@ def _timed(fn: Any, args: tuple, timeout_s: float) -> tuple[float, Any]:
     return elapsed, result
 
 
+AB_CHAINS = {"H", "K", "L"}  # chains supported by antpack / anarcii2 / riot
+
+
 @app.command()
 def main(
     chain: Annotated[str, typer.Option(help="Chain letter: H, K, L, A, B, G, D")] = "H",
-    scheme: Annotated[str, typer.Option(help="Numbering scheme: imgt, kabat")] = "imgt",
     output: Annotated[Path, typer.Option(help="Output file (.csv or .parquet)")] = Path(
         "benchmark_results.csv"
     ),
@@ -524,16 +533,15 @@ def main(
     ] = "1h",
 ) -> None:
     chain = chain.upper()
-    scheme = scheme.lower()
     mol_type = "tcr" if chain in TCR_CHAINS else "ab"
-    fixture = FIXTURES / f"{mol_type}_{chain}_{scheme}.csv"
+    fixture = FIXTURES / f"{mol_type}_{chain}_imgt.csv"
     if not fixture.exists():
         typer.echo(f"Fixture not found: {fixture}", err=True)
         raise typer.Exit(1)
 
     immunum_chain = IMMUNUM_CHAIN_MAP[chain]
-    immunum_scheme = scheme.upper()
     locus = RIOT_LOCUS_MAP[chain]
+    is_ab = chain in AB_CHAINS
 
     timeout_s = _parse_duration(timeout)
     run_sizes = sizes or BENCHMARK_SIZES
@@ -551,22 +559,22 @@ def main(
             (
                 "immunum_multithreaded",
                 _run_immunum_multithreaded,
-                lambda df, seqs, _c=[immunum_chain], _s=immunum_scheme: (df, _c, _s),
+                lambda df, seqs, _c=[immunum_chain]: (df, _c, "IMGT"),
             ),
             (
                 "immunum_singlethreaded",
                 _run_immunum_singlethreaded,
                 (lambda ann: lambda df, seqs: (seqs, ann))(
-                    Annotator(chains=[immunum_chain], scheme=immunum_scheme)
+                    Annotator(chains=[immunum_chain], scheme="IMGT")
                 ),
             ),
         ]
 
-        if chain not in TCR_CHAINS:
+        if is_ab:
             try:
                 from antpack import SingleChainAnnotator  # type: ignore[import]
 
-                ann = SingleChainAnnotator([chain], scheme=scheme)
+                ann = SingleChainAnnotator([chain], scheme="imgt")
                 runner_specs += [
                     (
                         "antpack",
@@ -576,7 +584,7 @@ def main(
                     (
                         "antpack_parallel",
                         _run_antpack_parallel,
-                        lambda df, seqs, _c=chain, _s=scheme: (seqs, _c, _s),
+                        lambda df, seqs, _c=chain: (seqs, _c, "imgt"),
                     ),
                 ]
             except ImportError:
@@ -585,7 +593,7 @@ def main(
         try:
             import anarci as _anarci_mod  # type: ignore[import]  # noqa: F401
 
-            anarci_kw: dict = {"scheme": scheme, "allow": {chain}, "ncpu": 1}
+            anarci_kw: dict = {"scheme": "imgt", "allow": {chain}, "ncpu": 1}
             runner_specs += [
                 (
                     "anarci",
@@ -595,52 +603,52 @@ def main(
                 (
                     "anarci_parallel",
                     _run_anarci_parallel,
-                    lambda df, seqs, _s=scheme, _c=chain: (seqs, _s, _c),
+                    lambda df, seqs, _c=chain: (seqs, "imgt", _c),
                 ),
             ]
         except ImportError:
             typer.echo("  anarci not installed, skipping")
 
-        try:
-            from anarcii import Anarcii  # type: ignore[import]
+        if is_ab:
+            try:
+                from anarcii import Anarcii  # type: ignore[import]
 
-            model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
-            runner_specs += [
-                (
-                    "anarcii2",
-                    _run_anarcii2,
-                    (lambda m, cl: lambda df, seqs: (seqs, m, cl))(model, chain),
-                ),
-                (
-                    "anarcii2_parallel",
-                    _run_anarcii2_parallel,
-                    lambda df, seqs, _c=chain: (seqs, _c),
-                ),
-            ]
-        except ImportError:
-            typer.echo("  anarcii not installed, skipping")
-
-        try:
-            from riot_na import create_riot_aa, Organism, Scheme  # type: ignore[import]
-
-            riot = create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
-            riot_scheme = getattr(Scheme, scheme.upper())
-            runner_specs += [
-                (
-                    "riot",
-                    _run_riot,
-                    (lambda rt, lo, rs: lambda df, seqs: (seqs, rt, lo, rs))(
-                        riot, locus, riot_scheme
+                model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
+                runner_specs += [
+                    (
+                        "anarcii2",
+                        _run_anarcii2,
+                        (lambda m, cl: lambda df, seqs: (seqs, m, cl))(model, chain),
                     ),
-                ),
-                (
-                    "riot_parallel",
-                    _run_riot_parallel,
-                    lambda df, seqs, _lo=locus, _s=scheme: (seqs, _lo, _s),
-                ),
-            ]
-        except ImportError:
-            typer.echo("  riot-na not installed, skipping")
+                    (
+                        "anarcii2_parallel",
+                        _run_anarcii2_parallel,
+                        lambda df, seqs, _c=chain: (seqs, _c),
+                    ),
+                ]
+            except ImportError:
+                typer.echo("  anarcii not installed, skipping")
+
+            try:
+                from riot_na import create_riot_aa, Organism, Scheme  # type: ignore[import]
+
+                riot = create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
+                runner_specs += [
+                    (
+                        "riot",
+                        _run_riot,
+                        (lambda rt, lo, rs: lambda df, seqs: (seqs, rt, lo, rs))(
+                            riot, locus, Scheme.IMGT
+                        ),
+                    ),
+                    (
+                        "riot_parallel",
+                        _run_riot_parallel,
+                        lambda df, seqs, _lo=locus: (seqs, _lo, "imgt"),
+                    ),
+                ]
+            except ImportError:
+                typer.echo("  riot-na not installed, skipping")
 
         timed_out: set[str] = set()
         position_cols: list[str] = []
@@ -674,6 +682,7 @@ def main(
                 rows.append(
                     {
                         "tool": name,
+                        "chain": chain,
                         "sample_size": size,
                         "round": r,
                         "time_s": elapsed,
