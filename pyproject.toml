@@ -13,7 +13,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
 
 
 [tool.maturin]
@@ -43,7 +42,16 @@ benchmark = [
     "anarcii>=2.0.5",
     "antpack~=0.2.7",
     "biopython>=1.86",
+    "riot-na>=1.2.2",
+    "scikit-bio==0.6.2",
     "typer>=0.24.1",
+]
+plots = [
+    "altair>=6.0.0",
+    "enpicolors",
+    "matplotlib>=3.10.8",
+    "pyarrow>=23.0.1",
+    "setuptools>=82.0.1",
 ]
 
 
@@ -66,6 +74,7 @@ project-excludes = [
 
 [tool.uv.sources]
 immunum-rs = { workspace = true }
+enpicolors = { git = "https://github.com/ENPICOM/enpicolors" }
 
 
 [tool.pytest.ini_options]

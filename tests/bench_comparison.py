@@ -33,6 +33,27 @@ SEED = 42
 
 META_COLS = {"header", "sequence", "species"}
 
+TCR_CHAINS = {"A", "B", "G", "D"}
+
+IMMUNUM_CHAIN_MAP = {
+    "H": "IGH",
+    "K": "IGK",
+    "L": "IGL",
+    "A": "TRA",
+    "B": "TRB",
+    "G": "TRG",
+    "D": "TRD",
+}
+RIOT_LOCUS_MAP = {
+    "H": "igh",
+    "K": "igk",
+    "L": "igl",
+    "A": "tra",
+    "B": "trb",
+    "G": "trg",
+    "D": "trd",
+}
+
 # IMGT region boundaries (numeric part of position string)
 IMGT_REGIONS: dict[str, tuple[int, int]] = {
     "FR1": (1, 26),
@@ -88,9 +109,11 @@ def _correctness(
 # ---------------------------------------------------------------------------
 
 
-def _run_immunum_multithreaded(df: polars.DataFrame) -> list[dict[str, str]]:
+def _run_immunum_multithreaded(
+    df: polars.DataFrame, chains: list[str], scheme: str
+) -> list[dict[str, str]]:
     result = df.select(
-        imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT")
+        imp.number(polars.col("sequence"), chains=chains, scheme=scheme)
         .alias("n")
         .struct.unnest()
     )
@@ -117,12 +140,12 @@ def _run_immunum_singlethreaded(
 
 
 def _run_antpack(
-    sequences: list[tuple[str, str]], annotator
+    sequences: list[tuple[str, str]], annotator, chain_letter: str
 ) -> list[Optional[dict[str, str]]]:
     results: list[Optional[dict[str, str]]] = []
     for _header, seq in sequences:
         numbering, _confidence, chain_type, err = annotator.analyze_seq(seq)
-        if err or chain_type != "H":
+        if err or chain_type != chain_letter:
             results.append(None)
             continue
         d = {
@@ -135,16 +158,17 @@ def _run_antpack(
 
 
 def _antpack_worker(
-    sequences_chunk: list[tuple[str, str]],
+    args: tuple,
 ) -> list[Optional[dict[str, str]]]:
+    sequences_chunk, chain_letter, scheme = args
     from antpack import SingleChainAnnotator
 
-    annotator = SingleChainAnnotator(["H"], scheme="imgt")
-    return _run_antpack(sequences_chunk, annotator)
+    annotator = SingleChainAnnotator([chain_letter], scheme=scheme)
+    return _run_antpack(sequences_chunk, annotator, chain_letter)
 
 
 def _run_antpack_parallel(
-    sequences: list[tuple[str, str]],
+    sequences: list[tuple[str, str]], chain_letter: str, scheme: str
 ) -> list[Optional[dict[str, str]]]:
     ncpu = os.cpu_count() or 1
     chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
@@ -152,7 +176,7 @@ def _run_antpack_parallel(
         sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
     ]
     with multiprocessing.Pool(ncpu) as pool:
-        results = pool.map(_antpack_worker, chunks)
+        results = pool.map(_antpack_worker, [(c, chain_letter, scheme) for c in chunks])
     return [item for chunk_result in results for item in chunk_result]
 
 
@@ -177,13 +201,16 @@ def _run_anarci(
 
 
 def _anarci_worker(
-    sequences_chunk: list[tuple[str, str]],
+    args: tuple,
 ) -> list[Optional[dict[str, str]]]:
-    return _run_anarci(sequences_chunk, {"scheme": "imgt", "allow": {"H"}, "ncpu": 1})
+    sequences_chunk, scheme, chain_letter = args
+    return _run_anarci(
+        sequences_chunk, {"scheme": scheme, "allow": {chain_letter}, "ncpu": 1}
+    )
 
 
 def _run_anarci_parallel(
-    sequences: list[tuple[str, str]],
+    sequences: list[tuple[str, str]], scheme: str, chain_letter: str
 ) -> list[Optional[dict[str, str]]]:
     ncpu = os.cpu_count() or 1
     chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
@@ -191,12 +218,12 @@ def _run_anarci_parallel(
         sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
     ]
     with multiprocessing.Pool(ncpu) as pool:
-        results = pool.map(_anarci_worker, chunks)
+        results = pool.map(_anarci_worker, [(c, scheme, chain_letter) for c in chunks])
     return [item for chunk_result in results for item in chunk_result]
 
 
 def _run_anarcii2(
-    sequences: list[tuple[str, str]], model
+    sequences: list[tuple[str, str]], model, chain_letter: str
 ) -> list[Optional[dict[str, str]]]:
     numbered_list = model.number(sequences)
     results: list[Optional[dict[str, str]]] = []
@@ -205,7 +232,7 @@ def _run_anarcii2(
         if (
             numbered is None
             or numbered.get("error")
-            or numbered.get("chain_type") != "H"
+            or numbered.get("chain_type") != chain_letter
         ):
             results.append(None)
             continue
@@ -222,16 +249,17 @@ def _run_anarcii2(
 
 
 def _anarcii2_worker(
-    sequences_chunk: list[tuple[str, str]],
+    args: tuple,
 ) -> list[Optional[dict[str, str]]]:
+    sequences_chunk, chain_letter = args
     from anarcii import Anarcii  # type: ignore[missing-import]
 
     model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
-    return _run_anarcii2(sequences_chunk, model)
+    return _run_anarcii2(sequences_chunk, model, chain_letter)
 
 
 def _run_anarcii2_parallel(
-    sequences: list[tuple[str, str]],
+    sequences: list[tuple[str, str]], chain_letter: str
 ) -> list[Optional[dict[str, str]]]:
     ncpu = os.cpu_count() or 1
     chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
@@ -239,7 +267,44 @@ def _run_anarcii2_parallel(
         sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
     ]
     with multiprocessing.Pool(ncpu) as pool:
-        results = pool.map(_anarcii2_worker, chunks)
+        results = pool.map(_anarcii2_worker, [(c, chain_letter) for c in chunks])
+    return [item for chunk_result in results for item in chunk_result]
+
+
+def _run_riot(
+    sequences: list[tuple[str, str]], riot, locus: str, riot_scheme
+) -> list[Optional[dict[str, str]]]:
+    results: list[Optional[dict[str, str]]] = []
+    for header, seq in sequences:
+        r = riot.run_on_sequence(header, seq, scheme=riot_scheme)
+        if r is None or r.exc is not None or r.locus != locus:
+            results.append(None)
+            continue
+        results.append({str(k): v for k, v in r.scheme_residue_mapping.items()})
+    return results
+
+
+def _riot_worker(
+    args: tuple,
+) -> list[Optional[dict[str, str]]]:
+    sequences_chunk, locus, scheme_name = args
+    from riot_na import create_riot_aa, Organism, Scheme  # type: ignore[import]
+
+    riot = create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
+    riot_scheme = getattr(Scheme, scheme_name.upper())
+    return _run_riot(sequences_chunk, riot, locus, riot_scheme)
+
+
+def _run_riot_parallel(
+    sequences: list[tuple[str, str]], locus: str, scheme_name: str
+) -> list[Optional[dict[str, str]]]:
+    ncpu = os.cpu_count() or 1
+    chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
+    chunks = [
+        sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
+    ]
+    with multiprocessing.Pool(ncpu) as pool:
+        results = pool.map(_riot_worker, [(c, locus, scheme_name) for c in chunks])
     return [item for chunk_result in results for item in chunk_result]
 
 
@@ -280,6 +345,14 @@ def immunum_annotator(request) -> Annotator:
     return Annotator(**request.param)
 
 
+@pytest.fixture(scope="module")
+def riot_annotator():
+    pytest.importorskip("riot_na")
+    from riot_na import create_riot_aa, Organism  # type: ignore[import]
+
+    return create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
+
+
 @pytest.fixture(
     scope="module", params=[{"seq_type": "antibody", "mode": "speed", "ncpu": 1}]
 )
@@ -305,7 +378,10 @@ def antpack_annotator(request):
 
 def test_immunum_multithreaded(benchmark, sample_df, sample_gt):
     result = benchmark.pedantic(
-        _run_immunum_multithreaded, args=(sample_df,), rounds=3, iterations=1
+        _run_immunum_multithreaded,
+        args=(sample_df, ["IGH"], "IMGT"),
+        rounds=3,
+        iterations=1,
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
@@ -365,6 +441,21 @@ def test_anarcii2_parallel(benchmark, sample_seqs, sample_gt):
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
+def test_riot(benchmark, sample_seqs, sample_gt, riot_annotator):
+    result = benchmark.pedantic(
+        _run_riot, args=(sample_seqs, riot_annotator), rounds=3, iterations=1
+    )
+    benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
+def test_riot_parallel(benchmark, sample_seqs, sample_gt):
+    pytest.importorskip("riot_na")
+    result = benchmark.pedantic(
+        _run_riot_parallel, args=(sample_seqs,), rounds=3, iterations=1
+    )
+    benchmark.extra_info.update(_correctness(result, sample_gt))
+
+
 # ---------------------------------------------------------------------------
 # CLI entrypoint
 # ---------------------------------------------------------------------------
@@ -419,7 +510,8 @@ def _timed(fn: Any, args: tuple, timeout_s: float) -> tuple[float, Any]:
 
 @app.command()
 def main(
-    fixture: Annotated[Path, typer.Option(help="Input fixture CSV")] = FIXTURE,
+    chain: Annotated[str, typer.Option(help="Chain letter: H, K, L, A, B, G, D")] = "H",
+    scheme: Annotated[str, typer.Option(help="Numbering scheme: imgt, kabat")] = "imgt",
     output: Annotated[Path, typer.Option(help="Output file (.csv or .parquet)")] = Path(
         "benchmark_results.csv"
     ),
@@ -431,6 +523,18 @@ def main(
         str, typer.Option(help="Per-function timeout (e.g. 1h, 30m, 90s)")
     ] = "1h",
 ) -> None:
+    chain = chain.upper()
+    scheme = scheme.lower()
+    mol_type = "tcr" if chain in TCR_CHAINS else "ab"
+    fixture = FIXTURES / f"{mol_type}_{chain}_{scheme}.csv"
+    if not fixture.exists():
+        typer.echo(f"Fixture not found: {fixture}", err=True)
+        raise typer.Exit(1)
+
+    immunum_chain = IMMUNUM_CHAIN_MAP[chain]
+    immunum_scheme = scheme.upper()
+    locus = RIOT_LOCUS_MAP[chain]
+
     timeout_s = _parse_duration(timeout)
     run_sizes = sizes or BENCHMARK_SIZES
     df_full = polars.read_csv(fixture, infer_schema=False)
@@ -439,41 +543,60 @@ def main(
     for size in run_sizes:
         typer.echo(f"\n=== size={size} ===")
         _table_header()
-        df = df_full.sample(n=size, seed=SEED, with_replacement=True)
-        seqs = list(zip(df["header"].to_list(), df["sequence"].to_list()))
-        position_cols = [c for c in df.columns if c not in META_COLS]
-        gt = [
-            {pos: row[pos] for pos in position_cols if row[pos]}
-            for row in df.iter_rows(named=True)
-        ]
 
-        runners: list[tuple[str, Any, tuple]] = [
-            ("immunum_multithreaded", _run_immunum_multithreaded, (df,)),
+        # Build static annotators once per size (outside the timed section).
+        # Each entry: (name, fn, data_args_fn) where data_args_fn(df, seqs) -> args tuple.
+        RunnerSpec = tuple[str, Any, Any]  # (name, fn, data_args_fn)
+        runner_specs: list[RunnerSpec] = [
+            (
+                "immunum_multithreaded",
+                _run_immunum_multithreaded,
+                lambda df, seqs, _c=[immunum_chain], _s=immunum_scheme: (df, _c, _s),
+            ),
             (
                 "immunum_singlethreaded",
                 _run_immunum_singlethreaded,
-                (seqs, Annotator(chains=["IGH"], scheme="IMGT")),
+                (lambda ann: lambda df, seqs: (seqs, ann))(
+                    Annotator(chains=[immunum_chain], scheme=immunum_scheme)
+                ),
             ),
         ]
 
-        try:
-            from antpack import SingleChainAnnotator  # type: ignore[import]
+        if chain not in TCR_CHAINS:
+            try:
+                from antpack import SingleChainAnnotator  # type: ignore[import]
 
-            annotator = SingleChainAnnotator(["H"], scheme="imgt")
-            runners += [
-                ("antpack", _run_antpack, (seqs, annotator)),
-                ("antpack_parallel", _run_antpack_parallel, (seqs,)),
-            ]
-        except ImportError:
-            typer.echo("  antpack not installed, skipping")
+                ann = SingleChainAnnotator([chain], scheme=scheme)
+                runner_specs += [
+                    (
+                        "antpack",
+                        _run_antpack,
+                        (lambda a, cl: lambda df, seqs: (seqs, a, cl))(ann, chain),
+                    ),
+                    (
+                        "antpack_parallel",
+                        _run_antpack_parallel,
+                        lambda df, seqs, _c=chain, _s=scheme: (seqs, _c, _s),
+                    ),
+                ]
+            except ImportError:
+                typer.echo("  antpack not installed, skipping")
 
         try:
             import anarci as _anarci_mod  # type: ignore[import]  # noqa: F401
 
-            anarci_kw: dict = {"scheme": "imgt", "allow": {"H"}, "ncpu": 1}
-            runners += [
-                ("anarci", _run_anarci, (seqs, anarci_kw)),
-                ("anarci_parallel", _run_anarci_parallel, (seqs,)),
+            anarci_kw: dict = {"scheme": scheme, "allow": {chain}, "ncpu": 1}
+            runner_specs += [
+                (
+                    "anarci",
+                    _run_anarci,
+                    (lambda kw: lambda df, seqs: (seqs, kw))(anarci_kw),
+                ),
+                (
+                    "anarci_parallel",
+                    _run_anarci_parallel,
+                    lambda df, seqs, _s=scheme, _c=chain: (seqs, _s, _c),
+                ),
             ]
         except ImportError:
             typer.echo("  anarci not installed, skipping")
@@ -482,15 +605,60 @@ def main(
             from anarcii import Anarcii  # type: ignore[import]
 
             model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
-            runners += [
-                ("anarcii2", _run_anarcii2, (seqs, model)),
-                ("anarcii2_parallel", _run_anarcii2_parallel, (seqs,)),
+            runner_specs += [
+                (
+                    "anarcii2",
+                    _run_anarcii2,
+                    (lambda m, cl: lambda df, seqs: (seqs, m, cl))(model, chain),
+                ),
+                (
+                    "anarcii2_parallel",
+                    _run_anarcii2_parallel,
+                    lambda df, seqs, _c=chain: (seqs, _c),
+                ),
             ]
         except ImportError:
             typer.echo("  anarcii not installed, skipping")
 
-        for name, fn, args in runners:
-            for r in range(rounds):
+        try:
+            from riot_na import create_riot_aa, Organism, Scheme  # type: ignore[import]
+
+            riot = create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
+            riot_scheme = getattr(Scheme, scheme.upper())
+            runner_specs += [
+                (
+                    "riot",
+                    _run_riot,
+                    (lambda rt, lo, rs: lambda df, seqs: (seqs, rt, lo, rs))(
+                        riot, locus, riot_scheme
+                    ),
+                ),
+                (
+                    "riot_parallel",
+                    _run_riot_parallel,
+                    lambda df, seqs, _lo=locus, _s=scheme: (seqs, _lo, _s),
+                ),
+            ]
+        except ImportError:
+            typer.echo("  riot-na not installed, skipping")
+
+        timed_out: set[str] = set()
+        position_cols: list[str] = []
+
+        for r in range(rounds):
+            df = df_full.sample(n=size, seed=r, with_replacement=True)
+            seqs = list(zip(df["header"].to_list(), df["sequence"].to_list()))
+            if not position_cols:
+                position_cols = [c for c in df.columns if c not in META_COLS]
+            gt = [
+                {pos: row[pos] for pos in position_cols if row[pos]}
+                for row in df.iter_rows(named=True)
+            ]
+
+            for name, fn, data_args_fn in runner_specs:
+                if name in timed_out:
+                    continue
+                args = data_args_fn(df, seqs)
                 try:
                     elapsed, result = _timed(fn, args, timeout_s)
                 except TimeoutError:
@@ -500,7 +668,8 @@ def main(
                         + [""] * (len(_COL_W) - 3)
                     )
                     typer.echo("  ".join(v.ljust(w) for v, w in zip(vals, _COL_W)))
-                    break
+                    timed_out.add(name)
+                    continue
                 correctness = _correctness(result, gt)
                 rows.append(
                     {
