@@ -82,7 +82,7 @@ tasks:
         desc: "Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)"
         cmd: |
             uv run --group benchmark python tests/bench_comparison.py \
-              --sizes 100 --sizes 1000 --sizes 10000 --sizes 100000 --sizes 1000000 \
+              --sizes 100 --sizes 1000 --sizes 10000 --sizes 100000 \
               --rounds 7 --output ./resources/benchmark_results/results_speed.csv --timeout 10m
 
     plots:
