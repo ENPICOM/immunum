@@ -23,7 +23,7 @@ tasks:
 
     test-rust:
         aliases: [tr]
-        cmd: cargo test --all-features
+        cmd: cargo test --no-default-features
 
     test:
         aliases: [t]

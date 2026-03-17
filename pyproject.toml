@@ -73,6 +73,7 @@ project-excludes = [
     "**/*venv/**/*",
     "**/.[!/.]*/**/*",
     "scripts/*",
+    "tests/*.py",
 ]
 
 [tool.uv.sources]
@@ -100,3 +101,7 @@ enabled = ["pypa", "pypi", "osv"]
 
 [tool.pysentry.defaults]
 fail_on = "high"
+
+[tool.ty.src]
+include = ["src"]
+exclude = ["tests"]
