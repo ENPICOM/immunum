@@ -89,7 +89,9 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
     let ca = inputs[0].str()?;
     let len = ca.len();
 
-    type RowResult = Option<(String, String, f32, Vec<String>, Vec<String>)>;
+    // Build per-row structs inside the parallel closure so Series allocation
+    // is parallelized. Series is Send+Sync in Polars, so this is safe.
+    type RowResult = Option<(String, String, f32, Series)>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
     let results: Vec<RowResult> = POOL.install(|| {
         values
@@ -103,12 +105,18 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
                     .zip(value.chars())
                     .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                     .unzip();
+                let n = positions.len();
+                let pos_series = Series::new("position".into(), positions);
+                let res_series = Series::new("residue".into(), residues);
+                let row_struct =
+                    StructChunked::from_series("".into(), n, [pos_series, res_series].iter())
+                        .ok()?
+                        .into_series();
                 Some((
                     result.chain.to_string(),
                     result.scheme.to_string(),
                     result.confidence,
-                    positions,
-                    residues,
+                    row_struct,
                 ))
             })
             .collect()
@@ -127,16 +135,10 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
                 confidence_vec.push(None);
                 row_structs.push(None);
             }
-            Some((chain, scheme, confidence, positions, residues)) => {
+            Some((chain, scheme, confidence, row_struct)) => {
                 chain_vec.push(Some(chain));
                 scheme_vec.push(Some(scheme));
                 confidence_vec.push(Some(confidence));
-                let n = positions.len();
-                let pos_series = Series::new("position".into(), positions);
-                let res_series = Series::new("residue".into(), residues);
-                let row_struct =
-                    StructChunked::from_series("".into(), n, [pos_series, res_series].iter())?
-                        .into_series();
                 row_structs.push(Some(row_struct));
             }
         }
@@ -174,7 +176,7 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
 
-    type ResultType = Vec<Option<(String, String, Vec<String>, Vec<String>)>>;
+    type ResultType = Vec<Option<(String, String, Series, Series)>>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
     let results: ResultType = POOL.install(|| {
         values
@@ -191,8 +193,8 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
                 Some((
                     result.chain.to_string(),
                     result.scheme.to_string(),
-                    positions,
-                    residues,
+                    Series::new("".into(), positions),
+                    Series::new("".into(), residues),
                 ))
             })
             .collect()
@@ -214,8 +216,8 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
             Some((chain, scheme, positions, residues)) => {
                 chain_builder.append_value(&chain);
                 scheme_builder.append_value(&scheme);
-                positions_builder.append_series(&Series::new("".into(), positions))?;
-                residues_builder.append_series(&Series::new("".into(), residues))?;
+                positions_builder.append_series(&positions)?;
+                residues_builder.append_series(&residues)?;
             }
         }
     }
