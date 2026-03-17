@@ -531,6 +531,17 @@ def main(
     timeout: Annotated[
         str, typer.Option(help="Per-function timeout (e.g. 1h, 30m, 90s)")
     ] = "1h",
+    tools: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            help=(
+                "Tools to run (repeatable). Matches exact name or '<tool>_*' prefix. "
+                "E.g. --tools immunum --tools anarci. "
+                "Available: immunum, immunum_multithreaded, immunum_singlethreaded, "
+                "antpack, anarci, anarcii2, riot (each also has a _parallel variant)."
+            )
+        ),
+    ] = None,
 ) -> None:
     chain = chain.upper()
     mol_type = "tcr" if chain in TCR_CHAINS else "ab"
@@ -649,6 +660,13 @@ def main(
                 ]
             except ImportError:
                 typer.echo("  riot-na not installed, skipping")
+
+        if tools:
+            runner_specs = [
+                spec
+                for spec in runner_specs
+                if any(spec[0] == t or spec[0].startswith(t + "_") for t in tools)
+            ]
 
         timed_out: set[str] = set()
         position_cols: list[str] = []
