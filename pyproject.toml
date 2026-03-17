@@ -18,6 +18,7 @@ classifiers = [
 [tool.maturin]
 module-name = "immunum._internal"
 features = ["python", "polars"]
+profile = "dist-release"
 
 
 [dependency-groups]
@@ -39,6 +40,7 @@ dev = [
     "ty>=0.0.19",
 ]
 benchmark = [
+    "immunum[polars]",
     "anarcii>=2.0.5",
     "antpack~=0.2.7",
     "biopython>=1.86",
