@@ -184,10 +184,11 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
                 Ok(result) => {
                     chain_builder.append_value(result.chain.to_string());
                     scheme_builder.append_value(result.scheme.to_string());
+                    let aligned_seq = &value[result.query_start..=result.query_end];
                     let (positions, residues): (Vec<String>, Vec<String>) = result
                         .positions
                         .iter()
-                        .zip(value.chars())
+                        .zip(aligned_seq.chars())
                         .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                         .unzip();
                     positions_builder.append_series(&Series::new("".into(), positions))?;
@@ -264,7 +265,8 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                     postfix_b.append_null();
                 }
                 Ok(result) => {
-                    let s = segment(&result.positions, value, result.scheme);
+                    let aligned_seq = &value[result.query_start..=result.query_end];
+                    let s = segment(&result.positions, aligned_seq, result.scheme);
                     prefix_b.append_value(s.get("prefix").map(|v| v.as_str()).unwrap_or(""));
                     fr1_b.append_value(s.get("fr1").map(|v| v.as_str()).unwrap_or(""));
                     cdr1_b.append_value(s.get("cdr1").map(|v| v.as_str()).unwrap_or(""));
@@ -338,7 +340,8 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                     postfix_b.append_null();
                 }
                 Ok(result) => {
-                    let s = segment(&result.positions, value, result.scheme);
+                    let aligned_seq = &value[result.query_start..=result.query_end];
+                    let s = segment(&result.positions, aligned_seq, result.scheme);
                     prefix_b.append_value(s.get("prefix").map(|v| v.as_str()).unwrap_or(""));
                     fr1_b.append_value(s.get("fr1").map(|v| v.as_str()).unwrap_or(""));
                     cdr1_b.append_value(s.get("cdr1").map(|v| v.as_str()).unwrap_or(""));

@@ -190,11 +190,12 @@ pub fn validate_entry(entry: &ValidationEntry, annotator: &Annotator) -> Result<
     // Each entry is (Position, amino_acid) for each residue
     // Numbering should match 1:1 with the sequence length
 
-    if result.positions.len() != entry.sequence.len() {
+    let aligned_len = result.query_end - result.query_start + 1;
+    if result.positions.len() != aligned_len {
         return Err(Error::AlignmentError(format!(
-            "Numbering length {} doesn't match sequence length {}",
+            "Numbering length {} doesn't match antibody region length {}",
             result.positions.len(),
-            entry.sequence.len(),
+            aligned_len,
         )));
     }
 

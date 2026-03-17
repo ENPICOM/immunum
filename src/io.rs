@@ -196,7 +196,8 @@ pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Res
 
 /// Write a single record in TSV format (without header)
 fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result<()> {
-    for (pos, ch) in rec.result.positions.iter().zip(rec.sequence.chars()) {
+    let aligned_seq = &rec.sequence[rec.result.query_start..=rec.result.query_end];
+    for (pos, ch) in rec.result.positions.iter().zip(aligned_seq.chars()) {
         writeln!(
             writer,
             "{}\t{}\t{}\t{:.4}\t{}\t{}",
@@ -225,11 +226,12 @@ pub fn write_jsonl(writer: &mut impl Write, records: &[NumberedRecord]) -> io::R
 }
 
 fn record_to_json(rec: &NumberedRecord) -> serde_json::Value {
+    let aligned_seq = &rec.sequence[rec.result.query_start..=rec.result.query_end];
     let numbering: serde_json::Map<String, serde_json::Value> = rec
         .result
         .positions
         .iter()
-        .zip(rec.sequence.chars())
+        .zip(aligned_seq.chars())
         .map(|(pos, ch)| (pos.to_string(), serde_json::Value::String(ch.to_string())))
         .collect();
 
@@ -249,13 +251,16 @@ mod tests {
     use std::io::Cursor;
 
     fn simple_test_result(positions: Vec<Position>) -> NumberingResult {
+        let query_end = positions.len().saturating_sub(1);
         NumberingResult {
             chain: Chain::IGH,
             scheme: Scheme::IMGT,
             positions,
-            start: 0,
-            end: 0,
+            cons_start: 0,
+            cons_end: 0,
             confidence: 1.0,
+            query_start: 0,
+            query_end,
         }
     }
 
