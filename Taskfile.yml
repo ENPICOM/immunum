@@ -83,9 +83,10 @@ tasks:
         cmd: |
             uv run --group benchmark python tests/bench_comparison.py \
               --sizes 100 --sizes 1000 --sizes 10000 --sizes 100000 \
-              --rounds 7 --output ./resources/benchmark_results/results_speed.csv --timeout 10m
+              --rounds 7 --output ./resources/benchmark_results/results_speed.csv --timeout 10m \
+            {{.CLI_ARGS}}
 
-    bench-scaling:
+    benchmark-scaling:
         desc: "Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
         cmd: |
             uv run --group benchmark python tests/bench_comparison.py \
