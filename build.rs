@@ -237,7 +237,7 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
         );
 
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        let counts_for_confidence = pos_data.occupancy > 0.5;
+        let counts_for_confidence = pos_data.occupancy > 0.9;
 
         position_scores.push(PositionScores {
             position: pos_data.position,
