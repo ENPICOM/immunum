@@ -238,7 +238,7 @@ def make_perf_barplot(data: pl.DataFrame, title: str) -> alt.Chart:
             x=alt.X("method:N", title="Method", sort="-y"),
             y=alt.Y(
                 "throughput:Q",
-                title="Sequences per second (log₁₀ scale)",
+                title="Sequences per second",
                 # scale=alt.Scale(type="log", base=10),
             ),
             color=alt.Color("method:N", scale=color_scale, legend=None),
@@ -274,7 +274,7 @@ p2_data = (
 
 plot2 = (
     alt.Chart(p2_data.to_pandas())
-    .mark_bar(opacity=0.7, stroke="black", strokeWidth=1.5)
+    .mark_bar(opacity=0.7, stroke="black", strokeWidth=1.5, size=20)
     .encode(
         y=alt.Y("pct_correct:Q", title="% Correct", scale=alt.Scale(domain=[0, 100])),
         x=alt.X(
@@ -282,10 +282,10 @@ plot2 = (
             title="Segment",
             sort=segments,
             axis=alt.Axis(labelAngle=-45),
-            scale=alt.Scale(paddingInner=0.4),
+            scale=alt.Scale(paddingInner=0.3),
         ),
         color=alt.Color("method:N", title="Tool", scale=color_scale),
-        xOffset=alt.XOffset("method:N", scale=alt.Scale(paddingInner=0.05)),
+        xOffset=alt.XOffset("method:N", scale=alt.Scale(paddingInner=0.01)),
         tooltip=["method", "segment", alt.Tooltip("pct_correct:Q", format=".2f")],
     )
     .properties(
