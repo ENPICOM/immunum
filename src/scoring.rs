@@ -31,6 +31,10 @@ pub struct PositionScores {
     pub gap_penalty: f32,
     /// Penalty for gap in consensus (insertion in query at this position)
     pub insertion_penalty: f32,
+    /// Best possible score at this position (max of all amino acid scores)
+    pub max_score: f32,
+    /// Whether this position counts toward the confidence score (occupancy > 0.5)
+    pub counts_for_confidence: bool,
 }
 
 impl PositionScores {

@@ -57,6 +57,10 @@ pub struct Alignment {
     pub start_pos: u8,
     /// End position in consensus
     pub end_pos: u8,
+    /// Sum of scores at confidence-relevant positions (occupancy > 0.5)
+    pub confidence_score: f32,
+    /// Sum of max possible scores at confidence-relevant positions
+    pub max_confidence_score: f32,
 }
 
 /// Reusable buffer for alignment DP matrix to avoid repeated allocation
@@ -189,7 +193,7 @@ pub fn align(
     // This prevents long CDR3 regions from being incorrectly treated as unaligned trailing sequence.
     // The query must align through its full length, but the consensus can have trailing gaps.
 
-    let aligned_positions = build_traceback(
+    let (aligned_positions, confidence_score, max_confidence_score) = build_traceback(
         dp_traceback,
         stride,
         query_bytes,
@@ -220,6 +224,8 @@ pub fn align(
         positions: aligned_positions,
         start_pos,
         end_pos,
+        confidence_score,
+        max_confidence_score,
     })
 }
 
@@ -227,55 +233,69 @@ fn build_traceback(
     dp_traceback: &[u8],
     stride: usize,
     query_bytes: &[u8],
-    consensus_positions: &[PositionScores],
+    positions: &[PositionScores],
     query_end: usize,
     cons_end: usize,
-) -> Vec<AlignedPosition> {
-    let mut aligned_positions: Vec<AlignedPosition> = Vec::new();
+) -> (Vec<AlignedPosition>, f32, f32) {
+    let mut aligned_positions = Vec::new();
+
+    let mut confidence_score = 0.0f32;
+    let mut max_confidence_score = 0.0f32;
 
     let mut i = query_end;
     let mut j = cons_end;
 
-    // For semi-global alignment, handle unaligned suffix of query
-    if i < query_bytes.len() {
-        // Add remaining query residues as insertions at the end
-        for _ in i..query_bytes.len() {
-            aligned_positions.push(AlignedPosition::Insertion());
-        }
-    }
+    // Track query/consensus indices for confidence
+    let mut qi = query_end;
 
     while i > 0 && j > 0 {
         match Direction::from_u8(dp_traceback[i * stride + j]) {
             Direction::Match => {
-                aligned_positions.push(AlignedPosition::Aligned(
-                    consensus_positions[j - 1].position,
-                ));
+                let pos = &positions[j - 1];
+                aligned_positions.push(AlignedPosition::Aligned(pos.position));
+
+                qi -= 1;
+
+                if pos.counts_for_confidence {
+                    let aa = query_bytes[qi].to_ascii_uppercase();
+                    confidence_score += pos.score_for(aa);
+                    max_confidence_score += pos.max_score;
+                }
+
                 i -= 1;
                 j -= 1;
             }
+
             Direction::GapInQuery => {
+                let pos = &positions[j - 1];
                 aligned_positions.push(AlignedPosition::QueryGap());
+
+                if pos.counts_for_confidence {
+                    confidence_score += pos.gap_penalty;
+                    max_confidence_score += pos.max_score;
+                }
+
                 j -= 1;
             }
+
             Direction::GapInConsensus => {
                 aligned_positions.push(AlignedPosition::Insertion());
+
+                qi -= 1;
                 i -= 1;
             }
         }
     }
 
-    // Handle unaligned prefix of query
     while i > 0 {
         aligned_positions.push(AlignedPosition::Insertion());
         i -= 1;
     }
 
-    // Reverse (we built it backwards)
     aligned_positions.reverse();
 
-    aligned_positions
+    (aligned_positions, confidence_score, max_confidence_score)
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -214,7 +214,7 @@ fn main() {
     println!("DEBUG VALIDATION ALIGNMENT");
 
     // Create annotator with the selected scheme
-    let annotator = match Annotator::new(&[chain], scheme) {
+    let annotator = match Annotator::new(&[chain], scheme, Some(0.0)) {
         Ok(a) => a,
         Err(err) => {
             eprintln!("Error creating annotator: {}", err);

@@ -3,7 +3,7 @@ use std::io::{self, BufWriter, IsTerminal, Write};
 use std::str::FromStr;
 
 use clap::{Args, Parser, Subcommand};
-use immunum::{Annotator, Chain, NumberedRecord, OutputFormat, Scheme};
+use immunum::{Annotator, Chain, NumberedRecord, OutputFormat, Scheme, DEFAULT_MIN_CONFIDENCE};
 
 #[derive(Parser)]
 #[command(name = "immunum", about = "Immune receptor sequence numbering")]
@@ -33,6 +33,9 @@ struct NumberArgs {
     /// Output format: tsv, json, jsonl
     #[arg(short, long, default_value = "tsv")]
     format: String,
+    /// Minimum confidence threshold (0.0-1.0). Sequences below this are skipped.
+    #[arg(long, default_value_t = DEFAULT_MIN_CONFIDENCE)]
+    min_confidence: f32,
 }
 
 fn run_number(args: &NumberArgs) -> Result<(), String> {
@@ -47,7 +50,7 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
         Scheme::from_str(&args.scheme).map_err(|_| format!("unknown scheme '{}'", args.scheme))?;
     let chains = Chain::parse_chain_spec(&args.chain).map_err(|e| e.to_string())?;
     let format = OutputFormat::from_str(&args.format)?;
-    let annotator = Annotator::new(&chains, scheme)
+    let annotator = Annotator::new(&chains, scheme, Some(args.min_confidence))
         .map_err(|e| format!("failed to create annotator: {}", e))?;
 
     let records = immunum::read_input(args.input.as_deref())?;
@@ -66,18 +69,22 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
         .write_header(&mut writer)
         .map_err(|e| format!("write error: {}", e))?;
 
-    for (i, rec) in records.into_iter().enumerate() {
-        let result = annotator
-            .number(&rec.sequence)
-            .map_err(|e| format!("failed to number '{}': {}", rec.id, e))?;
+    let mut written = 0;
+    for rec in records {
+        let result = match annotator.number(&rec.sequence) {
+            Ok(result) => result,
+            Err(immunum::Error::LowConfidence { .. }) => continue,
+            Err(e) => return Err(format!("failed to number '{}': {}", rec.id, e)),
+        };
         let numbered = NumberedRecord {
             id: rec.id,
             sequence: rec.sequence,
             result,
         };
         format
-            .write_record(&mut writer, &numbered, i)
+            .write_record(&mut writer, &numbered, written)
             .map_err(|e| format!("write error: {}", e))?;
+        written += 1;
     }
 
     format

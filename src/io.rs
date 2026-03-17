@@ -56,7 +56,10 @@ impl OutputFormat {
     /// Write format header (e.g. TSV column names, JSON array opening)
     pub fn write_header(&self, writer: &mut impl Write) -> io::Result<()> {
         match self {
-            Self::Tsv => writeln!(writer, "sequence_id\tchain\tscheme\tposition\tresidue"),
+            Self::Tsv => writeln!(
+                writer,
+                "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"
+            ),
             Self::Json => writeln!(writer, "["),
             Self::Jsonl => Ok(()),
         }
@@ -181,7 +184,10 @@ pub fn read_fasta(reader: impl BufRead) -> Result<Vec<Record>, String> {
 
 /// Write records in TSV long format (one row per position)
 pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
-    writeln!(writer, "sequence_id\tchain\tscheme\tposition\tresidue")?;
+    writeln!(
+        writer,
+        "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"
+    )?;
     for rec in records {
         write_tsv_record(writer, rec)?;
     }
@@ -193,8 +199,8 @@ fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result
     for (pos, ch) in rec.result.positions.iter().zip(rec.sequence.chars()) {
         writeln!(
             writer,
-            "{}\t{}\t{}\t{}\t{}",
-            rec.id, rec.result.chain, rec.result.scheme, pos, ch
+            "{}\t{}\t{}\t{:.4}\t{}\t{}",
+            rec.id, rec.result.chain, rec.result.scheme, rec.result.confidence, pos, ch
         )?;
     }
     Ok(())
@@ -231,6 +237,7 @@ fn record_to_json(rec: &NumberedRecord) -> serde_json::Value {
         "sequence_id": rec.id,
         "chain": rec.result.chain.to_string(),
         "scheme": rec.result.scheme.to_string(),
+        "confidence": rec.result.confidence,
         "numbering": numbering,
     })
 }
@@ -300,9 +307,12 @@ mod tests {
         write_tsv(&mut buf, &records).unwrap();
         let output = String::from_utf8(buf).unwrap();
         let lines: Vec<&str> = output.lines().collect();
-        assert_eq!(lines[0], "sequence_id\tchain\tscheme\tposition\tresidue");
-        assert_eq!(lines[1], "s1\tH\tIMGT\t1\tE");
-        assert_eq!(lines[2], "s1\tH\tIMGT\t2\tV");
+        assert_eq!(
+            lines[0],
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"
+        );
+        assert_eq!(lines[1], "s1\tH\tIMGT\t1.0000\t1\tE");
+        assert_eq!(lines[2], "s1\tH\tIMGT\t1.0000\t2\tV");
     }
 
     #[test]

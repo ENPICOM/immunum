@@ -15,7 +15,7 @@ fn raw_sequence_argument() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "sequence_id\tchain\tscheme\tposition\tresidue",
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue",
         ));
 }
 
@@ -153,7 +153,7 @@ fn output_to_file() {
         .stdout(predicate::str::is_empty());
 
     let contents = fs::read_to_string(&out_path).unwrap();
-    assert!(contents.contains("sequence_id\tchain\tscheme\tposition\tresidue"));
+    assert!(contents.contains("sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"));
 }
 
 // --- TSV piping via stdin ---

@@ -161,7 +161,7 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
     let mut scheme_builder = StringChunkedBuilder::new("scheme".into(), len);
     let mut positions_builder = ListStringChunkedBuilder::new("positions".into(), len, len);
     let mut residues_builder = ListStringChunkedBuilder::new("residues".into(), len, len);
-    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme) {
+    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme, None) {
         Ok(a) => a,
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
@@ -307,7 +307,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
     let mut cdr3_b = StringChunkedBuilder::new("cdr3".into(), len);
     let mut fr4_b = StringChunkedBuilder::new("fr4".into(), len);
     let mut postfix_b = StringChunkedBuilder::new("postfix".into(), len);
-    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme) {
+    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme, None) {
         Ok(a) => a,
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
