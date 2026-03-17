@@ -33,12 +33,13 @@ impl Direction {
     }
 }
 
-/// Represents a position in the alignment result
+/// Represents a position in the alignment result.
+/// The vector of these is always query-indexed (length == query length).
+/// Consensus positions skipped by the aligner are not represented here;
+/// the covered consensus range is captured by `Alignment::start_pos`/`end_pos`.
 #[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlignedPosition {
-    /// Gap in query (query has no residue here, consensus does)
-    QueryGap(),
     /// Aligned to consensus position N
     Aligned(u8),
     /// Insertion in query (query has residue, consensus doesn't)
@@ -193,31 +194,15 @@ pub fn align(
     // This prevents long CDR3 regions from being incorrectly treated as unaligned trailing sequence.
     // The query must align through its full length, but the consensus can have trailing gaps.
 
-    let (aligned_positions, confidence_score, max_confidence_score) = build_traceback(
-        dp_traceback,
-        stride,
-        query_bytes,
-        positions,
-        query_len,
-        best_j,
-    );
-
-    // Find start and end positions from aligned consensus positions
-    let start_pos = aligned_positions
-        .iter()
-        .find_map(|p| match p {
-            AlignedPosition::Aligned(n) => Some(*n),
-            _ => None,
-        })
-        .unwrap_or(1);
-    let end_pos = aligned_positions
-        .iter()
-        .rev()
-        .find_map(|p| match p {
-            AlignedPosition::Aligned(n) => Some(*n),
-            _ => None,
-        })
-        .unwrap_or(128);
+    let (aligned_positions, confidence_score, max_confidence_score, start_pos, end_pos) =
+        build_traceback(
+            dp_traceback,
+            stride,
+            query_bytes,
+            positions,
+            query_len,
+            best_j,
+        );
 
     Ok(Alignment {
         score: best_score,
@@ -236,17 +221,20 @@ fn build_traceback(
     positions: &[PositionScores],
     query_end: usize,
     cons_end: usize,
-) -> (Vec<AlignedPosition>, f32, f32) {
-    let mut aligned_positions = Vec::new();
+) -> (Vec<AlignedPosition>, f32, f32, u8, u8) {
+    // Exactly one entry per query residue
+    let mut aligned_positions = Vec::with_capacity(query_end);
 
     let mut confidence_score = 0.0f32;
     let mut max_confidence_score = 0.0f32;
 
+    // Tracked during backward traversal: first Aligned seen = end_pos, last = start_pos
+    let mut start_pos: u8 = 1;
+    let mut end_pos: u8 = 128;
+    let mut found_aligned = false;
+
     let mut i = query_end;
     let mut j = cons_end;
-
-    // Track query/consensus indices for confidence
-    let mut qi = query_end;
 
     while i > 0 && j > 0 {
         match Direction::from_u8(dp_traceback[i * stride + j]) {
@@ -254,13 +242,18 @@ fn build_traceback(
                 let pos = &positions[j - 1];
                 aligned_positions.push(AlignedPosition::Aligned(pos.position));
 
-                qi -= 1;
-
                 if pos.counts_for_confidence {
-                    let aa = query_bytes[qi].to_ascii_uppercase();
+                    let aa = query_bytes[i - 1].to_ascii_uppercase();
                     confidence_score += pos.score_for(aa);
                     max_confidence_score += pos.max_score;
                 }
+
+                // Going backwards: first Aligned = end_pos, every Aligned updates start_pos
+                if !found_aligned {
+                    end_pos = pos.position;
+                    found_aligned = true;
+                }
+                start_pos = pos.position;
 
                 i -= 1;
                 j -= 1;
@@ -268,20 +261,18 @@ fn build_traceback(
 
             Direction::GapInQuery => {
                 let pos = &positions[j - 1];
-                aligned_positions.push(AlignedPosition::QueryGap());
 
                 if pos.counts_for_confidence {
                     confidence_score += pos.gap_penalty;
                     max_confidence_score += pos.max_score;
                 }
 
+                // No query residue consumed — do not push to aligned_positions
                 j -= 1;
             }
 
             Direction::GapInConsensus => {
                 aligned_positions.push(AlignedPosition::Insertion());
-
-                qi -= 1;
                 i -= 1;
             }
         }
@@ -294,7 +285,13 @@ fn build_traceback(
 
     aligned_positions.reverse();
 
-    (aligned_positions, confidence_score, max_confidence_score)
+    (
+        aligned_positions,
+        confidence_score,
+        max_confidence_score,
+        start_pos,
+        end_pos,
+    )
 }
 #[cfg(test)]
 mod tests {
@@ -341,16 +338,11 @@ mod tests {
             result.score > -100.0,
             "Partial sequence should not be heavily penalized"
         );
-        // Allow some gaps but not excessive (e.g., <10% of sequence length)
-        let gap_count = result
-            .positions
-            .iter()
-            .filter(|p| matches!(p, AlignedPosition::QueryGap()))
-            .count();
-        assert!(
-            gap_count <= partial_seq.len() / 10,
-            "Query should have minimal gaps, found {} gaps",
-            gap_count
+        // Positions are query-indexed so length must equal query length
+        assert_eq!(
+            result.positions.len(),
+            partial_seq.len(),
+            "Positions length should equal query length"
         );
     }
 

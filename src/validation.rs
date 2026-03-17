@@ -161,6 +161,7 @@ pub fn validate_chain_with_scheme(
 ) -> Result<ChainMetrics> {
     let path = std::path::PathBuf::from(csv_path);
     let entries = load_validation_csv(&path)?;
+    // Use min_confidence=0 for validation: we want to test all sequences regardless of confidence
     let annotator = Annotator::new(&[chain], scheme, Some(0.0))?;
 
     let mut metrics = ChainMetrics::new(chain, scheme, csv_path.to_string());
