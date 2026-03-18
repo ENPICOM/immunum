@@ -16,6 +16,7 @@ jobs:
     name: Continuous Benchmarking with Bencher
     permissions:
       checks: write
+      contents: read
     runs-on: ubuntu-latest
     env:
       UV_PYTHON: "3.13"
@@ -47,6 +48,7 @@ jobs:
     name: Continuous Benchmarking with Bencher (PR)
     permissions:
       checks: write
+      contents: read
     runs-on: ubuntu-latest
     env:
       UV_PYTHON: "3.13"
