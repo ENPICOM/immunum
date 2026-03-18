@@ -122,10 +122,8 @@ tasks:
         cmd: uv run --no-sync --group docs mkdocs build {{.CLI_ARGS}}
 
     benchmark-cli:
-        vars:
-            PROFILE: '{{.PROFILE | default "dev"}}'
-        desc: "Behcmark correctness of the CLI tool"
-        cmd: cargo bench --profile {{.PROFILE}}
+        desc: "Speed benchmark using Criterion (benches/speed_benchmark.rs)"
+        cmd: cargo bench --no-default-features {{.CLI_ARGS}}
 
     benchmark-comparison:
         desc: "Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)"
@@ -134,6 +132,24 @@ tasks:
     benchmark-speed-polars:
         desc: "Speed benchmark for immunum polars across all chain/scheme fixtures"
         cmd: uv run pytest tests/bench_polars.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+
+    bencher-python:
+        silent: true
+        desc: "Run Python benchmarks with bencher"
+        cmd: bencher run --adapter python_pytest --token {{.BENCHER_API_TOKEN}} --file results.json "uv run --no-sync pytest --benchmark-json results.json tests/bench_polars.py"
+
+    bencher-rust:
+        silent: true
+        desc: "Run Criterion benchmarks with bencher"
+        cmd: bencher run --adapter rust_criterion --token {{.BENCHER_API_TOKEN}} "cargo bench --no-default-features"
+
+    bencher:
+        preconditions:
+            - sh: '[ -n "{{.BENCHER_API_TOKEN}}" ]'
+              msg: "BENCHER_API_TOKEN is not set"
+        cmds:
+            - task: bencher-rust
+            - task: bencher-python
 
     benchmark-accuracy:
         desc: "Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)"

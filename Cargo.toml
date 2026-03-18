@@ -45,6 +45,7 @@ pyo3-polars = { version = "0.24.0", features = [
 assert_cmd = "2"
 predicates = "3"
 tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [build-dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -73,6 +74,7 @@ path = "src/bin/debug_validation.rs"
 name = "benchmark"
 path = "src/bin/benchmark.rs"
 
-[[bin]]
+[[bench]]
 name = "speed-benchmark"
-path = "src/bin/speed_benchmark.rs"
+path = "benches/speed_benchmark.rs"
+harness = false
