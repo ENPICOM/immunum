@@ -405,7 +405,7 @@ def test_immunum_singlethreaded(benchmark, sample_seqs, sample_gt, immunum_annot
 
 def test_antpack(benchmark, sample_seqs, sample_gt, antpack_annotator):
     result = benchmark.pedantic(
-        _run_antpack, args=(sample_seqs, antpack_annotator), rounds=3, iterations=1
+        _run_antpack, args=(sample_seqs, antpack_annotator, "H"), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
@@ -413,7 +413,7 @@ def test_antpack(benchmark, sample_seqs, sample_gt, antpack_annotator):
 def test_antpack_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("antpack")
     result = benchmark.pedantic(
-        _run_antpack_parallel, args=(sample_seqs,), rounds=3, iterations=1
+        _run_antpack_parallel, args=(sample_seqs, "H", "imgt"), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
@@ -428,14 +428,17 @@ def test_anarci(benchmark, sample_seqs, sample_gt, anarci_kwargs):
 def test_anarci_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("anarci")
     result = benchmark.pedantic(
-        _run_anarci_parallel, args=(sample_seqs,), rounds=3, iterations=1
+        _run_anarci_parallel, args=(sample_seqs, "imgt", "H"), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
 def test_anarcii2(benchmark, sample_seqs, sample_gt, anarcii2_annotator):
     result = benchmark.pedantic(
-        _run_anarcii2, args=(sample_seqs, anarcii2_annotator), rounds=3, iterations=1
+        _run_anarcii2,
+        args=(sample_seqs, anarcii2_annotator, "H"),
+        rounds=3,
+        iterations=1,
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
@@ -443,14 +446,19 @@ def test_anarcii2(benchmark, sample_seqs, sample_gt, anarcii2_annotator):
 def test_anarcii2_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("anarcii")
     result = benchmark.pedantic(
-        _run_anarcii2_parallel, args=(sample_seqs,), rounds=3, iterations=1
+        _run_anarcii2_parallel, args=(sample_seqs, "H"), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
 def test_riot(benchmark, sample_seqs, sample_gt, riot_annotator):
+    from riot_na import Scheme  # type: ignore[import]
+
     result = benchmark.pedantic(
-        _run_riot, args=(sample_seqs, riot_annotator), rounds=3, iterations=1
+        _run_riot,
+        args=(sample_seqs, riot_annotator, "igh", Scheme.IMGT),
+        rounds=3,
+        iterations=1,
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
@@ -458,7 +466,7 @@ def test_riot(benchmark, sample_seqs, sample_gt, riot_annotator):
 def test_riot_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("riot_na")
     result = benchmark.pedantic(
-        _run_riot_parallel, args=(sample_seqs,), rounds=3, iterations=1
+        _run_riot_parallel, args=(sample_seqs, "igh", "IMGT"), rounds=3, iterations=1
     )
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
