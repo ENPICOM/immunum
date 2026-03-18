@@ -58,13 +58,6 @@ benchmark = [
     "typer>=0.24.1",
     "riot-na>=1.2.2",
 ]
-plots = [
-    "altair>=6.0.0",
-    "matplotlib>=3.10.8",
-    "pyarrow>=23.0.1",
-    "setuptools>=82.0.1",
-    "vl-convert-python>=1.9.0.post1",
-]
 
 
 [tool.uv]

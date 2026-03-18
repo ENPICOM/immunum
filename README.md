@@ -124,10 +124,10 @@ Also, by default, `task` caches results, but you can ignore it by running `task 
 
 ```bash
 # build a dev environment
-task build
+task build-local
 
 # build a dev environment with --release flag
-task build PROFILE=release
+task build-local PROFILE=release
 ```
 
 ### Testing

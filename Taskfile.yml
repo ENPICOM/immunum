@@ -2,6 +2,7 @@ version: "3"
 
 tasks:
     build:
+        silent: true
         vars:
             PROFILE: '{{.PROFILE | default "dev"}}'
         sources:
@@ -15,6 +16,13 @@ tasks:
             - .venv/{CACHEDIR.TAG,pyvenv.cfg}
         cmds:
             - uv sync --all-extras --all-groups --dev -C "build-args=--profile {{.PROFILE}}" {{.CLI_ARGS}}
+
+    build-local:
+        vars:
+            PROFILE: '{{.PROFILE | default "dev"}}'
+        cmds:
+            - task: build
+              vars: { PROFILE: "{{.PROFILE}}", CLI_ARGS: "--locked" }
             - pre-commit install
 
     build-ci:
@@ -40,7 +48,7 @@ tasks:
             - tests/test_*.py
             - docs/**/*.md
         cmds:
-            - uv run --no-project pytest {docs,tests/test_*.py} -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
+            - uv run --no-sync pytest {docs,tests/test_*.py} -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
 
     test-rust:
         vars:
@@ -74,9 +82,9 @@ tasks:
               vars: { PROFILE: "{{.PROFILE}}" }
         cmds:
             - cargo clippy --all-targets --all-features -- -D warnings
-            - uv run --no-project ruff check --config pyproject.toml
-            - uv run --no-project ty check --project .
-            - uv run --no-project pyrefly check -j 0
+            - uv run --no-sync ruff check --config pyproject.toml
+            - uv run --no-sync ty check --project .
+            - uv run --no-sync pyrefly check -j 0
             - 'git grep "# type: ignore\s*$" src/** && (echo -e "\033[31mBlanket ignores are not allowed\033[0m"; exit 1) || exit 0'
 
     format:
@@ -87,8 +95,8 @@ tasks:
               vars: { PROFILE: "{{.PROFILE}}" }
         cmds:
             - cargo fmt --all --check
-            - uv run --no-project ruff check --fix --config pyproject.toml
-            - uv run --no-project ruff format --config pyproject.toml
+            - uv run --no-sync ruff check --fix --config pyproject.toml
+            - uv run --no-sync ruff format --config pyproject.toml
 
     coverage:
         vars:
@@ -97,21 +105,21 @@ tasks:
             - task: build
               vars: { PROFILE: "{{.PROFILE}}" }
         cmds:
-            - uv run --no-project coverage run -m pytest --show-capture=no --disable-warnings --tb=no
-            - uv run --no-project coverage report -m
+            - uv run --no-sync coverage run -m pytest --show-capture=no --disable-warnings --tb=no
+            - uv run --no-sync coverage report -m
 
     pysentry:
         cmds:
-            - uv run --no-project pysentry-rs .
+            - uv run --no-sync pysentry-rs .
 
     docs-serve:
-        cmd: uv run --no-project --group docs mkdocs serve
+        cmd: uv run --no-sync --group docs mkdocs serve
 
     docs:
         cmd: task docs-serve
 
     docs-build:
-        cmd: uv run --no-project --group docs mkdocs build {{.CLI_ARGS}}
+        cmd: uv run --no-sync --group docs mkdocs build {{.CLI_ARGS}}
 
     benchmark-cli:
         vars:
@@ -159,7 +167,7 @@ tasks:
 
     plots:
         desc: "Produce plots from benchmark results"
-        cmd: uv run scripts/plots.py
+        cmd: uv run --script scripts/plots.py
 
     default:
         cmds:
