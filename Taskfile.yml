@@ -134,6 +134,9 @@ tasks:
         cmd: uv run pytest benches/bench_polars.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
 
     bencher-python:
+        deps:
+            - task: build-ci
+              vars: { PROFILE: "{{.PROFILE}}" }
         silent: true
         desc: "Run Python benchmarks with bencher"
         cmd: >-
