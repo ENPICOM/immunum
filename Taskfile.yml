@@ -11,7 +11,7 @@ tasks:
             - uv sync --reinstall
 
     build-ci:
-        cmd: uv sync --locked --all-extras --all-groups --dev
+        cmd: uv sync --locked --all-extras --all-groups --dev --compile-bytecode
 
     test-python:
         deps: [build-python]
@@ -83,7 +83,7 @@ tasks:
 
     pysentry:
         cmds:
-            - uv run pysentry-rs --all-extras .
+            - uv run pysentry-rs .
 
     docs-serve:
         cmd: uv run --no-project --group docs mkdocs serve
@@ -149,7 +149,7 @@ tasks:
             - resources/**/*
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
-            - uv tool run maturin develop --uv --features python --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            - uv tool run maturin develop --uv --features python --manifest-path ./Cargo.toml {{.CLI_ARGS}}
 
     build-polars:
         sources:
@@ -161,16 +161,19 @@ tasks:
             - resources/**/*
         cmds:
             # important to use `uv tool`` and not `uv run` since it's another environment
-            - uv tool run maturin develop --uv --features "python,polars" --profile {{.PROFILE | default "mindebug-dev"}} --manifest-path ./Cargo.toml {{.CLI_ARGS}}
+            - uv tool run maturin develop --uv --features "python,polars" --manifest-path ./Cargo.toml {{.CLI_ARGS}}
             - uv sync --all-extras --all-groups --dev --compile-bytecode
 
     ci:
+        env:
+            MATURIN_PEP517_ARGS: "--profile mindebug-dev"
         cmds:
-            - task: build-ci
-            - task: lint
-            - task: pysentry
-            - task: test
-              vars:
-                  PROFILE: "{{.PROFILE}}"
-            - task: coverage
-            - task: docs-build
+            # lack of ':' char is not a typo:
+            # otherwise env variable above
+            # does not get passed
+            - task build-ci
+            - task lint
+            - task pysentry
+            - task test
+            - task coverage
+            - task docs-build

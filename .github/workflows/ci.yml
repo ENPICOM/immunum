@@ -17,8 +17,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+    if: >
+      github.event_name != 'pull_request' ||
+      matrix.os == 'windows-latest' ||
+      matrix.python-version == '3.13'
     env:
       UV_PYTHON: ${{ matrix.python-version }}
+      MATURIN_PEP517_ARGS: "--profile dev"
 
     steps:
       - uses: actions/checkout@v4
@@ -35,4 +40,4 @@ jobs:
         run: uv tool install go-task-bin
 
       - name: Run CI
-        run: task ci PROFILE=dev
+        run: task ci
