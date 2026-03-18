@@ -136,12 +136,33 @@ tasks:
     bencher-python:
         silent: true
         desc: "Run Python benchmarks with bencher"
-        cmd: bencher run --adapter python_pytest --token {{.BENCHER_API_TOKEN}} --file results.json "uv run --no-sync pytest --benchmark-json results.json benches/bench_polars.py"
+        cmd: >-
+            bencher run
+            --adapter python_pytest
+            --token {{.BENCHER_API_TOKEN}}
+            --file results.json
+            --threshold-measure latency
+            --threshold-test t_test
+            --threshold-max-sample-size 64
+            --threshold-upper-boundary 0.99
+            --thresholds-reset
+            --err
+            "uv run --no-sync pytest --benchmark-json results.json benches/bench_polars.py"
 
     bencher-rust:
         silent: true
         desc: "Run Criterion benchmarks with bencher"
-        cmd: bencher run --adapter rust_criterion --token {{.BENCHER_API_TOKEN}} "cargo bench --no-default-features"
+        cmd: >-
+            bencher run
+            --adapter rust_criterion
+            --token {{.BENCHER_API_TOKEN}}
+            --threshold-measure latency
+            --threshold-test t_test
+            --threshold-max-sample-size 64
+            --threshold-upper-boundary 0.99
+            --thresholds-reset
+            --err
+            "cargo bench --no-default-features"
 
     bencher:
         preconditions:
