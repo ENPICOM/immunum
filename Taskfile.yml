@@ -15,7 +15,7 @@ tasks:
         generates:
             - .venv/{CACHEDIR.TAG,pyvenv.cfg}
         cmds:
-            - uv sync --all-extras --all-groups --dev -C "build-args=--profile {{.PROFILE}}" {{.CLI_ARGS}}
+            - uv sync --all-extras --all-groups --no-group benchmark --dev -C "build-args=--profile {{.PROFILE}}" {{.CLI_ARGS}}
 
     build-local:
         vars:
