@@ -1,3 +1,14 @@
+# /// script
+# requires-python = "==3.13"
+# dependencies = [
+#   "altair>=6.0.0",
+#   "polars>1.30.0",
+#   "pyarrow>=23.0.1",
+#   "pandas<3.0.0",
+#   "vl-convert-python>=1.9.0.post1",
+# ]
+# ///
+
 import glob
 
 import polars as pl
@@ -314,13 +325,11 @@ chart = (
     .configure_legend(labelColor=BLACK, titleColor=BLACK)
     .configure_view(stroke=BLACK)
 )
-chart.save("benchmark_plots.html")
-print("Saved benchmark_plots.html")
 
 for name, p in [
     ("plot1_performance", plot_perf),
     ("plot2_correctness", plot2),
 ]:
-    path = f"benchmark_{name}.svg"
+    path = f"assets/benchmark_{name}.svg"
     p.save(path)
     print(f"Saved {path}")

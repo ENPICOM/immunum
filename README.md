@@ -106,22 +106,60 @@ immunum number -f json sequences.fasta | jq '[.[] | {id: .sequence_id, numbering
 
 ## Development
 
-The project follows a test-driven development workflow.
+To orchestrate a project between cargo and python, we use [`task`](http://taskfile.dev).
+You can install it with:
 
 ```bash
-# Run tests
-cargo test
-
-# Lint
-cargo fmt
-cargo clippy
-
-# Run validation benchmarks (writes results to BENCHMARKS.toml)
-cargo run --release --bin benchmark
+uv tool install go-task-bin
 ```
 
-### Project structure
+And then run `task` or `task --list-all` to get the full list of available tasks.
 
+By default, `dev` profile will be used in all but `behcnmark-*` taks, but you can change it
+via providing `PROFILE=release` to your task.
+
+Also, by default, `task` caches results, but you can ignore it by running `task my-task -f`.
+
+### Building local environment
+
+```bash
+# build a dev environment
+task build-local
+
+# build a dev environment with --release flag
+task build-local PROFILE=release
+```
+
+### Testing
+
+```bash
+task test-rust    # test only rust code
+task test-python  # test only python code
+task test         # test all code
+```
+
+### Linting
+
+```bash
+task format  # formats python and rust code
+task lint    # runs linting for python and rust
+```
+
+### Benchmarking
+
+There are multiple benchmarks in the repository. For full list, see `task | grep behcmark`:
+
+```bash
+$ task | grep benchmark
+* benchmark-accuracy:           Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)
+* benchmark-cli:                Behcmark correctness of the CLI tool
+* benchmark-comparison:         Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)
+* benchmark-scaling:            Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
+* benchmark-speed:              Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)
+* benchmark-speed-polars:       Speed benchmark for immunum polars across all chain/scheme fixtures
+```
+
+## Project structure
 ```
 src/
 ├── main.rs          # CLI binary (immunum number ...)
@@ -148,6 +186,10 @@ fixtures/
 ├── ig.fasta         # Example antibody sequences
 └── ig.tsv           # Example TSV input
 scripts/             # Python tooling for generating consensus data
+immunum/
+└── _internal.pyi    # python stub file for pyo3
+└── polars.py        # polars extension module
+└── python.py        # python module
 ```
 
 ### Design decisions

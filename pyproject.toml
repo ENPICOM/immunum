@@ -18,11 +18,20 @@ classifiers = [
 [tool.maturin]
 module-name = "immunum._internal"
 features = ["python", "polars"]
-profile = "dist-release"
+profile = "release"
 
 
 [dependency-groups]
 polars = ["polars>1.30.0"]
+docs = [
+    "markdown-exec[ansi]",
+    "mkdocs<2.0",
+    "mkdocs-autorefs",
+    "mkdocs-macros-plugin",
+    "mkdocs-material",
+    "mkdocs-simple-hooks",
+    "mkdocstrings[python]",
+]
 dev = [
     "coverage>=7.10.6",
     "go-task-bin>=3.44.1",
@@ -33,6 +42,7 @@ dev = [
     "pyrefly>=0.53.0",
     "pysentry-rs>=0.3.10",
     "pytest-benchmark>=5.2.3",
+    "pytest-markdown-docs>=0.9.1",
     "pytest-xdist>=3.8.0",
     "pytest>=8.4.2",
     "rtoml>=0.13.0",
@@ -40,20 +50,13 @@ dev = [
     "ty>=0.0.19",
 ]
 benchmark = [
-    "immunum[polars]",
+    { include-group = "polars" },
     "anarcii>=2.0.5",
     "antpack~=0.2.7",
     "biopython>=1.86",
-    "riot-na>=1.2.2",
     "scikit-bio==0.6.2",
     "typer>=0.24.1",
-]
-plots = [
-    "altair>=6.0.0",
-    "matplotlib>=3.10.8",
-    "pyarrow>=23.0.1",
-    "setuptools>=82.0.1",
-    "vl-convert-python>=1.9.0.post1",
+    "riot-na>=1.2.2",
 ]
 
 
@@ -81,6 +84,9 @@ immunum-rs = { workspace = true }
 
 [tool.pytest.ini_options]
 markers = ["slow: mark test as slow (requires full validation fixtures)"]
+addopts = "--markdown-docs"
+testpaths = ["docs", "tests"]
+
 
 [tool.coverage.report]
 exclude_also = [
@@ -91,7 +97,7 @@ exclude_also = [
 fail_under = 90
 
 [tool.coverage.run]
-omit = ["/tmp/*"]
+omit = ["/tmp/*", "tests/bench*.py"]
 include = ["src/**", "tests/**"]
 
 [tool.pysentry.sources]
@@ -101,5 +107,5 @@ enabled = ["pypa", "pypi", "osv"]
 fail_on = "high"
 
 [tool.ty.src]
-include = ["src"]
+include = ["immunum"]
 exclude = ["tests"]
