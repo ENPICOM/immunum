@@ -11,7 +11,7 @@ tasks:
             - uv sync --reinstall
 
     build-ci:
-        cmd: uv sync --locked --all-extras --all-groups --dev --compile-bytecode
+        cmd: uv sync --locked --all-extras --all-groups --no-group benchmark --dev --compile-bytecode
 
     test-python:
         deps: [build-python]
