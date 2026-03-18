@@ -65,7 +65,7 @@ def large_sample():
 
 
 @pytest.mark.parametrize("chains,scheme", LARGE_SAMPLE_PARAMS)
-def test_benchmark_1m_sequences(benchmark, large_sample, chains, scheme):
+def test_benchmark_10k_sequences(benchmark, large_sample, chains, scheme):
     benchmark.pedantic(
         run_numbering, args=(large_sample, chains, scheme), rounds=3, iterations=1
     )

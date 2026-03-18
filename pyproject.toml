@@ -13,19 +13,17 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
 
 
 [tool.maturin]
 module-name = "immunum._internal"
 features = ["python", "polars"]
-# features = ["python"]
+profile = "dist-release"
 
 
 [dependency-groups]
 polars = ["polars>1.30.0"]
 dev = [
-    "antpack==0.3.8",
     "coverage>=7.10.6",
     "go-task-bin>=3.44.1",
     "hypothesis>=6.151.9",
@@ -41,6 +39,23 @@ dev = [
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
+benchmark = [
+    "immunum[polars]",
+    "anarcii>=2.0.5",
+    "antpack~=0.2.7",
+    "biopython>=1.86",
+    "riot-na>=1.2.2",
+    "scikit-bio==0.6.2",
+    "typer>=0.24.1",
+]
+plots = [
+    "altair>=6.0.0",
+    "matplotlib>=3.10.8",
+    "pyarrow>=23.0.1",
+    "setuptools>=82.0.1",
+    "vl-convert-python>=1.9.0.post1",
+]
+
 
 [tool.uv]
 default-groups = ["dev"]
@@ -57,6 +72,7 @@ project-excludes = [
     "**/*venv/**/*",
     "**/.[!/.]*/**/*",
     "scripts/*",
+    "tests/*.py",
 ]
 
 [tool.uv.sources]
@@ -77,3 +93,13 @@ fail_under = 90
 [tool.coverage.run]
 omit = ["/tmp/*"]
 include = ["src/**", "tests/**"]
+
+[tool.pysentry.sources]
+enabled = ["pypa", "pypi", "osv"]
+
+[tool.pysentry.defaults]
+fail_on = "high"
+
+[tool.ty.src]
+include = ["src"]
+exclude = ["tests"]
