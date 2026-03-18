@@ -105,8 +105,8 @@ tasks:
             - task: build
               vars: { PROFILE: "{{.PROFILE}}" }
         cmds:
-            - uv run --no-sync coverage run -m pytest --show-capture=no --disable-warnings --tb=no
-            - uv run --no-sync coverage report -m
+            - uv run --no-sync coverage run --rcfile=pyproject.toml -m pytest --show-capture=no --disable-warnings --tb=no
+            - uv run --no-sync coverage report --rcfile=pyproject.toml -m
 
     pysentry:
         cmds:
@@ -177,9 +177,6 @@ tasks:
         env:
             PROFILE: "dev"
         cmds:
-            # lack of ':' char is not a typo:
-            # otherwise env variable above
-            # does not get passed
             - task: lint
             - task: pysentry
             - task: build-ci
