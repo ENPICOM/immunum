@@ -50,12 +50,13 @@ dev = [
     "ty>=0.0.19",
 ]
 benchmark = [
-    "immunum[polars]",
+    { include-group = "polars" },
     "anarcii>=2.0.5",
     "antpack~=0.2.7",
     "biopython>=1.86",
     "scikit-bio==0.6.2",
     "typer>=0.24.1",
+    "riot-na>=1.2.2",
 ]
 plots = [
     "altair>=6.0.0",
