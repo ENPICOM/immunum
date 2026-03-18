@@ -50,7 +50,6 @@ benchmark = [
 ]
 plots = [
     "altair>=6.0.0",
-    "enpicolors",
     "matplotlib>=3.10.8",
     "pyarrow>=23.0.1",
     "setuptools>=82.0.1",
@@ -78,7 +77,6 @@ project-excludes = [
 
 [tool.uv.sources]
 immunum-rs = { workspace = true }
-enpicolors = { git = "https://github.com/ENPICOM/enpicolors" }
 
 
 [tool.pytest.ini_options]
