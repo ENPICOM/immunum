@@ -189,15 +189,6 @@ wheels = [
 ]
 
 [[package]]
-name = "blosum"
-version = "2.2.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/46/1c/fbded27d453242e4fb15bb327dbe4d828b0ff17b415d46dafea25f19fc8f/blosum-2.2.0.tar.gz", hash = "sha256:6200425b534c3b82d2dca303bbc685274e6adf34f9a257671f85291b20766c35", size = 24147, upload-time = "2025-11-21T14:45:19.411Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/dd/3bb3adebd4fca4e16072510fd54883075b4571bb84a37f5475965895bca7/blosum-2.2.0-py3-none-any.whl", hash = "sha256:707b89fe268b8d1f81a7a3aca600f4eb6d01215f46ba233f4ea185a557e226bd", size = 21528, upload-time = "2025-11-21T14:45:18.233Z" },
-]
-
-[[package]]
 name = "certifi"
 version = "2026.2.25"
 source = { registry = "https://pypi.org/simple" }
@@ -585,7 +576,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -826,7 +817,6 @@ benchmark = [
     { name = "antpack" },
     { name = "biopython" },
     { name = "immunum" },
-    { name = "riot-na" },
     { name = "scikit-bio" },
     { name = "typer" },
 ]
@@ -877,7 +867,6 @@ benchmark = [
     { name = "antpack", specifier = "~=0.2.7" },
     { name = "biopython", specifier = ">=1.86" },
     { name = "immunum", extras = ["polars"] },
-    { name = "riot-na", specifier = ">=1.2.2" },
     { name = "scikit-bio", specifier = "==0.6.2" },
     { name = "typer", specifier = ">=0.24.1" },
 ]
@@ -2328,15 +2317,6 @@ wheels = [
 ]
 
 [[package]]
-name = "python-dotenv"
-version = "1.2.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/82/ed/0301aeeac3e5353ef3d94b6ec08bbcabd04a72018415dcb29e588514bba8/python_dotenv-1.2.2.tar.gz", hash = "sha256:2c371a91fbd7ba082c2c1dc1f8bf89ca22564a087c2c287cd9b662adde799cf3", size = 50135, upload-time = "2026-03-01T16:00:26.196Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/d7/1959b9648791274998a9c3526f6d0ec8fd2233e4d4acce81bbae76b44b2a/python_dotenv-1.2.2-py3-none-any.whl", hash = "sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a", size = 22101, upload-time = "2026-03-01T16:00:25.09Z" },
-]
-
-[[package]]
 name = "pytz"
 version = "2026.1.post1"
 source = { registry = "https://pypi.org/simple" }
@@ -2443,35 +2423,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b3/c6/f3b320c27991c46f43ee9d856302c70dc2d0fb2dba4842ff739d5f46b393/rich-14.3.3.tar.gz", hash = "sha256:b8daa0b9e4eef54dd8cf7c86c03713f53241884e814f4e2f5fb342fe520f639b", size = 230582, upload-time = "2026-02-19T17:23:12.474Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/25/b208c5683343959b670dc001595f2f3737e051da617f66c31f7c4fa93abc/rich-14.3.3-py3-none-any.whl", hash = "sha256:793431c1f8619afa7d3b52b2cdec859562b950ea0d4b6b505397612db8d5362d", size = 310458, upload-time = "2026-02-19T17:23:13.732Z" },
-]
-
-[[package]]
-name = "riot-na"
-version = "1.2.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "biopython" },
-    { name = "blosum" },
-    { name = "click" },
-    { name = "psutil" },
-    { name = "python-dotenv" },
-    { name = "scikit-bio" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d1/9d/6eb7188580c869be88dda5d7634fe375e90c429a28964bed656c19be64ed/riot_na-1.2.2.tar.gz", hash = "sha256:49830bb90d15068dbe1216b3511ffcb34f9bba265c31b4822a42fc352b5715fd", size = 472157, upload-time = "2024-10-24T10:57:24.892Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/7a/f11566834aaa3d76c049772a109488c5e1c2badd601e4af0c889497fb948/riot_na-1.2.2-cp310-cp310-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:5b53cc0925320d3d4ebf9af3627e3069f5350f80e025ccd88ee38193a3de3411", size = 849733, upload-time = "2024-10-24T10:57:06.998Z" },
-    { url = "https://files.pythonhosted.org/packages/ca/fc/0fc2575f41333bd4034d49551977a861062b55ab87baa360be5eea0b41b9/riot_na-1.2.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5c65c7285e7eca53a7edab64a39225049b6e98c9d33be1f32af220ec8bf6583c", size = 4323189, upload-time = "2024-10-24T10:57:08.978Z" },
-    { url = "https://files.pythonhosted.org/packages/9f/67/e5ceb0cf82b32d6bf55e2e86400d76bcd2fec77b72f882d5a883765c5418/riot_na-1.2.2-cp310-none-win_amd64.whl", hash = "sha256:7c65b62ff915dde6ba360f75c302e6bcbb1a7fe73b8765b8ba55e31ffc2c4ece", size = 453679, upload-time = "2024-10-24T10:57:11.211Z" },
-    { url = "https://files.pythonhosted.org/packages/ea/3c/8ec49e67cde8383fb1f8349b768e9b24a42bee754547b2dc9c7617beadda/riot_na-1.2.2-cp311-cp311-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:eec227c8d8b7362c49ca1325251e86d40ebfcbcaa754aa9e094197fa09e42d06", size = 849774, upload-time = "2024-10-24T10:57:12.875Z" },
-    { url = "https://files.pythonhosted.org/packages/c5/7b/38932ddf0c93ff2fa1d86cebf3e9cef4720dbb2b445b8f08cb099cce3869/riot_na-1.2.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:304c5b875344107e0780dd5602deb6ccc0414abc4448409daad158f07d88a083", size = 4323564, upload-time = "2024-10-24T10:57:14.801Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/2d/7a39a3ab1e9213cd40507ad44600ec73959382cb3068525bce31bbc2e227/riot_na-1.2.2-cp311-none-win_amd64.whl", hash = "sha256:067764802db164c7820eb6ba09aa90566e331e9f3fb2ed9780bd6c79ad0cf016", size = 453680, upload-time = "2024-10-24T10:57:16.427Z" },
-    { url = "https://files.pythonhosted.org/packages/e2/7f/e54fea03de33b0c7ed4cc7377c24a85cac443aad167d6da6cf28880e16a9/riot_na-1.2.2-cp312-cp312-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:2fac9275925cc8b45e7c226b7f76b1357999b8330592807730c60532ed174c9e", size = 846886, upload-time = "2024-10-24T10:57:18.02Z" },
-    { url = "https://files.pythonhosted.org/packages/52/93/54b10dd96309fbc5a3aeaa8e264025724a68e9b31825b98db0dd08d72a63/riot_na-1.2.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a8bded62f69349ea246b1c78615c488f32b6f81a652fd1e9376c6a5bd42f5f7a", size = 4337176, upload-time = "2024-10-24T10:57:19.706Z" },
-    { url = "https://files.pythonhosted.org/packages/51/7b/35515653f59da72386463e167bfefb5847fe1aaaf2ca971da90b6eda63fd/riot_na-1.2.2-cp312-none-win_amd64.whl", hash = "sha256:b92a2cd2d6ac5ce853b438adfac58f7bee34886731cb3701000dcf9c54043668", size = 454310, upload-time = "2024-10-24T10:57:21.592Z" },
-    { url = "https://files.pythonhosted.org/packages/36/1a/e9349142690c8a5d5df7a10ea41d86d6e42ed3975997f5a4072674624955/riot_na-1.2.2-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:887474fdd300c4430eebaa555ffe47707c637138204026398f897c8a99bda9b4", size = 4287808, upload-time = "2024-10-24T10:57:23.277Z" },
 ]
 
 [[package]]
@@ -2997,18 +2948,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/54/fd/b207d1c525cb570ef47f3e9f836b154685011fce11a2f444ba8a4084d042/torch-2.10.0-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:6021db85958db2f07ec94e1bc77212721ba4920c12a18dc552d2ae36a3eb163f", size = 915612644, upload-time = "2026-01-21T16:21:47.019Z" },
     { url = "https://files.pythonhosted.org/packages/36/53/0197f868c75f1050b199fe58f9bf3bf3aecac9b4e85cc9c964383d745403/torch-2.10.0-cp313-cp313t-win_amd64.whl", hash = "sha256:ff43db38af76fda183156153983c9a096fc4c78d0cd1e07b14a2314c7f01c2c8", size = 113997015, upload-time = "2026-01-21T16:23:00.767Z" },
     { url = "https://files.pythonhosted.org/packages/0e/13/e76b4d9c160e89fff48bf16b449ea324bda84745d2ab30294c37c2434c0d/torch-2.10.0-cp313-none-macosx_11_0_arm64.whl", hash = "sha256:cdf2a523d699b70d613243211ecaac14fe9c5df8a0b0a9c02add60fb2a413e0f", size = 79498248, upload-time = "2026-01-21T16:23:09.315Z" },
-]
-
-[[package]]
-name = "tqdm"
-version = "4.67.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/09/a9/6ba95a270c6f1fbcd8dac228323f2777d886cb206987444e4bce66338dd4/tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb", size = 169598, upload-time = "2026-02-03T17:35:53.048Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl", hash = "sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf", size = 78374, upload-time = "2026-02-03T17:35:50.982Z" },
 ]
 
 [[package]]

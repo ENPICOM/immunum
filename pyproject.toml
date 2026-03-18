@@ -54,7 +54,6 @@ benchmark = [
     "anarcii>=2.0.5",
     "antpack~=0.2.7",
     "biopython>=1.86",
-    "riot-na>=1.2.2",
     "scikit-bio==0.6.2",
     "typer>=0.24.1",
 ]
