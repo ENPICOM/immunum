@@ -5,10 +5,7 @@ class _Annotator:
         self,
         chains: list[str],
         scheme: str,
-<<<<<<< HEAD
         min_confidence: float | None = None,
-    ): ...
-=======
     ) -> None:
         """Create an _Annotator for the given chains and numbering scheme.
 
@@ -21,6 +18,5 @@ class _Annotator:
         """
         ...
 
->>>>>>> AI-247-add-mkdocs-documentation-for-the-project
     def number(self, sequence: str): ...
     def segment(self, sequence: str): ...
