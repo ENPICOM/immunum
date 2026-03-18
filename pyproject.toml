@@ -13,19 +13,26 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
 
 
 [tool.maturin]
 module-name = "immunum._internal"
 features = ["python", "polars"]
-# features = ["python"]
+profile = "release"
 
 
 [dependency-groups]
 polars = ["polars>1.30.0"]
+docs = [
+    "markdown-exec[ansi]",
+    "mkdocs<2.0",
+    "mkdocs-autorefs",
+    "mkdocs-macros-plugin",
+    "mkdocs-material",
+    "mkdocs-simple-hooks",
+    "mkdocstrings[python]",
+]
 dev = [
-    "antpack==0.3.8",
     "coverage>=7.10.6",
     "go-task-bin>=3.44.1",
     "hypothesis>=6.151.9",
@@ -35,12 +42,23 @@ dev = [
     "pyrefly>=0.53.0",
     "pysentry-rs>=0.3.10",
     "pytest-benchmark>=5.2.3",
+    "pytest-markdown-docs>=0.9.1",
     "pytest-xdist>=3.8.0",
     "pytest>=8.4.2",
     "rtoml>=0.13.0",
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
+benchmark = [
+    { include-group = "polars" },
+    "anarcii>=2.0.5",
+    "antpack~=0.2.7",
+    "biopython>=1.86",
+    "scikit-bio==0.6.2",
+    "typer>=0.24.1",
+    "riot-na>=1.2.2",
+]
+
 
 [tool.uv]
 default-groups = ["dev"]
@@ -57,6 +75,7 @@ project-excludes = [
     "**/*venv/**/*",
     "**/.[!/.]*/**/*",
     "scripts/*",
+    "tests/*.py",
 ]
 
 [tool.uv.sources]
@@ -65,6 +84,9 @@ immunum-rs = { workspace = true }
 
 [tool.pytest.ini_options]
 markers = ["slow: mark test as slow (requires full validation fixtures)"]
+addopts = "--markdown-docs"
+testpaths = ["docs", "tests"]
+
 
 [tool.coverage.report]
 exclude_also = [
@@ -75,5 +97,15 @@ exclude_also = [
 fail_under = 90
 
 [tool.coverage.run]
-omit = ["/tmp/*"]
+omit = ["/tmp/*", "tests/bench*.py"]
 include = ["src/**", "tests/**"]
+
+[tool.pysentry.sources]
+enabled = ["pypa", "pypi", "osv"]
+
+[tool.pysentry.defaults]
+fail_on = "high"
+
+[tool.ty.src]
+include = ["immunum"]
+exclude = ["tests"]
