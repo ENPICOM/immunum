@@ -88,6 +88,7 @@ fn numbering_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
 fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
     let ca = inputs[0].str()?;
     let len = ca.len();
+    let name = ca.name().clone();
 
     // Build per-row structs inside the parallel closure so Series allocation
     // is parallelized. Series is Send+Sync in Polars, so this is safe.
