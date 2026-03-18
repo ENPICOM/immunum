@@ -105,8 +105,8 @@ tasks:
             - task: build
               vars: { PROFILE: "{{.PROFILE}}" }
         cmds:
-            - uv run --no-sync coverage run --rcfile=pyproject.toml pytest {docs,tests/test_*.py} -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
-            - uv run --no-sync coverage report --rcfile=pyproject.toml -m
+            - uv run --no-sync coverage run -m pytest {docs,tests/test_*.py} --benchmark-disable {{.CLI_ARGS}}
+            - uv run --no-sync coverage report -m
 
     pysentry:
         cmds:
