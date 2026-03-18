@@ -18,7 +18,7 @@ classifiers = [
 [tool.maturin]
 module-name = "immunum._internal"
 features = ["python", "polars"]
-profile = "dist-release"
+profile = "release"
 
 
 [dependency-groups]
@@ -114,5 +114,5 @@ enabled = ["pypa", "pypi", "osv"]
 fail_on = "high"
 
 [tool.ty.src]
-include = ["src"]
+include = ["immunum"]
 exclude = ["tests"]
