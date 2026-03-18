@@ -1,12 +1,6 @@
 __version__: str
 
 class _Annotator:
-    """Annotates antibody and TCR sequences with IMGT or Kabat position numbers.
-
-    Wraps the Rust alignment engine. Create one instance per chain/scheme
-    combination and reuse it across many sequences for best performance.
-    """
-
     def __init__(
         self,
         chains: list[str],
