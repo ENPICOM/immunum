@@ -172,9 +172,12 @@ tasks:
             # lack of ':' char is not a typo:
             # otherwise env variable above
             # does not get passed
-            - task build-ci
-            - task lint
-            - task pysentry
-            - task test
-            - task coverage
-            - task docs-build
+            - task: lint
+            - task: pysentry
+            - task: build-ci
+              vars: { PROFILE: "{{.PROFILE}}" }
+            - task: test
+              vars: { PROFILE: "{{.PROFILE}}" }
+            - task: coverage
+              vars: { PROFILE: "{{.PROFILE}}" }
+            - task: docs-build
