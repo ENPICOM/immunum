@@ -1,10 +1,9 @@
 ---
-name: Bug report
+name: "[bug] Bug report"
 about: Create a report to help us improve
 title: ''
-labels: ''
+labels: bug
 assignees: ''
-type: Bug
 
 ---
 
@@ -17,5 +16,9 @@ Steps to reproduce the behavior.
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Additional context**
-Add any other context about the problem here.
+**Running context**
+Feel free to mention explicitly or copy-paste output of:
+
+```
+uname -a && uv pip freeze
+```
