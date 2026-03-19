@@ -1,3 +1,5 @@
+#![cfg(feature = "cli")]
+
 use assert_cmd::cargo;
 use predicates::prelude::*;
 use std::fs;
