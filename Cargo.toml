@@ -21,6 +21,7 @@ keywords = [
     "imgt",
 ]
 authors = ["ENPICOM <dev@enpicom.com>"]
+readme = "README.md"
 
 [features]
 python = ["dep:pyo3", "dep:postcard", "dep:pyo3-build-config"]
