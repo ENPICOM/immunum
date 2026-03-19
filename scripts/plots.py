@@ -188,31 +188,27 @@ single_tools = [
     "anarci",
     "anarcii2",
     "antpack",
-    "riot",
 ]
 single_label_map = {
     "immunum_singlethreaded": "immunum",
     "anarci": "anarci",
     "anarcii2": "anarcii2",
     "antpack": "antpack",
-    "riot": "riot",
 }
 mt_tools = [
     "immunum_multithreaded",
     "antpack_parallel",
     "anarci_parallel",
     "anarcii2_parallel",
-    "riot_parallel",
 ]
 mt_label_map = {
     "immunum_multithreaded": "immunum",
     "antpack_parallel": "antpack",
     "anarci_parallel": "anarci",
     "anarcii2_parallel": "anarcii2",
-    "riot_parallel": "riot",
 }
 
-METHODS = ["immunum", "anarci", "anarcii2", "antpack", "riot"]
+METHODS = ["immunum", "anarci", "anarcii2", "antpack"]
 _enpicom_category = [
     "#7D5BFF",
     "#231E60",

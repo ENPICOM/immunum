@@ -138,7 +138,7 @@ tasks:
             - task: build-ci
               vars: { PROFILE: "{{.PROFILE}}" }
         silent: true
-        desc: "Run Python benchmarks with bencher"
+        desc: "Run Python benchmarks with bencher. Alerts are disabled, used only for tracking performance"
         cmd: >-
             bencher run
             --adapter python_pytest
@@ -147,7 +147,7 @@ tasks:
             --threshold-measure latency
             --threshold-test t_test
             --threshold-max-sample-size 64
-            --threshold-upper-boundary 0.99
+            --threshold-upper-boundary 0.01
             --thresholds-reset
             --err
             "uv run --no-sync pytest --benchmark-json results.json benches/bench_polars.py"

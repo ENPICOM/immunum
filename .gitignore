@@ -11,3 +11,4 @@ node_modules
 immunum/libimmunum.dylib.dSYM/
 site
 .task
+results.json
