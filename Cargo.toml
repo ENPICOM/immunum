@@ -12,6 +12,13 @@ categories = ["science::bioinformatics", "command-line-utilities"]
 keywords = ["antibody", "numbering", "schemes", "python", "imgt"]
 authors = ["ENPICOM <dev@enpicom.com>"]
 readme = "README.md"
+include = [
+    "src/**",
+    "build.rs",
+    "resources/consensus/*.csv",
+    "/README.md",
+    "Cargo.toml",
+]
 
 [features]
 python = ["dep:pyo3", "dep:postcard", "dep:pyo3-build-config"]
