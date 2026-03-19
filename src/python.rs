@@ -53,7 +53,8 @@ impl Annotator {
         })?;
 
         let numbering = PyDict::new(py);
-        for (pos, ch) in result.positions.iter().zip(sequence.chars()) {
+        let aligned_seq = &sequence[result.query_start..=result.query_end];
+        for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
             numbering.set_item(pos.to_string(), ch.to_string())?;
         }
 
@@ -74,7 +75,8 @@ impl Annotator {
             ))
         })?;
 
-        let segments = segment(&result.positions, sequence, result.scheme);
+        let aligned_seq = &sequence[result.query_start..=result.query_end];
+        let segments = segment(&result.positions, aligned_seq, result.scheme);
 
         let dict = PyDict::new(py);
         for (region, seq) in segments {

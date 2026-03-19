@@ -19,14 +19,18 @@ pub struct NumberingResult {
     pub chain: Chain,
     /// Numbering scheme used
     pub scheme: Scheme,
-    /// Numbered positions
+    /// Numbered positions for the aligned region only (length == query_end - query_start + 1)
     pub positions: Vec<Position>,
-    /// Start position in consensus
-    pub start: usize,
-    /// End position in consensus
-    pub end: usize,
+    /// First aligned consensus position
+    pub cons_start: usize,
+    /// Last aligned consensus position
+    pub cons_end: usize,
     /// Confidence score (normalized alignment score)
     pub confidence: f32,
+    /// 0-based index of the first antibody residue in the query (0 when no prefix)
+    pub query_start: usize,
+    /// 0-based index of the last antibody residue in the query (query.len()-1 when no suffix)
+    pub query_end: usize,
 }
 
 /// Default minimum confidence threshold for accepting a numbering result.
@@ -104,7 +108,10 @@ impl Annotator {
         }
 
         let (chain, alignment) = self.get_best_alignment(sequence)?;
-        let positions = apply_numbering(&alignment.positions, self.scheme, chain);
+
+        // Apply numbering only to the aligned subregion of the query
+        let aligned_positions = &alignment.positions[alignment.query_start..=alignment.query_end];
+        let positions = apply_numbering(aligned_positions, self.scheme, chain);
         let confidence = if alignment.max_confidence_score > 0.0 {
             (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
         } else {
@@ -122,9 +129,11 @@ impl Annotator {
             chain,
             scheme: self.scheme,
             positions,
-            start: alignment.start_pos as usize,
-            end: alignment.end_pos as usize,
+            cons_start: alignment.cons_start as usize,
+            cons_end: alignment.cons_end as usize,
             confidence,
+            query_start: alignment.query_start,
+            query_end: alignment.query_end,
         })
     }
 
@@ -182,7 +191,10 @@ mod tests {
         assert_eq!(result.chain, Chain::IGH);
         assert_eq!(result.scheme, Scheme::IMGT);
         assert!(result.confidence > 0.0 && result.confidence <= 1.0);
-        assert_eq!(result.positions.len(), sequence.len());
+        assert_eq!(
+            result.positions.len(),
+            result.query_end - result.query_start + 1
+        );
     }
 
     #[test]
@@ -200,5 +212,54 @@ mod tests {
         let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT, None).unwrap();
         let result = annotator.number("");
         assert!(result.is_err());
+    }
+
+    // Full IGH from the task description (FR1 through FR4)
+    const FULL_IGH: &str = "EVQLVESGGGLVQPGGSLRLSCAASGFNVSYSSIHWVRQAPGKGLEWVAYIYPSSGYTSYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCARSYSTKLAMDYWGQGTLVTVSS";
+
+    #[test]
+    fn test_number_no_flanking_has_zero_query_start_end() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let result = annotator.number(FULL_IGH).unwrap();
+        assert_eq!(result.query_start, 0);
+        assert_eq!(result.query_end, FULL_IGH.len() - 1);
+        assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    #[test]
+    fn test_number_with_prefix() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let prefix = "AAAAAA";
+        let sequence = format!("{prefix}{FULL_IGH}");
+        let result = annotator.number(&sequence).unwrap();
+        assert_eq!(result.chain, Chain::IGH);
+        assert_eq!(result.query_start, prefix.len());
+        assert_eq!(result.query_end, sequence.len() - 1);
+        assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    #[test]
+    fn test_number_with_suffix() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let suffix = "AAAAAAA";
+        let sequence = format!("{FULL_IGH}{suffix}");
+        let result = annotator.number(&sequence).unwrap();
+        assert_eq!(result.chain, Chain::IGH);
+        assert_eq!(result.query_start, 0);
+        assert_eq!(result.query_end, FULL_IGH.len() - 1);
+        assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    #[test]
+    fn test_number_with_both_flanking() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let prefix = "AAAAAA";
+        let suffix = "AAAAAAA";
+        let sequence = format!("{prefix}{FULL_IGH}{suffix}");
+        let result = annotator.number(&sequence).unwrap();
+        assert_eq!(result.chain, Chain::IGH);
+        assert_eq!(result.query_start, prefix.len());
+        assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
+        assert_eq!(result.positions.len(), FULL_IGH.len());
     }
 }
