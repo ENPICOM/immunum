@@ -145,6 +145,8 @@ struct PositionScores {
     scores: [f32; 26],
     gap_penalty: f32,
     insertion_penalty: f32,
+    max_score: f32,
+    counts_for_confidence: bool,
 }
 
 struct PositionData {
@@ -234,11 +236,16 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
             &pos_data.region,
         );
 
+        let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let counts_for_confidence = pos_data.occupancy > 0.9;
+
         position_scores.push(PositionScores {
             position: pos_data.position,
             scores,
             gap_penalty,
             insertion_penalty,
+            max_score,
+            counts_for_confidence,
         });
     }
 

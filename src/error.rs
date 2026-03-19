@@ -31,4 +31,7 @@ pub enum Error {
 
     #[error("Invalid sequence: {0}")]
     InvalidSequence(String),
+
+    #[error("Low confidence: {confidence:.4} < threshold {threshold:.4}")]
+    LowConfidence { confidence: f32, threshold: f32 },
 }

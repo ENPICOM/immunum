@@ -46,9 +46,9 @@ def compare_fixture(csv_path: Path, chains: list[str], scheme: str) -> tuple[int
             "header",
             "sequence",
             *position_cols,
-            imp.number(polars.col("sequence"), chains=chains, scheme=scheme).alias(
-                "numbered"
-            ),
+            imp.number(
+                polars.col("sequence"), chains=chains, scheme=scheme, min_confidence=0.0
+            ).alias("numbered"),
         ]
     )
 
