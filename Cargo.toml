@@ -21,6 +21,8 @@ include = [
 ]
 
 [features]
+default = ["cli"]
+cli = ["dep:clap", "dep:chrono", "dep:toml"]
 python = ["dep:pyo3", "dep:postcard", "dep:pyo3-build-config"]
 polars = [
     "dep:polars",
@@ -29,16 +31,17 @@ polars = [
     "dep:pyo3-polars",
     "dep:postcard",
 ]
+wasm = ["dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
-toml = "0.8"
 thiserror = "2.0"
-chrono = "0.4"
 strum = "0.27"
 strum_macros = "0.27"
-clap = { version = "4.5.60", features = ["derive"] }
+toml = { version = "0.8", optional = true }
+chrono = { version = "0.4", optional = true }
+clap = { version = "4.5.60", features = ["derive"], optional = true }
 
 pyo3 = { version = "0.25.0", features = [
     "abi3-py39",
@@ -55,9 +58,14 @@ pyo3-polars = { version = "0.24.0", features = [
     "dtype-struct",
     "dtype-array",
 ], optional = true }
+wasm-bindgen = { version = "0.2.114", optional = true }
+js-sys = { version = "0.3", optional = true }
 
 
 [dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
 tempfile = "3"
@@ -81,14 +89,17 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "immunum"
 path = "src/main.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "debug-validation"
 path = "src/bin/debug_validation.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "benchmark"
 path = "src/bin/benchmark.rs"
+required-features = ["cli"]
 
 [[bench]]
 name = "speed-benchmark"
