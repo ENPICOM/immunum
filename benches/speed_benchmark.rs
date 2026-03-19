@@ -10,7 +10,8 @@ fn bench_annotate(c: &mut Criterion) {
     let sequences: Vec<String> = records.into_iter().map(|r| r.sequence).collect();
 
     let chains = [Chain::IGH, Chain::IGK, Chain::IGL];
-    let annotator = Annotator::new(&chains, Scheme::IMGT, Some(0.0)).expect("Failed to create annotator");
+    let annotator =
+        Annotator::new(&chains, Scheme::IMGT, Some(0.0)).expect("Failed to create annotator");
 
     let mut group = c.benchmark_group("annotate");
     group.sample_size(10);
