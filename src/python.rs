@@ -12,8 +12,12 @@ use crate::types::{Chain, Scheme};
 impl Annotator {
     // python methods
     #[new]
-    #[pyo3(signature = (chains , scheme))]
-    pub fn init(chains: Vec<String>, scheme: String) -> PyResult<Self> {
+    #[pyo3(signature = (chains, scheme, min_confidence=None))]
+    pub fn init(
+        chains: Vec<String>,
+        scheme: String,
+        min_confidence: Option<f32>,
+    ) -> PyResult<Self> {
         let parsed_chains = chains
             .iter()
             .map(|chain| {
@@ -28,12 +32,13 @@ impl Annotator {
         let parsed_scheme = Scheme::from_str(&scheme).map_err(|_| {
             PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid scheme: {}", scheme))
         })?;
-        let annotator = Annotator::new(parsed_chains.as_slice(), parsed_scheme).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Failed to initialize annotator: {}",
-                e
-            ))
-        })?;
+        let annotator = Annotator::new(parsed_chains.as_slice(), parsed_scheme, min_confidence)
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Failed to initialize annotator: {}",
+                    e
+                ))
+            })?;
 
         Ok(annotator)
     }
@@ -86,6 +91,7 @@ impl Annotator {
         self.matrices = annotator.matrices;
         self.scheme = annotator.scheme;
         self.chains = annotator.chains;
+        self.min_confidence = annotator.min_confidence;
         Ok(())
     }
 

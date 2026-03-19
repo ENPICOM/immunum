@@ -29,6 +29,18 @@ pub struct NumberingResult {
     pub confidence: f32,
 }
 
+/// Default minimum confidence threshold for accepting a numbering result.
+///
+/// Based on empirical analysis of validated sequences:
+/// - Antibody sequences (IGH/IGK/IGL): min ~0.51, median ~0.78-0.85
+/// - TCR sequences (TRA/TRB/TRG/TRD): min ~0.28, median ~0.62-0.83
+///
+/// A threshold of 0.5 filters non-immunoglobulin sequences while retaining
+/// all validated antibody sequences. Some low-scoring TCR sequences (notably
+/// TCR-A p5=0.39, TCR-B p5=0.49) may fall below this threshold due to less
+/// complete consensus data. Set to 0.0 to disable filtering.
+pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.5;
+
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",
@@ -39,6 +51,7 @@ pub struct Annotator {
     pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
     pub(crate) scheme: Scheme,
     pub(crate) chains: Vec<Chain>,
+    pub(crate) min_confidence: f32,
     /// Reusable alignment buffer to avoid per-alignment allocation
     #[serde(skip)]
     align_buf: RefCell<AlignBuffer>,
@@ -50,13 +63,14 @@ impl Clone for Annotator {
             matrices: self.matrices.clone(),
             scheme: self.scheme,
             chains: self.chains.clone(),
+            min_confidence: self.min_confidence,
             align_buf: RefCell::new(AlignBuffer::new()),
         }
     }
 }
 
 impl Annotator {
-    pub fn new(chains: &[Chain], scheme: Scheme) -> Result<Self> {
+    pub fn new(chains: &[Chain], scheme: Scheme, min_confidence: Option<f32>) -> Result<Self> {
         if chains.is_empty() {
             return Err(Error::InvalidChain("chains cannot be empty".to_string()));
         }
@@ -78,6 +92,7 @@ impl Annotator {
             matrices,
             scheme,
             chains: chains.to_vec(),
+            min_confidence: min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
             align_buf: RefCell::new(AlignBuffer::new()),
         })
     }
@@ -90,7 +105,18 @@ impl Annotator {
 
         let (chain, alignment) = self.get_best_alignment(sequence)?;
         let positions = apply_numbering(&alignment.positions, self.scheme, chain);
-        let confidence = alignment.score / (sequence.len() as f32);
+        let confidence = if alignment.max_confidence_score > 0.0 {
+            (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        if confidence < self.min_confidence {
+            return Err(Error::LowConfidence {
+                confidence,
+                threshold: self.min_confidence,
+            });
+        }
 
         Ok(NumberingResult {
             chain,
@@ -132,19 +158,19 @@ mod tests {
 
     #[test]
     fn test_create_annotator() {
-        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT, None).unwrap();
         assert_eq!(annotator.matrices.len(), 7);
     }
 
     #[test]
     fn test_create_annotator_with_chains() {
-        let annotator = Annotator::new(&[Chain::IGH, Chain::IGK], Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(&[Chain::IGH, Chain::IGK], Scheme::IMGT, None).unwrap();
         assert_eq!(annotator.matrices.len(), 2);
     }
 
     #[test]
     fn test_number_igh_sequence() {
-        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT, None).unwrap();
 
         // Known IGH sequence
         let sequence =
@@ -155,13 +181,13 @@ mod tests {
         // Should detect as IGH
         assert_eq!(result.chain, Chain::IGH);
         assert_eq!(result.scheme, Scheme::IMGT);
-        assert!(result.confidence != 0.0);
+        assert!(result.confidence > 0.0 && result.confidence <= 1.0);
         assert_eq!(result.positions.len(), sequence.len());
     }
 
     #[test]
     fn test_number_with_single_chain() {
-        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
         let sequence =
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
 
@@ -171,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_empty_sequence() {
-        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT).unwrap();
+        let annotator = Annotator::new(ALL_CHAINS, Scheme::IMGT, None).unwrap();
         let result = annotator.number("");
         assert!(result.is_err());
     }

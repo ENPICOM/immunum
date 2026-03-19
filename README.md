@@ -30,6 +30,7 @@ use immunum::{Annotator, Chain, Scheme};
 let annotator = Annotator::new(
     &[Chain::IGH, Chain::IGK, Chain::IGL],
     Scheme::IMGT,
+    None, // uses default min_confidence of 0.5
 ).unwrap();
 
 let sequence = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";

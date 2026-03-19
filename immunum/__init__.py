@@ -41,8 +41,11 @@ class Annotator:
         self,
         chains: list[str],
         scheme: str,
+        min_confidence: float | None = None,
     ):
-        self._annotator = _Annotator(chains=chains, scheme=scheme)
+        self._annotator = _Annotator(
+            chains=chains, scheme=scheme, min_confidence=min_confidence
+        )
 
     def number(self, sequence: str) -> NumberingResult:
         return NumberingResult(**self._annotator.number(sequence))
