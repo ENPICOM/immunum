@@ -3,6 +3,22 @@ name = "immunum"
 version = "0.1.0"
 edition = "2021"
 default-run = "immunum"
+description = "Fast antibody and T-cell receptor numbering in Rust and Python"
+license = "MIT"
+repository = "https://github.com/ENPICOM/immunum"
+homepage = "https://immunum.enpicom.com"
+documentation = "https://immunum.enpicom.com"
+categories = ["science::bioinformatics", "command-line-utilities"]
+keywords = ["antibody", "numbering", "schemes", "python", "imgt"]
+authors = ["ENPICOM <dev@enpicom.com>"]
+readme = "README.md"
+include = [
+    "src/**",
+    "build.rs",
+    "resources/consensus/*.csv",
+    "/README.md",
+    "Cargo.toml",
+]
 
 [features]
 python = ["dep:pyo3", "dep:postcard", "dep:pyo3-build-config"]

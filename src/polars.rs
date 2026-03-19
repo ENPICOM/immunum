@@ -47,6 +47,7 @@ struct NumberKwargs {
 struct NumberFuncKwargs {
     chains: Vec<Chain>,
     scheme: Scheme,
+    min_confidence: Option<f32>,
 }
 
 // ── Numbering ────────────────────────────────────────────────────────────────
@@ -172,7 +173,11 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
     let ca = inputs[0].str()?;
     let len = ca.len();
     let name = ca.name().clone();
-    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme, None) {
+    let annotator: Annotator = match Annotator::new(
+        kwargs.chains.as_slice(),
+        kwargs.scheme,
+        kwargs.min_confidence,
+    ) {
         Ok(a) => a,
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
@@ -336,7 +341,11 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
     let ca = inputs[0].str()?;
     let len = ca.len();
     let name = ca.name().clone();
-    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme, None) {
+    let annotator: Annotator = match Annotator::new(
+        kwargs.chains.as_slice(),
+        kwargs.scheme,
+        kwargs.min_confidence,
+    ) {
         Ok(a) => a,
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };

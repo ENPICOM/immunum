@@ -15,8 +15,9 @@ class _Annotator:
                 TCR: ``"A"``, ``"B"``, ``"G"``, ``"D"``.
                 Pass multiple to enable auto-detection across them.
             scheme: Numbering scheme. Supported: ``"imgt"``, ``"kabat"``.
+            min_confidence: Minimum confidence score (0.0–1.0) below which
+                sequences are treated as unrecognized.
         """
         ...
-
     def number(self, sequence: str): ...
     def segment(self, sequence: str): ...
