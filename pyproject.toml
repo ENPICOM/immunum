@@ -76,6 +76,7 @@ project-excludes = [
     "**/.[!/.]*/**/*",
     "scripts/*",
     "tests/*.py",
+    "benches/*.py",
 ]
 
 [tool.uv.sources]
@@ -97,7 +98,7 @@ exclude_also = [
 fail_under = 90
 
 [tool.coverage.run]
-omit = ["/tmp/*", "tests/bench*.py"]
+omit = ["/tmp/*", "benches/*.py"]
 include = ["src/**", "tests/**"]
 
 [tool.pysentry.sources]
@@ -108,4 +109,4 @@ fail_on = "high"
 
 [tool.ty.src]
 include = ["immunum"]
-exclude = ["tests"]
+exclude = ["tests", "benches"]

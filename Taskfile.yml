@@ -122,18 +122,58 @@ tasks:
         cmd: uv run --no-sync --group docs mkdocs build {{.CLI_ARGS}}
 
     benchmark-cli:
-        vars:
-            PROFILE: '{{.PROFILE | default "dev"}}'
-        desc: "Behcmark correctness of the CLI tool"
-        cmd: cargo bench --profile {{.PROFILE}}
+        desc: "Speed benchmark using Criterion (benches/speed_benchmark.rs)"
+        cmd: cargo bench --no-default-features {{.CLI_ARGS}}
 
     benchmark-comparison:
         desc: "Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)"
-        cmd: uv run --group benchmark pytest tests/bench_comparison.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+        cmd: uv run --group benchmark pytest benches/bench_comparison.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
 
     benchmark-speed-polars:
         desc: "Speed benchmark for immunum polars across all chain/scheme fixtures"
-        cmd: uv run pytest tests/bench_polars.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+        cmd: uv run pytest benches/bench_polars.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+
+    bencher-python:
+        deps:
+            - task: build-ci
+              vars: { PROFILE: "{{.PROFILE}}" }
+        silent: true
+        desc: "Run Python benchmarks with bencher"
+        cmd: >-
+            bencher run
+            --adapter python_pytest
+            --token {{.BENCHER_API_TOKEN}}
+            --file results.json
+            --threshold-measure latency
+            --threshold-test t_test
+            --threshold-max-sample-size 64
+            --threshold-upper-boundary 0.99
+            --thresholds-reset
+            --err
+            "uv run --no-sync pytest --benchmark-json results.json benches/bench_polars.py"
+
+    bencher-rust:
+        silent: true
+        desc: "Run Criterion benchmarks with bencher"
+        cmd: >-
+            bencher run
+            --adapter rust_criterion
+            --token {{.BENCHER_API_TOKEN}}
+            --threshold-measure latency
+            --threshold-test t_test
+            --threshold-max-sample-size 64
+            --threshold-upper-boundary 0.99
+            --thresholds-reset
+            --err
+            "cargo bench --no-default-features"
+
+    bencher:
+        preconditions:
+            - sh: '[ -n "{{.BENCHER_API_TOKEN}}" ]'
+              msg: "BENCHER_API_TOKEN is not set"
+        cmds:
+            - task: bencher-rust
+            - task: bencher-python
 
     benchmark-accuracy:
         desc: "Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)"
@@ -142,7 +182,7 @@ tasks:
                 for f in fixtures/validation/*_imgt.csv; do
                   base=$(basename "$f" .csv)
                   chain=$(echo "$base" | cut -d_ -f2)
-                  uv run --group benchmark python tests/bench_comparison.py \
+                  uv run --group benchmark python benches/bench_comparison.py \
                     --chain "$chain" \
                     --sizes 1000 --rounds 7 \
                     --output "./resources/benchmark_results/results_${base}.csv" \
@@ -152,7 +192,7 @@ tasks:
     benchmark-speed:
         desc: "Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)"
         cmd: |
-            uv run --group benchmark python tests/bench_comparison.py \
+            uv run --group benchmark python benches/bench_comparison.py \
               --sizes 100 --sizes 1000 --sizes 10000 --sizes 100000 \
               --rounds 7 --output ./resources/benchmark_results/results_speed.csv --timeout 10m \
             {{.CLI_ARGS}}
@@ -160,7 +200,7 @@ tasks:
     benchmark-scaling:
         desc: "Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
         cmd: |
-            uv run --group benchmark python tests/bench_comparison.py \
+            uv run --group benchmark python benches/bench_comparison.py \
               --sizes 200 --sizes 2000 --sizes 20_000 --sizes 200_000 --sizes 2_000_000 \
               --rounds 1 --output ./resources/benchmark_results/results_scaling.csv \
               --timeout 30m {{.CLI_ARGS}}
