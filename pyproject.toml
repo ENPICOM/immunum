@@ -12,8 +12,16 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "License :: OSI Approved :: MIT License",
 ]
+keywords = ["antibody", "numbering", "schemes", "python", "imgt"]
+authors = [{ name = "ENPICOM", email = "dev@enpicom.com" }]
+license = { text = "MIT" }
 
+[project.urls]
+Homepage = "https://immunum.enpicom.com"
+Documentation = "https://immunum.enpicom.com"
+Repository = "https://github.com/ENPICOM/immunum"
 
 [tool.maturin]
 module-name = "immunum._internal"
