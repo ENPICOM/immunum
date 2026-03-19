@@ -35,6 +35,9 @@ jobs:
       - name: Setup Taskfile
         run: uv tool install go-task-bin
 
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
       - name: Run CI
         run: task ci
 
@@ -61,6 +64,9 @@ jobs:
 
       - name: Setup Taskfile
         run: uv tool install go-task-bin
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Run CI
         run: task ci
