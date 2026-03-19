@@ -9,17 +9,7 @@ repository = "https://github.com/ENPICOM/immunum"
 homepage = "https://immunum.enpicom.com"
 documentation = "https://immunum.enpicom.com"
 categories = ["science::bioinformatics", "command-line-utilities"]
-keywords = [
-    "antibody",
-    "numbering",
-    "immunology",
-    "bioinformatics",
-    "python",
-    "rust",
-    "schemes",
-    "kabat",
-    "imgt",
-]
+keywords = ["antibody", "numbering", "schemes", "python", "imgt"]
 authors = ["ENPICOM <dev@enpicom.com>"]
 readme = "README.md"
 
