@@ -64,6 +64,31 @@ tasks:
             - cargo test --no-default-features --profile {{.PROFILE}}
             - cargo test --test cli --profile {{.PROFILE}}
 
+    build-wasm:
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - resources/**/*
+        generates:
+            - pkg/immunum.js
+        cmds:
+            - wasm-pack build --target nodejs --features wasm --no-default-features {{.CLI_ARGS}}
+
+    test-wasm:
+        deps:
+            - task: build-wasm
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - resources/**/*
+            - tests/test_wasm.mjs
+        cmds:
+            - node --test tests/test_wasm.mjs
+
     test:
         aliases: [t]
         vars:
@@ -73,6 +98,7 @@ tasks:
               vars: { PROFILE: "{{.PROFILE}}" }
             - task: test-python
               vars: { PROFILE: "{{.PROFILE}}" }
+            - task: test-wasm
 
     lint:
         vars:
