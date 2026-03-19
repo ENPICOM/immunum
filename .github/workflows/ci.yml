@@ -11,7 +11,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  ci:
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -35,4 +36,31 @@ jobs:
         run: uv tool install go-task-bin
 
       - name: Run CI
-        run: task ci PROFILE=dev
+        run: task ci
+
+  ci-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.13"]
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Taskfile
+        run: uv tool install go-task-bin
+
+      - name: Run CI
+        run: task ci

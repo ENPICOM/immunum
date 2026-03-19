@@ -1,0 +1,16 @@
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:        #3229C1; /* Blue */
+  --md-primary-fg-color--light: #7D5BFF; /* Purple */
+  --md-primary-fg-color--dark:  #231E60; /* Dark Blue */
+  --md-primary-bg-color:        #F0F4FC; /* Off-white */
+  --md-accent-fg-color:         #7D5BFF; /* Purple */
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:        #7D5BFF; /* Purple */
+  --md-primary-fg-color--light: #3229C1; /* Blue */
+  --md-primary-fg-color--dark:  #231E60; /* Dark Blue */
+  --md-primary-bg-color:        #F0F4FC; /* Off-white */
+  --md-accent-fg-color:         #7D5BFF; /* Purple */
+}
