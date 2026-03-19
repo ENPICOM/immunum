@@ -30,21 +30,33 @@ def numbering_method(expr: IntoExprColumn, *, annotator: _Annotator) -> pl.Expr:
     )
 
 
-def number(expr: IntoExprColumn, *, chains: list[str], scheme: str) -> pl.Expr:
+def number(
+    expr: IntoExprColumn,
+    *,
+    chains: list[str],
+    scheme: str,
+    min_confidence: float | None = None,
+) -> pl.Expr:
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
         function_name="numbering_struct_expr",
         is_elementwise=True,
-        kwargs={"chains": chains, "scheme": scheme},
+        kwargs={"chains": chains, "scheme": scheme, "min_confidence": min_confidence},
     )
 
 
-def segment(expr: IntoExprColumn, *, chains: list[str], scheme: str) -> pl.Expr:
+def segment(
+    expr: IntoExprColumn,
+    *,
+    chains: list[str],
+    scheme: str,
+    min_confidence: float | None = None,
+) -> pl.Expr:
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
         function_name="segmentation_struct_expr",
         is_elementwise=True,
-        kwargs={"chains": chains, "scheme": scheme},
+        kwargs={"chains": chains, "scheme": scheme, "min_confidence": min_confidence},
     )

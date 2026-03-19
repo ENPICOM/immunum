@@ -41,7 +41,7 @@ IGH_SEQ = (
 )
 def annotator(request):
     chains, scheme = request.param
-    return immunum.Annotator(chains, scheme)
+    return immunum.Annotator(chains, scheme, min_confidence=0)
 
 
 class TestAnnotatorInit:
