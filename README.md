@@ -1,10 +1,15 @@
 # immunum
 
-High-performance antibody and TCR sequence numbering in Rust.
+High-performance antibody and TCR sequence numbering in Rust, Python, and WebAssembly.
 
 ## Overview
 
-`immunum` is a pure-Rust library for numbering antibody and T-cell receptor (TCR) variable domain sequences. It uses Needleman-Wunsch semi-global alignment against position-specific scoring matrices (PSSM) built from consensus sequences, with BLOSUM62-based substitution scores.
+`immunum` is a library for numbering antibody and T-cell receptor (TCR) variable domain sequences. It uses Needleman-Wunsch semi-global alignment against position-specific scoring matrices (PSSM) built from consensus sequences, with BLOSUM62-based substitution scores.
+
+Available as:
+- **Rust crate** — core library and CLI
+- **Python package** — via PyPI (`pip install immunum`), with a [Polars](https://pola.rs) plugin for vectorized batch processing
+- **npm package** — WebAssembly build for Node.js and browsers
 
 ### Supported chains
 
@@ -22,7 +27,105 @@ High-performance antibody and TCR sequence numbering in Rust.
 
 Chain type is automatically detected by aligning against all loaded chains and selecting the best match.
 
-## Usage
+## Python
+
+### Installation
+
+```bash
+pip install immunum
+```
+
+### Numbering
+
+```python
+from immunum import Annotator
+
+annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
+
+sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+
+result = annotator.number(sequence)
+print(result.chain)       # H
+print(result.confidence)  # 0.97
+print(result.numbering)   # {"1": "E", "2": "V", "3": "Q", ...}
+```
+
+### Segmentation
+
+`segment` splits the sequence into FR/CDR regions:
+
+```python
+result = annotator.segment(sequence)
+print(result.fr1)   # EVQLVESGGGLVKPGGSLKLSCAAS
+print(result.cdr1)  # GFTFSSYAMS
+print(result.fr2)   # WVRQAPGKGLEWVS
+print(result.cdr2)  # AISGSGGS
+print(result.fr3)   # TYYADSVKGRFTISRDNAKN
+print(result.cdr3)  # ...
+print(result.fr4)   # ...
+```
+
+Chains: `"H"` (heavy), `"K"` (kappa), `"L"` (lambda), `"A"` (TRA), `"B"` (TRB), `"G"` (TRG), `"D"` (TRD).
+
+### Polars plugin
+
+For batch processing, `immunum.polars` registers elementwise Polars expressions:
+
+```python
+import polars as pl
+import immunum.polars as ip
+
+df = pl.DataFrame({"sequence": [
+    "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
+    "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
+]})
+
+# Add a struct column with chain, scheme, confidence, numbering
+result = df.with_columns(
+    ip.number(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("numbered")
+)
+
+# Add a struct column with FR/CDR segments
+result = df.with_columns(
+    ip.segment(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("segmented")
+)
+```
+
+The `number` expression returns a struct with fields `chain`, `scheme`, `confidence`, and `numbering` (a struct of position→residue). The `segment` expression returns a struct with fields `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `prefix`, `postfix`.
+
+## WebAssembly
+
+### Installation
+
+```bash
+npm install immunum
+```
+
+### Usage
+
+```js
+import init, { Annotator } from "immunum";
+
+await init(); // load the wasm module
+
+const annotator = new Annotator(["H", "K", "L"], "imgt");
+
+const sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+
+const result = annotator.number(sequence);
+console.log(result.chain);       // "H"
+console.log(result.confidence);  // 0.97
+console.log(result.numbering);   // { "1": "E", "2": "V", ... }
+
+const segments = annotator.segment(sequence);
+console.log(segments.cdr3);
+
+annotator.free(); // or use `using annotator = new Annotator(...)` with explicit resource management
+```
+
+## Rust
+
+### Usage
 
 ```rust
 use immunum::{Annotator, Chain, Scheme};
@@ -33,7 +136,7 @@ let annotator = Annotator::new(
     None, // uses default min_confidence of 0.5
 ).unwrap();
 
-let sequence = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
+let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
 let result = annotator.number(sequence).unwrap();
 
