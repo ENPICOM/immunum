@@ -50,6 +50,7 @@ pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.5;
     feature = "python",
     pyclass(name = "_Annotator", module = "immunum._internal", unsendable)
 )]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
 #[derive(Serialize, Deserialize)]
 pub struct Annotator {
     pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,

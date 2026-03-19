@@ -595,7 +595,6 @@ wheels = [
 
 [[package]]
 name = "immunum"
-version = "1.0.0"
 source = { editable = "." }
 
 [package.dev-dependencies]
