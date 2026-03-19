@@ -336,7 +336,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
     let ca = inputs[0].str()?;
     let len = ca.len();
     let name = ca.name().clone();
-    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme) {
+    let annotator: Annotator = match Annotator::new(kwargs.chains.as_slice(), kwargs.scheme, None) {
         Ok(a) => a,
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
