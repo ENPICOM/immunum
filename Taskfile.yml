@@ -221,7 +221,7 @@ tasks:
             uv run --group benchmark python benches/bench_comparison.py \
               --sizes 200 --sizes 2000 --sizes 20_000 --sizes 200_000 \
               --rounds 3 --output ./resources/benchmark_results/results_speed.csv \
-              --timeout 10m --no-check-correctness {{.CLI_ARGS}}
+              --timeout 10m --no-correctness-check {{.CLI_ARGS}}
 
     plots:
         desc: "Produce plots from benchmark results"
