@@ -216,20 +216,12 @@ tasks:
                 done
 
     benchmark-speed:
-        desc: "Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)"
+        desc: "Speed benchmark: sizes 200..20M (10x steps), 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
         cmd: |
             uv run --group benchmark python benches/bench_comparison.py \
-              --sizes 100 --sizes 1000 --sizes 10000 --sizes 100000 \
-              --rounds 7 --output ./resources/benchmark_results/results_speed.csv --timeout 10m \
-            {{.CLI_ARGS}}
-
-    benchmark-scaling:
-        desc: "Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
-        cmd: |
-            uv run --group benchmark python benches/bench_comparison.py \
-              --sizes 200 --sizes 2000 --sizes 20_000 --sizes 200_000 --sizes 2_000_000 \
-              --rounds 1 --output ./resources/benchmark_results/results_scaling.csv \
-              --timeout 30m {{.CLI_ARGS}}
+              --sizes 200 --sizes 2000 --sizes 20_000 --sizes 200_000 \
+              --rounds 3 --output ./resources/benchmark_results/results_scaling.csv \
+              --timeout 10m --no-check-correctness {{.CLI_ARGS}}
 
     plots:
         desc: "Produce plots from benchmark results"

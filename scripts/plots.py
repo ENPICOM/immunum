@@ -181,7 +181,7 @@ acc_summary = (
 )
 
 # ── Plots 1 & 3: Performance boxplots at fixed batch size ────────────────────
-BATCH_SIZE = 10_000
+BATCH_SIZE = 100_000
 
 single_tools = [
     "immunum_singlethreaded",
@@ -235,23 +235,43 @@ p3_data = perf_base.filter(pl.col("tool").is_in(mt_tools)).with_columns(
 def make_perf_barplot(data: pl.DataFrame, title: str) -> alt.Chart:
     summary = (
         data.group_by("method")
-        .agg(pl.col("throughput").mean())
-        .sort("throughput", descending=True)
+        .agg(
+            pl.col("throughput").mean().alias("mean_throughput"),
+            pl.col("throughput").std().alias("std_throughput"),
+        )
+        .sort("mean_throughput", descending=True)
     )
-    return (
-        alt.Chart(summary.to_pandas())
+    method_order = summary["method"].to_list()
+    pdf = summary.to_pandas()
+    bars = (
+        alt.Chart()
         .mark_bar(opacity=0.7, stroke="black", strokeWidth=1.5)
         .encode(
-            x=alt.X("method:N", title="Method", sort="-y"),
-            y=alt.Y(
-                "throughput:Q",
-                title="Sequences per second",
-                # scale=alt.Scale(type="log", base=10),
-            ),
+            x=alt.X("method:N", title="Method", sort=method_order),
+            y=alt.Y("mean_throughput:Q", title="Sequences per second"),
             color=alt.Color("method:N", scale=color_scale, legend=None),
-            tooltip=["method", alt.Tooltip("throughput:Q", format=",.0f")],
+            tooltip=[
+                "method",
+                alt.Tooltip("mean_throughput:Q", format=",.0f", title="Mean seq/s"),
+                alt.Tooltip("std_throughput:Q", format=",.0f", title="Std seq/s"),
+            ],
         )
-        .properties(title=title, width=300, height=350)
+    )
+    errorbars = (
+        alt.Chart()
+        .mark_rule(strokeWidth=2)
+        .encode(
+            x=alt.X("method:N", sort=method_order),
+            y=alt.Y("errbar_min:Q"),
+            y2=alt.Y2("errbar_max:Q"),
+        )
+        .transform_calculate(
+            errbar_min="datum.mean_throughput - datum.std_throughput / 2",
+            errbar_max="datum.mean_throughput + datum.std_throughput / 2",
+        )
+    )
+    return alt.layer(bars, errorbars, data=pdf).properties(
+        title=title, width=300, height=350
     )
 
 
@@ -259,6 +279,74 @@ plot_perf = (
     make_perf_barplot(p1_data, "Single-threaded")
     | make_perf_barplot(p3_data, "Multi-threaded")
 ).resolve_scale(y="shared")
+
+
+# ── Plot 3: Scaling — time vs batch size ──────────────────────────────────────
+def make_scaling_plot(
+    data: pl.DataFrame, tool_label_map: dict, title: str
+) -> alt.Chart:
+    df = (
+        data.with_columns(pl.col("tool").replace(tool_label_map).alias("method"))
+        .group_by(["method", "sample_size"])
+        .agg(
+            pl.col("time_s").mean().alias("mean_time"),
+            pl.col("time_s").std().alias("std_time"),
+        )
+        .sort(["method", "sample_size"])
+    )
+    size_order = sorted(df["sample_size"].unique().to_list())
+    pdf = df.to_pandas()
+    pdf["sample_size"] = pdf["sample_size"].astype(str)
+    size_order_str = [str(s) for s in size_order]
+
+    lines = (
+        alt.Chart()
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("sample_size:O", title="Batch size", sort=size_order_str),
+            y=alt.Y(
+                "mean_time:Q", title="Time (s)", scale=alt.Scale(type="log", base=10)
+            ),
+            color=alt.Color("method:N", title="Method", scale=color_scale),
+            tooltip=[
+                "method",
+                alt.Tooltip("sample_size:O", title="Batch size"),
+                alt.Tooltip("mean_time:Q", format=".3f", title="Mean time (s)"),
+                alt.Tooltip("std_time:Q", format=".3f", title="Std (s)"),
+            ],
+        )
+    )
+    errorbars = (
+        alt.Chart()
+        .mark_rule()
+        .encode(
+            x=alt.X("sample_size:O", sort=size_order_str),
+            y=alt.Y("errbar_min:Q"),
+            y2=alt.Y2("errbar_max:Q"),
+            color=alt.Color("method:N", scale=color_scale),
+        )
+        .transform_calculate(
+            errbar_min="datum.mean_time - datum.std_time / 2",
+            errbar_max="datum.mean_time + datum.std_time / 2",
+        )
+    )
+    return alt.layer(lines, errorbars, data=pdf).properties(
+        title=title, width=400, height=350
+    )
+
+
+plot_scaling = (
+    make_scaling_plot(
+        speed_df.filter(pl.col("tool").is_in(single_tools)),
+        single_label_map,
+        "Single-threaded",
+    )
+    | make_scaling_plot(
+        speed_df.filter(pl.col("tool").is_in(mt_tools)),
+        mt_label_map,
+        "Multi-threaded",
+    )
+).resolve_scale(y="shared", color="shared")
 
 # ── Plot 2: Correctness by chain and segment ──────────────────────────────────
 single_thread_mask = ~(
@@ -325,6 +413,7 @@ chart = (
 for name, p in [
     ("plot1_performance", plot_perf),
     ("plot2_correctness", plot2),
+    ("plot3_scaling", plot_scaling),
 ]:
     path = f"assets/benchmark_{name}.svg"
     p.save(path)
