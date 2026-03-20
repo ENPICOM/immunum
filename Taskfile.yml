@@ -216,10 +216,10 @@ tasks:
                 done
 
     benchmark-speed:
-        desc: "Speed benchmark: sizes 200..20M (10x steps), 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
+        desc: "Speed benchmark: sizes 100..10M (10x steps), 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
         cmd: |
             uv run --group benchmark python benches/bench_comparison.py \
-              --sizes 200 --sizes 2000 --sizes 20_000 --sizes 200_000 --sizes 2_000_000 \
+              --sizes 1_000_000 --sizes 500 --sizes 1000 --sizes 5000 --sizes 10_000 --sizes 50_000 --sizes 100_000 --sizes 500_000 --sizes 100 \
               --rounds 3 --output ./resources/benchmark_results/results_speed.csv \
               --timeout 10m --no-correctness-check {{.CLI_ARGS}}
 
