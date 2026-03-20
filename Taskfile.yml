@@ -223,6 +223,13 @@ tasks:
               --rounds 3 --output ./resources/benchmark_results/results_speed.csv \
               --timeout 10m --no-correctness-check {{.CLI_ARGS}}
 
+    benchmark:
+        desc: "Run all benchmarks and produce plots for them"
+        cmds:
+            - task: benchmark-accuracy
+            - task: benchmark-speed
+            - task: plots
+
     plots:
         desc: "Produce plots from benchmark results"
         cmd: uv run --script scripts/plots.py
