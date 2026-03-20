@@ -12,8 +12,8 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { Annotator } from "../pkg/immunum.js";
 
-const ALL_CHAINS = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"];
-const AB_CHAINS = ["IGH", "IGK", "IGL"];
+const ALL_CHAINS = ["H", "K", "L", "A", "B", "G", "D"];
+const AB_CHAINS = ["H", "K", "L"];
 
 const IGH_SEQ =
   "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
@@ -23,41 +23,51 @@ const TRB_SEQ =
   "GVTQTPKFQVLKTGQSMTLQCAQDMNHEYMSWYRQDPGMGLRLIHYSVGAGITDQGEVPNGYNVSRSTTEDFPLRLLSAAPSQTSVYFCASRPGLAGGRPEQYFGPGTRLTVTE";
 
 describe("Annotator init", () => {
-  it("constructs with valid args", () => {
-    const annotator = new Annotator(["IGH"], "IMGT");
+  it("constructs with short-form chains", () => {
+    const annotator = new Annotator(["H"], "imgt");
+    assert.ok(annotator);
+  });
+
+  it("constructs with long-form chains (IGH)", () => {
+    const annotator = new Annotator(["IGH"], "imgt");
+    assert.ok(annotator);
+  });
+
+  it("constructs with name-form chains (heavy)", () => {
+    const annotator = new Annotator(["heavy"], "imgt");
     assert.ok(annotator);
   });
 
   it("throws on invalid chain", () => {
-    assert.throws(() => new Annotator(["INVALID"], "IMGT"));
+    assert.throws(() => new Annotator(["INVALID"], "imgt"));
   });
 
   it("throws on invalid scheme", () => {
-    assert.throws(() => new Annotator(["IGH"], "INVALID"));
+    assert.throws(() => new Annotator(["H"], "INVALID"));
   });
 
   it("throws on Kabat + TCR", () => {
-    assert.throws(() => new Annotator(["TRA"], "Kabat"));
+    assert.throws(() => new Annotator(["A"], "kabat"));
   });
 });
 
 describe("number()", () => {
   it("returns correct chain and scheme for IGH", () => {
-    const annotator = new Annotator(ALL_CHAINS, "IMGT");
+    const annotator = new Annotator(ALL_CHAINS, "imgt");
     const result = annotator.number(IGH_SEQ);
     assert.equal(result.chain, "H");
     assert.equal(result.scheme, "IMGT");
   });
 
   it("returns confidence as a number between 0 and 1", () => {
-    const annotator = new Annotator(["IGH"], "IMGT");
+    const annotator = new Annotator(["H"], "imgt");
     const result = annotator.number(IGH_SEQ);
     assert.equal(typeof result.confidence, "number");
     assert.ok(result.confidence > 0 && result.confidence <= 1);
   });
 
-  it("returns numbering as an object with string keys and values", () => {
-    const annotator = new Annotator(["IGH"], "IMGT");
+  it("returns numbering as an object with string keys and single-char values", () => {
+    const annotator = new Annotator(["H"], "imgt");
     const result = annotator.number(IGH_SEQ);
     assert.equal(typeof result.numbering, "object");
     const entries = Object.entries(result.numbering);
@@ -70,14 +80,20 @@ describe("number()", () => {
   });
 
   it("throws on empty sequence", () => {
-    const annotator = new Annotator(ALL_CHAINS, "IMGT");
+    const annotator = new Annotator(ALL_CHAINS, "imgt");
     assert.throws(() => annotator.number(""));
   });
 
-  it("works with all antibody chains", () => {
-    const annotator = new Annotator(AB_CHAINS, "IMGT");
+  it("detects kappa or lambda for IGL sequence", () => {
+    const annotator = new Annotator(AB_CHAINS, "imgt");
     const result = annotator.number(IGL_SEQ);
     assert.ok(["K", "L"].includes(result.chain));
+  });
+
+  it("returns kabat scheme label for kabat annotator", () => {
+    const annotator = new Annotator(["H"], "kabat");
+    const result = annotator.number(IGH_SEQ);
+    assert.equal(result.scheme, "Kabat");
   });
 });
 
