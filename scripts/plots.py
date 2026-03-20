@@ -303,7 +303,12 @@ def make_scaling_plot(
         alt.Chart()
         .mark_line(point=True)
         .encode(
-            x=alt.X("sample_size:O", title="Batch size", sort=size_order_str),
+            x=alt.X(
+                "sample_size:O",
+                title="Batch size",
+                sort=size_order_str,
+                axis=alt.Axis(labelAngle=45),
+            ),
             y=alt.Y(
                 "mean_time:Q", title="Time (s)", scale=alt.Scale(type="log", base=10)
             ),
@@ -394,6 +399,23 @@ plot2 = (
 BLACK = "#000000"
 WHITE = "#ffffff"
 
+
+def _configure_for_export(chart):
+    return (
+        chart.configure(background=WHITE)
+        .configure_axis(
+            labelColor=BLACK,
+            titleColor=BLACK,
+            gridColor="#dddddd",
+            domainColor=BLACK,
+            tickColor=BLACK,
+        )
+        .configure_title(color=BLACK, anchor="middle")
+        .configure_legend(labelColor=BLACK, titleColor=BLACK)
+        .configure_view(stroke=BLACK)
+    )
+
+
 chart = (
     alt.vconcat(plot_perf, plot2)
     .resolve_scale(color="independent")
@@ -412,8 +434,8 @@ chart = (
 
 for name, p in [
     ("plot1_performance", plot_perf),
-    ("plot2_correctness", plot2),
-    ("plot3_scaling", plot_scaling),
+    ("plot2_correctness", _configure_for_export(plot2)),
+    ("plot3_scaling", _configure_for_export(plot_scaling)),
 ]:
     path = f"assets/benchmark_{name}.svg"
     p.save(path)
