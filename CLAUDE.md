@@ -1,185 +1,85 @@
-# CLAUDE.md
+## Development Guidelines
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+### Python
+- Always execute python commands with `uv` and the `.venv` environment
 
-## Project Overview
+### Rust
+- **Test-Driven Development**: Write tests before implementation
+  - Don't create nonsensical tests
+  - Use `cargo test` to run all tests
+  - Use `cargo test --lib <module>::tests::<test_name>` for specific tests
 
-Immunum is a high-performance Rust library for numbering antibody and T-cell receptor sequences using standard immunological numbering schemes (IMGT and Kabat). The project provides:
-- A CLI tool (`immunum-cli`)
-- Python bindings via PyO3
-- WebAssembly bindings for web applications
+- **Code Quality**: Always run at the end of task
+  - `cargo fmt` - Auto-format code
+  - `cargo clippy` - Lint and catch common mistakes
+  - `cargo test` - Verify all tests pass
 
-## Build Commands
+- **Validation Benchmarks**: Track accuracy metrics
+  - `cargo run --release --bin benchmark` - Update validation metrics (writes BENCHMARKS.toml, prints deltas)
+  - Always use `--release` for accurate execution time measurements
+  - Commit updated BENCHMARKS.toml when making improvements to alignment/scoring
+  - See BENCHMARKS.toml for current accuracy across all chains
 
-### Rust Development
-```bash
-# Build the CLI tool
-cargo build
+- **Best Practices**:
+  - Only create the code needed in the moment
+  - Keep the code concise
+  - Use `cargo build --release` for optimized builds
 
-# Run all Rust tests
-cargo test
+## Project Structure
 
-# Run with debug output for specific tests
-RUST_BACKTRACE=1 cargo test test_name -- --nocapture
+### Core Library (`src/`)
+- **lib.rs**: Library entry point, exports public API
+- **types.rs**: Core data types (Chain, Position, Region, Scheme)
+- **error.rs**: Error types using thiserror
+- **scoring.rs**: Position-specific scoring matrices loaded from build-time generated JSON
+- **alignment.rs**: Needleman-Wunsch semi-global alignment with IMGT-aware region numbering
+- **numbering.rs**: Numbering module entry point
+- **numbering/imgt.rs**: IMGT numbering rules for CDR1/2/3 with symmetric insertions
+- **numbering/kabat.rs**: Kabat numbering rules
+- **annotator.rs**: High-level API for sequence annotation with auto chain detection
+- **io.rs**: Input parsing (FASTA, raw sequences) and output formatting (TSV, JSON, JSONL)
+- **validation.rs**: Validation framework comparing numbering against test datasets
 
-# Run linting and checks
-cargo clippy
-cargo check
+### Binaries (`src/bin/`, `src/main.rs`)
+- **main.rs**: CLI binary (`immunum number` command with scheme/chain/format options)
+- **debug_validation.rs**: Debug tool for visualizing alignment mismatches with expected vs actual positions
+- **benchmark.rs**: Generate validation metrics report (writes BENCHMARKS.toml, prints deltas)
+- **speed_benchmark.rs**: Performance benchmarks
 
-# Clean build artifacts
-cargo clean
-```
+### Build System
+- **build.rs**: Compile-time generation of scoring matrices from CSV consensus files with region-aware gap/insertion penalties
+  - Penalty constants at top of file for easy tuning
+  - Uses BLOSUM62 for amino acid substitution scores
 
-### Python Development
-```bash
-# Set up Python environment (uses uv package manager)
-uv venv && source .venv/bin/activate
-uv sync
+### Key Design Decisions
+- Semi-global alignment forces full query consumption to prevent long CDR3s being treated as trailing gaps
+- FR regions use alignment-based numbering, CDR regions use scheme-specific numbering rules
+- Highly conserved FR positions have 3x gap penalties to enforce anchor points
 
-# Build and install Python package in development mode
-uv run maturin develop --features python
+## Data Files
 
-# Build release wheel
-uv run maturin build --features python --release
+### Fixtures (`fixtures/validation/`)
+Validation datasets with expected IMGT numbering for testing:
+- **ab_H_imgt.csv, ab_K_imgt.csv, ab_L_imgt.csv**: Antibody heavy/kappa/lambda chains (2473/1491/383 sequences)
+- **tcr_A_imgt.csv, tcr_B_imgt.csv, tcr_G_imgt.csv, tcr_D_imgt.csv**: TCR alpha/beta/gamma/delta chains (865/934/25/23 sequences)
 
-# Run Python tests
-uv run pytest
+### Resources (`resources/consensus/`)
+Consensus sequences with amino acid frequencies, conservation scores, and penalties:
+- **{IGH,IGK,IGL}.csv**: IMGT antibody consensus sequences
+- **{TRA,TRB,TRG,TRD}.csv**: IMGT TCR consensus sequences
+- Format: position, consensus_aas, frequencies, occupancy, region
 
-# Important: If tests fail after making changes to Python bindings
-# uv may cache and reinstall old versions. To fix:
-rm -rf .venv/lib/python3.11/site-packages/immunum*
-uv run maturin develop --features python
-pytest tests/python/  # Run pytest directly, not via 'uv run'
-```
+## Python Scripts (`scripts/`)
 
-### WebAssembly Development
-```bash
-# Build WASM module
-wasm-pack build --target web --out-dir wasm_build --features wasm --no-default-features
+### Data Processing
+- **number_test_sequences.py**: Process FASTA files with AntPack/ANARCI, generate numbered CSV validation files
+- **generate_consensus.py**: Generate consensus CSV files from numbered sequences with conservation metrics
 
-# Run WASM tests
-node test-wasm-node.js
-npm test
-```
+### Analysis
+- **analyze_sequences.py**: Analyze numbered sequences, generate statistics and plots for CDR/FR regions
+- **imgt_kabat_conversion.py**: Convert between IMGT and Kabat CDR3 numbering schemes using sequence indices
 
-## Architecture
-
-### Core Architecture
-The codebase follows a modular Rust architecture with the main entry point being the `Annotator` struct in `src/annotator.rs`. Key architectural components:
-
-- **Annotator**: Main API entry point that handles sequence numbering with pre-built numbering schemes and cached terminal schemes for performance
-- **NumberingScheme**: Core data structure containing reference sequences, scoring matrices, and cached HashSets for O(1) lookups
-- **Sequence Processing**: Handles FASTA/FASTQ file parsing with support for gzip compression
-- **Alignment Engine**: Custom Needleman-Wunsch implementation optimized for immunoglobulin sequences with performance enhancements
-
-### Performance Optimizations
-Recent optimizations have achieved 20x+ performance improvements:
-
-- **Terminal Scheme Caching**: Pre-computed terminal schemes during Annotator initialization to eliminate repeated creation during prefiltering
-- **Region Extraction**: Optimized from 7-pass to single-pass algorithm, removing sequence string allocations
-- **HashSet Lookups**: Replaced O(n) vector searches with O(1) HashSet lookups in critical paths
-- **Memory Layout**: Optimized NumberingPosition and RegionInfo structures for better cache locality
-- **Parallel Processing**: Enhanced Rayon-based parallelization with custom thread pools
-
-### Key Modules
-- `annotator.rs`: Main API with parallel processing support via Rayon and terminal scheme caching
-- `schemes.rs`: Numbering scheme data and initialization with cached HashSets for performance
-- `needleman_wunsch.rs`: Sequence alignment implementation with optimized O(1) lookups
-- `prefiltering.rs`: Performance optimization for multi-chain analysis using terminal schemes
-- `sequence.rs`: File format handling (FASTA/FASTQ/gzip)
-- `result.rs`: Output formatting and annotation results with optimized region extraction
-- `python_bindings.rs`/`wasm_bindings.rs`: Language bindings
-- `bin/benchmark.rs`: Standalone performance testing tool
-
-### Features System
-The project uses Cargo features for conditional compilation:
-- `python`: Enables PyO3 Python bindings
-- `wasm`: Enables WebAssembly bindings
-- Default features include both `python` and `wasm`
-
-### Parallel Processing
-The library extensively uses Rayon for parallel processing in:
-- Multi-sequence processing (`number_sequences`)
-- File processing (`number_file`)
-- CLI tool processing
-
-### Testing Strategy
-- Rust unit tests cover core functionality
-- Integration tests in `tests/` directory for validation
-- Python binding tests via pytest
-- WASM binding tests via Node.js
-- Performance benchmarks via standalone `benchmark` binary
-- AbPdSeq validation tests for accuracy verification
-
-## Development Commands
-
-### Running Single Tests
-```bash
-# Run specific Rust test
-cargo test test_name
-
-# Run Python tests with verbose output
-uv run pytest -v
-
-# If Python tests fail after code changes (due to uv caching issues):
-rm -rf .venv/lib/python3.11/site-packages/immunum*
-uv run maturin develop --features python
-pytest -v  # Run directly without 'uv run'
-
-# Run validation tests
-cargo test abpdseq_validation_test
-```
-
-### Performance Testing
-```bash
-# Build release version for accurate performance measurement
-cargo run --release --bin benchmark -n 1000 -r 5 -t 8 --output benchmark.json
-
-# Test accuracy against benchmark dataset, successful sequence matches should be at least 99%
-cargo test --release --test abpdseq_validation_test test_abpdseq_validation_full -- --ignored --nocapture
-```
-
-### Debugging
-```bash
-# Run with Rust backtrace
-RUST_BACKTRACE=1 cargo run -- [args]
-
-# Test with debug output
-cargo test test_name -- --nocapture
-```
-
-### Multi-threading
-The CLI supports parallel processing via the `--threads` option. Set thread count for development testing:
-```bash
-./target/debug/immunum-cli --threads 4 [other args]
-```
-
-## Package Managers
-- **Rust**: Standard `cargo` for Rust dependencies
-- **Python**: `uv` (modern Python package manager, faster than pip)
-- **JavaScript**: `npm` for WASM testing dependencies
-
-# Important Instructions
-
-- Run `cargo fmt` after changes
-- Run tests after changes
-- Run `cargo clippy --workspace --all-targets --all-features -- -D warnings` and fix warnings at the end of a big code change
-- `immunum.pyi` contains the python interface definition stubs and should be updated whenever we change the python bindings file
-
-## Performance Benchmarking
-
-The standalone benchmark tool provides comprehensive performance metrics:
-
-```bash
-# Example benchmark output showing optimization results:
-# Sequential processing: 444.4 sequences/second (vs 22.1 before optimization)
-# Parallel processing: 1,724.1 sequences/second (vs 78.1 before optimization)
-# Memory usage: Optimized through HashSet caching and single-pass algorithms
-```
-
-Key performance testing methodology:
-- Test with realistic sequence datasets (AbPdSeq validation set)
-- Measure both sequential and parallel processing speeds
-- Track memory usage and allocation patterns
-- Compare with/without prefiltering enabled
-- Use release builds for accurate performance measurement
+### Utilities (`scripts/utils/`)
+- **fasta.py**: FASTA file parsing
+- **numbering.py**: Numbering utilities and position definitions
+- **csv_output.py**: CSV file writing utilities

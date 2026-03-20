@@ -6,3 +6,9 @@ wasm_build
 /.claude
 
 node_modules
+.coverage
+.vscode
+immunum/libimmunum.dylib.dSYM/
+site
+.task
+results.json

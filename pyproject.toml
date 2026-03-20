@@ -1,21 +1,119 @@
 [build-system]
-requires = ["maturin>=1,<2"]
+requires = ["maturin>=1.10.2,<2.0", "polars>1.30.0"]
 build-backend = "maturin"
-
-[tool.maturin]
-manifest-path = "Cargo.toml"
 
 [project]
 name = "immunum"
 dynamic = ["version"]
-description = "A high-performance Python library for numbering antibody and T-cell receptor sequences using standard immunological numbering schemes."
-readme = "docs/PYTHON_README.md"
-requires-python = ">=3.11"
+description = "Flexible and fast antibody sequence annotation in Rust with python bindings"
+readme = "README.md"
+requires-python = ">=3.10, <3.14"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "License :: OSI Approved :: MIT License",
+]
+keywords = ["antibody", "numbering", "schemes", "python", "imgt"]
+authors = [{ name = "ENPICOM", email = "dev@enpicom.com" }]
+license = { text = "MIT" }
+
+[project.urls]
+Homepage = "https://immunum.enpicom.com"
+Documentation = "https://immunum.enpicom.com"
+Repository = "https://github.com/ENPICOM/immunum"
+
+[tool.maturin]
+module-name = "immunum._internal"
+features = ["python", "polars"]
+profile = "release"
+
 
 [dependency-groups]
-dev = [
-    "ruff>=0.12.1",
-    "pytest>=7.0.0",
-    "maturin>=1.9.0",
-    "maturin-import-hook>=0.3.0",
+polars = ["polars>1.30.0"]
+docs = [
+    "markdown-exec[ansi]",
+    "mkdocs<2.0",
+    "mkdocs-autorefs",
+    "mkdocs-macros-plugin",
+    "mkdocs-material",
+    "mkdocs-simple-hooks",
+    "mkdocstrings[python]",
 ]
+dev = [
+    "coverage>=7.10.6",
+    "go-task-bin>=3.44.1",
+    "hypothesis>=6.151.9",
+    "pandas-stubs>=2.3.3.251219",
+    "pandas>=2.3.3",
+    "pre-commit>=4.3.0",
+    "pyrefly>=0.53.0",
+    "pysentry-rs>=0.3.10",
+    "pytest-benchmark>=5.2.3",
+    "pytest-markdown-docs>=0.9.1",
+    "pytest-xdist>=3.8.0",
+    "pytest>=8.4.2",
+    "rtoml>=0.13.0",
+    "ruff>=0.15.4",
+    "ty>=0.0.19",
+]
+benchmark = [
+    { include-group = "polars" },
+    "anarcii>=2.0.5",
+    "antpack~=0.2.7",
+    "biopython>=1.86",
+    "scikit-bio==0.6.2",
+    "typer>=0.24.1",
+]
+
+
+[tool.uv]
+default-groups = ["dev"]
+cache-keys = [{ file = "./Cargo.toml" }, { file = "./**/*.rs" }]
+
+[tool.uv.workspace]
+members = ["."]
+
+[tool.pyrefly]
+project-includes = ["**/*.py*"]
+project-excludes = [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/*venv/**/*",
+    "**/.[!/.]*/**/*",
+    "scripts/*",
+    "tests/*.py",
+    "benches/*.py",
+]
+
+[tool.uv.sources]
+immunum-rs = { workspace = true }
+
+
+[tool.pytest.ini_options]
+markers = ["slow: mark test as slow (requires full validation fixtures)"]
+addopts = "--markdown-docs"
+testpaths = ["docs", "tests"]
+
+
+[tool.coverage.report]
+exclude_also = [
+    'no cover: start(?s:.)*?no cover: stop',
+    "def __repr__",
+    "@abstract",
+]
+fail_under = 90
+
+[tool.coverage.run]
+omit = ["/tmp/*", "benches/*.py"]
+include = ["src/**", "tests/**"]
+
+[tool.pysentry.sources]
+enabled = ["pypa", "pypi", "osv"]
+
+[tool.pysentry.defaults]
+fail_on = "high"
+
+[tool.ty.src]
+include = ["immunum"]
+exclude = ["tests", "benches"]

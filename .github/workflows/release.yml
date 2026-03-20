@@ -1,14 +1,14 @@
-name: Release Python Wheels
+name: Release
 
 on:
   push:
     branches: [master]
     paths:
-      - 'Cargo.toml'
-  workflow_dispatch:  # Allow manual triggering for testing
+      - "Cargo.toml"
+  workflow_dispatch: # Allow manual triggering for testing
 
 permissions:
-  contents: write  # Required for creating releases
+  contents: write # Required for creating releases
 
 jobs:
   check-version:
@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history for tag checking
+          fetch-depth: 0 # Fetch all history for tag checking
 
       - name: Get version from Cargo.toml
         id: get_version
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
@@ -67,8 +67,8 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --features python -i python${{ matrix.python-version }}
-          sccache: 'true'
+          args: --release --features python,polars -i python${{ matrix.python-version }}
+          sccache: "true"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -83,7 +83,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -96,8 +96,8 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: aarch64
-          args: --release --features python -i python${{ matrix.python-version }}
-          sccache: 'true'
+          args: --profile dist-release --features python,polars -i python${{ matrix.python-version }}
+          sccache: "true"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -128,6 +128,7 @@ jobs:
 
   create-release:
     needs: [check-version, build-linux, build-macos, build-sdist]
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -151,21 +152,64 @@ jobs:
             --notes "Python wheels for immunum v$VERSION
 
           Built for:
-          - Python 3.11, 3.12, 3.13
-          - Linux x86_64 (manylinux)
-          - Linux aarch64/ARM64 (manylinux)
-          - macOS Apple Silicon (M1/M2/M3)
+          - Python 3.10, 3.11, 3.12, 3.13
+          - Linux x86_64 and aarch64 (manylinux)
+          - macOS Apple Silicon (aarch64)
 
-          Install with: \`pip install immunum==$VERSION\`
-
-          **Note**: Intel Mac users can install via Rosetta 2. Windows users should install from source." \
+          Install with: \`pip install immunum==$VERSION\`" \
             dist/*
 
-      # Uncomment the following section when you're ready to publish to PyPI
-      # - name: Publish to PyPI
-      #   uses: PyO3/maturin-action@v1
-      #   env:
-      #     MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-      #   with:
-      #     command: upload
-      #     args: --skip-existing dist/*
+  publish-pypi:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Publish to PyPI
+        run: uv publish dist/*
+
+  publish-npm:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    environment: npmjs
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM package
+        run: wasm-pack build --release --target nodejs --features wasm --no-default-features
+
+      - name: Publish to npm
+        working-directory: pkg
+        run: npm publish --access public
+
+  publish-crate:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish

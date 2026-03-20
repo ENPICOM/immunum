@@ -1,243 +1,343 @@
-#![allow(clippy::upper_case_acronyms)]
+//! Core types for sequence numbering
 
-use clap::ValueEnum;
-use serde::Serialize;
-use std::ops::Range;
+use crate::error::{Error, Result};
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
+use strum_macros::{Display, EnumString};
 
-#[derive(Debug, Clone)]
-pub struct RegionRange {
-    pub start: u32,
-    pub end: u32,
-}
-impl RegionRange {
-    pub fn positions(&self) -> Range<u32> {
-        self.start..self.end
-    }
-}
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 
-/// Numbering schemes for immunoglobulin sequences
-#[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Serialize)]
-#[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub enum Scheme {
-    /// IMGT numbering scheme
-    #[value(alias = "I")]
-    IMGT,
-    /// Kabat numbering scheme
-    #[value(alias = "K")]
-    KABAT,
-}
-
-/// CDR definition schemes for determining CDR boundaries
-#[derive(Clone, Copy, Debug, PartialEq, ValueEnum, Serialize)]
-#[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
-pub enum CdrDefinitions {
-    /// IMGT CDR definitions (default for IMGT scheme)
-    #[value(alias = "I")]
-    IMGT,
-    /// Kabat CDR definitions (default for KABAT scheme)
-    #[value(alias = "K")]
-    KABAT,
-    /// North CDR definitions
-    #[value(alias = "N")]
-    NORTH,
-}
-
-impl CdrDefinitions {
-    /// Get the default CDR definition for a given numbering scheme
-    pub fn from_scheme(scheme: Scheme) -> Self {
-        match scheme {
-            Scheme::IMGT => CdrDefinitions::IMGT,
-            Scheme::KABAT => CdrDefinitions::KABAT,
-        }
-    }
-}
-
-/// Immunoglobulin and T-cell receptor chain types
-#[derive(Clone, Copy, Debug, PartialEq, Hash, Eq, ValueEnum, Serialize)]
-#[cfg_attr(feature = "python", pyo3::pyclass(eq, eq_int))]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum Chain {
-    // IG Heavy chain variants
-    #[value(alias = "Heavy", alias = "H")]
+    #[strum(
+        serialize = "IGH",
+        to_string = "H",
+        serialize = "heavy",
+        ascii_case_insensitive
+    )]
     IGH,
-
-    // IG Kappa chain variants
-    #[value(alias = "Kappa", alias = "K")]
+    #[strum(
+        serialize = "IGK",
+        to_string = "K",
+        serialize = "kappa",
+        ascii_case_insensitive
+    )]
     IGK,
-
-    // IG Lambda chain variants
-    #[value(alias = "Lambda", alias = "L")]
+    #[strum(
+        serialize = "IGL",
+        to_string = "L",
+        serialize = "lambda",
+        ascii_case_insensitive
+    )]
     IGL,
-
-    // T-cell receptor Alpha chain variants
-    #[value(alias = "Alpha", alias = "A")]
+    #[strum(
+        serialize = "TRA",
+        to_string = "A",
+        serialize = "alpha",
+        ascii_case_insensitive
+    )]
     TRA,
-
-    // T-cell receptor Beta chain variants
-    #[value(alias = "Beta", alias = "B")]
+    #[strum(
+        serialize = "TRB",
+        to_string = "B",
+        serialize = "beta",
+        ascii_case_insensitive
+    )]
     TRB,
-
-    // T-cell receptor Gamma chain variants
-    #[value(alias = "Gamma", alias = "G")]
+    #[strum(
+        serialize = "TRG",
+        to_string = "G",
+        serialize = "gamma",
+        ascii_case_insensitive
+    )]
     TRG,
-
-    // T-cell receptor Delta chain variants
-    #[value(alias = "Delta", alias = "D")]
+    #[strum(
+        serialize = "TRD",
+        to_string = "D",
+        serialize = "delta",
+        ascii_case_insensitive
+    )]
     TRD,
 }
 
+/// All chain variants
+pub const ALL_CHAINS: &[Chain] = &[
+    Chain::IGH,
+    Chain::IGK,
+    Chain::IGL,
+    Chain::TRA,
+    Chain::TRB,
+    Chain::TRG,
+    Chain::TRD,
+];
+
+/// All immunoglobulin chains
+pub const IG_CHAINS: &[Chain] = &[Chain::IGH, Chain::IGK, Chain::IGL];
+
+/// All T-cell receptor chains
+pub const TCR_CHAINS: &[Chain] = &[Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD];
+
 impl Chain {
-    pub fn to_short(self) -> &'static str {
-        match self {
-            Chain::IGH => "H",
-            Chain::IGK => "K",
-            Chain::IGL => "L",
-            Chain::TRA => "A",
-            Chain::TRB => "B",
-            Chain::TRG => "G",
-            Chain::TRD => "D",
+    /// Parse a chain spec string: group aliases (ig, tcr, all) or comma-separated chains
+    pub fn parse_chain_spec(s: &str) -> Result<Vec<Chain>> {
+        match s.to_lowercase().as_str() {
+            "all" => Ok(ALL_CHAINS.to_vec()),
+            "ig" => Ok(IG_CHAINS.to_vec()),
+            "tcr" => Ok(TCR_CHAINS.to_vec()),
+            _ => s
+                .split(',')
+                .map(|c| {
+                    Chain::from_str(c.trim()).map_err(|_| {
+                        Error::InvalidChain(format!(
+                            "unknown chain '{}' (options: h,k,l,a,b,g,d,ig,tcr,all)",
+                            c.trim()
+                        ))
+                    })
+                })
+                .collect(),
         }
     }
 }
 
-/// Efficient representation of a numbering position
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(untagged)]
-pub enum NumberingPosition {
-    /// Gap in alignment
-    Gap,
-    /// Simple numeric position
-    Number(u32),
-    /// Position with insertion (e.g., "32A")
-    Insertion { position: u32, insertion: char },
+/// Numbering schemes for output
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
+pub enum Scheme {
+    /// IMGT numbering (canonical internal representation)
+    #[strum(to_string = "IMGT", serialize = "i", ascii_case_insensitive)]
+    IMGT,
+    /// Kabat numbering (derived from IMGT)
+    #[strum(to_string = "Kabat", serialize = "k", ascii_case_insensitive)]
+    Kabat,
 }
 
-impl std::fmt::Display for NumberingPosition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NumberingPosition::Gap => write!(f, "-"),
-            NumberingPosition::Number(n) => write!(f, "{}", n),
-            NumberingPosition::Insertion {
-                position,
-                insertion,
-            } => {
-                write!(f, "{}{}", position, insertion)
-            }
-        }
-    }
+/// Position in a numbered sequence
+/// Can be a simple number or a number with an insertion letter (e.g., "111A")
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Position {
+    /// The numeric part of the position (max 128 for IMGT)
+    pub number: u8,
+    /// Optional insertion letter (for IMGT: A, B, C, etc.)
+    pub insertion: Option<char>,
 }
 
-impl NumberingPosition {
-    /// Create from string (for backward compatibility)
-    pub fn from_string(s: &str) -> Self {
-        if s == "-" {
-            NumberingPosition::Gap
-        } else if let Ok(num) = s.parse::<u32>() {
-            NumberingPosition::Number(num)
-        } else {
-            // Try to parse as insertion (e.g., "32A")
-            if s.len() > 1 {
-                if let Ok(position) = s[..s.len() - 1].parse::<u32>() {
-                    if let Some(insertion) = s.chars().last() {
-                        return NumberingPosition::Insertion {
-                            position,
-                            insertion,
-                        };
-                    }
-                }
-            }
-            // Fallback to treating as number 0 if can't parse
-            NumberingPosition::Number(0)
-        }
-    }
-}
-
-impl PartialEq<str> for NumberingPosition {
-    fn eq(&self, other: &str) -> bool {
-        match self {
-            NumberingPosition::Gap => other == "-",
-            NumberingPosition::Number(n) => other == n.to_string(),
-            NumberingPosition::Insertion {
-                position,
-                insertion,
-            } => other == format!("{}{}", position, insertion),
-        }
-    }
-}
-
-impl PartialEq<&str> for NumberingPosition {
-    fn eq(&self, other: &&str) -> bool {
-        self == *other
-    }
-}
-
-impl PartialEq<String> for NumberingPosition {
-    fn eq(&self, other: &String) -> bool {
-        self == other.as_str()
-    }
-}
-
-impl PartialEq<NumberingPosition> for String {
-    fn eq(&self, other: &NumberingPosition) -> bool {
-        other == self.as_str()
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct RegionInfo {
-    pub start: usize,
-    pub end: usize,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Regions {
-    pub fr1: RegionInfo,
-    pub cdr1: RegionInfo,
-    pub fr2: RegionInfo,
-    pub cdr2: RegionInfo,
-    pub fr3: RegionInfo,
-    pub cdr3: RegionInfo,
-    pub fr4: RegionInfo,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ChainNumbering {
-    #[serde(serialize_with = "serialize_numbering_positions")]
-    pub numbers: Vec<NumberingPosition>,
-    pub confidence: f64,
-    pub scheme: Scheme,
-    pub chain: Chain,
-    pub cdr_definition: CdrDefinitions,
-    pub start: usize,
-    pub end: usize,
-    pub regions: Regions,
-}
-
-/// Custom serializer to maintain backward compatibility with JSON output
-fn serialize_numbering_positions<S>(
-    positions: &[NumberingPosition],
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let strings: Vec<String> = positions.iter().map(|p| p.to_string()).collect();
-    strings.serialize(serializer)
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct SequenceResult {
-    pub sequence_id: String,
-    pub chains: Vec<ChainNumbering>,
-}
-
-impl SequenceResult {
-    pub fn new(sequence_id: String, chains: Vec<ChainNumbering>) -> Self {
+impl Position {
+    /// Create a new position with just a number
+    pub fn new(number: u8) -> Self {
         Self {
-            sequence_id,
-            chains,
+            number,
+            insertion: None,
         }
+    }
+
+    /// Create a new position with a number and insertion letter
+    pub fn with_insertion(number: u8, insertion: char) -> Self {
+        Self {
+            number,
+            insertion: Some(insertion),
+        }
+    }
+}
+
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ins) = self.insertion {
+            write!(f, "{}{}", self.number, ins)
+        } else {
+            write!(f, "{}", self.number)
+        }
+    }
+}
+
+impl FromStr for Position {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let s = s.trim();
+        if s.is_empty() {
+            return Err(Error::InvalidPosition("empty string".to_string()));
+        }
+
+        // Find where digits end
+        let digit_end = s
+            .chars()
+            .position(|c| !c.is_ascii_digit())
+            .unwrap_or(s.len());
+
+        if digit_end == 0 {
+            return Err(Error::InvalidPosition(format!("no numeric part: {}", s)));
+        }
+
+        let number: u8 = s[..digit_end]
+            .parse()
+            .map_err(|_| Error::InvalidPosition(format!("invalid number: {}", s)))?;
+
+        // Parse insertion letter if present
+        let insertion = match &s[digit_end..] {
+            "" => None,
+            rest if rest.len() == 1 && rest.chars().next().unwrap().is_alphabetic() => {
+                Some(rest.chars().next().unwrap())
+            }
+            _ => {
+                return Err(Error::InvalidPosition(format!(
+                    "invalid insertion part: {}",
+                    s
+                )))
+            }
+        };
+
+        Ok(Self { number, insertion })
+    }
+}
+
+/// Functional regions in a numbered sequence
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, EnumString, Display)]
+pub enum Region {
+    FR1,
+    CDR1,
+    FR2,
+    CDR2,
+    FR3,
+    CDR3,
+    FR4,
+}
+
+/// A rule mapping a range of alignment positions to numbering positions
+///
+/// Defines how to handle insertions and deletions when the alignment length doesn't match the numbering range.
+#[derive(Debug, Clone, Copy)]
+pub struct NumberingRule {
+    /// First alignment position (inclusive)
+    pub align_start: u8,
+    /// Last alignment position (inclusive)
+    pub align_end: u8,
+    /// First numbering position (inclusive)
+    pub num_start: u8,
+    /// Last numbering position (inclusive)
+    pub num_end: u8,
+    /// Order to delete positions when alignment is shorter than numbering range (for variable regions)
+    pub deletion_order: &'static [u8],
+    /// How to handle insertions when alignment is longer than numbering range (for variable regions)
+    pub insertion: Insertion,
+}
+
+impl NumberingRule {
+    /// Framework-like region with direct 1:1 mapping (alignment positions equal numbering positions)
+    pub const fn fr(start: u8, end: u8) -> Self {
+        Self {
+            align_start: start,
+            align_end: end,
+            num_start: start,
+            num_end: end,
+            deletion_order: &[],
+            insertion: Insertion::None,
+        }
+    }
+
+    /// Framework region with simple offset mapping (alignment positions map to numbering positions with a fixed offset)
+    pub const fn offset(align_start: u8, align_end: u8, offset: i8) -> Self {
+        let num_start = (align_start as i16 + offset as i16) as u8;
+        Self {
+            align_start,
+            align_end,
+            num_start,
+            num_end: num_start + (align_end - align_start),
+            deletion_order: &[],
+            insertion: Insertion::None,
+        }
+    }
+
+    /// Variable region: CDR or other variable length region with custom deletion/insertion rules
+    /// and explicit align and numbering ranges
+    pub const fn variable(
+        align_start: u8,
+        align_end: u8,
+        num_start: u8,
+        num_end: u8,
+        deletion_order: &'static [u8],
+        insertion: Insertion,
+    ) -> Self {
+        Self {
+            align_start,
+            align_end,
+            num_start,
+            num_end,
+            deletion_order,
+            insertion,
+        }
+    }
+
+    /// Check if a position falls within this rule's source range
+    #[inline]
+    pub const fn contains(&self, pos: u8) -> bool {
+        pos >= self.align_start && pos <= self.align_end
+    }
+}
+/// How insertions are handled when a variable region exceeds its base length
+#[derive(Debug, Clone, Copy)]
+pub enum Insertion {
+    /// Simple offset arithmetic — no insertions possible (framework regions)
+    None,
+    /// All insertions after a single position: 35A, 35B, 35C (Kabat style)
+    Sequential(u8),
+    /// Insertions split symmetrically between two positions: 111A, 112A, 111B, 112B (IMGT style)
+    Symmetric { left: u8, right: u8 },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chain_parsing() {
+        assert_eq!("IGH".parse::<Chain>().unwrap(), Chain::IGH);
+        assert_eq!("igh".parse::<Chain>().unwrap(), Chain::IGH);
+        assert_eq!("H".parse::<Chain>().unwrap(), Chain::IGH);
+        assert_eq!("heavy".parse::<Chain>().unwrap(), Chain::IGH);
+        assert_eq!("TRA".parse::<Chain>().unwrap(), Chain::TRA);
+        assert_eq!("A".parse::<Chain>().unwrap(), Chain::TRA);
+        assert!("invalid".parse::<Chain>().is_err());
+    }
+
+    #[test]
+    fn test_position_parsing() {
+        let pos = "111".parse::<Position>().unwrap();
+        assert_eq!(pos.number, 111);
+        assert_eq!(pos.insertion, None);
+
+        let pos = "111A".parse::<Position>().unwrap();
+        assert_eq!(pos.number, 111);
+        assert_eq!(pos.insertion, Some('A'));
+
+        assert!("".parse::<Position>().is_err());
+        assert!("A".parse::<Position>().is_err());
+        assert!("111AB".parse::<Position>().is_err());
+    }
+
+    #[test]
+    fn test_parse_chain_spec_groups() {
+        let ig = Chain::parse_chain_spec("ig").unwrap();
+        assert_eq!(ig, vec![Chain::IGH, Chain::IGK, Chain::IGL]);
+
+        let tcr = Chain::parse_chain_spec("tcr").unwrap();
+        assert_eq!(tcr, vec![Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD]);
+
+        let all = Chain::parse_chain_spec("all").unwrap();
+        assert_eq!(all.len(), 7);
+    }
+
+    #[test]
+    fn test_parse_chain_spec_csv() {
+        let chains = Chain::parse_chain_spec("h,k,l").unwrap();
+        assert_eq!(chains, vec![Chain::IGH, Chain::IGK, Chain::IGL]);
+    }
+
+    #[test]
+    fn test_parse_chain_spec_invalid() {
+        assert!(Chain::parse_chain_spec("xyz").is_err());
     }
 }

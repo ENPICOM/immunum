@@ -1,303 +1,340 @@
-# Immunum
+# immunum
 
-A high-performance CLI tool, Python library, and WebAssembly module for numbering antibody and T-cell receptor sequences using standard immunological numbering schemes.
+High-performance antibody and TCR sequence numbering in Rust, Python, and WebAssembly.
+
+[![Crates.io](https://img.shields.io/crates/v/immunum)](https://crates.io/crates/immunum)
+[![PyPI](https://img.shields.io/pypi/v/immunum)](https://pypi.org/project/immunum/)
+[![npm](https://img.shields.io/npm/v/immunum)](https://www.npmjs.com/package/immunum)
+[![License: MIT](https://img.shields.io/crates/l/immunum)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/ENPICOM/immunum/ci.yml?label=CI)](https://github.com/ENPICOM/immunum/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-immunum.enpicom.com-blue)](https://immunum.enpicom.com)
 
 ## Overview
 
-Immunum provides a command-line interface, Python bindings and WebAssembly module for numbering immunoglobulin (antibody) and T-cell receptor sequences according to established numbering schemes like IMGT and Kabat. The tool is built in Rust for performance and provides Python bindings via PyO3 for easy integration into bioinformatics workflows. It also provides a WebAssembly module for use in web applications.
+`immunum` is a library for numbering antibody and T-cell receptor (TCR) variable domain sequences. It uses Needleman-Wunsch semi-global alignment against position-specific scoring matrices (PSSM) built from consensus sequences, with BLOSUM62-based substitution scores.
 
-## Features
+**>99% position accuracy** across 6,000+ validation sequences. Processes a full dataset in ~0.6s.
 
-- **Multiple Numbering Schemes**: Support for IMGT and Kabat numbering schemes
-- **Flexible CDR Definitions**: IMGT, Kabat, and North CDR boundary definitions
-- **Chain Type Support**: Handle all major immunoglobulin and T-cell receptor chain types:
-  - Immunoglobulin Heavy (IGH), Kappa (IGK), and Lambda (IGL) chains
-  - T-cell receptor Alpha (TRA), Beta (TRB), Gamma (TRG), and Delta (TRD) chains  ( Not tested yet )
-- **Multi-Chain Analysis**: Detect multiple chain types in single sequences (paired analysis)
-- **High Performance**:
-  - Rust implementation
-  - Parallel processing support for large datasets
-  - K-mer prefiltering for fast multi-chain analysis
-  - Custom thread pool configuration
-- **Flexible Input/Output**:
-  - File formats: FASTA, FASTQ (including gzip compression)
-  - Direct sequence strings
-  - JSON output format with detailed region information
-- **Quality Control**: Configurable confidence thresholds and alignment parameters
-- **Multiple Interfaces**: CLI tool, Python library, and WebAssembly module
+Available as:
+- **Rust crate** — core library and CLI
+- **Python package** — via PyPI (`pip install immunum`), with a [Polars](https://pola.rs) plugin for vectorized batch processing
+- **npm package** — for Node.js and browsers
 
-## Installation
+### Supported chains
 
-### From Source
+| Antibody | TCR |
+|----------|-----|
+| IGH (heavy) | TRA (alpha) |
+| IGK (kappa) | TRB (beta) |
+| IGL (lambda) | TRD (delta) |
+| | TRG (gamma) |
 
-#### Prerequisites
-- Rust (1.70+)
-- Python (3.11+)
+### Numbering schemes
 
-#### Build and Install
-```bash
-# Clone the repository
-git clone https://github.com/ENPICOM/immunum.git && cd immunum
+- **IMGT** — all 7 chain types
+- **Kabat** — antibody chains (IGH, IGK, IGL)
 
-# Build the CLI tool
-cargo build
-```
+Chain type is automatically detected by aligning against all loaded chains and selecting the best match.
 
-## Usage
+## Table of Contents
 
-### Command Line Interface
+- [Python](#python)
+  - [Installation](#installation)
+  - [Numbering](#numbering)
+  - [Segmentation](#segmentation)
+  - [Polars plugin](#polars-plugin)
+- [JavaScript / npm](#javascript--npm)
+  - [Installation](#installation-1)
+  - [Usage](#usage)
+- [Rust](#rust)
+  - [Usage](#usage-1)
+- [CLI](#cli)
+  - [Options](#options)
+  - [Input](#input)
+  - [Output](#output)
+  - [Examples](#examples)
+- [Development](#development)
+- [Project structure](#project-structure)
 
-The CLI tool is named `immunum-cli` and provides a simple interface for sequence numbering with JSON output:
+## Python
 
-```bash
-# Number a sequence string using IMGT scheme for heavy chain
-immunum-cli -i "QVQLVQSGAEVKKPGASVKVSCKAS" -s imgt -c igh -o results.json
-
-# Process a FASTA file with multiple chain types
-immunum-cli -i sequences.fasta -s kabat -c igh igk igl -o results.json
-
-# Process gzipped FASTQ file with custom CDR definitions
-immunum-cli -i sequences.fastq.gz -s imgt -c tra trb --cdr-definitions north -o results.json
-
-# Use parallel processing with custom confidence threshold
-immunum-cli -i large_sequences.fasta -s imgt -c igh igk igl -t 8 -m 0.8 -o results.json
-
-# Enable verbose output to see processing details
-immunum-cli -i sequences.fasta -s kabat -c igh -v -o results.json
-
-# Allow multiple chains per sequence (paired chain analysis)
-immunum-cli -i paired_sequences.fasta -s imgt -c igh igk igl --max-chains 2 -o results.json
-
-# Disable prefiltering for more exhaustive search
-immunum-cli -i sequences.fasta -s imgt -c igh igk igl --disable-prefiltering -o results.json
-```
-
-#### CLI Options
-
-**Required:**
-- `-i, --input <INPUT>`: Input file path (FASTA/FASTQ) or sequence string
-- `-o, --output <OUTPUT>`: Output file path for JSON results
-
-**Numbering Scheme:**
-- `-s, --scheme <SCHEME>`: Numbering scheme (`imgt` or `kabat`) [default: imgt]
-- `--cdr-definitions <CDR_DEFINITIONS>`: CDR definition scheme (`imgt`, `kabat`, or `north`) [default: matches scheme]
-
-**Chain Selection:**
-- `-c, --chains <CHAINS>...`: Chain types to process (multiple values allowed) [default: igh igk igl]
-- `--max-chains <MAX_CHAINS>`: Maximum chains per sequence (0=unlimited, 1=single) [default: 1]
-
-**Performance & Quality:**
-- `-t, --threads <THREADS>`: Number of threads for parallel processing [default: CPU cores]
-- `-m, --min-confidence <MIN_CONFIDENCE>`: Minimum alignment confidence [default: 0.7]
-- `--min-kmer-overlap <MIN_KMER_OVERLAP>`: K-mer overlap threshold for prefiltering [default: 0.2]
-- `--disable-prefiltering`: Disable prefiltering for more exhaustive search
-
-**Output:**
-- `-v, --verbose`: Show detailed progress for each sequence processed
-
-#### Supported Chain Types
-
-| Chain Type | Full Name | Aliases |
-|------------|-----------|---------|
-| `igh` | Immunoglobulin Heavy | `heavy`, `h` |
-| `igk` | Immunoglobulin Kappa | `kappa`, `k` |
-| `igl` | Immunoglobulin Lambda | `lambda`, `l` |
-| `tra` | T-cell Receptor Alpha | `alpha`, `a` |
-| `trb` | T-cell Receptor Beta | `beta`, `b` |
-| `trg` | T-cell Receptor Gamma | `gamma`, `g` |
-| `trd` | T-cell Receptor Delta | `delta`, `d` |
-
-#### Supported Numbering Schemes
-
-| Scheme | Description | Aliases |
-|--------|-------------|---------|
-| `imgt` | IMGT numbering scheme | `i` |
-| `kabat` | Kabat numbering scheme | `k` |
-
-#### CDR Definition Schemes
-
-| Scheme | Description | Best For |
-|--------|-------------|----------|
-| `imgt` | IMGT CDR definitions (default for IMGT scheme) | Standardized analysis |
-| `kabat` | Kabat CDR definitions (default for Kabat scheme) | Traditional analysis |
-| `north` | North CDR definitions | Alternative CDR boundaries |
-
-#### Output Format
-
-The CLI outputs results in JSON format with the following structure:
-
-```json
-[
-  {
-    "sequence_name": "sequence_1",
-    "chains": [
-      {
-        "sequence": "QVQLVQSGAEVKKPGASVKVSCKAS...",
-        "numbers": ["1", "2", "3", "4", "5", "..."],
-        "scheme": "IMGT",
-        "chain": "IGH",
-        "confidence": 0.95,
-        "start": 0,
-        "end": 119,
-        "regions": {
-          "fr1": {"start": 1, "end": 26, "sequence": "QVQLVQSGAEVKKPGASVKVSCKAS"},
-          "cdr1": {"start": 27, "end": 38, "sequence": "GYTFTSYYMH"},
-          "fr2": {"start": 39, "end": 55, "sequence": "WVRQAPGQGLEWMG"},
-          "cdr2": {"start": 56, "end": 65, "sequence": "IINPSGGSTSYAQKFQ"},
-          "fr3": {"start": 66, "end": 104, "sequence": "GRVTMTRDTSTSTVYMELSSLRSEDTAVYYCAR"},
-          "cdr3": {"start": 105, "end": 117, "sequence": "WGGRGSYAMDYW"},
-          "fr4": {"start": 118, "end": 128, "sequence": "GQGTLVTVSS"}
-        }
-      }
-    ]
-  }
-]
-```
-
-**JSON Fields:**
-- `sequence_name`: Original sequence identifier from FASTA header or auto-generated
-- `chains`: Array of detected chains in the sequence
-- `sequence`: Full input sequence
-- `numbers`: Position numbers according to the numbering scheme
-- `scheme`: Applied numbering scheme (IMGT/KABAT)
-- `chain`: Detected chain type (IGH/IGK/IGL/TRA/TRB/TRG/TRD)
-- `confidence`: Alignment confidence score (0.0-1.0)
-- `start`/`end`: Indices of numbered region within input sequence
-- `regions`: CDR and framework regions with positions and sequences
-
-### Python Library
-
-#### Building from Source
-
-To build and install the Python library from source:
+### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/ENPICOM/immunum.git && cd immunum
-
-# Install UV (Python package manager) if not already installed
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Create and activate virtual environment
-uv venv && source .venv/bin/activate
-
-# Install dependencies
-uv sync
-
-# Build and install the Python package in development mode
-uv run maturin develop --features python
+pip install immunum
 ```
 
-#### Installing in Your Python Environment
-
-To install the library in your own Python project:
-
-```bash
-# Option 1: Build wheel and install
-uv run maturin build --features python --release
-pip install target/wheels/immunum-*.whl
-
-# Option 2: Install directly in development mode (for contributors)
-uv run maturin develop --features python
-```
-
-#### Python API Usage
-
-The Python API provides a simple interface for sequence numbering with automatic parallel processing:
+### Numbering
 
 ```python
-import immunum
+from immunum import Annotator
 
-# Create an annotator for IMGT scheme with heavy chain support
-annotator = immunum.Annotator(
-    scheme=immunum.Scheme.IMGT,
-    chains=[immunum.Chain.IGH]
-)
+annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
 
-# Process multiple sequences (returns list of chain results for each sequence)
-sequences = [
-    "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYYMHWVRQAPGQGLEWMGIINPSGGSTSYAQKFQGRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARWGGRGSYAMDYWGQGTLVTVSS",
-    "DIQMTQSPSSLSASVGDRVTITC"
-]
+sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
 
-# Each sequence returns a list of detected chains: [(numbers, confidence, chain), ...]
-results = annotator.number_sequences(sequences)
-
-for i, sequence_chains in enumerate(results):
-    print(f"Sequence {i+1}: Found {len(sequence_chains)} chains")
-    for numbers, confidence, chain in sequence_chains:
-        print(f"  Chain {chain}: {confidence:.2f} confidence")
-        print(f"  Numbers: {numbers[:10]}...")  # First 10 positions
-
-# Multi-chain annotator for comprehensive analysis
-multi_annotator = immunum.Annotator(
-    scheme=immunum.Scheme.IMGT,
-    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-    threads=8  # Use 8 threads for parallel processing
-)
-
-# Process with higher chain limit for paired sequences
-paired_results = multi_annotator.number_sequences(sequences, max_chains=2)
-for i, sequence_chains in enumerate(paired_results):
-    print(f"Paired sequence {i+1}:")
-    for numbers, confidence, chain in sequence_chains:
-        print(f"  {chain}: {confidence:.2f}")
-
-# Process sequences with IDs
-sequences_with_ids = [
-    ("heavy_chain_1", "QVQLVQSGAEVKKPGASVKVSCKAS"),
-    ("light_chain_1", "DIQMTQSPSSLSASVGDRVTITC")
-]
-
-id_results = multi_annotator.number_sequences(sequences_with_ids)
-
-# Custom parameters for fine-tuning
-custom_annotator = immunum.Annotator(
-    scheme=immunum.Scheme.KABAT,
-    chains=[immunum.Chain.IGH, immunum.Chain.IGK, immunum.Chain.IGL],
-    disable_prefiltering=False,  # Use prefiltering for speed
-    threads=4,                   # Use 4 threads
-    min_confidence=0.8,          # Higher confidence threshold
-    min_kmer_overlap=0.3         # Higher k-mer overlap requirement
-)
-
-
-### WASM Module
-
-The project also provides a WASM module that can be used in JS environments. You can build the WASM module using the following command:
-
-```bash
-cd immunum && wasm-pack build --target web --out-dir ../wasm_build --features wasm --no-default-features; cd -
-```
-Check `test-wasm-node.js` for an example of how to use the WASM module in a Node.js environment.
-
-
-### Development
-The project uses `cargo` for Rust package management and `uv` for Python package management.
-
-### Running Tests
-
-The Rust test should cover all the functionality of the library. You can run the tests using the following command:
-
-```bash
-cargo test
+result = annotator.number(sequence)
+print(result.chain)       # H
+print(result.confidence)  # 0.97
+print(result.numbering)   # {"1": "E", "2": "V", "3": "Q", ...}
 ```
 
-We also have integration tests for the python and WASM bindings, these are intended to be small and only test the bindings themselves. You can run the tests using the following command:
+### Segmentation
 
-```bash
-uv run pytest
-node test-wasm-node.js
+`segment` splits the sequence into FR/CDR regions:
+
+```python
+result = annotator.segment(sequence)
+print(result.fr1)   # EVQLVESGGGLVKPGGSLKLSCAAS
+print(result.cdr1)  # GFTFSSYAMS
+print(result.fr2)   # WVRQAPGKGLEWVS
+print(result.cdr2)  # AISGSGGS
+print(result.fr3)   # TYYADSVKGRFTISRDNAKN
+print(result.cdr3)  # ...
+print(result.fr4)   # ...
 ```
 
-## Contributing
+Chains: `"H"` (heavy), `"K"` (kappa), `"L"` (lambda), `"A"` (TRA), `"B"` (TRB), `"G"` (TRG), `"D"` (TRD).
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite (`cargo test && pytest`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+### Polars plugin
 
+For batch processing, `immunum.polars` registers elementwise Polars expressions:
+
+```python
+import polars as pl
+import immunum.polars as ip
+
+df = pl.DataFrame({"sequence": [
+    "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
+    "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
+]})
+
+# Add a struct column with chain, scheme, confidence, numbering
+result = df.with_columns(
+    ip.number(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("numbered")
+)
+
+# Add a struct column with FR/CDR segments
+result = df.with_columns(
+    ip.segment(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("segmented")
+)
+```
+
+The `number` expression returns a struct with fields `chain`, `scheme`, `confidence`, and `numbering` (a struct of position→residue). The `segment` expression returns a struct with fields `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `prefix`, `postfix`.
+
+## JavaScript / npm
+
+### Installation
+
+```bash
+npm install immunum
+```
+
+### Usage
+
+```js
+import init, { Annotator } from "immunum";
+
+await init(); // load the wasm module
+
+const annotator = new Annotator(["H", "K", "L"], "imgt");
+
+const sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+
+const result = annotator.number(sequence);
+console.log(result.chain);       // "H"
+console.log(result.confidence);  // 0.97
+console.log(result.numbering);   // { "1": "E", "2": "V", ... }
+
+const segments = annotator.segment(sequence);
+console.log(segments.cdr3);
+
+annotator.free(); // or use `using annotator = new Annotator(...)` with explicit resource management
+```
+
+## Rust
+
+### Usage
+
+```rust
+use immunum::{Annotator, Chain, Scheme};
+
+let annotator = Annotator::new(
+    &[Chain::IGH, Chain::IGK, Chain::IGL],
+    Scheme::IMGT,
+    None, // uses default min_confidence of 0.5
+).unwrap();
+
+let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+
+let result = annotator.number(sequence).unwrap();
+
+println!("Chain: {}", result.chain);        // IGH
+println!("Confidence: {:.2}", result.confidence);
+
+for (aa, pos) in sequence.chars().zip(result.positions.iter()) {
+    println!("{} -> {}", aa, pos);
+}
+```
+
+Add to `Cargo.toml`:
+
+```toml
+[dependencies]
+immunum = "0.9"
+```
+
+## CLI
+
+```bash
+immunum number [OPTIONS] [INPUT] [OUTPUT]
+```
+
+### Options
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`) | `imgt` |
+| `-c, --chain` | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig` |
+| `-f, --format` | Output format: `tsv`, `json`, `jsonl` | `tsv` |
+
+### Input
+
+Accepts a raw sequence, a FASTA file, or stdin (auto-detected):
+
+```bash
+immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS
+immunum number sequences.fasta
+cat sequences.fasta | immunum number
+immunum number - < sequences.fasta
+```
+
+### Output
+
+Writes to stdout by default, or to a file if a second positional argument is given:
+
+```bash
+immunum number sequences.fasta results.tsv
+immunum number -f json sequences.fasta results.json
+```
+
+### Examples
+
+```bash
+# Kabat scheme, JSON output
+immunum number -s kabat -f json EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS
+
+# All chains (antibody + TCR), JSONL output
+immunum number -c all -f jsonl sequences.fasta
+
+# TCR sequences only, save to file
+immunum number -c tcr tcr_sequences.fasta output.tsv
+
+# Extract sequences from a TSV column and pipe in (see fixtures/ig.tsv)
+tail -n +2 fixtures/ig.tsv | cut -f2 | immunum number
+awk -F'\t' 'NR==1{for(i=1;i<=NF;i++) if($i=="sequence") c=i} NR>1{print $c}' fixtures/ig.tsv | immunum number
+
+# Filter TSV output to CDR3 positions (111-128 in IMGT)
+immunum number sequences.fasta | awk -F'\t' '$4 >= 111 && $4 <= 128'
+
+# Filter to heavy chain results only
+immunum number -c all sequences.fasta | awk -F'\t' 'NR==1 || $2=="H"'
+
+# Extract CDR3 sequences with jq
+immunum number -f json sequences.fasta | jq '[.[] | {id: .sequence_id, numbering}]'
+```
+
+## Development
+
+To orchestrate a project between cargo and python, we use [`task`](http://taskfile.dev).
+You can install it with:
+
+```bash
+uv tool install go-task-bin
+```
+
+And then run `task` or `task --list-all` to get the full list of available tasks.
+
+By default, `dev` profile will be used in all but `benchmark-*` tasks, but you can change it
+via providing `PROFILE=release` to your task.
+
+Also, by default, `task` caches results, but you can ignore it by running `task my-task -f`.
+
+### Building local environment
+
+```bash
+# build a dev environment
+task build-local
+
+# build a dev environment with --release flag
+task build-local PROFILE=release
+```
+
+### Testing
+
+```bash
+task test-rust    # test only rust code
+task test-python  # test only python code
+task test         # test all code
+```
+
+### Linting
+
+```bash
+task format  # formats python and rust code
+task lint    # runs linting for python and rust
+```
+
+### Benchmarking
+
+There are multiple benchmarks in the repository. For full list, see `task | grep benchmark`:
+
+```bash
+$ task | grep benchmark
+* benchmark-accuracy:           Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)
+* benchmark-cli:                Benchmark correctness of the CLI tool
+* benchmark-comparison:         Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)
+* benchmark-scaling:            Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
+* benchmark-speed:              Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)
+* benchmark-speed-polars:       Speed benchmark for immunum polars across all chain/scheme fixtures
+```
+
+## Project structure
+```
+src/
+├── main.rs          # CLI binary (immunum number ...)
+├── lib.rs           # Public API
+├── annotator.rs     # Sequence annotation and chain detection
+├── alignment.rs     # Needleman-Wunsch semi-global alignment
+├── io.rs            # Input parsing (FASTA, raw) and output formatting (TSV, JSON, JSONL)
+├── numbering.rs     # Numbering module entry point
+├── numbering/
+│   ├── imgt.rs      # IMGT numbering rules
+│   └── kabat.rs     # Kabat numbering rules
+├── scoring.rs       # PSSM and scoring matrices
+├── types.rs         # Core domain types (Chain, Scheme, Position)
+├── validation.rs    # Validation utilities
+├── error.rs         # Error types
+└── bin/
+    ├── benchmark.rs       # Validation metrics report
+    ├── debug_validation.rs # Alignment mismatch visualization
+    └── speed_benchmark.rs  # Performance benchmarks
+resources/
+└── consensus/       # Consensus sequence CSVs (compiled into scoring matrices)
+fixtures/
+├── validation/      # ANARCI-numbered reference datasets
+├── ig.fasta         # Example antibody sequences
+└── ig.tsv           # Example TSV input
+scripts/             # Python tooling for generating consensus data
+immunum/
+├── _internal.pyi    # python stub file for pyo3
+├── polars.py        # polars extension module
+└── python.py        # python module
+```
+
+### Design decisions
+
+- **Semi-global alignment** forces full query consumption, preventing long CDR3 regions from being treated as trailing gaps.
+- **Anchor positions** at highly conserved FR residues receive 3× gap penalties to stabilize alignment.
+- **FR regions** use alignment-based numbering; **CDR regions** use scheme-specific insertion rules.
+- Scoring matrices are generated at compile time from consensus data via `build.rs`.

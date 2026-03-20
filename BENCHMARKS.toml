@@ -1,0 +1,62 @@
+last_updated = "2026-03-17"
+execution_time_secs = 0.6
+
+[imgt.A]
+total_sequences = 865
+perfect_sequences = 763
+perfect_pct = 88.21
+overall_accuracy = 99.41
+
+[imgt.B]
+total_sequences = 934
+perfect_sequences = 911
+perfect_pct = 97.54
+overall_accuracy = 99.79
+
+[imgt.D]
+total_sequences = 23
+perfect_sequences = 23
+perfect_pct = 100.0
+overall_accuracy = 100.0
+
+[imgt.G]
+total_sequences = 25
+perfect_sequences = 24
+perfect_pct = 96.0
+overall_accuracy = 99.96
+
+[imgt.H]
+total_sequences = 2452
+perfect_sequences = 2449
+perfect_pct = 99.88
+overall_accuracy = 100.0
+
+[imgt.K]
+total_sequences = 1485
+perfect_sequences = 1481
+perfect_pct = 99.73
+overall_accuracy = 99.99
+
+[imgt.L]
+total_sequences = 371
+perfect_sequences = 369
+perfect_pct = 99.46
+overall_accuracy = 99.99
+
+[kabat.H]
+total_sequences = 2452
+perfect_sequences = 2449
+perfect_pct = 99.88
+overall_accuracy = 100.0
+
+[kabat.K]
+total_sequences = 1485
+perfect_sequences = 1480
+perfect_pct = 99.66
+overall_accuracy = 99.99
+
+[kabat.L]
+total_sequences = 371
+perfect_sequences = 369
+perfect_pct = 99.46
+overall_accuracy = 99.99
