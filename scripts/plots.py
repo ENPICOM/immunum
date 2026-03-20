@@ -181,7 +181,7 @@ acc_summary = (
 )
 
 # ── Plots 1 & 3: Performance boxplots at fixed batch size ────────────────────
-BATCH_SIZE = 100_000
+BATCH_SIZE = speed_df["sample_size"].max()
 
 single_tools = [
     "immunum_singlethreaded",
