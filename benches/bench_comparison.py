@@ -209,27 +209,15 @@ def _extract_numbering_anarci(numbered_list: list) -> list[Optional[dict[str, st
     return results
 
 
-def _anarci_worker(
-    args: tuple,
-) -> list[Optional[dict[str, str]]]:
-    sequences_chunk, scheme, chain_letter = args
-    raw = _run_anarci(
-        sequences_chunk, {"scheme": scheme, "allow": {chain_letter}, "ncpu": 1}
-    )
-    return _extract_numbering_anarci(raw)
-
-
 def _run_anarci_parallel(
     sequences: list[tuple[str, str]], scheme: str, chain_letter: str
-) -> list[Optional[dict[str, str]]]:
-    ncpu = os.cpu_count() or 1
-    chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
-    chunks = [
-        sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
-    ]
-    with multiprocessing.Pool(ncpu) as pool:
-        results = pool.map(_anarci_worker, [(c, scheme, chain_letter) for c in chunks])
-    return [item for chunk_result in results for item in chunk_result]
+) -> list:
+    from anarci import anarci  # type: ignore[missing-import]
+
+    numbered_list, _, _ = anarci(
+        sequences, scheme=scheme, allow={chain_letter}, ncpu=os.cpu_count() or 1
+    )
+    return numbered_list
 
 
 def _run_anarcii2(sequences: list[tuple[str, str]], model):
@@ -261,28 +249,11 @@ def _extract_numbering_anarcii2(
     return results
 
 
-def _anarcii2_worker(
-    args: tuple,
-) -> list[Optional[dict[str, str]]]:
-    sequences_chunk, chain_letter = args
+def _run_anarcii2_parallel(sequences: list[tuple[str, str]]):
     from anarcii import Anarcii  # type: ignore[missing-import]
 
-    model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
-    raw = _run_anarcii2(sequences_chunk, model)
-    return _extract_numbering_anarcii2(raw, chain_letter)
-
-
-def _run_anarcii2_parallel(
-    sequences: list[tuple[str, str]], chain_letter: str
-) -> list[Optional[dict[str, str]]]:
-    ncpu = os.cpu_count() or 1
-    chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
-    chunks = [
-        sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
-    ]
-    with multiprocessing.Pool(ncpu) as pool:
-        results = pool.map(_anarcii2_worker, [(c, chain_letter) for c in chunks])
-    return [item for chunk_result in results for item in chunk_result]
+    model = Anarcii(seq_type="antibody", mode="speed", ncpu=os.cpu_count() or 1)
+    return model.number(sequences)
 
 
 # ---------------------------------------------------------------------------
@@ -393,9 +364,10 @@ def test_anarci(benchmark, sample_seqs, sample_gt, anarci_kwargs):
 
 def test_anarci_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("anarci")
-    result = benchmark.pedantic(
+    raw = benchmark.pedantic(
         _run_anarci_parallel, args=(sample_seqs, "imgt", "H"), rounds=3, iterations=1
     )
+    result = _extract_numbering_anarci(raw)
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
@@ -412,9 +384,10 @@ def test_anarcii2(benchmark, sample_seqs, sample_gt, anarcii2_annotator):
 
 def test_anarcii2_parallel(benchmark, sample_seqs, sample_gt):
     pytest.importorskip("anarcii")
-    result = benchmark.pedantic(
-        _run_anarcii2_parallel, args=(sample_seqs, "H"), rounds=3, iterations=1
+    raw = benchmark.pedantic(
+        _run_anarcii2_parallel, args=(sample_seqs,), rounds=3, iterations=1
     )
+    result = _extract_numbering_anarcii2(raw, "H")
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
@@ -593,7 +566,7 @@ def main(
                 (
                     "anarci_parallel",
                     _run_anarci_parallel,
-                    lambda raw, seqs: raw,
+                    lambda raw, seqs: _extract_numbering_anarci(raw),
                     lambda df, seqs, _c=chain: (seqs, "imgt", _c),
                 ),
             ]
@@ -619,8 +592,12 @@ def main(
                     (
                         "anarcii2_parallel",
                         _run_anarcii2_parallel,
-                        lambda raw, seqs: raw,
-                        lambda df, seqs, _c=chain: (seqs, _c),
+                        (
+                            lambda cl: (
+                                lambda raw, seqs: _extract_numbering_anarcii2(raw, cl)
+                            )
+                        )(chain),
+                        lambda df, seqs: (seqs,),
                     ),
                 ]
             except ImportError:
