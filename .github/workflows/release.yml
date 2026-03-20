@@ -96,7 +96,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: aarch64
-          args: --profile dist-release --features python,polars -i python${{ matrix.python-version }}
+          args: --release --features python,polars -i python${{ matrix.python-version }}
           sccache: "true"
 
       - name: Upload wheels
