@@ -173,7 +173,7 @@ tasks:
             --threshold-measure latency
             --threshold-test t_test
             --threshold-max-sample-size 64
-            --threshold-upper-boundary 0.01
+            --threshold-upper-boundary 0.99
             --thresholds-reset
             --err
             "uv run --no-sync pytest --benchmark-json results.json benches/bench_polars.py"
