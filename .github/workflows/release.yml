@@ -179,6 +179,26 @@ jobs:
       - name: Publish to PyPI
         run: uv publish dist/*
 
+  publish-npm:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    environment: npmjs
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM package
+        run: wasm-pack build --release --target nodejs --features wasm --no-default-features
+
+      - name: Publish to npm
+        working-directory: pkg
+        run: npm publish --access public
+
   publish-crate:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_release == 'true'

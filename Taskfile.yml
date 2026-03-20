@@ -164,7 +164,7 @@ tasks:
             - task: build-ci
               vars: { PROFILE: "{{.PROFILE}}" }
         silent: true
-        desc: "Run Python benchmarks with bencher"
+        desc: "Run Python benchmarks with bencher. Alerts are disabled, used only for tracking performance"
         cmd: >-
             bencher run
             --adapter python_pytest

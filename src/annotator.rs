@@ -50,7 +50,7 @@ pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.5;
     feature = "python",
     pyclass(name = "_Annotator", module = "immunum._internal", unsendable)
 )]
-#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen)]
+#[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip_typescript))]
 #[derive(Serialize, Deserialize)]
 pub struct Annotator {
     pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
@@ -184,7 +184,7 @@ mod tests {
 
         // Known IGH sequence
         let sequence =
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
+            "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
         let result = annotator.number(sequence).unwrap();
 
@@ -202,7 +202,7 @@ mod tests {
     fn test_number_with_single_chain() {
         let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
         let sequence =
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
+            "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
         let result = annotator.number(sequence).unwrap();
         assert_eq!(result.chain, Chain::IGH);

@@ -6,9 +6,75 @@ use crate::annotator::Annotator;
 use crate::numbering::segment;
 use crate::types::{Chain, Scheme};
 
+#[wasm_bindgen(typescript_custom_section)]
+const TS_TYPES: &str = r#"
+/** Numbered residues keyed by IMGT/Kabat position string (e.g. `"112A"`). */
+export type Numbering = Record<string, string>;
+
+/** Result returned by {@link Annotator.number}. */
+export interface NumberingResult {
+    /** Detected chain type: `"H"`, `"K"`, `"L"`, `"A"`, `"B"`, `"G"`, or `"D"`. */
+    chain: string;
+    /** Numbering scheme used: `"imgt"` or `"kabat"`. */
+    scheme: string;
+    /** Alignment confidence score between 0 and 1. */
+    confidence: number;
+    /** Position-to-residue mapping for the aligned region. */
+    numbering: Numbering;
+}
+
+/** FR/CDR segments returned by {@link Annotator.segment}. */
+export interface SegmentationResult {
+    fr1: string;
+    cdr1: string;
+    fr2: string;
+    cdr2: string;
+    fr3: string;
+    cdr3: string;
+    fr4: string;
+    /** Residues before FR1 (non-canonical N-terminal extension). */
+    prefix: string;
+    /** Residues after FR4 (non-canonical C-terminal extension). */
+    postfix: string;
+}
+
+/**
+ * Annotates antibody and T-cell receptor sequences with IMGT or Kabat position numbers.
+ *
+ * @param chains - Chain types to consider during auto-detection. Each entry is a
+ *   case-insensitive string. Accepted values:
+ *   - Antibody heavy chain: `"IGH"` / `"H"` / `"heavy"`
+ *   - Antibody kappa chain: `"IGK"` / `"K"` / `"kappa"`
+ *   - Antibody lambda chain: `"IGL"` / `"L"` / `"lambda"`
+ *   - TCR alpha chain:       `"TRA"` / `"A"` / `"alpha"`
+ *   - TCR beta chain:        `"TRB"` / `"B"` / `"beta"`
+ *   - TCR gamma chain:       `"TRG"` / `"G"` / `"gamma"`
+ *   - TCR delta chain:       `"TRD"` / `"D"` / `"delta"`
+ *
+ *   Pass all chains you want to consider; the annotator scores each and picks the
+ *   best-matching one. To consider every supported chain pass all seven values.
+ *
+ * @param scheme - Numbering scheme to use for output positions. Accepted values
+ *   (case-insensitive):
+ *   - `"IMGT"` / `"i"` — IMGT numbering (recommended; used internally)
+ *   - `"Kabat"` / `"k"` — Kabat numbering (derived from IMGT)
+ *
+ * @param min_confidence - Optional minimum alignment confidence threshold in the
+ *   range `[0, 1]`. Sequences scoring below this value are rejected with an error.
+ *   Defaults to `0.5` when `null` or omitted.
+ */
+export class Annotator {
+    free(): void;
+    [Symbol.dispose](): void;
+    constructor(chains: string[], scheme: string, min_confidence?: number | null);
+    number(sequence: string): NumberingResult;
+    segment(sequence: string): SegmentationResult;
+}
+"#;
+
 #[wasm_bindgen]
 impl Annotator {
-    #[wasm_bindgen(constructor, js_name = "new")]
+    #[wasm_bindgen(constructor, js_name = "new", skip_typescript)]
     pub fn wasm_new(
         chains: Vec<String>,
         scheme: String,
@@ -27,7 +93,7 @@ impl Annotator {
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
-    #[wasm_bindgen(js_name = "number")]
+    #[wasm_bindgen(js_name = "number", skip_typescript)]
     pub fn wasm_number(&self, sequence: &str) -> Result<JsValue, JsValue> {
         let result = self
             .number(sequence)
@@ -52,7 +118,7 @@ impl Annotator {
         Ok(dict.into())
     }
 
-    #[wasm_bindgen(js_name = "segment")]
+    #[wasm_bindgen(js_name = "segment", skip_typescript)]
     pub fn wasm_segment(&self, sequence: &str) -> Result<JsValue, JsValue> {
         let result = self
             .number(sequence)

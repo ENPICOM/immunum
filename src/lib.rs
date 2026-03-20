@@ -26,7 +26,7 @@
 //! // Create an annotator for all antibody chains with IMGT numbering
 //! let annotator = Annotator::new(&[Chain::IGH, Chain::IGK, Chain::IGL], Scheme::IMGT, None).unwrap();
 //!
-//! let sequence = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
+//! let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 //! let result = annotator.number(sequence).unwrap();
 //!
 //! println!("Chain:      {}", result.chain);       // IGH

@@ -44,15 +44,6 @@ IMMUNUM_CHAIN_MAP = {
     "G": "TRG",
     "D": "TRD",
 }
-RIOT_LOCUS_MAP = {
-    "H": "igh",
-    "K": "igk",
-    "L": "igl",
-    "A": "tra",
-    "B": "trb",
-    "G": "trg",
-    "D": "trd",
-}
 
 # IMGT region boundaries (numeric part of position string)
 IMGT_REGIONS: dict[str, tuple[int, int]] = {
@@ -278,43 +269,6 @@ def _run_anarcii2_parallel(
     return [item for chunk_result in results for item in chunk_result]
 
 
-def _run_riot(
-    sequences: list[tuple[str, str]], riot, locus: str, riot_scheme
-) -> list[Optional[dict[str, str]]]:
-    results: list[Optional[dict[str, str]]] = []
-    for header, seq in sequences:
-        r = riot.run_on_sequence(header, seq, scheme=riot_scheme)
-        if r is None or r.exc is not None or r.locus != locus:
-            results.append(None)
-            continue
-        results.append({str(k): v for k, v in r.scheme_residue_mapping.items()})
-    return results
-
-
-def _riot_worker(
-    args: tuple,
-) -> list[Optional[dict[str, str]]]:
-    sequences_chunk, locus, scheme_name = args
-    from riot_na import create_riot_aa, Organism, Scheme  # type: ignore[import]
-
-    riot = create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
-    riot_scheme = getattr(Scheme, scheme_name.upper())
-    return _run_riot(sequences_chunk, riot, locus, riot_scheme)
-
-
-def _run_riot_parallel(
-    sequences: list[tuple[str, str]], locus: str, scheme_name: str
-) -> list[Optional[dict[str, str]]]:
-    ncpu = os.cpu_count() or 1
-    chunk_size = max(1, (len(sequences) + ncpu - 1) // ncpu)
-    chunks = [
-        sequences[i : i + chunk_size] for i in range(0, len(sequences), chunk_size)
-    ]
-    with multiprocessing.Pool(ncpu) as pool:
-        results = pool.map(_riot_worker, [(c, locus, scheme_name) for c in chunks])
-    return [item for chunk_result in results for item in chunk_result]
-
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -350,14 +304,6 @@ def anarci_kwargs(request) -> dict:
 @pytest.fixture(scope="module", params=[{"chains": ["IGH"], "scheme": "IMGT"}])
 def immunum_annotator(request) -> Annotator:
     return Annotator(**request.param)
-
-
-@pytest.fixture(scope="module")
-def riot_annotator():
-    pytest.importorskip("riot_na")
-    from riot_na import create_riot_aa, Organism  # type: ignore[import]
-
-    return create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
 
 
 @pytest.fixture(
@@ -451,26 +397,6 @@ def test_anarcii2_parallel(benchmark, sample_seqs, sample_gt):
     benchmark.extra_info.update(_correctness(result, sample_gt))
 
 
-def test_riot(benchmark, sample_seqs, sample_gt, riot_annotator):
-    from riot_na import Scheme  # type: ignore[import]
-
-    result = benchmark.pedantic(
-        _run_riot,
-        args=(sample_seqs, riot_annotator, "igh", Scheme.IMGT),
-        rounds=3,
-        iterations=1,
-    )
-    benchmark.extra_info.update(_correctness(result, sample_gt))
-
-
-def test_riot_parallel(benchmark, sample_seqs, sample_gt):
-    pytest.importorskip("riot_na")
-    result = benchmark.pedantic(
-        _run_riot_parallel, args=(sample_seqs, "igh", "IMGT"), rounds=3, iterations=1
-    )
-    benchmark.extra_info.update(_correctness(result, sample_gt))
-
-
 # ---------------------------------------------------------------------------
 # CLI entrypoint
 # ---------------------------------------------------------------------------
@@ -523,7 +449,7 @@ def _timed(fn: Any, args: tuple, timeout_s: float) -> tuple[float, Any]:
     return elapsed, result
 
 
-AB_CHAINS = {"H", "K", "L"}  # chains supported by antpack / anarcii2 / riot
+AB_CHAINS = {"H", "K", "L"}  # chains supported by antpack / anarcii2
 
 
 @app.command()
@@ -546,7 +472,7 @@ def main(
                 "Tools to run (repeatable). Matches exact name or '<tool>_*' prefix. "
                 "E.g. --tools immunum --tools anarci. "
                 "Available: immunum, immunum_multithreaded, immunum_singlethreaded, "
-                "antpack, anarci, anarcii2, riot (each also has a _parallel variant)."
+                "antpack, anarci, anarcii2 (each also has a _parallel variant)."
             )
         ),
     ] = None,
@@ -559,7 +485,6 @@ def main(
         raise typer.Exit(1)
 
     immunum_chain = IMMUNUM_CHAIN_MAP[chain]
-    locus = RIOT_LOCUS_MAP[chain]
     is_ab = chain in AB_CHAINS
 
     timeout_s = _parse_duration(timeout)
@@ -647,27 +572,6 @@ def main(
                 ]
             except ImportError:
                 typer.echo("  anarcii not installed, skipping")
-
-            try:
-                from riot_na import create_riot_aa, Organism, Scheme  # type: ignore[import]
-
-                riot = create_riot_aa(allowed_species=(Organism.HOMO_SAPIENS,))
-                runner_specs += [
-                    (
-                        "riot",
-                        _run_riot,
-                        (lambda rt, lo, rs: lambda df, seqs: (seqs, rt, lo, rs))(
-                            riot, locus, Scheme.IMGT
-                        ),
-                    ),
-                    (
-                        "riot_parallel",
-                        _run_riot_parallel,
-                        lambda df, seqs, _lo=locus: (seqs, _lo, "imgt"),
-                    ),
-                ]
-            except ImportError:
-                typer.echo("  riot-na not installed, skipping")
 
         if tools:
             runner_specs = [
