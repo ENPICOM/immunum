@@ -22,7 +22,7 @@ jobs:
       UV_PYTHON: "3.13"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: bencherdev/bencher@main
 
@@ -30,7 +30,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Setup Taskfile
         run: uv tool install go-task-bin
@@ -55,7 +55,7 @@ jobs:
       UV_PYTHON: "3.13"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: bencherdev/bencher@main
 
@@ -63,7 +63,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
 
       - name: Setup Taskfile
         run: uv tool install go-task-bin
