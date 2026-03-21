@@ -16,7 +16,7 @@ classifiers = [
 ]
 keywords = ["antibody", "numbering", "schemes", "python", "imgt"]
 authors = [{ name = "ENPICOM", email = "dev@enpicom.com" }]
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 
 [project.urls]
 Homepage = "https://immunum.enpicom.com"
