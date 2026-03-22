@@ -191,7 +191,7 @@ plot_scaling = (
         single_label_map,
         "Single-threaded",
     )
-    | make_scaling_plot(
+    & make_scaling_plot(
         speed_df.filter(pl.col("tool").is_in(mt_tools)),
         mt_label_map,
         "Multi-threaded",
@@ -275,6 +275,9 @@ for name, p in [
     ("plot2_correctness", _configure_for_export(plot2)),
     ("plot3_scaling", _configure_for_export(plot_scaling)),
 ]:
-    path = f"docs/assets/benchmark_{name}.svg"
-    p.save(path)
-    print(f"Saved {path}")
+    svg_path = f"docs/assets/benchmark_{name}.svg"
+    p.save(svg_path)
+    print(f"Saved {svg_path}")
+    html_path = f"docs/assets/benchmark_{name}.html"
+    p.save(html_path)
+    print(f"Saved {html_path}")

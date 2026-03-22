@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    #vis.vega-embed {
+      width: 100%;
+      display: flex;
+    }
+
+    #vis.vega-embed details,
+    #vis.vega-embed details summary {
+      position: relative;
+    }
+  </style>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega@6"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-lite@6.1.0"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-embed@7"></script>
+</head>
+<body>
+  <div id="vis"></div>
+  <script>
+    (function(vegaEmbed) {
+      var spec = {"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": "#000000"}, "background": "#ffffff", "legend": {"labelColor": "#000000", "titleColor": "#000000"}, "title": {"anchor": "middle", "color": "#000000"}}, "data": {"name": "data-247ef96544cbec7f6ee52fbc5023c6f5"}, "mark": {"type": "bar", "opacity": 0.7, "size": 20, "stroke": "black", "strokeWidth": 1.5}, "encoding": {"color": {"field": "method", "title": "Tool", "type": "nominal"}, "tooltip": [{"field": "method", "type": "nominal"}, {"field": "segment", "type": "nominal"}, {"field": "pct_correct", "format": ".2f", "type": "quantitative"}], "x": {"axis": {"labelAngle": -45}, "field": "segment", "scale": {"paddingInner": 0.3}, "sort": ["FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4"], "title": "Segment", "type": "nominal"}, "xOffset": {"field": "method", "scale": {"paddingInner": 0.01}, "type": "nominal"}, "y": {"field": "pct_correct", "scale": {"domain": [0, 100]}, "title": "% Correct", "type": "quantitative"}}, "height": 400, "title": "Correctness by segment (n=1,000, averaged across chains)", "width": 1000, "$schema": "https://vega.github.io/schema/vega-lite/v6.1.0.json", "datasets": {"data-247ef96544cbec7f6ee52fbc5023c6f5": [{"method": "anarcii2", "segment": "FR1", "pct_correct": 61.83047619047619}, {"method": "antpack", "segment": "FR1", "pct_correct": 100.0}, {"method": "immunum", "segment": "FR1", "pct_correct": 99.98428571428572}, {"method": "anarcii2", "segment": "CDR1", "pct_correct": 35.845238095238095}, {"method": "antpack", "segment": "CDR1", "pct_correct": 100.0}, {"method": "immunum", "segment": "CDR1", "pct_correct": 100.0}, {"method": "anarcii2", "segment": "FR2", "pct_correct": 64.06619047619049}, {"method": "antpack", "segment": "FR2", "pct_correct": 100.0}, {"method": "immunum", "segment": "FR2", "pct_correct": 100.0}, {"method": "anarcii2", "segment": "CDR2", "pct_correct": 36.06619047619048}, {"method": "antpack", "segment": "CDR2", "pct_correct": 100.0}, {"method": "immunum", "segment": "CDR2", "pct_correct": 100.0}, {"method": "anarcii2", "segment": "FR3", "pct_correct": 65.85666666666667}, {"method": "antpack", "segment": "FR3", "pct_correct": 100.0}, {"method": "immunum", "segment": "FR3", "pct_correct": 99.99571428571429}, {"method": "anarcii2", "segment": "CDR3", "pct_correct": 32.83761904761905}, {"method": "antpack", "segment": "CDR3", "pct_correct": 100.0}, {"method": "immunum", "segment": "CDR3", "pct_correct": 99.99142857142859}, {"method": "anarcii2", "segment": "FR4", "pct_correct": 84.30380952380953}, {"method": "antpack", "segment": "FR4", "pct_correct": 100.0}, {"method": "immunum", "segment": "FR4", "pct_correct": 99.96285714285713}]}};
+      var embedOpt = {"mode": "vega-lite"};
+
+      function showError(el, error){
+          el.innerHTML = ('<div style="color:red;">'
+                          + '<p>JavaScript Error: ' + error.message + '</p>'
+                          + "<p>This usually means there's a typo in your chart specification. "
+                          + "See the javascript console for the full traceback.</p>"
+                          + '</div>');
+          throw error;
+      }
+      const el = document.getElementById('vis');
+      vegaEmbed("#vis", spec, embedOpt)
+        .catch(error => showError(el, error));
+    })(vegaEmbed);
+
+  </script>
+</body>
+</html>
