@@ -17,6 +17,7 @@ include = [
     "build.rs",
     "resources/consensus/*.csv",
     "/README.md",
+    "/LICENSE",
     "Cargo.toml",
 ]
 
