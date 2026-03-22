@@ -5,3 +5,5 @@
 ::: immunum.polars.segment
 
 ::: immunum.polars.numbering_method
+
+::: immunum.polars.segmentation_method
