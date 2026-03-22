@@ -48,7 +48,10 @@ theme:
 
 nav:
   - Home: index.md
-  - Usage: usage/index.md
+  - Usage:
+      - usage/index.md
+      - Python module: usage/python.md
+      - Polars module: usage/polars.md
   - API:
       - api/index.md
       - immunum: api/immunum.md
