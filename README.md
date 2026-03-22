@@ -11,9 +11,7 @@ High-performance antibody and TCR sequence numbering in Rust, Python, and WebAss
 
 ## Overview
 
-`immunum` is a library for numbering antibody and T-cell receptor (TCR) variable domain sequences. It uses Needleman-Wunsch semi-global alignment against position-specific scoring matrices (PSSM) built from consensus sequences, with BLOSUM62-based substitution scores.
-
-**>99% position accuracy** across 6,000+ validation sequences. Processes a full dataset in ~0.6s.
+`immunum` is a library for numbering antibody and T-cell receptor (TCR) variable domain sequences. It uses Needleman-Wunsch semi-global alignment against position-specific scoring matrices built from consensus sequences, with BLOSUM62-based substitution scores.
 
 Available as:
 
@@ -23,12 +21,12 @@ Available as:
 
 ### Supported chains
 
-| Antibody | TCR |
-|----------|-----|
-| IGH (heavy) | TRA (alpha) |
-| IGK (kappa) | TRB (beta) |
+| Antibody     | TCR         |
+| ------------ | ----------- |
+| IGH (heavy)  | TRA (alpha) |
+| IGK (kappa)  | TRB (beta)  |
 | IGL (lambda) | TRD (delta) |
-| | TRG (gamma) |
+|              | TRG (gamma) |
 
 ### Numbering schemes
 
@@ -146,12 +144,13 @@ await init(); // load the wasm module
 
 const annotator = new Annotator(["H", "K", "L"], "imgt");
 
-const sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+const sequence =
+  "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
 const result = annotator.number(sequence);
-console.log(result.chain);       // "H"
-console.log(result.confidence);  // 0.97
-console.log(result.numbering);   // { "1": "E", "2": "V", ... }
+console.log(result.chain); // "H"
+console.log(result.confidence); // 0.97
+console.log(result.numbering); // { "1": "E", "2": "V", ... }
 
 const segments = annotator.segment(sequence);
 console.log(segments.cdr3);
@@ -199,11 +198,11 @@ immunum number [OPTIONS] [INPUT] [OUTPUT]
 
 ### Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`) | `imgt` |
-| `-c, --chain` | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig` |
-| `-f, --format` | Output format: `tsv`, `json`, `jsonl` | `tsv` |
+| Flag           | Description                                                                                                                        | Default |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`)                                                                                      | `imgt`  |
+| `-c, --chain`  | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig`    |
+| `-f, --format` | Output format: `tsv`, `json`, `jsonl`                                                                                              | `tsv`   |
 
 ### Input
 
@@ -307,6 +306,7 @@ $ task | grep benchmark
 ```
 
 ## Project structure
+
 ```
 src/
 ├── main.rs          # CLI binary (immunum number ...)
