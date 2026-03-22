@@ -20,6 +20,9 @@ print(result.numbering["1"])  # "Q"
 **Segmentation** splits the sequence into FR1–FR4 and CDR1–CDR3 regions plus prefix/postfix:
 
 ```python
+from immunum import Annotator
+
+annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
 result = annotator.segment(
     "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
 )

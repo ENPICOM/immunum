@@ -13,33 +13,37 @@ Note that `.unique()` is called before materializing any other columns — this 
 loading the full FR region strings for every row.
 
 ```python
+import pytest
 import polars as pl
 import immunum.polars as imp
 
-PARQUET = "test.parquet"
 
-unique_pairs = (
-    pl.scan_parquet(PARQUET)
-    .filter(
-        pl.all_horizontal(
-            pl.col("sequence_alignment_aa_heavy").is_not_null(),
-            pl.col("sequence_alignment_aa_light").is_not_null(),
+def unique_cdr3_pairs(source: str) -> pl.DataFrame:
+    return (
+        pl.scan_parquet(source)
+        .filter(
+            pl.all_horizontal(
+                pl.col("sequence_alignment_aa_heavy").is_not_null(),
+                pl.col("sequence_alignment_aa_light").is_not_null(),
+            )
         )
+        .select(
+            imp.segment("sequence_alignment_aa_heavy", chains=["IGH"], scheme="IMGT")
+            .name.suffix_fields("_heavy")
+            .struct.unnest(),
+            imp.segment("sequence_alignment_aa_light", chains=["IGL", "IGK"], scheme="IMGT")
+            .name.suffix_fields("_light")
+            .struct.unnest(),
+        )
+        .unique(subset=["cdr3_heavy", "cdr3_light"])
+        .select("cdr3_heavy", "cdr3_light")
+        .head(20)
+        .collect(engine="streaming")
     )
-    .select(
-        imp.segment("sequence_alignment_aa_heavy", chains=["IGH"], scheme="IMGT")
-        .name.suffix_fields("_heavy")
-        .struct.unnest(),
-        imp.segment("sequence_alignment_aa_light", chains=["IGL", "IGK"], scheme="IMGT")
-        .name.suffix_fields("_light")
-        .struct.unnest(),
-    )
-    .unique(subset=["cdr3_heavy", "cdr3_light"])
-    .select("cdr3_heavy", "cdr3_light")
-    .head(20)
-    .collect(engine="streaming")
-)
-print(unique_pairs)
+
+
+pytest.skip("requires parquet data files")
+print(unique_cdr3_pairs("source.parquet"))
 
 # shape: (20, 2)
 # ┌──────────────────────┬──────────────┐
@@ -68,70 +72,49 @@ sequences in the reference dataset share the same frameworks, then return the 20
 common groups.
 
 ```python
+import pytest
 import polars as pl
 import immunum.polars as imp
 
-heavy_col = "sequence_alignment_aa_heavy"
-light_col = "sequence_alignment_aa_light"
-N = 10_000
-SOURCE = (
-    pl.scan_parquet("test.parquet")
-    .filter(
-        pl.all_horizontal(
-            pl.col(heavy_col).is_not_null(),
-            pl.col(light_col).is_not_null(),
-        )
-    )
-    .head(N)
-)
-TARGET = (
-    pl.scan_parquet("validate.parquet")
-    .filter(
-        pl.all_horizontal(
-            pl.col(heavy_col).is_not_null(),
-            pl.col(light_col).is_not_null(),
-        )
-    )
-    .head(N)
-)
+HEAVY = "sequence_alignment_aa_heavy"
+LIGHT = "sequence_alignment_aa_light"
+FRAMEWORK_COLS = ["fr1_heavy", "fr2_heavy", "fr3_heavy", "fr1_light", "fr2_light", "fr3_light"]
 
-FRAMEWORK_COLS = [
-    "fr1_heavy",
-    "fr2_heavy",
-    "fr3_heavy",
-    "fr1_light",
-    "fr2_light",
-    "fr3_light",
-]
 
-top_groups = (
-    SOURCE.select(
-        imp.segment(heavy_col, chains=["IGH"], scheme="IMGT")
-        .name.suffix_fields("_heavy")
-        .struct.unnest(),
-        imp.segment(light_col, chains=["IGK", "IGL"], scheme="IMGT")
-        .name.suffix_fields("_light")
-        .struct.unnest(),
+def top_framework_groups(source: str, target: str, n: int = 10_000) -> pl.DataFrame:
+    def _segment(path: str) -> pl.LazyFrame:
+        return (
+            pl.scan_parquet(path)
+            .filter(
+                pl.all_horizontal(
+                    pl.col(HEAVY).is_not_null(),
+                    pl.col(LIGHT).is_not_null(),
+                )
+            )
+            .head(n)
+            .select(
+                imp.segment(HEAVY, chains=["IGH"], scheme="IMGT")
+                .name.suffix_fields("_heavy")
+                .struct.unnest(),
+                imp.segment(LIGHT, chains=["IGK", "IGL"], scheme="IMGT")
+                .name.suffix_fields("_light")
+                .struct.unnest(),
+            )
+        )
+
+    return (
+        _segment(source)
+        .join(_segment(target), on=FRAMEWORK_COLS, how="inner")
+        .group_by(FRAMEWORK_COLS)
+        .agg(pl.len().alias("count"))
+        .sort("count", descending=True)
+        .head(20)
+        .collect(engine="streaming")
     )
-    .join(
-        TARGET.select(
-            imp.segment(heavy_col, chains=["IGH"], scheme="IMGT")
-            .name.suffix_fields("_heavy")
-            .struct.unnest(),
-            imp.segment(light_col, chains=["IGK", "IGL"], scheme="IMGT")
-            .name.suffix_fields("_light")
-            .struct.unnest(),
-        ),
-        on=FRAMEWORK_COLS,
-        how="inner",
-    )
-    .group_by(FRAMEWORK_COLS)
-    .agg(pl.len().alias("count"))
-    .sort("count", descending=True)
-    .head(20)
-    .collect(engine="streaming")
-)
-print(top_groups)
+
+
+pytest.skip("requires parquet data files")
+print(top_framework_groups("source.parquet", "target.parquet"))
 
 # shape: (20, 7)
 # ┌───────────────────────────┬───────────────────┬─────────────────────────────────┬────────────────────────────┬───────────────────┬─────────────────────────────────┬───────┐
@@ -164,19 +147,26 @@ Ecosystem of `polars` has many handy tools for data engineering -- for instance,
 an intermediate file:
 
 ```python
+import pytest
 import polars as pl
-import polars_bio as pb
+pb = pytest.importorskip("polars-bio")
 import immunum.polars as imp
 
-print(
-    pb.scan_fasta("sequences.fasta")
-    .select(
-        pl.col("name"),
-        imp.segment("sequence", chains=["IGH", "IGK", "IGL"], scheme="IMGT")
-        .struct.unnest(),
+
+def annotate_fasta(path: str) -> pl.DataFrame:
+    return (
+        pb.scan_fasta(path)
+        .select(
+            pl.col("name"),
+            imp.segment("sequence", chains=["IGH", "IGK", "IGL"], scheme="IMGT")
+            .struct.unnest(),
+        )
+        .collect(engine="streaming")
     )
-    .collect(engine='streaming')
-)
+
+
+pytest.skip("requires polars_bio and a FASTA file")
+print(annotate_fasta("sequences.fasta"))
 ```
 
 ### Example: computing minimal distance between CDR3s in two datasets
@@ -186,47 +176,46 @@ Pre-filter to unique CDR3s and, if the datasets are large, narrow the search to
 equal-length sequences first to reduce the cross-product size.
 
 ```python
+import pytest
 import polars as pl
+pld = pytest.importorskip("polars_distance")
 import immunum.polars as imp
-import polars_distance as pld
 
-result = (
-    SOURCE
-    .select(
-        imp.segment(heavy_col, chains=["IGH"], scheme="IMGT")
-        .struct.field("cdr3")
-        .alias("cdr3_a")
-    )
-    .filter(pl.col("cdr3_a").is_not_null())
-    .unique("cdr3_a")
-    .collect()
-    .join(
-        TARGET
-        .select(
-            imp.segment(heavy_col, chains=["IGH"], scheme="IMGT")
-            .struct.field("cdr3")
-            .alias("cdr3_b")
+
+def nearest_cdr3s(source: str, target: str) -> pl.DataFrame:
+    def _extract(path: str, alias: str) -> pl.DataFrame:
+        return (
+            pl.scan_parquet(path)
+            .select(
+                imp.segment("sequence_aa", chains=["IGH"], scheme="IMGT")
+                .struct.field("cdr3")
+                .alias(alias)
+            )
+            .filter(pl.col(alias).is_not_null())
+            .unique(alias)
+            .collect()
         )
-        .filter(pl.col("cdr3_b").is_not_null())
-        .unique("cdr3_b")
-        .collect(),
-        how="cross",
+
+    return (
+        _extract(source, "cdr3_a")
+        .join(_extract(target, "cdr3_b"), how="cross")
+        .select(
+            pl.col("cdr3_a"),
+            pl.col("cdr3_b"),
+            pld.col("cdr3_a").dist_str.levenshtein("cdr3_b").alias("dist"),
+        )
+        .group_by("cdr3_a")
+        .agg(
+            pl.col("dist").min().alias("min_dist"),
+            pl.col("cdr3_b").sort_by("dist").first().alias("nearest_cdr3"),
+        )
+        .sort("min_dist")
+        .head(20)
     )
-    .select(
-        pl.col("cdr3_a"),
-        pl.col("cdr3_b"),
-        pld.col("cdr3_a").dist_str.levenshtein("cdr3_b").alias("dist"),
-    )
-    .group_by("cdr3_a")
-    .agg(
-        pl.col("dist").min().alias("min_dist"),
-        pl.col("cdr3_b").sort_by("dist").first().alias("nearest_cdr3"),
-    )
-    .sort("min_dist")
-    .head(20)
-    .collect(engine='streaming')
-)
-print(result)
+
+
+pytest.skip("requires polars_distance and parquet data files")
+print(nearest_cdr3s("source.parquet", "target.parquet"))
 
 # shape: (20, 3)
 # ┌───────────────────┬──────────┬───────────────────┐
