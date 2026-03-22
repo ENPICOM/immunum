@@ -63,4 +63,4 @@ Mean wall-clock time (log scale) as a function of batch size, from 100 to 1,000,
 sequences. Separate panels for single-threaded and multi-threaded execution.
 Deviations (especially in the multi-threaded panel) reflect parallelisation overhead and process-spawning costs.
 
-<iframe src="../assets/benchmark_plot3_scaling.html" width="100%" height="800px" frameborder="0" scrolling="no"></iframe>
+<iframe src="../assets/benchmark_plot3_scaling.html" width="100%" height="1000px" frameborder="0" scrolling="no"></iframe>
