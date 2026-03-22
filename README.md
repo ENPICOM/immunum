@@ -92,13 +92,13 @@ annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
 sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
 
 result = annotator.segment(sequence)
-print(result.fr1)   # QVQLVQSGAEVKRPGSSVTVSCKAS
-print(result.cdr1)  # GGSFSTYA
-print(result.fr2)   # LSWVRQAPGRGLEWMGG
-print(result.cdr2)  # VIPLLTIT
-print(result.fr3)   # NYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYC
-print(result.cdr3)  # AREGTTGKPIGAFAH
-print(result.fr4)   # WGQGTLVTVSS
+assert result.fr1 == 'QVQLVQSGAEVKRPGSSVTVSCKAS'
+assert result.cdr1 == 'GGSFSTYA'
+assert result.fr2 == 'LSWVRQAPGRGLEWMGG'
+assert result.cdr2 == 'VIPLLTIT'
+assert result.fr3 == 'NYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYC'
+assert result.cdr3 == 'AREGTTGKPIGAFAH'
+assert result.fr4 == 'WGQGTLVTVSS'
 ```
 
 Chains: `"H"` (heavy), `"K"` (kappa), `"L"` (lambda), `"A"` (TRA), `"B"` (TRB), `"G"` (TRG), `"D"` (TRD).
