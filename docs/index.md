@@ -1,3 +1,1 @@
-# Section
-
-Hello, world!
+--8<-- "README.md"

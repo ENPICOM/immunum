@@ -74,8 +74,6 @@ p1_data = perf_base.filter(pl.col("tool").is_in(single_tools)).with_columns(
 p3_data = perf_base.filter(pl.col("tool").is_in(mt_tools)).with_columns(
     pl.col("tool").replace(mt_label_map).alias("method")
 )
-print(p3_data.get_column("tool").unique())
-print(p1_data.get_column("tool").unique())
 
 
 def make_perf_barplot(data: pl.DataFrame, title: str) -> alt.Chart:
@@ -277,6 +275,6 @@ for name, p in [
     ("plot2_correctness", _configure_for_export(plot2)),
     ("plot3_scaling", _configure_for_export(plot_scaling)),
 ]:
-    path = f"assets/benchmark_{name}.svg"
+    path = f"docs/assets/benchmark_{name}.svg"
     p.save(path)
     print(f"Saved {path}")

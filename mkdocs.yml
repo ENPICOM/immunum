@@ -48,11 +48,12 @@ theme:
 
 nav:
   - Home: index.md
-  - Usage:
-      - Overview: usage/index.md
-  - API Reference:
+  - Usage: usage/index.md
+  - API:
       - api/index.md
-      - Annotator: api/annotator.md
+      - immunum: api/immunum.md
+      - immunum.polars: api/polars.md
+  - Benchmarks: benchmarks/index.md
 
 extra_css:
   - stylesheets/extra.css
@@ -70,6 +71,8 @@ plugins:
             docstring_style: google
 
 markdown_extensions:
+  - pymdownx.snippets:
+      base_path: [.]
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
