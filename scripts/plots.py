@@ -73,8 +73,6 @@ p1_data = perf_base.filter(pl.col("tool").is_in(single_tools)).with_columns(
 p3_data = perf_base.filter(pl.col("tool").is_in(mt_tools)).with_columns(
     pl.col("tool").replace(mt_label_map).alias("method")
 )
-print(p3_data.get_column("tool").unique())
-print(p1_data.get_column("tool").unique())
 
 
 def make_perf_barplot(data: pl.DataFrame, title: str) -> alt.Chart:
