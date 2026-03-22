@@ -117,3 +117,7 @@ fail_on = "high"
 [tool.ty.src]
 include = ["immunum"]
 exclude = ["tests", "benches"]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 40

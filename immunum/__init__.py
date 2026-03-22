@@ -61,21 +61,33 @@ class SegmenationResult:
     ```python
     from immunum import Annotator
 
-    annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
+    annotator = Annotator(
+        chains=["H", "K", "L"],
+        scheme="imgt",
+    )
 
     sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
 
     result = annotator.segment(sequence)
-    assert result.fr1 == 'QVQLVQSGAEVKRPGSSVTVSCKAS'
-    assert result.cdr1 == 'GGSFSTYA'
-    assert result.fr2 == 'LSWVRQAPGRGLEWMGG'
-    assert result.cdr2 == 'VIPLLTIT'
-    assert result.fr3 == 'NYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYC'
-    assert result.cdr3 == 'AREGTTGKPIGAFAH'
-    assert result.fr4 == 'WGQGTLVTVSS'
+    assert (
+        result.fr1
+        == "QVQLVQSGAEVKRPGSSVTVSCKAS"
+    )
+    assert result.cdr1 == "GGSFSTYA"
+    assert result.fr2 == "LSWVRQAPGRGLEWMGG"
+    assert result.cdr2 == "VIPLLTIT"
+    assert (
+        result.fr3
+        == "NYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYC"
+    )
+    assert result.cdr3 == "AREGTTGKPIGAFAH"
+    assert result.fr4 == "WGQGTLVTVSS"
 
-    for segment, aminoacids in result.as_dict().items():
-        print(f'{segment}: {aminoacids}')
+    for (
+        segment,
+        aminoacids,
+    ) in result.as_dict().items():
+        print(f"{segment}: {aminoacids}")
 
     # fr1: QVQLVQSGAEVKRPGSSVTVSCKAS
     # cdr1: GGSFSTYA
@@ -126,18 +138,26 @@ class NumberingResult:
     ```python
     from immunum import Annotator
 
-    annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
+    annotator = Annotator(
+        chains=["H", "K", "L"],
+        scheme="imgt",
+    )
 
     sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
 
     result = annotator.number(sequence)
-    assert result.chain == 'H'
-    assert result.scheme == 'IMGT'
-    assert isinstance(result.confidence, float)
-    assert result.numbering['1'] == 'Q'
+    assert result.chain == "H"
+    assert result.scheme == "IMGT"
+    assert isinstance(
+        result.confidence, float
+    )
+    assert result.numbering["1"] == "Q"
 
-    for position, amino_acid in result.numbering.items():
-        print(f'{position}: {amino_acid}')
+    for (
+        position,
+        amino_acid,
+    ) in result.numbering.items():
+        print(f"{position}: {amino_acid}")
 
     # 1: Q
     # 2: V

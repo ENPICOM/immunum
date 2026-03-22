@@ -3,14 +3,14 @@
 ::: immunum.Annotator
     options:
       members: true
-      filters: ["!^__"]
+      filters: ["!^_"]
 
 ::: immunum.NumberingResult
     options:
       members: true
-      filters: ["!^__"]
+      filters: ["!^_"]
 
 ::: immunum.SegmenationResult
     options:
       members: true
-      filters: ["!^__"]
+      filters: ["!^_"]

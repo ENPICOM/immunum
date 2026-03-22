@@ -66,9 +66,13 @@ plugins:
         python:
           paths: [.]
           options:
-            show_source: false
+            members_order: source
+            show_source: true
             show_root_heading: true
             docstring_style: google
+            show_if_no_docstring: false
+            filters: ["!^_"]
+            show_attribute_values: false
 
 markdown_extensions:
   - pymdownx.snippets:
@@ -85,3 +89,8 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - footnotes
+
+validation:
+  links:
+    unrecognized_links: ignore
+    anchors: ignore
