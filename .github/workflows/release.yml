@@ -145,14 +145,23 @@ jobs:
           VERSION="${{ needs.check-version.outputs.version }}"
           gh release create "v$VERSION" \
             --title "Release v$VERSION" \
-            --notes "Python wheels for immunum v$VERSION
+            --notes "## immunum v$VERSION
 
+          ### Python
           Built for:
-          - Python 3.10, 3.11, 3.12, 3.13
+          - Python 3.13 (abi3, compatible with 3.9+)
           - Linux x86_64 and aarch64 (manylinux)
           - macOS Apple Silicon (aarch64)
 
-          Install with: \`pip install immunum==$VERSION\`" \
+          Install with: \`pip install immunum==$VERSION\`
+
+          ### JavaScript / WASM
+          Built for Node.js (CommonJS).
+
+          Install with: \`npm install immunum@$VERSION\`
+
+          ### Rust
+          Install with: \`cargo add immunum@$VERSION\`" \
             dist/*
 
   publish-pypi:
