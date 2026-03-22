@@ -35,7 +35,7 @@ acc_summary = (
 
 # ── Plots 1 & 3: Performance boxplots at fixed batch size ────────────────────
 # BATCH_SIZE = speed_df["sample_size"].median()
-BATCH_SIZE = 500_000
+BATCH_SIZE = 10_000
 
 single_tools = [
     "immunum_singlethreaded",

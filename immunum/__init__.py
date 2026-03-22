@@ -1,6 +1,56 @@
 from immunum._internal import _Annotator  # noqa: F401
 from dataclasses import dataclass
 
+_CHAIN_ALIASES: dict[str, str] = {
+    "igh": "IGH",
+    "h": "IGH",
+    "heavy": "IGH",
+    "igk": "IGK",
+    "k": "IGK",
+    "kappa": "IGK",
+    "igl": "IGL",
+    "l": "IGL",
+    "lambda": "IGL",
+    "tra": "TRA",
+    "a": "TRA",
+    "alpha": "TRA",
+    "trb": "TRB",
+    "b": "TRB",
+    "beta": "TRB",
+    "trg": "TRG",
+    "g": "TRG",
+    "gamma": "TRG",
+    "trd": "TRD",
+    "d": "TRD",
+    "delta": "TRD",
+}
+
+_SCHEME_ALIASES: dict[str, str] = {
+    "imgt": "IMGT",
+    "i": "IMGT",
+    "kabat": "Kabat",
+    "k": "Kabat",
+}
+
+
+def _normalize_chains(chains: list[str]) -> list[str]:
+    result = []
+    for chain in chains:
+        normalized = _CHAIN_ALIASES.get(chain.lower())
+        if normalized is None:
+            valid = sorted(set(_CHAIN_ALIASES.values()))
+            raise ValueError(f"Unknown chain {chain!r}. Valid chains: {valid}")
+        result.append(normalized)
+    return result
+
+
+def _normalize_scheme(scheme: str) -> str:
+    normalized = _SCHEME_ALIASES.get(scheme.lower())
+    if normalized is None:
+        valid = sorted(set(_SCHEME_ALIASES.values()))
+        raise ValueError(f"Unknown scheme {scheme!r}. Valid schemes: {valid}")
+    return normalized
+
 
 @dataclass(frozen=True)
 class SegmenationResult:
@@ -75,7 +125,9 @@ class Annotator:
         min_confidence: float | None = None,
     ):
         self._annotator = _Annotator(
-            chains=chains, scheme=scheme, min_confidence=min_confidence
+            chains=_normalize_chains(chains),
+            scheme=_normalize_scheme(scheme),
+            min_confidence=min_confidence,
         )
 
     def number(self, sequence: str) -> NumberingResult:

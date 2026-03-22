@@ -12,6 +12,7 @@ except ImportError as e:
     ) from e
 
 from immunum._internal import _Annotator  # noqa: F401
+from immunum import _normalize_chains, _normalize_scheme
 
 if TYPE_CHECKING:
     from immunum.typing import IntoExprColumn
@@ -42,7 +43,11 @@ def number(
         plugin_path=LIB,
         function_name="numbering_struct_expr",
         is_elementwise=True,
-        kwargs={"chains": chains, "scheme": scheme, "min_confidence": min_confidence},
+        kwargs={
+            "chains": _normalize_chains(chains),
+            "scheme": _normalize_scheme(scheme),
+            "min_confidence": min_confidence,
+        },
     )
 
 
@@ -58,5 +63,9 @@ def segment(
         plugin_path=LIB,
         function_name="segmentation_struct_expr",
         is_elementwise=True,
-        kwargs={"chains": chains, "scheme": scheme, "min_confidence": min_confidence},
+        kwargs={
+            "chains": _normalize_chains(chains),
+            "scheme": _normalize_scheme(scheme),
+            "min_confidence": min_confidence,
+        },
     )

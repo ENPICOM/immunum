@@ -37,6 +37,7 @@ def get_benchmark_threshold(benchmark_key: str) -> float:
 
 
 def compare_fixture(csv_path: Path, chains: list[str], scheme: str) -> tuple[int, int]:
+    # no cover: start
     """Returns (mismatches, total) for a validation fixture."""
     df = polars.read_csv(csv_path, infer_schema=False)
     position_cols = [c for c in df.columns if c not in META_COLS]
@@ -63,6 +64,7 @@ def compare_fixture(csv_path: Path, chains: list[str], scheme: str) -> tuple[int
         if got != expected:
             mismatches += 1
 
+    # no cover: stop
     return mismatches, result.height
 
 
