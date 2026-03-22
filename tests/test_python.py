@@ -40,6 +40,14 @@ TRD_SEQ = "QKVTQAQSSVSMPVRKAVTLNCLYETSWWSYYIFWYKQLPSKEMIFLIRQGSDEQNAKSGRYSVNFKKA
         pytest.param((["lambda"], "IMGT", IGL_SEQ), id="named_chain_alias_lambda"),
         pytest.param((["alpha"], "IMGT", TRA_SEQ), id="named_chain_alias_alpha"),
         pytest.param((["beta"], "IMGT", TRB_SEQ), id="named_chain_alias_beta"),
+        pytest.param((["A"], "IMGT", TRA_SEQ), id="short_chain_alias_A"),
+        pytest.param((["B"], "IMGT", TRB_SEQ), id="short_chain_alias_B"),
+        pytest.param((["G"], "IMGT", TRG_SEQ), id="short_chain_alias_G"),
+        pytest.param((["D"], "IMGT", TRD_SEQ), id="short_chain_alias_D"),
+        pytest.param((["gamma"], "IMGT", TRG_SEQ), id="named_chain_alias_gamma"),
+        pytest.param((["delta"], "IMGT", TRD_SEQ), id="named_chain_alias_delta"),
+        pytest.param((["IGH"], "i", IGH_SEQ), id="scheme_alias_i"),
+        pytest.param((AB_CHAINS, "k", IGL_SEQ), id="scheme_alias_k"),
     ]
 )
 def annotator_and_seq(request):
@@ -117,3 +125,51 @@ class TestNumbering:
         assert set(result.as_dict()) == {f"cdr{i}" for i in (1, 2, 3)} | {
             f"fr{i}" for i in (1, 2, 3, 4)
         } | {"prefix", "postfix"}
+
+
+class TestNormalization:
+    @pytest.mark.parametrize(
+        "alias_chains,canonical_chains,scheme,seq",
+        [
+            (["H"], ["IGH"], "IMGT", IGH_SEQ),
+            (["K"], ["IGK"], "IMGT", IGL_SEQ),
+            (["L"], ["IGL"], "IMGT", IGL_SEQ),
+            (["A"], ["TRA"], "IMGT", TRA_SEQ),
+            (["B"], ["TRB"], "IMGT", TRB_SEQ),
+            (["G"], ["TRG"], "IMGT", TRG_SEQ),
+            (["D"], ["TRD"], "IMGT", TRD_SEQ),
+            (["heavy"], ["IGH"], "IMGT", IGH_SEQ),
+            (["kappa"], ["IGK"], "IMGT", IGL_SEQ),
+            (["lambda"], ["IGL"], "IMGT", IGL_SEQ),
+            (["alpha"], ["TRA"], "IMGT", TRA_SEQ),
+            (["beta"], ["TRB"], "IMGT", TRB_SEQ),
+            (["gamma"], ["TRG"], "IMGT", TRG_SEQ),
+            (["delta"], ["TRD"], "IMGT", TRD_SEQ),
+            (["igh"], ["IGH"], "imgt", IGH_SEQ),
+            (["IGH"], ["IGH"], "i", IGH_SEQ),
+            (AB_CHAINS, AB_CHAINS, "k", IGL_SEQ),
+        ],
+    )
+    def test_alias_produces_identical_result(
+        self, alias_chains, canonical_chains, scheme, seq
+    ):
+        alias_result = immunum.Annotator(alias_chains, scheme).number(seq)
+        canonical_result = immunum.Annotator(
+            canonical_chains, "IMGT" if scheme in ("i", "imgt", "IMGT") else "Kabat"
+        ).number(seq)
+        assert alias_result.chain == canonical_result.chain
+        assert alias_result.scheme == canonical_result.scheme
+        assert alias_result.numbering == canonical_result.numbering
+
+    @pytest.mark.parametrize(
+        "chains,scheme",
+        [
+            (["INVALID"], "IMGT"),
+            (["IGH"], "INVALID"),
+            (["Z"], "IMGT"),
+            (["IGX"], "IMGT"),
+        ],
+    )
+    def test_unknown_alias_raises(self, chains, scheme):
+        with pytest.raises(ValueError):
+            immunum.Annotator(chains, scheme)

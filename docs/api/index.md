@@ -1,3 +1,4 @@
 # API Reference
 
-- [Annotator](annotator.md) — sequence annotation and numbering
+- [immunum](immunum.md) — core classes and sequence annotation
+- [immunum.polars](polars.md) — Polars plugin for vectorized batch processing

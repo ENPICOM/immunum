@@ -49,10 +49,14 @@ theme:
 nav:
   - Home: index.md
   - Usage:
-      - Overview: usage/index.md
-  - API Reference:
+      - usage/index.md
+      - Python module: usage/python.md
+      - Polars module: usage/polars.md
+  - API:
       - api/index.md
-      - Annotator: api/annotator.md
+      - immunum: api/immunum.md
+      - immunum.polars: api/polars.md
+  - Benchmarks: benchmarks/index.md
 
 extra_css:
   - stylesheets/extra.css
@@ -65,11 +69,17 @@ plugins:
         python:
           paths: [.]
           options:
-            show_source: false
+            members_order: source
+            show_source: true
             show_root_heading: true
             docstring_style: google
+            show_if_no_docstring: false
+            filters: ["!^_"]
+            show_attribute_values: false
 
 markdown_extensions:
+  - pymdownx.snippets:
+      base_path: [.]
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -82,3 +92,8 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - footnotes
+
+validation:
+  links:
+    unrecognized_links: ignore
+    anchors: ignore

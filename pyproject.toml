@@ -92,8 +92,8 @@ immunum-rs = { workspace = true }
 
 [tool.pytest.ini_options]
 markers = ["slow: mark test as slow (requires full validation fixtures)"]
-addopts = "--markdown-docs"
-testpaths = ["docs", "tests"]
+addopts = "--markdown-docs --doctest-modules"
+testpaths = ["docs", "tests", "immunum"]
 
 
 [tool.coverage.report]
@@ -117,3 +117,7 @@ fail_on = "high"
 [tool.ty.src]
 include = ["immunum"]
 exclude = ["tests", "benches"]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 40

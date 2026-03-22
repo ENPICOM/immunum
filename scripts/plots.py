@@ -34,8 +34,7 @@ acc_summary = (
 )
 
 # ── Plots 1 & 3: Performance boxplots at fixed batch size ────────────────────
-# BATCH_SIZE = speed_df["sample_size"].median()
-BATCH_SIZE = 500_000
+BATCH_SIZE = 10_000
 
 single_tools = [
     "immunum_singlethreaded",
@@ -74,8 +73,6 @@ p1_data = perf_base.filter(pl.col("tool").is_in(single_tools)).with_columns(
 p3_data = perf_base.filter(pl.col("tool").is_in(mt_tools)).with_columns(
     pl.col("tool").replace(mt_label_map).alias("method")
 )
-print(p3_data.get_column("tool").unique())
-print(p1_data.get_column("tool").unique())
 
 
 def make_perf_barplot(data: pl.DataFrame, title: str) -> alt.Chart:
@@ -193,7 +190,7 @@ plot_scaling = (
         single_label_map,
         "Single-threaded",
     )
-    | make_scaling_plot(
+    & make_scaling_plot(
         speed_df.filter(pl.col("tool").is_in(mt_tools)),
         mt_label_map,
         "Multi-threaded",
@@ -277,6 +274,9 @@ for name, p in [
     ("plot2_correctness", _configure_for_export(plot2)),
     ("plot3_scaling", _configure_for_export(plot_scaling)),
 ]:
-    path = f"assets/benchmark_{name}.svg"
-    p.save(path)
-    print(f"Saved {path}")
+    svg_path = f"docs/assets/benchmark_{name}.svg"
+    p.save(svg_path)
+    print(f"Saved {svg_path}")
+    html_path = f"docs/assets/benchmark_{name}.html"
+    p.save(html_path)
+    print(f"Saved {html_path}")
