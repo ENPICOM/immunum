@@ -16,6 +16,7 @@ High-performance antibody and TCR sequence numbering in Rust, Python, and WebAss
 **>99% position accuracy** across 6,000+ validation sequences. Processes a full dataset in ~0.6s.
 
 Available as:
+
 - **Rust crate** — core library and CLI
 - **Python package** — via PyPI (`pip install immunum`), with a [Polars](https://pola.rs) plugin for vectorized batch processing
 - **npm package** — for Node.js and browsers
@@ -75,8 +76,8 @@ sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRI
 
 result = annotator.number(sequence)
 print(result.chain)       # H
-print(result.confidence)  # 0.97
-print(result.numbering)   # {"1": "E", "2": "V", "3": "Q", ...}
+print(result.confidence)  # 0.78
+print(result.numbering)   # {"1": "Q", "2": "V", "3": "Q", ...}
 ```
 
 ### Segmentation
@@ -85,13 +86,13 @@ print(result.numbering)   # {"1": "E", "2": "V", "3": "Q", ...}
 
 ```python
 result = annotator.segment(sequence)
-print(result.fr1)   # EVQLVESGGGLVKPGGSLKLSCAAS
-print(result.cdr1)  # GFTFSSYAMS
-print(result.fr2)   # WVRQAPGKGLEWVS
-print(result.cdr2)  # AISGSGGS
-print(result.fr3)   # TYYADSVKGRFTISRDNAKN
-print(result.cdr3)  # ...
-print(result.fr4)   # ...
+print(result.fr1)   # QVQLVQSGAEVKRPGSSVTVSCKAS
+print(result.cdr1)  # GGSFSTYA
+print(result.fr2)   # LSWVRQAPGRGLEWMGG
+print(result.cdr2)  # VIPLLTIT
+print(result.fr3)   # NYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYC
+print(result.cdr3)  # AREGTTGKPIGAFAH
+print(result.fr4)   # WGQGTLVTVSS
 ```
 
 Chains: `"H"` (heavy), `"K"` (kappa), `"L"` (lambda), `"A"` (TRA), `"B"` (TRB), `"G"` (TRG), `"D"` (TRD).
@@ -102,7 +103,7 @@ For batch processing, `immunum.polars` registers elementwise Polars expressions:
 
 ```python
 import polars as pl
-import immunum.polars as ip
+import immunum.polars as imp
 
 df = pl.DataFrame({"sequence": [
     "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
@@ -111,12 +112,12 @@ df = pl.DataFrame({"sequence": [
 
 # Add a struct column with chain, scheme, confidence, numbering
 result = df.with_columns(
-    ip.number(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("numbered")
+    imp.number(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("numbered")
 )
 
 # Add a struct column with FR/CDR segments
 result = df.with_columns(
-    ip.segment(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("segmented")
+    imp.segment(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("segmented")
 )
 ```
 
