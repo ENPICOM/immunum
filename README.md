@@ -85,6 +85,12 @@ print(result.numbering)   # {"1": "Q", "2": "V", "3": "Q", ...}
 `segment` splits the sequence into FR/CDR regions:
 
 ```python
+from immunum import Annotator
+
+annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
+
+sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+
 result = annotator.segment(sequence)
 print(result.fr1)   # QVQLVQSGAEVKRPGSSVTVSCKAS
 print(result.cdr1)  # GGSFSTYA

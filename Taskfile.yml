@@ -48,7 +48,7 @@ tasks:
             - tests/test_*.py
             - docs/**/*.md
         cmds:
-            - uv run --no-sync pytest {docs,tests/test_*.py} -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
+            - uv run --no-sync pytest {README.md,docs,tests/test_*.py} -n  $(( $(nproc) - 2 )) --benchmark-disable {{.CLI_ARGS}}
 
     test-rust:
         vars:
