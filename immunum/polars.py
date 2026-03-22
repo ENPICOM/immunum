@@ -12,7 +12,7 @@ except ImportError as e:
     ) from e
 
 from immunum._internal import _Annotator  # noqa: F401
-from immunum import _normalize_chains, _normalize_scheme
+from immunum import _normalize_chains, _normalize_scheme, Annotator
 
 if TYPE_CHECKING:
     from immunum.typing import IntoExprColumn
@@ -21,13 +21,23 @@ if TYPE_CHECKING:
 LIB = Path(__file__).parent
 
 
-def numbering_method(expr: IntoExprColumn, *, annotator: _Annotator) -> pl.Expr:
+def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
         function_name="numbering_class_struct_expr",
         is_elementwise=True,
-        kwargs={"annotator": annotator},
+        kwargs={"annotator": annotator._annotator},
+    )
+
+
+def segmentation_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
+    return register_plugin_function(
+        args=[expr],
+        plugin_path=LIB,
+        function_name="segmentation_class_struct_expr",
+        is_elementwise=True,
+        kwargs={"annotator": annotator._annotator},
     )
 
 
