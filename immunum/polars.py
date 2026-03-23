@@ -65,6 +65,7 @@ def number(
                 "residues": pl.List(
                     pl.String
                 ),
+                "error": pl.String,
             }
         )
     ]
@@ -155,6 +156,7 @@ def segment(
             "cdr3": pl.String,
             "fr4": pl.String,
             "postfix": pl.String,
+            "error": pl.String,
         }
     )
     print(
@@ -236,6 +238,7 @@ def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
         "scheme",
         "confidence",
         "numbering",
+        "error",
     }
     ```
 
@@ -299,6 +302,7 @@ def segmentation_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Exp
             "cdr3": pl.String,
             "fr4": pl.String,
             "postfix": pl.String,
+            "error": pl.String,
         }
     )
     ```

@@ -45,42 +45,46 @@ impl Annotator {
 
     #[pyo3(signature = (sequence), name = "number")]
     pub fn _number<'py>(&self, py: Python<'py>, sequence: &str) -> PyResult<Bound<'py, PyDict>> {
-        let result = self.number(sequence).map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid sequence: {}",
-                sequence
-            ))
-        })?;
-
-        let numbering = PyDict::new(py);
-        let aligned_seq = &sequence[result.query_start..=result.query_end];
-        for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
-            numbering.set_item(pos.to_string(), ch.to_string())?;
-        }
-
         let dict = PyDict::new(py);
-        dict.set_item("chain", result.chain.to_string())?;
-        dict.set_item("scheme", result.scheme.to_string())?;
-        dict.set_item("confidence", result.confidence)?;
-        dict.set_item("numbering", numbering)?;
+        match self.number(sequence) {
+            Ok(result) => {
+                let numbering = PyDict::new(py);
+                let aligned_seq = &sequence[result.query_start..=result.query_end];
+                for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
+                    numbering.set_item(pos.to_string(), ch.to_string())?;
+                }
+                dict.set_item("chain", result.chain.to_string())?;
+                dict.set_item("scheme", result.scheme.to_string())?;
+                dict.set_item("confidence", result.confidence)?;
+                dict.set_item("numbering", numbering)?;
+                dict.set_item("error", py.None())?;
+            }
+            Err(e) => {
+                dict.set_item("chain", py.None())?;
+                dict.set_item("scheme", py.None())?;
+                dict.set_item("confidence", py.None())?;
+                dict.set_item("numbering", py.None())?;
+                dict.set_item("error", e.to_string())?;
+            }
+        }
         Ok(dict)
     }
 
     #[pyo3(signature = (sequence), name = "segment")]
     pub fn _segment<'py>(&self, py: Python<'py>, sequence: &str) -> PyResult<Bound<'py, PyDict>> {
-        let result = self.number(sequence).map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                "Invalid sequence: {}",
-                sequence
-            ))
-        })?;
-
-        let aligned_seq = &sequence[result.query_start..=result.query_end];
-        let segments = segment(&result.positions, aligned_seq, result.scheme);
-
         let dict = PyDict::new(py);
-        for (region, seq) in segments {
-            dict.set_item(region, seq)?;
+        match self.number(sequence) {
+            Ok(result) => {
+                let aligned_seq = &sequence[result.query_start..=result.query_end];
+                let segments = segment(&result.positions, aligned_seq, result.scheme);
+                for (region, seq) in segments {
+                    dict.set_item(region, seq)?;
+                }
+                dict.set_item("error", py.None())?;
+            }
+            Err(e) => {
+                dict.set_item("error", e.to_string())?;
+            }
         }
         Ok(dict)
     }

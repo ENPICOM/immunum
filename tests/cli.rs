@@ -17,7 +17,7 @@ fn raw_sequence_argument() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue",
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror",
         ));
 }
 
@@ -155,7 +155,7 @@ fn output_to_file() {
         .stdout(predicate::str::is_empty());
 
     let contents = fs::read_to_string(&out_path).unwrap();
-    assert!(contents.contains("sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"));
+    assert!(contents.contains("sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"));
 }
 
 // --- TSV piping via stdin ---
@@ -168,6 +168,98 @@ fn stdin_multiple_raw_sequences() {
         .assert()
         .success()
         .stdout(predicate::str::contains("seq_1").and(predicate::str::contains("seq_2")));
+}
+
+// --- Error field in output ---
+
+#[test]
+fn invalid_sequence_emits_error_record_jsonl() {
+    // A garbage sequence should appear as an error record, not abort the batch
+    let output = immunum()
+        .args(["number", "-f", "jsonl"])
+        .write_stdin("AAAAAAAAAA\n")
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid jsonl");
+    assert!(
+        parsed["error"].is_string(),
+        "error field should be a string"
+    );
+    assert!(parsed["chain"].is_null(), "chain should be null on error");
+    assert!(
+        parsed["numbering"].is_null(),
+        "numbering should be null on error"
+    );
+}
+
+#[test]
+fn valid_sequence_has_null_error_jsonl() {
+    let output = immunum()
+        .args([
+            "number",
+            "-f",
+            "jsonl",
+            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid jsonl");
+    assert!(parsed["error"].is_null(), "error should be null on success");
+    assert!(
+        parsed["chain"].is_string(),
+        "chain should be set on success"
+    );
+}
+
+#[test]
+fn mixed_batch_always_emits_one_record_per_input() {
+    // Two sequences: one valid IGH, one garbage
+    let input = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS\nAAAAAAAAAAAAAAAAA\n";
+    let output = immunum()
+        .args(["number", "-f", "jsonl"])
+        .write_stdin(input)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "one output per input");
+
+    let first: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+    let second: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+    assert!(first["error"].is_null());
+    assert!(second["error"].is_string());
+}
+
+#[test]
+fn error_record_appears_in_tsv() {
+    let output = immunum()
+        .args(["number", "-f", "tsv"])
+        .write_stdin("AAAAAAAAAA\n")
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2); // header + one error row
+    assert!(
+        lines[1].contains("seq_1"),
+        "error row should have sequence id"
+    );
+    // last column (error) should be non-empty
+    let cols: Vec<&str> = lines[1].split('\t').collect();
+    assert!(
+        !cols.last().unwrap().is_empty(),
+        "error column should be non-empty"
+    );
 }
 
 // --- Error cases ---

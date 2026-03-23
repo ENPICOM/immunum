@@ -65,6 +65,7 @@ fn numbering_class_struct_output(_input_fields: &[Field]) -> PolarsResult<Field>
             "numbering".into(),
             DataType::List(Box::new(DataType::Struct(inner_fields))),
         ),
+        Field::new("error".into(), DataType::String),
     ];
     Ok(Field::new("numbering".into(), DataType::Struct(fields)))
 }
@@ -81,6 +82,7 @@ fn numbering_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
             "residues".into(),
             DataType::List(Box::new(DataType::String)),
         ),
+        Field::new("error".into(), DataType::String),
     ];
     Ok(Field::new("numbering".into(), DataType::Struct(fields)))
 }
@@ -93,14 +95,17 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
 
     // Build per-row structs inside the parallel closure so Series allocation
     // is parallelized. Series is Send+Sync in Polars, so this is safe.
-    type RowResult = Option<(String, String, f32, Series)>;
+    type RowResult = Result<(String, String, f32, Series), String>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
-    let results: Vec<RowResult> = POOL.install(|| {
+    let results: Vec<Option<RowResult>> = POOL.install(|| {
         values
             .par_iter()
             .map_with(kwargs.annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                let result = ann.number(value).ok()?;
+                let result = match ann.number(value) {
+                    Ok(r) => r,
+                    Err(e) => return Some(Err(e.to_string())),
+                };
                 let (positions, residues): (Vec<String>, Vec<String>) = result
                     .positions
                     .iter()
@@ -114,12 +119,12 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
                     StructChunked::from_series("".into(), n, [pos_series, res_series].iter())
                         .ok()?
                         .into_series();
-                Some((
+                Some(Ok((
                     result.chain.to_string(),
                     result.scheme.to_string(),
                     result.confidence,
                     row_struct,
-                ))
+                )))
             })
             .collect()
     });
@@ -128,6 +133,7 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
     let mut scheme_vec: Vec<Option<String>> = Vec::with_capacity(len);
     let mut confidence_vec: Vec<Option<f32>> = Vec::with_capacity(len);
     let mut row_structs: Vec<Option<Series>> = Vec::with_capacity(len);
+    let mut error_vec: Vec<Option<String>> = Vec::with_capacity(len);
 
     for row in results {
         match row {
@@ -136,12 +142,21 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
                 scheme_vec.push(None);
                 confidence_vec.push(None);
                 row_structs.push(None);
+                error_vec.push(None);
             }
-            Some((chain, scheme, confidence, row_struct)) => {
+            Some(Err(e)) => {
+                chain_vec.push(None);
+                scheme_vec.push(None);
+                confidence_vec.push(None);
+                row_structs.push(None);
+                error_vec.push(Some(e));
+            }
+            Some(Ok((chain, scheme, confidence, row_struct))) => {
                 chain_vec.push(Some(chain));
                 scheme_vec.push(Some(scheme));
                 confidence_vec.push(Some(confidence));
                 row_structs.push(Some(row_struct));
+                error_vec.push(None);
             }
         }
     }
@@ -158,12 +173,14 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
     let scheme_series = Series::new("scheme".into(), scheme_vec);
     let confidence_series = Series::new("confidence".into(), confidence_vec);
     let numbering_series = numbering_builder.finish().into_series();
+    let error_series = Series::new("error".into(), error_vec);
 
     let fields = [
         chain_series,
         scheme_series,
         confidence_series,
         numbering_series,
+        error_series,
     ];
     StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }
@@ -182,26 +199,29 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
 
-    type ResultType = Vec<Option<(String, String, Series, Series)>>;
+    type ResultType = Vec<Option<Result<(String, String, Series, Series), String>>>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
     let results: ResultType = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                let result = ann.number(value).ok()?;
+                let result = match ann.number(value) {
+                    Ok(r) => r,
+                    Err(e) => return Some(Err(e.to_string())),
+                };
                 let (positions, residues): (Vec<String>, Vec<String>) = result
                     .positions
                     .iter()
                     .zip(value.chars())
                     .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                     .unzip();
-                Some((
+                Some(Ok((
                     result.chain.to_string(),
                     result.scheme.to_string(),
                     Series::new("".into(), positions),
                     Series::new("".into(), residues),
-                ))
+                )))
             })
             .collect()
     });
@@ -210,6 +230,7 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
     let mut scheme_builder = StringChunkedBuilder::new("scheme".into(), len);
     let mut positions_builder = ListStringChunkedBuilder::new("positions".into(), len, len);
     let mut residues_builder = ListStringChunkedBuilder::new("residues".into(), len, len);
+    let mut error_builder = StringChunkedBuilder::new("error".into(), len);
 
     for row in results {
         match row {
@@ -218,12 +239,21 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
                 scheme_builder.append_null();
                 positions_builder.append_null();
                 residues_builder.append_null();
+                error_builder.append_null();
             }
-            Some((chain, scheme, positions, residues)) => {
+            Some(Err(e)) => {
+                chain_builder.append_null();
+                scheme_builder.append_null();
+                positions_builder.append_null();
+                residues_builder.append_null();
+                error_builder.append_value(&e);
+            }
+            Some(Ok((chain, scheme, positions, residues))) => {
                 chain_builder.append_value(&chain);
                 scheme_builder.append_value(&scheme);
                 positions_builder.append_series(&positions)?;
                 residues_builder.append_series(&residues)?;
+                error_builder.append_null();
             }
         }
     }
@@ -233,6 +263,7 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
         scheme_builder.finish().into_series(),
         positions_builder.finish().into_series(),
         residues_builder.finish().into_series(),
+        error_builder.finish().into_series(),
     ];
     StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }
@@ -250,6 +281,7 @@ fn segmentation_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
         Field::new("cdr3".into(), DataType::String),
         Field::new("fr4".into(), DataType::String),
         Field::new("postfix".into(), DataType::String),
+        Field::new("error".into(), DataType::String),
     ];
     Ok(Field::new("segmentation".into(), DataType::Struct(fields)))
 }
@@ -260,17 +292,20 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
     let len = ca.len();
     let name = ca.name().clone();
 
-    type SegResult = Option<[String; 9]>;
+    type SegResult = Option<Result<[String; 9], String>>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
     let results: Vec<SegResult> = POOL.install(|| {
         values
             .par_iter()
             .map_with(kwargs.annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                let result = ann.number(value).ok()?;
+                let result = match ann.number(value) {
+                    Ok(r) => r,
+                    Err(e) => return Some(Err(e.to_string())),
+                };
                 let s = segment(&result.positions, value, result.scheme);
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
-                Some([
+                Some(Ok([
                     get("prefix"),
                     get("fr1"),
                     get("cdr1"),
@@ -280,7 +315,7 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                     get("cdr3"),
                     get("fr4"),
                     get("postfix"),
-                ])
+                ]))
             })
             .collect()
     });
@@ -294,6 +329,7 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
     let mut cdr3_b = StringChunkedBuilder::new("cdr3".into(), len);
     let mut fr4_b = StringChunkedBuilder::new("fr4".into(), len);
     let mut postfix_b = StringChunkedBuilder::new("postfix".into(), len);
+    let mut error_b = StringChunkedBuilder::new("error".into(), len);
 
     for row in results {
         match row {
@@ -307,8 +343,21 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                 cdr3_b.append_null();
                 fr4_b.append_null();
                 postfix_b.append_null();
+                error_b.append_null();
             }
-            Some([prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, postfix]) => {
+            Some(Err(e)) => {
+                prefix_b.append_null();
+                fr1_b.append_null();
+                cdr1_b.append_null();
+                fr2_b.append_null();
+                cdr2_b.append_null();
+                fr3_b.append_null();
+                cdr3_b.append_null();
+                fr4_b.append_null();
+                postfix_b.append_null();
+                error_b.append_value(&e);
+            }
+            Some(Ok([prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, postfix])) => {
                 prefix_b.append_value(&prefix);
                 fr1_b.append_value(&fr1);
                 cdr1_b.append_value(&cdr1);
@@ -318,6 +367,7 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                 cdr3_b.append_value(&cdr3);
                 fr4_b.append_value(&fr4);
                 postfix_b.append_value(&postfix);
+                error_b.append_null();
             }
         }
     }
@@ -332,6 +382,7 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
         cdr3_b.finish().into_series(),
         fr4_b.finish().into_series(),
         postfix_b.finish().into_series(),
+        error_b.finish().into_series(),
     ];
     StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }
@@ -350,17 +401,20 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
         Err(e) => polars_bail!(InvalidOperation: "{}", e),
     };
 
-    type SegResult = Option<[String; 9]>;
+    type SegResult = Option<Result<[String; 9], String>>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
     let results: Vec<SegResult> = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                let result = ann.number(value).ok()?;
+                let result = match ann.number(value) {
+                    Ok(r) => r,
+                    Err(e) => return Some(Err(e.to_string())),
+                };
                 let s = segment(&result.positions, value, result.scheme);
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
-                Some([
+                Some(Ok([
                     get("prefix"),
                     get("fr1"),
                     get("cdr1"),
@@ -370,7 +424,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                     get("cdr3"),
                     get("fr4"),
                     get("postfix"),
-                ])
+                ]))
             })
             .collect()
     });
@@ -384,6 +438,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
     let mut cdr3_b = StringChunkedBuilder::new("cdr3".into(), len);
     let mut fr4_b = StringChunkedBuilder::new("fr4".into(), len);
     let mut postfix_b = StringChunkedBuilder::new("postfix".into(), len);
+    let mut error_b = StringChunkedBuilder::new("error".into(), len);
 
     for row in results {
         match row {
@@ -397,8 +452,21 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                 cdr3_b.append_null();
                 fr4_b.append_null();
                 postfix_b.append_null();
+                error_b.append_null();
             }
-            Some([prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, postfix]) => {
+            Some(Err(e)) => {
+                prefix_b.append_null();
+                fr1_b.append_null();
+                cdr1_b.append_null();
+                fr2_b.append_null();
+                cdr2_b.append_null();
+                fr3_b.append_null();
+                cdr3_b.append_null();
+                fr4_b.append_null();
+                postfix_b.append_null();
+                error_b.append_value(&e);
+            }
+            Some(Ok([prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, postfix])) => {
                 prefix_b.append_value(&prefix);
                 fr1_b.append_value(&fr1);
                 cdr1_b.append_value(&cdr1);
@@ -408,6 +476,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                 cdr3_b.append_value(&cdr3);
                 fr4_b.append_value(&fr4);
                 postfix_b.append_value(&postfix);
+                error_b.append_null();
             }
         }
     }
@@ -422,6 +491,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
         cdr3_b.finish().into_series(),
         fr4_b.finish().into_series(),
         postfix_b.finish().into_series(),
+        error_b.finish().into_series(),
     ];
     StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }

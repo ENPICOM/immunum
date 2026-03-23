@@ -97,6 +97,26 @@ class TestPolarsNumber:
         assert "chain" in result.columns
         assert "positions" in result.columns
         assert "residues" in result.columns
+        assert "error" in result.columns
+
+    def test_number_error_field_null_on_success(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        result = df.select(
+            imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "numbered"
+            )
+        ).unnest("numbered")
+        assert result["error"][0] is None
+
+    def test_number_error_field_set_on_failure(self):
+        df = polars.DataFrame({"sequence": ["AAAAAAAAAAAAAAAA"]})
+        result = df.select(
+            imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "numbered"
+            )
+        ).unnest("numbered")
+        assert result["error"][0] is not None
+        assert result["chain"][0] is None
 
     def test_number_multiple_sequences(self):
         df = polars.DataFrame({"sequence": [IGH_SEQ, SEQ]})
@@ -150,17 +170,30 @@ class TestPolarsSegment:
             )
         ).unnest("segmented")
         expected_fields = {
-            "fr1",
-            "fr2",
-            "fr3",
-            "fr4",
-            "cdr1",
-            "cdr2",
-            "cdr3",
-            "prefix",
-            "postfix",
+            "fr1", "fr2", "fr3", "fr4",
+            "cdr1", "cdr2", "cdr3",
+            "prefix", "postfix", "error",
         }
         assert expected_fields.issubset(set(result.columns))
+
+    def test_segment_error_field_null_on_success(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        result = df.select(
+            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "segmented"
+            )
+        ).unnest("segmented")
+        assert result["error"][0] is None
+
+    def test_segment_error_field_set_on_failure(self):
+        df = polars.DataFrame({"sequence": ["AAAAAAAAAAAAAAAA"]})
+        result = df.select(
+            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "segmented"
+            )
+        ).unnest("segmented")
+        assert result["error"][0] is not None
+        assert result["fr1"][0] is None
 
     def test_segment_multiple_sequences(self):
         df = polars.DataFrame({"sequence": [IGH_SEQ, SEQ]})
@@ -227,3 +260,4 @@ class TestPolarsNumberingMethod:
         assert "scheme" in result.columns
         assert "confidence" in result.columns
         assert "numbering" in result.columns
+        assert "error" in result.columns

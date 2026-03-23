@@ -103,16 +103,24 @@ class TestNumbering:
         result = annotator.number(IGH_SEQ)
         assert result.chain == "H"
         assert result.scheme == "IMGT"
+        assert result.error is None
 
     def test_number_with_single_chain(self):
         annotator = immunum.Annotator(["IGH"], "IMGT")
         result = annotator.number(IGH_SEQ)
         assert result.chain == "H"
 
-    def test_empty_sequence_raises(self):
+    def test_empty_sequence_returns_error(self):
         annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
-        with pytest.raises(ValueError):
-            annotator.number("")
+        result = annotator.number("")
+        assert result.error is not None
+        assert result.chain is None
+
+    def test_invalid_sequence_returns_error(self):
+        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
+        result = annotator.number("AAAAAAAAAAAAAAAA")
+        assert result.error is not None
+        assert result.chain is None
 
     def test_confidence_is_float(self, annotator_and_seq):
         annotator, seq = annotator_and_seq
@@ -125,6 +133,13 @@ class TestNumbering:
         assert set(result.as_dict()) == {f"cdr{i}" for i in (1, 2, 3)} | {
             f"fr{i}" for i in (1, 2, 3, 4)
         } | {"prefix", "postfix"}
+        assert result.error is None
+
+    def test_segmentation_invalid_sequence_returns_error(self):
+        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
+        result = annotator.segment("AAAAAAAAAAAAAAAA")
+        assert result.error is not None
+        assert result.fr1 is None
 
 
 class TestNormalization:

@@ -12,11 +12,31 @@ pub struct Record {
     pub sequence: String,
 }
 
-/// A numbered record: input record paired with its numbering result
+/// A numbered record: input record paired with its numbering result (or an error)
 pub struct NumberedRecord {
     pub id: String,
     pub sequence: String,
-    pub result: NumberingResult,
+    pub result: Option<NumberingResult>,
+    pub error: Option<String>,
+}
+
+impl NumberedRecord {
+    pub fn success(id: String, sequence: String, result: NumberingResult) -> Self {
+        Self {
+            id,
+            sequence,
+            result: Some(result),
+            error: None,
+        }
+    }
+    pub fn failure(id: String, sequence: String, error: String) -> Self {
+        Self {
+            id,
+            sequence,
+            result: None,
+            error: Some(error),
+        }
+    }
 }
 
 /// Output format
@@ -58,7 +78,7 @@ impl OutputFormat {
         match self {
             Self::Tsv => writeln!(
                 writer,
-                "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"
+                "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
             ),
             Self::Json => writeln!(writer, "["),
             Self::Jsonl => Ok(()),
@@ -186,7 +206,7 @@ pub fn read_fasta(reader: impl BufRead) -> Result<Vec<Record>, String> {
 pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     writeln!(
         writer,
-        "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"
+        "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
     )?;
     for rec in records {
         write_tsv_record(writer, rec)?;
@@ -196,13 +216,25 @@ pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Res
 
 /// Write a single record in TSV format (without header)
 fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result<()> {
-    let aligned_seq = &rec.sequence[rec.result.query_start..=rec.result.query_end];
-    for (pos, ch) in rec.result.positions.iter().zip(aligned_seq.chars()) {
-        writeln!(
-            writer,
-            "{}\t{}\t{}\t{:.4}\t{}\t{}",
-            rec.id, rec.result.chain, rec.result.scheme, rec.result.confidence, pos, ch
-        )?;
+    match &rec.result {
+        Some(result) => {
+            let aligned_seq = &rec.sequence[result.query_start..=result.query_end];
+            for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
+                writeln!(
+                    writer,
+                    "{}\t{}\t{}\t{:.4}\t{}\t{}\t",
+                    rec.id, result.chain, result.scheme, result.confidence, pos, ch
+                )?;
+            }
+        }
+        None => {
+            writeln!(
+                writer,
+                "{}\t\t\t\t\t\t{}",
+                rec.id,
+                rec.error.as_deref().unwrap_or("")
+            )?;
+        }
     }
     Ok(())
 }
@@ -226,22 +258,33 @@ pub fn write_jsonl(writer: &mut impl Write, records: &[NumberedRecord]) -> io::R
 }
 
 fn record_to_json(rec: &NumberedRecord) -> serde_json::Value {
-    let aligned_seq = &rec.sequence[rec.result.query_start..=rec.result.query_end];
-    let numbering: serde_json::Map<String, serde_json::Value> = rec
-        .result
-        .positions
-        .iter()
-        .zip(aligned_seq.chars())
-        .map(|(pos, ch)| (pos.to_string(), serde_json::Value::String(ch.to_string())))
-        .collect();
-
-    serde_json::json!({
-        "sequence_id": rec.id,
-        "chain": rec.result.chain.to_string(),
-        "scheme": rec.result.scheme.to_string(),
-        "confidence": rec.result.confidence,
-        "numbering": numbering,
-    })
+    match &rec.result {
+        Some(result) => {
+            let aligned_seq = &rec.sequence[result.query_start..=result.query_end];
+            let numbering: serde_json::Map<String, serde_json::Value> = result
+                .positions
+                .iter()
+                .zip(aligned_seq.chars())
+                .map(|(pos, ch)| (pos.to_string(), serde_json::Value::String(ch.to_string())))
+                .collect();
+            serde_json::json!({
+                "sequence_id": rec.id,
+                "chain": result.chain.to_string(),
+                "scheme": result.scheme.to_string(),
+                "confidence": result.confidence,
+                "numbering": numbering,
+                "error": null,
+            })
+        }
+        None => serde_json::json!({
+            "sequence_id": rec.id,
+            "chain": null,
+            "scheme": null,
+            "confidence": null,
+            "numbering": null,
+            "error": rec.error.as_deref().unwrap_or("unknown error"),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -303,21 +346,39 @@ mod tests {
                 insertion: None,
             },
         ]);
-        let records = vec![NumberedRecord {
-            id: "s1".to_string(),
-            sequence: "EV".to_string(),
+        let records = vec![NumberedRecord::success(
+            "s1".to_string(),
+            "EV".to_string(),
             result,
-        }];
+        )];
         let mut buf = Vec::new();
         write_tsv(&mut buf, &records).unwrap();
         let output = String::from_utf8(buf).unwrap();
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(
             lines[0],
-            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue"
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
         );
-        assert_eq!(lines[1], "s1\tH\tIMGT\t1.0000\t1\tE");
-        assert_eq!(lines[2], "s1\tH\tIMGT\t1.0000\t2\tV");
+        assert_eq!(lines[1], "s1\tH\tIMGT\t1.0000\t1\tE\t");
+        assert_eq!(lines[2], "s1\tH\tIMGT\t1.0000\t2\tV\t");
+    }
+
+    #[test]
+    fn test_write_tsv_error() {
+        let records = vec![NumberedRecord::failure(
+            "bad".to_string(),
+            "AAAAA".to_string(),
+            "low confidence".to_string(),
+        )];
+        let mut buf = Vec::new();
+        write_tsv(&mut buf, &records).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(
+            lines[0],
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
+        );
+        assert_eq!(lines[1], "bad\t\t\t\t\t\tlow confidence");
     }
 
     #[test]
@@ -326,17 +387,34 @@ mod tests {
             number: 1,
             insertion: None,
         }]);
-        let records = vec![NumberedRecord {
-            id: "s1".to_string(),
-            sequence: "E".to_string(),
+        let records = vec![NumberedRecord::success(
+            "s1".to_string(),
+            "E".to_string(),
             result,
-        }];
+        )];
         let mut buf = Vec::new();
         write_jsonl(&mut buf, &records).unwrap();
         let output = String::from_utf8(buf).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
         assert_eq!(parsed["sequence_id"], "s1");
         assert_eq!(parsed["numbering"]["1"], "E");
+        assert!(parsed["error"].is_null());
+    }
+
+    #[test]
+    fn test_write_jsonl_error() {
+        let records = vec![NumberedRecord::failure(
+            "bad".to_string(),
+            "AAAAA".to_string(),
+            "low confidence".to_string(),
+        )];
+        let mut buf = Vec::new();
+        write_jsonl(&mut buf, &records).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
+        assert_eq!(parsed["sequence_id"], "bad");
+        assert!(parsed["chain"].is_null());
+        assert_eq!(parsed["error"], "low confidence");
     }
 
     #[test]
@@ -345,17 +423,18 @@ mod tests {
             number: 1,
             insertion: None,
         }]);
-        let records = vec![NumberedRecord {
-            id: "s1".to_string(),
-            sequence: "E".to_string(),
+        let records = vec![NumberedRecord::success(
+            "s1".to_string(),
+            "E".to_string(),
             result,
-        }];
+        )];
         let mut buf = Vec::new();
         write_json(&mut buf, &records).unwrap();
         let output = String::from_utf8(buf).unwrap();
         let parsed: Vec<serde_json::Value> = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0]["sequence_id"], "s1");
+        assert!(parsed[0]["error"].is_null());
     }
 
     #[test]
