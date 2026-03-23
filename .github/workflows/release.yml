@@ -190,9 +190,8 @@ jobs:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
-    environment: npmjs
     permissions:
-      id-token: write
+      id-token: write  # Required for OIDC
       contents: read
     steps:
       - uses: actions/checkout@v6
@@ -211,7 +210,7 @@ jobs:
 
       - name: Publish to npm
         working-directory: pkg
-        run: npm publish --access public
+        run: npm publish
 
   publish-crate:
     needs: [check-version, create-release]
