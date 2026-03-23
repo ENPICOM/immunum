@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 use crate::alignment::{align, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
-use crate::numbering::apply_numbering;
+use crate::numbering::{apply_numbering, segment as segment_positions};
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme, TCR_CHAINS};
 
@@ -31,6 +31,20 @@ pub struct NumberingResult {
     pub query_start: usize,
     /// 0-based index of the last antibody residue in the query (query.len()-1 when no suffix)
     pub query_end: usize,
+}
+
+/// Result of segmenting a sequence into FR/CDR regions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SegmentResult {
+    pub prefix: String,
+    pub fr1: String,
+    pub cdr1: String,
+    pub fr2: String,
+    pub cdr2: String,
+    pub fr3: String,
+    pub cdr3: String,
+    pub fr4: String,
+    pub postfix: String,
 }
 
 /// Default minimum confidence threshold for accepting a numbering result.
@@ -135,6 +149,24 @@ impl Annotator {
             confidence,
             query_start: alignment.query_start,
             query_end: alignment.query_end,
+        })
+    }
+
+    /// Segment a sequence into FR/CDR regions
+    pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
+        let result = self.number(sequence)?;
+        let aligned_seq = &sequence[result.query_start..=result.query_end];
+        let mut map = segment_positions(&result.positions, aligned_seq, result.scheme);
+        Ok(SegmentResult {
+            prefix: map.remove("prefix").unwrap_or_default(),
+            fr1: map.remove("fr1").unwrap_or_default(),
+            cdr1: map.remove("cdr1").unwrap_or_default(),
+            fr2: map.remove("fr2").unwrap_or_default(),
+            cdr2: map.remove("cdr2").unwrap_or_default(),
+            fr3: map.remove("fr3").unwrap_or_default(),
+            cdr3: map.remove("cdr3").unwrap_or_default(),
+            fr4: map.remove("fr4").unwrap_or_default(),
+            postfix: map.remove("postfix").unwrap_or_default(),
         })
     }
 
@@ -249,6 +281,20 @@ mod tests {
         assert_eq!(result.query_start, 0);
         assert_eq!(result.query_end, FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    #[test]
+    fn test_segment_igh_sequence() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let sequence =
+            "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+        let segments = annotator.segment(sequence).unwrap();
+        assert_eq!(segments.fr1, "QVQLVQSGAEVKRPGSSVTVSCKAS");
+        assert_eq!(segments.cdr1, "GGSFSTYA");
+        assert_eq!(segments.cdr3, "AREGTTGKPIGAFAH");
+        assert_eq!(segments.fr4, "WGQGTLVTVSS");
+        assert!(segments.prefix.is_empty());
+        assert!(segments.postfix.is_empty());
     }
 
     #[test]

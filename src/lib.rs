@@ -72,7 +72,7 @@ pub use numbering::imgt;
 pub use numbering::kabat;
 
 pub use alignment::{align, Alignment};
-pub use annotator::{Annotator, NumberingResult, DEFAULT_MIN_CONFIDENCE};
+pub use annotator::{Annotator, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE};
 pub use error::{Error, Result};
 pub use scoring::ScoringMatrix;
 pub use types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
