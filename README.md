@@ -1,6 +1,6 @@
-# immunum
+![Immunum Logo](https://raw.githubusercontent.com/ENPICOM/immunum/master/docs/assets/immunum_logotype.svg)
 
-High-performance antibody and TCR sequence numbering in Rust, Python, and WebAssembly.
+Immunum is a high-performance antibody and TCR sequence numbering tool for Rust, Python, Polars and JS/TS.
 
 [![Crates.io](https://img.shields.io/crates/v/immunum)](https://crates.io/crates/immunum)
 [![PyPI](https://img.shields.io/pypi/v/immunum)](https://pypi.org/project/immunum/)

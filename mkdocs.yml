@@ -1,10 +1,12 @@
 site_name: "immunum: antibody numbering and segmentation"
 site_url: https://immunum.enpicom.com
-repo_url: https://github.com/ENPICOM/immunum-rs
-repo_name: ENPICOM/immunum-rs
+repo_url: https://github.com/ENPICOM/immunum
+repo_name: ENPICOM/immunum
 
 theme:
   name: material
+  logo: assets/immunum_logo.svg
+  favicon: assets/immunum_logo.svg
 
   palette:
     # Palette toggle for automatic mode
