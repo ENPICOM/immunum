@@ -1,0 +1,80 @@
+name: Bencher
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bencher:
+    if: github.event_name != 'pull_request'
+    name: Continuous Benchmarking with Bencher
+    permissions:
+      checks: write
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.13"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: bencherdev/bencher@main
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Taskfile
+        run: uv tool install go-task-bin
+
+      - name: Run bencher
+        run: task bencher
+        env:
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          BENCHER_PROJECT: ${{ secrets.BENCHER_PROJECT }}
+          BENCHER_BRANCH: main
+          BENCHER_TESTBED: ubuntu-latest
+          BENCHER_GITHUB_ACTIONS: ${{ secrets.GITHUB_TOKEN }}
+
+  bencher-pr:
+    if: github.event_name == 'pull_request'
+    name: Continuous Benchmarking with Bencher (PR)
+    permissions:
+      checks: write
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.13"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: bencherdev/bencher@main
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Setup Taskfile
+        run: uv tool install go-task-bin
+
+      - name: Run bencher
+        run: task bencher
+        env:
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          BENCHER_PROJECT: ${{ secrets.BENCHER_PROJECT }}
+          BENCHER_BRANCH: ${{ github.head_ref }}
+          BENCHER_BRANCH_START_POINT: ${{ github.base_ref }}
+          BENCHER_BRANCH_START_POINT_HASH: ${{ github.event.pull_request.base.sha }}
+          BENCHER_TESTBED: ubuntu-latest
+          BENCHER_GITHUB_ACTIONS: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,99 @@
+site_name: "immunum: antibody numbering and segmentation"
+site_url: https://immunum.enpicom.com
+repo_url: https://github.com/ENPICOM/immunum-rs
+repo_name: ENPICOM/immunum-rs
+
+theme:
+  name: material
+
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  locale: en
+  navigation_depth: 3
+  features:
+    - navigation.tracking
+    - navigation.instant
+    - navigation.expand
+    - navigation.tabs
+    - navigation.indexes
+    - navigation.tabs.sticky
+    - navigation.footer
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Usage:
+      - usage/index.md
+      - Python module: usage/python.md
+      - Polars module: usage/polars.md
+  - API:
+      - api/index.md
+      - immunum: api/immunum.md
+      - immunum.polars: api/polars.md
+  - Benchmarks: benchmarks/index.md
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search:
+      lang: en
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            members_order: source
+            show_source: true
+            show_root_heading: true
+            docstring_style: google
+            show_if_no_docstring: false
+            filters: ["!^_"]
+            show_attribute_values: false
+
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: [.]
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - footnotes
+
+validation:
+  links:
+    unrecognized_links: ignore
+    anchors: ignore

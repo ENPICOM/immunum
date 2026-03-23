@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    #vis.vega-embed {
+      width: 100%;
+      display: flex;
+    }
+
+    #vis.vega-embed details,
+    #vis.vega-embed details summary {
+      position: relative;
+    }
+  </style>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega@6"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-lite@6.1.0"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-embed@7"></script>
+</head>
+<body>
+  <div id="vis"></div>
+  <script>
+    (function(vegaEmbed) {
+      var spec = {"config": {"view": {"continuousWidth": 300, "continuousHeight": 300}}, "hconcat": [{"layer": [{"mark": {"type": "bar", "opacity": 0.7, "stroke": "black", "strokeWidth": 1.5}, "encoding": {"color": {"field": "method", "legend": null, "type": "nominal"}, "tooltip": [{"field": "method", "type": "nominal"}, {"field": "mean_throughput", "format": ",.0f", "title": "Mean seq/s", "type": "quantitative"}, {"field": "std_throughput", "format": ",.0f", "title": "Std seq/s", "type": "quantitative"}], "x": {"field": "method", "sort": ["immunum", "antpack", "anarcii2", "anarci"], "title": "Method", "type": "nominal"}, "y": {"field": "mean_throughput", "title": "Sequences per second", "type": "quantitative"}}}, {"mark": {"type": "rule", "strokeWidth": 2}, "encoding": {"x": {"field": "method", "sort": ["immunum", "antpack", "anarcii2", "anarci"], "type": "nominal"}, "y": {"field": "errbar_min", "type": "quantitative"}, "y2": {"field": "errbar_max"}}, "transform": [{"calculate": "datum.mean_throughput - datum.std_throughput / 2", "as": "errbar_min"}, {"calculate": "datum.mean_throughput + datum.std_throughput / 2", "as": "errbar_max"}]}], "data": {"name": "data-cc944eed1c1e5d97469f651d684a2708"}, "height": 350, "title": "Single-threaded (n=10,000)", "width": 300}, {"layer": [{"mark": {"type": "bar", "opacity": 0.7, "stroke": "black", "strokeWidth": 1.5}, "encoding": {"color": {"field": "method", "legend": null, "type": "nominal"}, "tooltip": [{"field": "method", "type": "nominal"}, {"field": "mean_throughput", "format": ",.0f", "title": "Mean seq/s", "type": "quantitative"}, {"field": "std_throughput", "format": ",.0f", "title": "Std seq/s", "type": "quantitative"}], "x": {"field": "method", "sort": ["immunum", "antpack", "anarcii2", "anarci"], "title": "Method", "type": "nominal"}, "y": {"field": "mean_throughput", "title": "Sequences per second", "type": "quantitative"}}}, {"mark": {"type": "rule", "strokeWidth": 2}, "encoding": {"x": {"field": "method", "sort": ["immunum", "antpack", "anarcii2", "anarci"], "type": "nominal"}, "y": {"field": "errbar_min", "type": "quantitative"}, "y2": {"field": "errbar_max"}}, "transform": [{"calculate": "datum.mean_throughput - datum.std_throughput / 2", "as": "errbar_min"}, {"calculate": "datum.mean_throughput + datum.std_throughput / 2", "as": "errbar_max"}]}], "data": {"name": "data-49f2e9e0ff71a98edd8a63c67f26decf"}, "height": 350, "title": "Multi-threaded (n=10,000)", "width": 300}], "resolve": {"scale": {"y": "shared"}}, "$schema": "https://vega.github.io/schema/vega-lite/v6.1.0.json", "datasets": {"data-cc944eed1c1e5d97469f651d684a2708": [{"method": "immunum", "mean_throughput": 9465.866755146342, "std_throughput": 22.370316581478345}, {"method": "antpack", "mean_throughput": 9020.695430933823, "std_throughput": 520.2893309638105}, {"method": "anarcii2", "mean_throughput": 105.67897133519091, "std_throughput": 46.76069238588432}, {"method": "anarci", "mean_throughput": 59.40251574607466, "std_throughput": 0.5780831293204282}], "data-49f2e9e0ff71a98edd8a63c67f26decf": [{"method": "immunum", "mean_throughput": 86143.23234103573, "std_throughput": 1532.682880785459}, {"method": "antpack", "mean_throughput": 782.207377003378, "std_throughput": 11.343738761327693}, {"method": "anarcii2", "mean_throughput": 78.3853588777681, "std_throughput": 1.2339864866553614}, {"method": "anarci", "mean_throughput": 48.13526537804296, "std_throughput": 0.3877724138886215}]}};
+      var embedOpt = {"mode": "vega-lite"};
+
+      function showError(el, error){
+          el.innerHTML = ('<div style="color:red;">'
+                          + '<p>JavaScript Error: ' + error.message + '</p>'
+                          + "<p>This usually means there's a typo in your chart specification. "
+                          + "See the javascript console for the full traceback.</p>"
+                          + '</div>');
+          throw error;
+      }
+      const el = document.getElementById('vis');
+      vegaEmbed("#vis", spec, embedOpt)
+        .catch(error => showError(el, error));
+    })(vegaEmbed);
+
+  </script>
+</body>
+</html>
