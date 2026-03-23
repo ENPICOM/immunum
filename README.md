@@ -16,7 +16,7 @@ High-performance antibody and TCR sequence numbering in Rust, Python, and WebAss
 Available as:
 
 - **Rust crate** — core library and CLI
-- **Python package** — via PyPI (`pip install immunum`), with a [Polars](https://pola.rs) plugin for vectorized batch processing
+- **Python package** — with a [Polars](https://pola.rs) plugin for vectorized batch processing
 - **npm package** — for Node.js and browsers
 
 ### Supported chains
@@ -28,12 +28,14 @@ Available as:
 | IGL (lambda) | TRD (delta) |
 |              | TRG (gamma) |
 
+Chain codes: `H` (IGH), `K` (IGK), `L` (IGL), `A` (TRA), `B` (TRB), `D` (TRD), `G` (TRG).
+
+Chain type is automatically detected by aligning against all loaded chains and selecting the best match.
+
 ### Numbering schemes
 
 - **IMGT** — all 7 chain types
 - **Kabat** — antibody chains (IGH, IGK, IGL)
-
-Chain type is automatically detected by aligning against all loaded chains and selecting the best match.
 
 ## Table of Contents
 
@@ -46,6 +48,7 @@ Chain type is automatically detected by aligning against all loaded chains and s
   - [Installation](#installation-1)
   - [Usage](#usage)
 - [Rust](#rust)
+  - [Installation](#installation-2)
   - [Usage](#usage-1)
 - [CLI](#cli)
   - [Options](#options)
@@ -99,8 +102,6 @@ assert result.cdr3 == 'AREGTTGKPIGAFAH'
 assert result.fr4 == 'WGQGTLVTVSS'
 ```
 
-Chains: `"H"` (heavy), `"K"` (kappa), `"L"` (lambda), `"A"` (TRA), `"B"` (TRB), `"G"` (TRG), `"D"` (TRD).
-
 ### Polars plugin
 
 For batch processing, `immunum.polars` registers elementwise Polars expressions:
@@ -138,9 +139,7 @@ npm install immunum
 ### Usage
 
 ```js
-import init, { Annotator } from "immunum";
-
-await init(); // load the wasm module
+const { Annotator } = require("immunum");
 
 const annotator = new Annotator(["H", "K", "L"], "imgt");
 
@@ -148,17 +147,26 @@ const sequence =
   "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
 const result = annotator.number(sequence);
-console.log(result.chain); // "H"
+console.log(result.chain);      // "H"
 console.log(result.confidence); // 0.97
-console.log(result.numbering); // { "1": "E", "2": "V", ... }
+console.log(result.numbering);  // { "1": "Q", "2": "V", ... }
 
 const segments = annotator.segment(sequence);
-console.log(segments.cdr3);
+console.log(segments.cdr3); // "AREGTTGKPIGAFAH"
 
 annotator.free(); // or use `using annotator = new Annotator(...)` with explicit resource management
 ```
 
 ## Rust
+
+### Installation
+
+Add to `Cargo.toml`:
+
+```toml
+[dependencies]
+immunum = "0.9"
+```
 
 ### Usage
 
@@ -174,20 +182,14 @@ let annotator = Annotator::new(
 let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
 let result = annotator.number(sequence).unwrap();
-
 println!("Chain: {}", result.chain);        // IGH
 println!("Confidence: {:.2}", result.confidence);
-
 for (aa, pos) in sequence.chars().zip(result.positions.iter()) {
     println!("{} -> {}", aa, pos);
 }
-```
 
-Add to `Cargo.toml`:
-
-```toml
-[dependencies]
-immunum = "0.9"
+let segments = annotator.segment(sequence).unwrap();
+println!("CDR3: {}", segments.cdr3);
 ```
 
 ## CLI
