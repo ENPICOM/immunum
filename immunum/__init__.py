@@ -1,5 +1,6 @@
 from immunum._internal import _Annotator  # noqa: F401
 from dataclasses import dataclass
+from typing import Optional
 
 _CHAIN_ALIASES: dict[str, str] = {
     "igh": "IGH",
@@ -101,21 +102,22 @@ class SegmenationResult:
     ```
     """
 
-    fr1: str
-    cdr1: str
-    fr2: str
-    cdr2: str
-    fr3: str
-    cdr3: str
-    fr4: str
-    prefix: str
-    postfix: str
+    fr1: Optional[str]
+    cdr1: Optional[str]
+    fr2: Optional[str]
+    cdr2: Optional[str]
+    fr3: Optional[str]
+    cdr3: Optional[str]
+    fr4: Optional[str]
+    prefix: Optional[str]
+    postfix: Optional[str]
+    error: Optional[str]
 
-    def as_dict(self) -> dict[str, str]:
-        """Return dict mapping segment names to sequences
+    def as_dict(self) -> dict[str, Optional[str]]:
+        """Return dict mapping segment names to sequences (excludes error field)
 
         Returns:
-            dict[str, str]: dict mapping ['fr1', 'fr2', ...] to their aminoacid sequences
+            dict[str, str | None]: dict mapping ['fr1', 'fr2', ...] to their aminoacid sequences
         """
         return {
             "fr1": self.fr1,
@@ -166,10 +168,11 @@ class NumberingResult:
     ```
     """
 
-    chain: str
-    scheme: str
-    confidence: float
-    numbering: dict[str, str]
+    chain: Optional[str]
+    scheme: Optional[str]
+    confidence: Optional[float]
+    numbering: Optional[dict[str, str]]
+    error: Optional[str]
 
 
 class Annotator:
@@ -240,10 +243,8 @@ class Annotator:
 
         Returns:
             A `NumberingResult` with the detected chain, scheme, confidence score,
-            and a ``{position: residue}`` numbering dict.
-
-        Raises:
-            ValueError: If the sequence is empty or scores below ``min_confidence``.
+            and a ``{position: residue}`` numbering dict. On failure, ``error`` is
+            set and all other fields are ``None``.
         """
         return NumberingResult(**self._annotator.number(sequence))
 
@@ -255,9 +256,19 @@ class Annotator:
 
         Returns:
             A `SegmenationResult` with ``fr1``–``fr4``, ``cdr1``–``cdr3``,
-            and any unaligned ``prefix``/``postfix`` residues.
-
-        Raises:
-            ValueError: If the sequence is empty or scores below ``min_confidence``.
+            and any unaligned ``prefix``/``postfix`` residues. On failure,
+            ``error`` is set and all region fields are ``None``.
         """
-        return SegmenationResult(**self._annotator.segment(sequence))
+        raw = self._annotator.segment(sequence)
+        return SegmenationResult(
+            fr1=raw.get("fr1"),
+            cdr1=raw.get("cdr1"),
+            fr2=raw.get("fr2"),
+            cdr2=raw.get("cdr2"),
+            fr3=raw.get("fr3"),
+            cdr3=raw.get("cdr3"),
+            fr4=raw.get("fr4"),
+            prefix=raw.get("prefix"),
+            postfix=raw.get("postfix"),
+            error=raw.get("error"),
+        )
