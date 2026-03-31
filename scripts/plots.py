@@ -16,7 +16,7 @@ import altair as alt
 
 
 # ── Load data ────────────────────────────────────────────────────────────────
-accuracy_files = glob.glob("resources/benchmark_results/results_ab_*_imgt.csv")
+accuracy_files = glob.glob("resources/benchmark_results/results_*_imgt.csv")
 acc_df = pl.concat([pl.read_csv(f) for f in accuracy_files])
 
 speed_df = pl.read_csv("resources/benchmark_results/results_speed.csv")
@@ -198,45 +198,85 @@ plot_scaling = (
 ).resolve_scale(y="shared", color="shared")
 
 # ── Plot 2: Correctness by chain and segment ──────────────────────────────────
-single_thread_mask = ~(
-    acc_summary["tool"].str.ends_with("_parallel")
-    | acc_summary["tool"].str.ends_with("_multithreaded")
-)
 p2_data = (
     acc_df.filter(
         ~pl.col("tool").str.ends_with("_parallel")
         & ~pl.col("tool").str.ends_with("_multithreaded")
     )
-    .group_by("tool")
-    .agg([pl.col(s).mean() for s in segments])
     .with_columns(pl.col("tool").replace(single_label_map).alias("method"))
     .drop("tool")
     .unpivot(
-        index=["method"], on=segments, variable_name="segment", value_name="pct_correct"
+        index=["method", "chain", "round", "sample_size"],
+        on=segments,
+        variable_name="segment",
+        value_name="pct_correct",
     )
 )
 
-plot2 = (
-    alt.Chart(p2_data.to_pandas())
-    .mark_bar(opacity=0.7, stroke="black", strokeWidth=1.5, size=20)
-    .encode(
-        y=alt.Y("pct_correct:Q", title="% Correct", scale=alt.Scale(domain=[0, 100])),
+CHAIN_ORDER = ["H", "K", "L", "A", "B", "G", "D"]
+METHOD_ORDER = ["immunum", "antpack", "anarci", "anarcii2"]
+
+p2_pdf = p2_data.to_pandas()
+
+_method_cols = []
+for i, method in enumerate(METHOD_ORDER):
+    sub = p2_pdf[p2_pdf["method"] == method]
+    if sub.empty:
+        continue
+    base = alt.Chart(sub)
+    bars = base.mark_bar(opacity=0.7).encode(
+        y=alt.Y(
+            "mean(pct_correct):Q",
+            title="% Correct" if i == 0 else "",
+            axis=alt.Axis(labelFontSize=8, titleFontSize=9),
+        ),
         x=alt.X(
             "segment:N",
-            title="Segment",
+            title=None,
             sort=segments,
-            axis=alt.Axis(labelAngle=-45),
+            axis=alt.Axis(labelAngle=-60, labelFontSize=7),
             scale=alt.Scale(paddingInner=0.3),
         ),
-        color=alt.Color("method:N", title="Tool"),
-        xOffset=alt.XOffset("method:N", scale=alt.Scale(paddingInner=0.01)),
-        tooltip=["method", "segment", alt.Tooltip("pct_correct:Q", format=".2f")],
+        color=alt.Color("method:N", legend=None),
+        tooltip=[
+            "method",
+            "chain",
+            "segment",
+            alt.Tooltip("mean(pct_correct):Q", format=".2f", title="Mean %"),
+            alt.Tooltip("stdev(pct_correct):Q", format=".2f", title="Std %"),
+        ],
     )
-    .properties(
-        title=f"Correctness by segment ({acc_size_label}, averaged across chains)",
-        width=1000,
-        height=400,
+    errorbars = base.mark_errorbar(extent="stdev").encode(
+        x=alt.X("segment:N", sort=segments),
+        y=alt.Y("pct_correct:Q"),
+        color=alt.Color("method:N", legend=None),
     )
+    c = (
+        (bars + errorbars)
+        .properties(width=90, height=60, title=alt.TitleParams(method, fontSize=11))
+        .facet(
+            row=alt.Row(
+                "chain:N",
+                sort=CHAIN_ORDER,
+                header=alt.Header(
+                    labelAngle=0,
+                    labelAlign="right",
+                    labelFontSize=10,
+                    title="Chain" if i == 0 else None,
+                    titleFontSize=10,
+                ),
+            ),
+        )
+        .resolve_scale(y="shared")
+    )
+    _method_cols.append(c)
+
+plot2 = alt.hconcat(
+    *_method_cols,
+    title=alt.TitleParams(
+        f"Correctness by segment ({acc_size_label})", fontSize=13, anchor="middle"
+    ),
+    spacing=10,
 )
 
 # ── Save ─────────────────────────────────────────────────────────────────────

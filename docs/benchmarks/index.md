@@ -47,7 +47,7 @@ IMGT regions (FR1–FR4 and CDR1–CDR3). Because the ground truth is derived fr
 antpack/ANARCI agreement, those two tools score 100% by construction — see the note
 above.
 
-<iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="480px" frameborder="0" scrolling="no"></iframe>
+<iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 
 ## Throughput at fixed batch size
 
