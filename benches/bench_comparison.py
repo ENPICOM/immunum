@@ -111,7 +111,9 @@ def _run_immunum_multithreaded(
         case _:
             raise ValueError(f"Invalid {scheme=}")
     return df.select(
-        imp.number(polars.col("sequence"), chains=chains, scheme=scheme).alias("n")
+        imp.number(
+            polars.col("sequence"), chains=chains, scheme=scheme, min_confidence=0.0
+        ).alias("n")
     )
 
 
@@ -120,7 +122,7 @@ def _extract_numbering_immunum_multithreaded(
 ) -> list[dict[str, str]]:
     result = result.unnest("n")
     return [
-        dict(zip(pos, res))
+        dict(zip(pos, res)) if pos is not None and res is not None else None
         for pos, res in zip(
             result.get_column("positions").to_list(),
             result.get_column("residues").to_list(),
@@ -131,11 +133,18 @@ def _extract_numbering_immunum_multithreaded(
 def _run_immunum_singlethreaded(
     sequences: list[tuple[str, str]], annotator: Annotator
 ) -> list:
-    return [annotator.number(seq) for _header, seq in sequences]
+    rv = []
+    for _header, seq in sequences:
+        try:
+            result = annotator.number(seq)
+        except ValueError:
+            result = None
+        rv.append(result)
+    return rv
 
 
 def _extract_numbering_immunum_singlethreaded(results: list) -> list[dict[str, str]]:
-    return [n.numbering for n in results]
+    return [n.numbering if n is not None else None for n in results]
 
 
 def _run_antpack(
@@ -221,7 +230,7 @@ def _run_anarci_parallel(
 
 
 def _run_anarcii2(sequences: list[tuple[str, str]], model):
-    return model.number(sequences)
+    return model.number([seq for _, seq in sequences])
 
 
 def _extract_numbering_anarcii2(
@@ -253,7 +262,7 @@ def _run_anarcii2_parallel(sequences: list[tuple[str, str]]):
     from anarcii import Anarcii  # type: ignore[missing-import]
 
     model = Anarcii(seq_type="antibody", mode="speed", ncpu=os.cpu_count() or 1)
-    return model.number(sequences)
+    return model.number([seq for _, seq in sequences])
 
 
 # ---------------------------------------------------------------------------
@@ -288,7 +297,10 @@ def anarci_kwargs(request) -> dict:
     return request.param
 
 
-@pytest.fixture(scope="module", params=[{"chains": ["IGH"], "scheme": "IMGT"}])
+@pytest.fixture(
+    scope="module",
+    params=[{"chains": ["IGH"], "scheme": "IMGT", "min_confidence": 0.0}],
+)
 def immunum_annotator(request) -> Annotator:
     return Annotator(**request.param)
 
