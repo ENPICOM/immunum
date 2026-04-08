@@ -69,22 +69,14 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
         .write_header(&mut writer)
         .map_err(|e| format!("write error: {}", e))?;
 
-    let mut written = 0;
-    for rec in records {
-        let result = match annotator.number(&rec.sequence) {
-            Ok(result) => result,
-            Err(immunum::Error::LowConfidence { .. }) => continue,
-            Err(e) => return Err(format!("failed to number '{}': {}", rec.id, e)),
-        };
-        let numbered = NumberedRecord {
-            id: rec.id,
-            sequence: rec.sequence,
-            result,
+    for (written, rec) in records.into_iter().enumerate() {
+        let numbered = match annotator.number(&rec.sequence) {
+            Ok(result) => NumberedRecord::success(rec.id, rec.sequence, result),
+            Err(e) => NumberedRecord::failure(rec.id, rec.sequence, e.to_string()),
         };
         format
             .write_record(&mut writer, &numbered, written)
             .map_err(|e| format!("write error: {}", e))?;
-        written += 1;
     }
 
     format

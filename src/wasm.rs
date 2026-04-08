@@ -11,31 +11,35 @@ const TS_TYPES: &str = r#"
 /** Numbered residues keyed by IMGT/Kabat position string (e.g. `"112A"`). */
 export type Numbering = Record<string, string>;
 
-/** Result returned by {@link Annotator.number}. */
+/** Result returned by {@link Annotator.number}. On failure, chain/scheme/confidence/numbering are null and error contains the reason. */
 export interface NumberingResult {
-    /** Detected chain type: `"H"`, `"K"`, `"L"`, `"A"`, `"B"`, `"G"`, or `"D"`. */
-    chain: string;
-    /** Numbering scheme used: `"imgt"` or `"kabat"`. */
-    scheme: string;
-    /** Alignment confidence score between 0 and 1. */
-    confidence: number;
-    /** Position-to-residue mapping for the aligned region. */
-    numbering: Numbering;
+    /** Detected chain type: `"H"`, `"K"`, `"L"`, `"A"`, `"B"`, `"G"`, or `"D"`. Null on failure. */
+    chain: string | null;
+    /** Numbering scheme used: `"imgt"` or `"kabat"`. Null on failure. */
+    scheme: string | null;
+    /** Alignment confidence score between 0 and 1. Null on failure. */
+    confidence: number | null;
+    /** Position-to-residue mapping for the aligned region. Null on failure. */
+    numbering: Numbering | null;
+    /** Error message if numbering failed, null on success. */
+    error: string | null;
 }
 
-/** FR/CDR segments returned by {@link Annotator.segment}. */
+/** FR/CDR segments returned by {@link Annotator.segment}. On failure, all region fields are absent and error contains the reason. */
 export interface SegmentationResult {
-    fr1: string;
-    cdr1: string;
-    fr2: string;
-    cdr2: string;
-    fr3: string;
-    cdr3: string;
-    fr4: string;
+    fr1?: string;
+    cdr1?: string;
+    fr2?: string;
+    cdr2?: string;
+    fr3?: string;
+    cdr3?: string;
+    fr4?: string;
     /** Residues before FR1 (non-canonical N-terminal extension). */
-    prefix: string;
+    prefix?: string;
     /** Residues after FR4 (non-canonical C-terminal extension). */
-    postfix: string;
+    postfix?: string;
+    /** Error message if segmentation failed, null on success. */
+    error: string | null;
 }
 
 /**
@@ -69,6 +73,7 @@ export class Annotator {
     constructor(chains: string[], scheme: string, min_confidence?: number | null);
     number(sequence: string): NumberingResult;
     segment(sequence: string): SegmentationResult;
+
 }
 "#;
 
@@ -94,44 +99,55 @@ impl Annotator {
     }
 
     #[wasm_bindgen(js_name = "number", skip_typescript)]
-    pub fn wasm_number(&self, sequence: &str) -> Result<JsValue, JsValue> {
-        let result = self
-            .number(sequence)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-        let aligned_seq = &sequence[result.query_start..=result.query_end];
-        let numbering = Object::new();
-        for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
-            Reflect::set(
-                &numbering,
-                &JsValue::from_str(&pos.to_string()),
-                &JsValue::from_str(&ch.to_string()),
-            )
-            .unwrap();
-        }
-
+    pub fn wasm_number(&self, sequence: &str) -> JsValue {
         let dict = Object::new();
-        Reflect::set(&dict, &"chain".into(), &result.chain.to_string().into()).unwrap();
-        Reflect::set(&dict, &"scheme".into(), &result.scheme.to_string().into()).unwrap();
-        Reflect::set(&dict, &"confidence".into(), &result.confidence.into()).unwrap();
-        Reflect::set(&dict, &"numbering".into(), &numbering.into()).unwrap();
-        Ok(dict.into())
+        match self.number(sequence) {
+            Ok(result) => {
+                let aligned_seq = &sequence[result.query_start..=result.query_end];
+                let numbering = Object::new();
+                for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
+                    Reflect::set(
+                        &numbering,
+                        &JsValue::from_str(&pos.to_string()),
+                        &JsValue::from_str(&ch.to_string()),
+                    )
+                    .unwrap();
+                }
+                Reflect::set(&dict, &"chain".into(), &result.chain.to_string().into()).unwrap();
+                Reflect::set(&dict, &"scheme".into(), &result.scheme.to_string().into()).unwrap();
+                Reflect::set(&dict, &"confidence".into(), &result.confidence.into()).unwrap();
+                Reflect::set(&dict, &"numbering".into(), &numbering.into()).unwrap();
+                Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
+            }
+            Err(e) => {
+                Reflect::set(&dict, &"chain".into(), &JsValue::NULL).unwrap();
+                Reflect::set(&dict, &"scheme".into(), &JsValue::NULL).unwrap();
+                Reflect::set(&dict, &"confidence".into(), &JsValue::NULL).unwrap();
+                Reflect::set(&dict, &"numbering".into(), &JsValue::NULL).unwrap();
+                Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
+            }
+        }
+        dict.into()
     }
 
     #[wasm_bindgen(js_name = "segment", skip_typescript)]
-    pub fn wasm_segment(&self, sequence: &str) -> Result<JsValue, JsValue> {
-        let result = self
-            .number(sequence)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-        let aligned_seq = &sequence[result.query_start..=result.query_end];
-        let segments = segment(&result.positions, aligned_seq, result.scheme);
-
+    pub fn wasm_segment(&self, sequence: &str) -> JsValue {
         let dict = Object::new();
-        for (region, seq) in &segments {
-            Reflect::set(&dict, &JsValue::from_str(region), &JsValue::from_str(seq)).unwrap();
+        match self.number(sequence) {
+            Ok(result) => {
+                let aligned_seq = &sequence[result.query_start..=result.query_end];
+                let segments = segment(&result.positions, aligned_seq, result.scheme);
+                for (region, seq) in &segments {
+                    Reflect::set(&dict, &JsValue::from_str(region), &JsValue::from_str(seq))
+                        .unwrap();
+                }
+                Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
+            }
+            Err(e) => {
+                Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
+            }
         }
-        Ok(dict.into())
+        dict.into()
     }
 }
 
@@ -152,7 +168,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = ann.wasm_number(IGH_SEQ).unwrap();
+        let result = ann.wasm_number(IGH_SEQ);
         let chain = Reflect::get(&result, &"chain".into()).unwrap();
         assert_eq!(chain.as_string().unwrap(), "H");
         let confidence = Reflect::get(&result, &"confidence".into()).unwrap();
@@ -168,7 +184,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = ann.wasm_segment(IGH_SEQ).unwrap();
+        let result = ann.wasm_segment(IGH_SEQ);
         let fr1 = Reflect::get(&result, &"fr1".into()).unwrap();
         assert!(!fr1.as_string().unwrap().is_empty());
     }

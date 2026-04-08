@@ -79,9 +79,26 @@ describe("number()", () => {
     }
   });
 
-  it("throws on empty sequence", () => {
+  it("returns error field on empty sequence (does not throw)", () => {
     const annotator = new Annotator(ALL_CHAINS, "imgt");
-    assert.throws(() => annotator.number(""));
+    const result = annotator.number("");
+    assert.equal(result.chain, null);
+    assert.equal(result.numbering, null);
+    assert.equal(typeof result.error, "string");
+  });
+
+  it("returns error field on invalid sequence (does not throw)", () => {
+    const annotator = new Annotator(ALL_CHAINS, "imgt");
+    const result = annotator.number("AAAAAAAAAAAAAAAA");
+    assert.equal(result.chain, null);
+    assert.equal(result.numbering, null);
+    assert.equal(typeof result.error, "string");
+  });
+
+  it("returns null error on success", () => {
+    const annotator = new Annotator(["H"], "imgt");
+    const result = annotator.number(IGH_SEQ);
+    assert.equal(result.error, null);
   });
 
   it("detects kappa or lambda for IGL sequence", () => {
@@ -118,5 +135,18 @@ describe("segment()", () => {
     const annotator = new Annotator(["TRB"], "IMGT");
     const result = annotator.segment(TRB_SEQ);
     assert.ok(result.cdr3.length > 0);
+  });
+
+  it("returns null error on success", () => {
+    const annotator = new Annotator(["H"], "IMGT");
+    const result = annotator.segment(IGH_SEQ);
+    assert.equal(result.error, null);
+  });
+
+  it("returns error field on invalid sequence (does not throw)", () => {
+    const annotator = new Annotator(ALL_CHAINS, "IMGT");
+    const result = annotator.segment("AAAAAAAAAAAAAAAA");
+    assert.equal(typeof result.error, "string");
+    assert.equal(result.fr1, undefined);
   });
 });
