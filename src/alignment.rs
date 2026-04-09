@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, Result};
 use crate::scoring::PositionScores;
 
 #[cfg(feature = "python")]
@@ -105,15 +104,11 @@ pub fn align(
     query: &str,
     positions: &[PositionScores],
     align_buffer: Option<&mut AlignBuffer>,
-) -> Result<Alignment> {
+) -> Alignment {
     let query_bytes = query.as_bytes();
     let query_len = query_bytes.len();
     let cons_len = positions.len();
     let stride = cons_len + 1;
-
-    if query_len == 0 {
-        return Err(Error::InvalidSequence("empty sequence".to_string()));
-    }
 
     // Use provided buffer or allocate a local one
     let mut local_buf;
@@ -227,7 +222,7 @@ pub fn align(
         best_j,
     );
 
-    Ok(Alignment {
+    Alignment {
         score: best_score,
         positions: aligned_positions,
         cons_start,
@@ -236,7 +231,7 @@ pub fn align(
         max_confidence_score,
         query_start,
         query_end,
-    })
+    }
 }
 
 fn build_traceback(
@@ -335,7 +330,7 @@ mod tests {
     use crate::scoring::ScoringMatrix;
     use crate::Chain;
 
-    fn test_align(query: &str, positions: &[PositionScores]) -> Result<Alignment> {
+    fn test_align(query: &str, positions: &[PositionScores]) -> Alignment {
         align(query, positions, None)
     }
     #[test]
@@ -346,7 +341,7 @@ mod tests {
         let sequence =
             "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
-        let result = test_align(sequence, &matrix.positions).unwrap();
+        let result = test_align(sequence, &matrix.positions);
 
         // Alignment should produce a score (may be negative for partial sequences)
         assert!(!result.positions.is_empty());
@@ -358,7 +353,9 @@ mod tests {
     fn test_empty_sequence() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let result = test_align("", &matrix.positions);
-        assert!(result.is_err());
+        // Empty sequence should align with negative infinity score and no positions
+        assert_eq!(result.score, f32::NEG_INFINITY);
+        assert!(result.positions.is_empty());
     }
 
     #[test]
@@ -367,7 +364,7 @@ mod tests {
 
         // A sequence starting from middle of framework should align without heavy penalty
         let partial_seq = "GLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
-        let result = test_align(partial_seq, &matrix.positions).unwrap();
+        let result = test_align(partial_seq, &matrix.positions);
 
         // Should have a reasonable score (not heavily penalized for missing start)
         assert!(
@@ -388,7 +385,7 @@ mod tests {
 
         // A sequence ending in middle should align without heavy penalty
         let partial_seq = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVS";
-        let result = test_align(partial_seq, &matrix.positions).unwrap();
+        let result = test_align(partial_seq, &matrix.positions);
 
         // Should have a reasonable score
         assert!(
@@ -403,7 +400,7 @@ mod tests {
 
         // A small fragment from the middle should align
         let fragment = "GLEWVSAISKSGGSTYY";
-        let result = test_align(fragment, &matrix.positions).unwrap();
+        let result = test_align(fragment, &matrix.positions);
 
         // Should align without extreme penalties for missing ends
         assert!(
@@ -426,7 +423,7 @@ mod tests {
     #[test]
     fn test_normal_antibody_no_flanking() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        let result = test_align(FULL_IGH, &matrix.positions).unwrap();
+        let result = test_align(FULL_IGH, &matrix.positions);
 
         assert_eq!(result.query_start, 0, "No prefix: query_start should be 0");
         assert_eq!(
@@ -442,7 +439,7 @@ mod tests {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let suffix = "AAAAAAA";
         let sequence = format!("{FULL_IGH}{suffix}");
-        let result = test_align(&sequence, &matrix.positions).unwrap();
+        let result = test_align(&sequence, &matrix.positions);
 
         assert_eq!(
             result.query_end,
@@ -462,7 +459,7 @@ mod tests {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let prefix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}");
-        let result = test_align(&sequence, &matrix.positions).unwrap();
+        let result = test_align(&sequence, &matrix.positions);
 
         assert_eq!(
             result.query_start,
@@ -479,7 +476,7 @@ mod tests {
         let prefix = "AAAAAAA";
         let suffix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}{suffix}");
-        let result = test_align(&sequence, &matrix.positions).unwrap();
+        let result = test_align(&sequence, &matrix.positions);
 
         assert_eq!(result.query_start, prefix.len());
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
