@@ -155,25 +155,23 @@ jobs:
           fi
 
           {
-            echo "## immunum v$VERSION"
+            echo "# immunum v$VERSION"
+            echo
+            echo "## What's changed"
             echo
             cat changelog_section.md
             echo
-            echo "### Python"
-            echo "Built for:"
-            echo "- Python 3.13 (abi3, compatible with 3.9+)"
-            echo "- Linux x86_64 and aarch64 (manylinux)"
-            echo "- macOS Apple Silicon (aarch64)"
+            echo "## Install"
             echo
-            echo "Install with: \`pip install immunum==$VERSION\`"
+            echo "**Python** — \`pip install immunum==$VERSION\`"
+            echo "**JavaScript / WASM** — \`npm install immunum@$VERSION\`"
+            echo "**Rust** — \`cargo add immunum@$VERSION\`"
             echo
-            echo "### JavaScript / WASM"
-            echo "Built for Node.js (CommonJS)."
+            echo "## Build info"
             echo
-            echo "Install with: \`npm install immunum@$VERSION\`"
-            echo
-            echo "### Rust"
-            echo "Install with: \`cargo add immunum@$VERSION\`"
+            echo "- **Python wheels:** 3.13 (abi3, compatible with 3.9+) — Linux x86_64, Linux aarch64 (manylinux), macOS Apple Silicon"
+            echo "- **WASM package:** Node.js (CommonJS)"
+            echo "- **Rust crate:** published to crates.io"
           } > release_notes.md
 
       - name: Create GitHub Release
