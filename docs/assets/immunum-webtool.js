@@ -174,6 +174,12 @@ async function main() {
     r.addEventListener("change", refreshChainAvailability);
   }
 
+  const confSlider = $("min-confidence");
+  const confValue = $("confidence-value");
+  confSlider.addEventListener("input", () => {
+    confValue.textContent = parseFloat(confSlider.value).toFixed(2);
+  });
+
   for (const btn of document.querySelectorAll("[data-example]")) {
     btn.addEventListener("click", () => {
       const key = btn.dataset.example;
@@ -207,15 +213,23 @@ async function main() {
       return;
     }
 
+    const minConfidence = parseFloat($("min-confidence").value);
+
     let annotator;
     try {
-      annotator = new Annotator(chains, scheme);
+      annotator = new Annotator(chains, scheme, minConfidence);
     } catch (err) {
       showError(`Could not initialise annotator: ${err}`);
       return;
     }
     try {
       const numResult = annotator.number(sequence);
+      if (!numResult || !numResult.numbering) {
+        showError(
+          "No variable domain found. Check that the sequence is a variable region and that the selected chains/scheme match.",
+        );
+        return;
+      }
       const segResult = annotator.segment(sequence);
       renderResult(sequence, numResult, segResult);
     } catch (err) {

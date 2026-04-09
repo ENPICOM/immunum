@@ -50,6 +50,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Demo: demo.md
   - Usage:
       - usage/index.md
       - Python module: usage/python.md
