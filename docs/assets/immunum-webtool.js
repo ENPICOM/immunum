@@ -164,7 +164,13 @@ function renderResult(sequence, numberResult, segResult) {
   $("immunum-result").hidden = false;
 }
 
+let wasmReady = null;
+
 async function main() {
+  // The script may run on a page that doesn't have the tool (e.g. when
+  // Material's instant navigation loads a different page). Bail out early.
+  if (!document.getElementById("immunum-form")) return;
+
   // Wire UI immediately so example buttons + scheme switching work even
   // before the WASM module finishes loading.
   buildChainCheckboxes();
@@ -188,8 +194,10 @@ async function main() {
   }
 
   try {
-    await init();
+    if (!wasmReady) wasmReady = init();
+    await wasmReady;
   } catch (err) {
+    wasmReady = null;
     showError(`Failed to load WASM module: ${err}`);
     return;
   }
@@ -240,4 +248,14 @@ async function main() {
   });
 }
 
-main();
+// Material for MkDocs uses instant navigation, which replaces the page
+// body without re-running <script> tags. Subscribe to its `document$`
+// observable so main() runs on every navigation to this page. Fall back
+// to a plain invocation if the observable isn't available.
+if (typeof window !== "undefined" && window.document$?.subscribe) {
+  window.document$.subscribe(() => {
+    main();
+  });
+} else {
+  main();
+}
