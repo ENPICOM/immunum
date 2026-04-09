@@ -76,6 +76,18 @@ tasks:
         cmds:
             - wasm-pack build --target nodejs --features wasm --no-default-features {{.CLI_ARGS}}
 
+    build-wasm-web:
+        sources:
+            - src/**/*.rs
+            - build.rs
+            - Cargo.toml
+            - Cargo.lock
+            - resources/**/*
+        generates:
+            - docs/assets/wasm/immunum.js
+        cmds:
+            - wasm-pack build --target web --out-dir docs/assets/wasm --no-default-features --features wasm {{.CLI_ARGS}}
+
     test-wasm:
         deps:
             - task: build-wasm
@@ -139,12 +151,16 @@ tasks:
             - uv run --no-sync pysentry-rs .
 
     docs-serve:
+        deps:
+            - task: build-wasm-web
         cmd: uv run --no-sync --group docs mkdocs serve
 
     docs:
         cmd: task docs-serve
 
     docs-build:
+        deps:
+            - task: build-wasm-web
         cmd: uv run --no-sync --group docs mkdocs build {{.CLI_ARGS}}
 
     benchmark-cli:

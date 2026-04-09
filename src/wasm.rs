@@ -8,10 +8,23 @@ use crate::types::{Chain, Scheme};
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_TYPES: &str = r#"
-/** Numbered residues keyed by IMGT/Kabat position string (e.g. `"112A"`). */
-export type Numbering = Record<string, string>;
+/**
+ * Ordered position → residue map, iterated in IMGT-correct order.
+ *
+ * Mirrors the Python API's ordered `dict` behaviour: iteration yields
+ * positions in the order emitted by the numbering scheme (so CDR3
+ * insertions like `"111A"` / `"112A"` appear between `"111"` and `"112"`
+ * rather than being reordered). Keys are position strings (e.g. `"112A"`)
+ * and values are single-character residues.
+ *
+ * **Breaking change in 2.0.0:** previously `Record<string, string>`. Use
+ * `numbering.get("112A")` instead of `numbering["112A"]`, and iterate with
+ * `for (const [pos, aa] of numbering)` or `numbering.entries()` instead of
+ * `Object.entries(numbering)`.
+ */
+export type Numbering = Map<string, string>;
 
-/** Result returned by {@link Annotator.number}. On failure, chain/scheme/confidence/numbering are null and error contains the reason. */
+/** Result returned by {@link Annotator.number}. On failure, chain/scheme/confidence/numbering/query_start/query_end are null and error contains the reason. */
 export interface NumberingResult {
     /** Detected chain type: `"H"`, `"K"`, `"L"`, `"A"`, `"B"`, `"G"`, or `"D"`. Null on failure. */
     chain: string | null;
@@ -21,6 +34,10 @@ export interface NumberingResult {
     confidence: number | null;
     /** Position-to-residue mapping for the aligned region. Null on failure. */
     numbering: Numbering | null;
+    /** 0-indexed start of the aligned region in the input sequence (inclusive). Null on failure. */
+    query_start: number | null;
+    /** 0-indexed end of the aligned region in the input sequence (inclusive). Null on failure. */
+    query_end: number | null;
     /** Error message if numbering failed, null on success. */
     error: string | null;
 }
@@ -104,19 +121,29 @@ impl Annotator {
         match self.number(sequence) {
             Ok(result) => {
                 let aligned_seq = &sequence[result.query_start..=result.query_end];
-                let numbering = Object::new();
+                let numbering = js_sys::Map::new();
                 for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
-                    Reflect::set(
-                        &numbering,
+                    numbering.set(
                         &JsValue::from_str(&pos.to_string()),
                         &JsValue::from_str(&ch.to_string()),
-                    )
-                    .unwrap();
+                    );
                 }
                 Reflect::set(&dict, &"chain".into(), &result.chain.to_string().into()).unwrap();
                 Reflect::set(&dict, &"scheme".into(), &result.scheme.to_string().into()).unwrap();
                 Reflect::set(&dict, &"confidence".into(), &result.confidence.into()).unwrap();
                 Reflect::set(&dict, &"numbering".into(), &numbering.into()).unwrap();
+                Reflect::set(
+                    &dict,
+                    &"query_start".into(),
+                    &(result.query_start as u32).into(),
+                )
+                .unwrap();
+                Reflect::set(
+                    &dict,
+                    &"query_end".into(),
+                    &(result.query_end as u32).into(),
+                )
+                .unwrap();
                 Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
             }
             Err(e) => {
@@ -124,6 +151,8 @@ impl Annotator {
                 Reflect::set(&dict, &"scheme".into(), &JsValue::NULL).unwrap();
                 Reflect::set(&dict, &"confidence".into(), &JsValue::NULL).unwrap();
                 Reflect::set(&dict, &"numbering".into(), &JsValue::NULL).unwrap();
+                Reflect::set(&dict, &"query_start".into(), &JsValue::NULL).unwrap();
+                Reflect::set(&dict, &"query_end".into(), &JsValue::NULL).unwrap();
                 Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
             }
         }

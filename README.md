@@ -2,6 +2,8 @@
 
 Immunum is a high-performance antibody and TCR sequence numbering tool for Rust, Python, Polars and JS/TS.
 
+Try it in your browser: [interactive demo](https://immunum.enpicom.com/demo/).
+
 [![Crates.io](https://img.shields.io/crates/v/immunum)](https://crates.io/crates/immunum)
 [![PyPI](https://img.shields.io/pypi/v/immunum)](https://pypi.org/project/immunum/)
 [![npm](https://img.shields.io/npm/v/immunum)](https://www.npmjs.com/package/immunum)

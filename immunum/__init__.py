@@ -172,6 +172,8 @@ class NumberingResult:
     scheme: Optional[str]
     confidence: Optional[float]
     numbering: Optional[dict[str, str]]
+    query_start: Optional[int]
+    query_end: Optional[int]
     error: Optional[str]
 
 

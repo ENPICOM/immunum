@@ -59,6 +59,39 @@ pub struct SegmentResult {
 /// complete consensus data. Set to 0.0 to disable filtering.
 pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.5;
 
+/// Minimum allowed input sequence length.
+pub const MIN_SEQUENCE_LENGTH: usize = 30;
+
+/// Maximum allowed input sequence length.
+pub const MAX_SEQUENCE_LENGTH: usize = 1000;
+
+/// Validate that `sequence` contains only standard amino acid characters
+/// (case-insensitive) and that its length is within the allowed bounds.
+fn validate_sequence(sequence: &str) -> Result<()> {
+    let len = sequence.len();
+    if len < MIN_SEQUENCE_LENGTH {
+        return Err(Error::InvalidSequence(format!(
+            "sequence length {} is below minimum {}",
+            len, MIN_SEQUENCE_LENGTH
+        )));
+    }
+    if len > MAX_SEQUENCE_LENGTH {
+        return Err(Error::InvalidSequence(format!(
+            "sequence length {} exceeds maximum {}",
+            len, MAX_SEQUENCE_LENGTH
+        )));
+    }
+    for (i, b) in sequence.bytes().enumerate() {
+        if !b.is_ascii_alphabetic() {
+            return Err(Error::InvalidSequence(format!(
+                "invalid character {:?} at position {i}",
+                b as char
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",
@@ -118,9 +151,7 @@ impl Annotator {
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
     pub fn number(&self, sequence: &str) -> Result<NumberingResult> {
-        if sequence.is_empty() {
-            return Err(Error::InvalidSequence("empty sequence".to_string()));
-        }
+        validate_sequence(sequence)?;
 
         let (chain, alignment) = self.get_best_alignment(sequence)?;
 
@@ -174,19 +205,18 @@ impl Annotator {
     /// If multiple chains were provided during initialization, this will align to all
     /// of them and return the best match. If only one chain was provided, it will
     /// align to that chain directly.
-    pub fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
+    fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
         let mut buf = self.align_buf.borrow_mut();
         // Align to all loaded chain types and find best match by raw alignment score
         let mut best: Option<(Chain, Alignment)> = None;
         for (chain, matrix) in &self.matrices {
-            if let Ok(alignment) = align(sequence, &matrix.positions, Some(&mut *buf)) {
-                let is_better = match &best {
-                    Some((_, prev)) => alignment.score > prev.score,
-                    None => true,
-                };
-                if is_better {
-                    best = Some((*chain, alignment));
-                }
+            let alignment = align(sequence, &matrix.positions, Some(&mut *buf));
+            let is_better = match &best {
+                Some((_, prev)) => alignment.score > prev.score,
+                None => true,
+            };
+            if is_better {
+                best = Some((*chain, alignment));
             }
         }
         best.ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
