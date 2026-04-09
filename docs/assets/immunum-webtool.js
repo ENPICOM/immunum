@@ -233,9 +233,8 @@ async function main() {
     try {
       const numResult = annotator.number(sequence);
       if (!numResult || !numResult.numbering) {
-        showError(
-          "No variable domain found. Check that the sequence is a variable region and that the selected chains/scheme match.",
-        );
+        const reason = numResult?.error || "no variable domain found";
+        showError(`Numbering failed: ${reason}.`);
         return;
       }
       const segResult = annotator.segment(sequence);

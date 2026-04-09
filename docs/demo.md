@@ -51,8 +51,8 @@ hide:
       </fieldset>
 
       <fieldset class="immunum-field immunum-confidence-field">
-        <legend>Min. confidence <span id="confidence-value">0.70</span></legend>
-        <input type="range" id="min-confidence" min="0" max="1" step="0.01" value="0.5">
+        <legend>Min. confidence <span id="confidence-value">0.50</span></legend>
+        <input type="range" id="min-confidence" min="0" max="1" step="0.01" value="0.5" autocomplete="off">
       </fieldset>
 
       <div class="immunum-run-wrap">
