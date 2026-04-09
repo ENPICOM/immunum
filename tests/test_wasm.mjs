@@ -102,11 +102,30 @@ describe("number()", () => {
     }
   });
 
+  it("returns query_start/query_end as inclusive 0-indexed ints on success", () => {
+    const annotator = new Annotator(["H"], "imgt");
+    const result = annotator.number(IGH_SEQ);
+    assert.equal(typeof result.query_start, "number");
+    assert.equal(typeof result.query_end, "number");
+    assert.ok(Number.isInteger(result.query_start));
+    assert.ok(Number.isInteger(result.query_end));
+    assert.ok(result.query_start >= 0);
+    assert.ok(result.query_end >= result.query_start);
+    assert.ok(result.query_end < IGH_SEQ.length);
+    // Aligned length should match the number of numbered residues.
+    assert.equal(
+      result.query_end - result.query_start + 1,
+      result.numbering.size,
+    );
+  });
+
   it("returns error field on empty sequence (does not throw)", () => {
     const annotator = new Annotator(ALL_CHAINS, "imgt");
     const result = annotator.number("");
     assert.equal(result.chain, null);
     assert.equal(result.numbering, null);
+    assert.equal(result.query_start, null);
+    assert.equal(result.query_end, null);
     assert.equal(typeof result.error, "string");
   });
 

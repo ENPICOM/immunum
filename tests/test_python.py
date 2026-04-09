@@ -110,11 +110,21 @@ class TestNumbering:
         result = annotator.number(IGH_SEQ)
         assert result.chain == "H"
 
+    def test_query_start_end_on_success(self):
+        annotator = immunum.Annotator(["IGH"], "IMGT")
+        result = annotator.number(IGH_SEQ)
+        assert isinstance(result.query_start, int)
+        assert isinstance(result.query_end, int)
+        assert 0 <= result.query_start <= result.query_end < len(IGH_SEQ)
+        assert result.query_end - result.query_start + 1 == len(result.numbering)
+
     def test_empty_sequence_returns_error(self):
         annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
         result = annotator.number("")
         assert result.error is not None
         assert result.chain is None
+        assert result.query_start is None
+        assert result.query_end is None
 
     def test_invalid_sequence_returns_error(self):
         annotator = immunum.Annotator(ALL_CHAINS, "IMGT")

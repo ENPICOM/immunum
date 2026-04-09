@@ -90,24 +90,16 @@ function clearError() {
   $("immunum-error").hidden = true;
 }
 
-// Map each index in the aligned sequence to a region label, based on the
-// segment() substrings. Segments are contiguous and in order.
-function buildRegionMap(sequence, segments) {
-  const map = new Map();
-  let cursor = 0;
+function buildRegionArray(segments, alignedLen) {
+  const arr = new Array(alignedLen).fill(null);
+  let offset = 0;
   for (const region of REGIONS) {
     const seg = segments[region] || "";
-    if (!seg.length) continue;
-    // Find the segment starting at or after cursor (segments are non-overlapping
-    // and appear in order in the original sequence).
-    const idx = sequence.indexOf(seg, cursor);
-    if (idx < 0) continue;
-    for (let i = 0; i < seg.length; i++) {
-      map.set(idx + i, region);
+    for (let i = 0; i < seg.length && offset < alignedLen; i++, offset++) {
+      arr[offset] = region;
     }
-    cursor = idx + seg.length;
   }
-  return map;
+  return arr;
 }
 
 function renderResult(sequence, numberResult, segResult) {
@@ -147,29 +139,25 @@ function renderResult(sequence, numberResult, segResult) {
   const conf = Math.max(0, Math.min(1, numberResult.confidence));
   $("result-confidence-value").textContent = `Confidence: ${(conf * 100).toFixed(1)}%`;
 
-  // Figure out which region each numbered residue belongs to by locating the
-  // aligned residue in the original sequence. We consume characters left to
-  // right so repeated residues map in order.
-  const regionMap = buildRegionMap(sequence, segResult);
-
-  // Walk the sequence and the ordered numbering entries together. The WASM
-  // bindings emit `numbering` by iterating positions in order, and JS object
-  // iteration preserves insertion order for string keys.
-  const entries = Array.from(numberResult.numbering);
+  const alignedLen = qEnd - qStart + 1;
+  const regionArr = buildRegionArray(segResult, alignedLen);
   const grid = $("result-grid");
-  grid.innerHTML = "";
+  grid.textContent = "";
 
-  let seqCursor = 0;
-  for (const [pos, aa] of entries) {
-    const idx = sequence.indexOf(aa, seqCursor);
-    let region = null;
-    if (idx >= 0) {
-      region = regionMap.get(idx) || null;
-      seqCursor = idx + 1;
-    }
+  let offset = 0;
+  for (const [pos, aa] of numberResult.numbering) {
+    const region = offset < alignedLen ? regionArr[offset] : null;
+    offset++;
     const pill = document.createElement("div");
     pill.className = "immunum-residue" + (region ? ` region-${region}` : "");
-    pill.innerHTML = `<span class="pos">${pos}</span><span class="aa">${aa}</span>`;
+    const posSpan = document.createElement("span");
+    posSpan.className = "pos";
+    posSpan.textContent = pos;
+    const aaSpan = document.createElement("span");
+    aaSpan.className = "aa";
+    aaSpan.textContent = aa;
+    pill.appendChild(posSpan);
+    pill.appendChild(aaSpan);
     grid.appendChild(pill);
   }
 

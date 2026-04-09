@@ -16,6 +16,11 @@ const TS_TYPES: &str = r#"
  * insertions like `"111A"` / `"112A"` appear between `"111"` and `"112"`
  * rather than being reordered). Keys are position strings (e.g. `"112A"`)
  * and values are single-character residues.
+ *
+ * **Breaking change in 2.0.0:** previously `Record<string, string>`. Use
+ * `numbering.get("112A")` instead of `numbering["112A"]`, and iterate with
+ * `for (const [pos, aa] of numbering)` or `numbering.entries()` instead of
+ * `Object.entries(numbering)`.
  */
 export type Numbering = Map<string, string>;
 
