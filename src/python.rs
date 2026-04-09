@@ -57,6 +57,8 @@ impl Annotator {
                 dict.set_item("scheme", result.scheme.to_string())?;
                 dict.set_item("confidence", result.confidence)?;
                 dict.set_item("numbering", numbering)?;
+                dict.set_item("query_start", result.query_start)?;
+                dict.set_item("query_end", result.query_end)?;
                 dict.set_item("error", py.None())?;
             }
             Err(e) => {
@@ -64,6 +66,8 @@ impl Annotator {
                 dict.set_item("scheme", py.None())?;
                 dict.set_item("confidence", py.None())?;
                 dict.set_item("numbering", py.None())?;
+                dict.set_item("query_start", py.None())?;
+                dict.set_item("query_end", py.None())?;
                 dict.set_item("error", e.to_string())?;
             }
         }

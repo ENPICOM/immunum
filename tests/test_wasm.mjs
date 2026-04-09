@@ -66,16 +66,39 @@ describe("number()", () => {
     assert.ok(result.confidence > 0 && result.confidence <= 1);
   });
 
-  it("returns numbering as an object with string keys and single-char values", () => {
+  it("returns numbering as an ordered Map of string→residue", () => {
     const annotator = new Annotator(["H"], "imgt");
     const result = annotator.number(IGH_SEQ);
-    assert.equal(typeof result.numbering, "object");
-    const entries = Object.entries(result.numbering);
-    assert.ok(entries.length > 0);
-    for (const [pos, aa] of entries) {
+    assert.ok(result.numbering instanceof Map);
+    assert.ok(result.numbering.size > 0);
+    for (const [pos, aa] of result.numbering) {
       assert.equal(typeof pos, "string");
       assert.equal(typeof aa, "string");
       assert.equal(aa.length, 1);
+    }
+  });
+
+  it("iterates numbering in IMGT order with insertions between base positions", () => {
+    const annotator = new Annotator(["H"], "imgt");
+    const result = annotator.number(IGH_SEQ);
+    const keys = Array.from(result.numbering.keys());
+    const idx111 = keys.indexOf("111");
+    assert.ok(idx111 >= 0, "expected base position 111 to be present");
+    const insertionKeys = keys.filter((k) => /^11[12][A-Z]$/.test(k));
+    for (const ins of insertionKeys) {
+      const insIdx = keys.indexOf(ins);
+      assert.ok(insIdx > idx111, `insertion ${ins} must appear after 111`);
+      const after = keys.slice(insIdx + 1);
+      for (const k of after) {
+        const m = /^(\d+)$/.exec(k);
+        if (m) {
+          assert.ok(
+            parseInt(m[1], 10) >= 112,
+            `insertion ${ins} should not precede base position ${k}`,
+          );
+          break;
+        }
+      }
     }
   });
 

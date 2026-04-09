@@ -14,3 +14,304 @@
   --md-primary-bg-color:        #F0F4FC; /* Off-white */
   --md-accent-fg-color:         #7D5BFF; /* Purple */
 }
+
+/* ---------- Homepage: hero ---------- */
+.immunum-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem 0 1rem;
+}
+.immunum-hero-logo {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+}
+.immunum-hero-text h1 {
+  margin: 0;
+  font-size: 2.2rem;
+}
+.immunum-hero-text p {
+  margin: 0.25rem 0 0;
+  font-size: 1.05rem;
+  opacity: 0.85;
+}
+
+/* ---------- Homepage: interactive tool ---------- */
+.immunum-tool {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: var(--md-code-bg-color);
+}
+.immunum-form { display: flex; flex-direction: column; gap: 1rem; }
+.immunum-field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
+.immunum-field > span { font-weight: 600; opacity: 0.8; }
+.immunum-field textarea,
+.immunum-field select {
+  font-family: var(--md-code-font-family, monospace);
+  font-size: 0.9rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  width: 100%;
+  box-sizing: border-box;
+}
+.immunum-field textarea { resize: vertical; min-height: 5.5rem; word-break: break-all; }
+.immunum-field textarea:focus,
+.immunum-field select:focus { outline: 2px solid var(--md-accent-fg-color); outline-offset: 1px; }
+
+.immunum-examples {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  font-size: 0.8rem; opacity: 0.85;
+}
+.immunum-examples button {
+  background: transparent;
+  color: var(--md-accent-fg-color);
+  border: 1px solid var(--md-accent-fg-color);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.immunum-examples button:hover { background: var(--md-accent-fg-color); color: #fff; }
+
+.immunum-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.immunum-chain-field {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem 0.6rem;
+  margin: 0;
+  grid-column: 1 / -1;
+}
+.immunum-chain-field legend {
+  padding: 0 0.3rem;
+  font-weight: 600;
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+.immunum-chain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.35rem 0.9rem;
+}
+.immunum-chain-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+.immunum-chain-check input[type="checkbox"] {
+  accent-color: var(--md-accent-fg-color);
+  cursor: pointer;
+}
+.immunum-chain-check.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.immunum-chain-check.is-disabled input { cursor: not-allowed; }
+.immunum-scheme-field {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem 0.6rem;
+  margin: 0;
+}
+.immunum-scheme-field legend {
+  padding: 0 0.3rem;
+  font-weight: 600;
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+.immunum-scheme-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 0.9rem;
+}
+.immunum-scheme-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+.immunum-scheme-radio input[type="radio"] {
+  accent-color: var(--md-accent-fg-color);
+  cursor: pointer;
+}
+
+.immunum-run-wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+}
+.immunum-run {
+  background: linear-gradient(135deg, var(--md-primary-fg-color), var(--md-accent-fg-color));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.85rem 2.2rem;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -8px var(--md-accent-fg-color);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.immunum-run:disabled { opacity: 0.55; cursor: wait; box-shadow: none; }
+.immunum-run:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -10px var(--md-accent-fg-color);
+}
+
+.immunum-result {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.immunum-error {
+  margin-top: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: rgba(220, 53, 69, 0.12);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  font-size: 0.88rem;
+}
+
+.immunum-result-header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem;
+  margin-bottom: 0.9rem;
+}
+.immunum-badge {
+  background: var(--md-primary-fg-color);
+  color: #fff;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.immunum-confidence {
+  display: flex; align-items: center; gap: 0.55rem;
+  font-size: 0.8rem; flex: 1; min-width: 200px;
+}
+.immunum-confidence-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--md-default-fg-color--lightest);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.immunum-confidence-bar > div {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--md-primary-fg-color), var(--md-accent-fg-color));
+  transition: width 0.25s ease;
+}
+
+.immunum-legend {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem;
+  font-size: 0.72rem;
+}
+.immunum-legend > span {
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.immunum-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.immunum-residue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 2.4rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+  background: var(--md-default-fg-color--lightest);
+  font-family: var(--md-code-font-family, monospace);
+  line-height: 1.1;
+}
+.immunum-residue .pos { font-size: 0.65rem; opacity: 0.75; }
+.immunum-residue .aa  { font-size: 1rem; font-weight: 700; }
+
+.immunum-aligned {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+.immunum-aligned-label {
+  display: block;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-bottom: 0.3rem;
+}
+.immunum-aligned pre {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background: var(--md-default-fg-color--lightest);
+  font-family: var(--md-code-font-family, monospace);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.immunum-aligned-flank { opacity: 0.4; }
+.immunum-aligned-core  { font-weight: 700; color: var(--md-accent-fg-color); }
+
+/* Region colors — tuned to read on both light and dark palettes. */
+.region-fr1  { background: #dbeafe; color: #1e3a8a; }
+.region-cdr1 { background: #bbf7d0; color: #14532d; }
+.region-fr2  { background: #e0e7ff; color: #312e81; }
+.region-cdr2 { background: #86efac; color: #14532d; }
+.region-fr3  { background: #c7d2fe; color: #1e1b4b; }
+.region-cdr3 { background: #4ade80; color: #052e16; }
+.region-fr4  { background: #bfdbfe; color: #1e3a8a; }
+
+[data-md-color-scheme="slate"] .region-fr1  { background: #1e3a8a; color: #dbeafe; }
+[data-md-color-scheme="slate"] .region-cdr1 { background: #14532d; color: #bbf7d0; }
+[data-md-color-scheme="slate"] .region-fr2  { background: #312e81; color: #e0e7ff; }
+[data-md-color-scheme="slate"] .region-cdr2 { background: #166534; color: #86efac; }
+[data-md-color-scheme="slate"] .region-fr3  { background: #1e1b4b; color: #c7d2fe; }
+[data-md-color-scheme="slate"] .region-cdr3 { background: #15803d; color: #bbf7d0; }
+[data-md-color-scheme="slate"] .region-fr4  { background: #1e40af; color: #bfdbfe; }
+
+/* ---------- Homepage: resource cards ---------- */
+.immunum-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0 2rem;
+}
+.immunum-card {
+  display: block;
+  padding: 1.1rem 1.2rem;
+  border-radius: 12px;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  background: var(--md-default-bg-color);
+  color: inherit !important;
+  text-decoration: none !important;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.immunum-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 6px 20px -10px var(--md-accent-fg-color);
+}
+.immunum-card h3 { margin: 0 0 0.35rem; font-size: 1rem; color: var(--md-accent-fg-color); }
+.immunum-card p  { margin: 0; font-size: 0.85rem; opacity: 0.8; }

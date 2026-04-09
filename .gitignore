@@ -10,5 +10,6 @@ node_modules
 .vscode
 immunum/libimmunum.dylib.dSYM/
 site
+docs/assets/wasm/
 .task
 results.json
