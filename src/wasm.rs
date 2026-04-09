@@ -10,17 +10,7 @@ use crate::types::{Chain, Scheme};
 const TS_TYPES: &str = r#"
 /**
  * Ordered position → residue map, iterated in IMGT-correct order.
- *
- * Mirrors the Python API's ordered `dict` behaviour: iteration yields
- * positions in the order emitted by the numbering scheme (so CDR3
- * insertions like `"111A"` / `"112A"` appear between `"111"` and `"112"`
- * rather than being reordered). Keys are position strings (e.g. `"112A"`)
- * and values are single-character residues.
- *
- * **Breaking change in 2.0.0:** previously `Record<string, string>`. Use
- * `numbering.get("112A")` instead of `numbering["112A"]`, and iterate with
- * `for (const [pos, aa] of numbering)` or `numbering.entries()` instead of
- * `Object.entries(numbering)`.
+ * Keys are position strings (e.g. `"112A"`) and values are single-character residues.
  */
 export type Numbering = Map<string, string>;
 

@@ -138,6 +138,44 @@ jobs:
       - name: List artifacts
         run: ls -lah dist/
 
+      - name: Build release notes
+        id: notes
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          # Extract the section for this version from CHANGELOG.md
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { p=1; next }
+            p && /^## \[/ { exit }
+            p { print }
+          ' CHANGELOG.md > changelog_section.md
+
+          if [ ! -s changelog_section.md ]; then
+            echo "::error::No CHANGELOG.md entry found for version $VERSION"
+            exit 1
+          fi
+
+          {
+            echo "## immunum v$VERSION"
+            echo
+            cat changelog_section.md
+            echo
+            echo "### Python"
+            echo "Built for:"
+            echo "- Python 3.13 (abi3, compatible with 3.9+)"
+            echo "- Linux x86_64 and aarch64 (manylinux)"
+            echo "- macOS Apple Silicon (aarch64)"
+            echo
+            echo "Install with: \`pip install immunum==$VERSION\`"
+            echo
+            echo "### JavaScript / WASM"
+            echo "Built for Node.js (CommonJS)."
+            echo
+            echo "Install with: \`npm install immunum@$VERSION\`"
+            echo
+            echo "### Rust"
+            echo "Install with: \`cargo add immunum@$VERSION\`"
+          } > release_notes.md
+
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -145,23 +183,7 @@ jobs:
           VERSION="${{ needs.check-version.outputs.version }}"
           gh release create "v$VERSION" \
             --title "Release v$VERSION" \
-            --notes "## immunum v$VERSION
-
-          ### Python
-          Built for:
-          - Python 3.13 (abi3, compatible with 3.9+)
-          - Linux x86_64 and aarch64 (manylinux)
-          - macOS Apple Silicon (aarch64)
-
-          Install with: \`pip install immunum==$VERSION\`
-
-          ### JavaScript / WASM
-          Built for Node.js (CommonJS).
-
-          Install with: \`npm install immunum@$VERSION\`
-
-          ### Rust
-          Install with: \`cargo add immunum@$VERSION\`" \
+            --notes-file release_notes.md \
             dist/*
 
   publish-pypi:
