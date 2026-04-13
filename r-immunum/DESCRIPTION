@@ -1,6 +1,6 @@
 Package: immunum
 Title: Fast Antibody and T-Cell Receptor Sequence Numbering
-Version: 1.0.0
+Version: 1.1.0
 Authors@R: c(
     person("Eli", "Eydlin", role = "aut", email = "ilyabeydlin@gmail.com"),
     person("Egor", "Marin", role = c("aut", "cre"), email = "e.marin@enpicom.com"),
