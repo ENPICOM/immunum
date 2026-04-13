@@ -1,0 +1,36 @@
+[package]
+name = "immunumr"
+version = "1.0.0"
+edition = "2021"
+publish = false
+license = "MIT"
+
+[lib]
+crate-type = ["staticlib"]
+name = "immunumr"
+
+[dependencies]
+extendr-api = "0.7"
+rayon = "1.10"
+
+# Path dependency to the repo-root immunum crate. This works because:
+#
+# - r-universe clones the full repo before running `R CMD build` in the
+#   `r-immunum/` subdir, so `../../..` resolves to the repo root.
+# - `remotes::install_github("ENPICOM/immunum", subdir = "r-immunum")`
+#   extracts the full repo tarball, so the path resolves there too.
+# - Local dev: parent is always present.
+#
+# This is the same pattern xgboost/R-package uses (relative paths into
+# the parent repo). The R package always builds against the exact Rust
+# source at the same commit — no version drift possible.
+#
+# `default-features = false` disables the `cli` feature so we don't drag
+# in clap/chrono/toml — we only need the library API.
+immunum = { path = "../../..", default-features = false }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+strip = "debuginfo"

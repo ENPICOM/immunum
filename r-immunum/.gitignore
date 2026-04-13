@@ -1,0 +1,32 @@
+# R artifacts
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+.Rcheck/
+*.tar.gz
+
+# R package build artifacts
+src/*.o
+src/*.so
+src/*.dll
+src/symbols.rds
+src/entrypoint.o
+
+# Cargo artifacts
+src/extendr/target/
+src/extendr/immunum-source/
+src/rust/target/
+src/rust/.cargo/
+src/.cargo/
+
+# Internal dev notes
+EXTENDR_ERROR_HANDLING.md
+
+# pkgdown
+docs/
+
+# OS
+.DS_Store
+Thumbs.db

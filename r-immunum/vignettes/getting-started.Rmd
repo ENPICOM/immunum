@@ -1,0 +1,112 @@
+---
+title: "Getting started with immunum"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with immunum}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+`immunum` is an R package for numbering antibody and T-cell receptor (TCR)
+variable-domain sequences using IMGT and Kabat schemes. It wraps the
+[immunum Rust crate](https://crates.io/crates/immunum) via
+[extendr](https://extendr.github.io/) for high performance.
+
+## Installation
+
+Install from r-universe:
+
+```{r, eval = FALSE}
+install.packages("immunum",
+  repos = c("https://enpicom.r-universe.dev", getOption("repos"))
+)
+```
+
+## Numbering
+
+Create an `Annotator` and number a single sequence:
+
+```{r}
+library(immunum)
+
+ann <- Annotator$new(chains = c("H", "K", "L"), scheme = "imgt")
+
+sequence <- paste0(
+  "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGG",
+  "VIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGT",
+  "TGKPIGAFAHWGQGTLVTVSS"
+)
+
+result <- ann$number(sequence)
+result$chain       # "H"
+result$confidence  # 0.78
+result$numbering   # named character: "1"="Q", "2"="V", ...
+```
+
+The `chains` argument controls which chain types are tried during alignment.
+Chain aliases are case-insensitive — `"H"`, `"heavy"`, and `"IGH"` all
+resolve to the same chain.
+
+### Supported chains
+
+| Antibody      | TCR          |
+|---------------|--------------|
+| IGH (heavy)   | TRA (alpha)  |
+| IGK (kappa)   | TRB (beta)   |
+| IGL (lambda)  | TRD (delta)  |
+|               | TRG (gamma)  |
+
+### Numbering schemes
+
+- **IMGT** — all 7 chain types
+- **Kabat** — antibody chains only (IGH, IGK, IGL)
+
+## Segmentation
+
+`segment()` splits the sequence into framework (FR) and
+complementarity-determining (CDR) regions:
+
+```{r}
+seg <- ann$segment(sequence)
+seg$fr1      # "QVQLVQSGAEVKRPGSSVTVSCKAS"
+seg$cdr1     # "GGSFSTYA"
+seg$fr2      # "LSWVRQAPGRGLEWMGG"
+seg$cdr2     # "VIPLLTIT"
+seg$fr3      # "NYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYC"
+seg$cdr3     # "AREGTTGKPIGAFAH"
+seg$fr4      # "WGQGTLVTVSS"
+```
+
+Prefix and postfix residues that fall outside the numbered domain are
+returned in `seg$prefix` and `seg$postfix`.
+
+## Polars batch processing
+
+For large datasets, immunum integrates with
+[polars](https://pola.rs/) for vectorized, multi-threaded processing.
+See `vignette("batch-processing")` for details.
+
+## Validation
+
+immunum provides access to benchmark accuracy thresholds from the
+upstream test suite:
+
+```{r}
+# List all known validation fixtures
+validation_fixtures()
+
+# Look up the benchmark-suite accuracy threshold
+benchmark_threshold("imgt.H")   # 99.88
+```
+
+The validation fixture CSVs (reference numberings for ~10k sequences)
+live at `fixtures/validation/` in the source repo and are available
+when running tests from the repo tree -- same as the Python package.

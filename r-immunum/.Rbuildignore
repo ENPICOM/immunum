@@ -1,0 +1,20 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^LICENSE\.md$
+^README\.Rmd$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^\.github$
+^tools$
+^src/extendr/target$
+^src/extendr/Cargo\.lock$
+# NOTE: src/extendr/cargo-overrides.toml MUST ship — it neutralizes the
+# upstream repo's PyO3-only macOS rustflags (-undefined dynamic_lookup) so
+# the R extension links correctly on darwin. Do not add it to the ignore
+# list. The file lives at src/extendr/cargo-overrides.toml (non-hidden) and
+# is loaded by Makevars/Makevars.win via cargo's `--config <PATH>` flag.
+^cran-comments\.md$
+^CRAN-RELEASE$
+^revdep$
+^EXTENDR_ERROR_HANDLING\.md$
