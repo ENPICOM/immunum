@@ -1,0 +1,25 @@
+[package]
+name = "immunumr"
+version = "1.1.0"
+edition = "2021"
+publish = false
+license = "MIT"
+
+[lib]
+crate-type = ["staticlib"]
+name = "immunumr"
+
+[dependencies]
+extendr-api = "0.7"
+rayon = "1.10"
+
+# Depends on the published crates.io release.
+# Bump this when the crate version advances.
+# `default-features = false` disables the `cli` feature (clap/chrono/toml).
+immunum = { version = "1.1.0", default-features = false }
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+strip = "debuginfo"

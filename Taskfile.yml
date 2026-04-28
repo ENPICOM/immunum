@@ -250,6 +250,28 @@ tasks:
         desc: "Produce plots from benchmark results"
         cmd: uv run --script scripts/plots.py
 
+    r:build:
+        desc: "Install the R package locally"
+        dir: r-immunum
+        cmd: R CMD INSTALL .
+
+    r:test:
+        desc: "Run R package tests"
+        dir: r-immunum
+        cmd: Rscript -e 'testthat::test_local()'
+
+    r:check:
+        desc: "Run R CMD check on the R package"
+        cmds:
+            - R CMD build r-immunum
+            - R CMD check immunum_*.tar.gz --no-manual
+            - rm -f immunum_*.tar.gz
+
+    r:bench:
+        desc: "Run R benchmarks (single-seq + batch throughput)"
+        dir: r-immunum
+        cmd: Rscript bench/bench-annotate.R
+
     default:
         cmds:
             - task --list-all

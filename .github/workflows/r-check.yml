@@ -1,0 +1,81 @@
+name: R CMD check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "r-immunum/**"
+      - "src/**"
+      - "build.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "resources/**"
+      - ".github/workflows/r-check.yml"
+  pull_request:
+    paths:
+      - "r-immunum/**"
+      - "src/**"
+      - "build.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "resources/**"
+      - ".github/workflows/r-check.yml"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  r-check:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            r-version: release
+          - os: ubuntu-latest
+            r-version: devel
+          - os: ubuntu-latest
+            r-version: oldrel-1
+          - os: macos-latest
+            r-version: release
+          - os: windows-latest
+            r-version: release
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: r-immunum
+          workspaces: r-immunum/src/extendr
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.r-version }}
+          use-public-rspm: true
+
+      - name: Install R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: r-immunum
+
+      # R CMD check copies the package to a temp directory, breaking the
+      # path dependency to the parent Rust crate. Since we target r-universe
+      # (which clones the full repo), we install from the repo and run tests
+      # directly instead.
+      - name: Install package
+        shell: bash
+        run: R CMD INSTALL --install-tests r-immunum
+
+      - name: Run tests
+        shell: bash
+        run: Rscript -e 'testthat::test_package("immunum", stop_on_failure = TRUE)'
+        env:
+          IMMUNUM_FIXTURES: ${{ github.workspace }}/fixtures/validation

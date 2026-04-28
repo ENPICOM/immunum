@@ -1,6 +1,6 @@
 ![Immunum Logo](https://raw.githubusercontent.com/ENPICOM/immunum/master/docs/assets/immunum_logotype.svg)
 
-Immunum is a high-performance antibody and TCR sequence numbering tool for Rust, Python, Polars and JS/TS.
+Immunum is a high-performance antibody and TCR sequence numbering tool for Rust, Python, R, Polars and JS/TS.
 
 Try it in your browser: [interactive demo](https://immunum.enpicom.com/demo/).
 
@@ -19,6 +19,7 @@ Available as:
 
 - **Rust crate** — core library and CLI
 - **Python package** — with a [Polars](https://pola.rs) plugin for vectorized batch processing
+- **R package** — with rayon-parallel batch processing, distributed via r-universe
 - **npm package** — for Node.js and browsers
 
 ### Supported chains
@@ -46,11 +47,15 @@ Chain type is automatically detected by aligning against all loaded chains and s
   - [Numbering](#numbering)
   - [Segmentation](#segmentation)
   - [Polars plugin](#polars-plugin)
-- [JavaScript / npm](#javascript--npm)
+- [R](#r)
   - [Installation](#installation-1)
+  - [Numbering](#numbering-1)
+  - [Segmentation](#segmentation-1)
+- [JavaScript / npm](#javascript--npm)
+  - [Installation](#installation-2)
   - [Usage](#usage)
 - [Rust](#rust)
-  - [Installation](#installation-2)
+  - [Installation](#installation-3)
   - [Usage](#usage-1)
 - [CLI](#cli)
   - [Options](#options)
@@ -130,6 +135,64 @@ result = df.with_columns(
 
 The `number` expression returns a struct with fields `chain`, `scheme`, `confidence`, and `numbering` (a struct of position→residue). The `segment` expression returns a struct with fields `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `prefix`, `postfix`.
 
+## R
+
+### Installation
+
+```r
+# install.packages("remotes")
+remotes::install_github("ENPICOM/immunum", subdir = "r-immunum", build = FALSE)
+```
+
+<details>
+<summary>Building from source</summary>
+
+Building from source requires a [Rust toolchain](https://rustup.rs). On Windows you also need [Rtools](https://cran.r-project.org/bin/windows/Rtools/).
+
+Check your setup with:
+
+```r
+# install.packages("rextendr")
+rextendr::rust_sitrep()
+```
+
+Install Rust if needed:
+
+```bash
+# macOS / Linux
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Windows: download and run rustup-init.exe from https://rustup.rs
+```
+
+</details>
+
+### Numbering
+
+```r
+library(immunum)
+
+ann <- Annotator$new(chains = c("H", "K", "L"), scheme = "imgt")
+
+sequence <- "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+
+result <- ann$number(sequence)
+result$chain       # "H"
+result$confidence  # 0.78
+result$numbering   # named character vector: c("1"="Q", "2"="V", ...)
+result$error       # NULL on success, error message on failure
+```
+
+### Segmentation
+
+```r
+result <- ann$segment(sequence)
+result$fr1   # "QVQLVQSGAEVKRPGSSVTVSCKAS"
+result$cdr1  # "GGSFSTYA"
+result$cdr3  # "AREGTTGKPIGAFAH"
+result$fr4   # "WGQGTLVTVSS"
+```
+
 ## JavaScript / npm
 
 ### Installation
@@ -167,7 +230,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-immunum = "0.9"
+immunum = "1.1"
 ```
 
 ### Usage
@@ -286,6 +349,7 @@ task build-local PROFILE=release
 task test-rust    # test only rust code
 task test-python  # test only python code
 task test         # test all code
+task r:test       # test R package
 ```
 
 ### Linting
@@ -307,6 +371,12 @@ $ task | grep benchmark
 * benchmark-scaling:            Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
 * benchmark-speed:              Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)
 * benchmark-speed-polars:       Speed benchmark for immunum polars across all chain/scheme fixtures
+```
+
+R vs Python scaling benchmark:
+
+```bash
+task r:bench          # R vs Python polars scaling benchmark with chart
 ```
 
 ## Project structure
@@ -341,6 +411,10 @@ immunum/
 ├── _internal.pyi    # python stub file for pyo3
 ├── polars.py        # polars extension module
 └── python.py        # python module
+r-immunum/           # R package (extendr bindings)
+├── R/               # R source files (Annotator, polars wrappers, normalization)
+├── src/extendr/     # Rust shim crate (path dep to parent immunum crate)
+└── tests/testthat/  # testthat tests (annotator, polars, validation, cross-language)
 ```
 
 ### Design decisions
