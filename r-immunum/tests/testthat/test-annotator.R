@@ -114,6 +114,7 @@ test_that("query_start and query_end are returned on success", {
   expect_true(result$query_start >= 1L)
   expect_true(result$query_end >= result$query_start)
   expect_true(result$query_end <= nchar(IGH_SEQ))
+  expect_equal(result$query_end - result$query_start + 1L, length(result$numbering))
   expect_null(result$error)
 })
 
@@ -148,7 +149,7 @@ test_that("numbering is a named character vector with one entry per residue", {
 
 # ── Segmentation ────────────────────────────────────────────────────────────
 
-test_that("segmentation returns the nine expected fields", {
+test_that("segmentation returns the nine expected fields with no error", {
   skip_if_not_loaded()
   expected_fields <- c("prefix", "fr1", "cdr1", "fr2", "cdr2",
                        "fr3", "cdr3", "fr4", "postfix")
@@ -156,6 +157,7 @@ test_that("segmentation returns the nine expected fields", {
     ann <- Annotator$new(chains = case$chains, scheme = case$scheme)
     seg <- ann$segment(case$seq)
     expect_setequal(names(seg), expected_fields)
+    expect_null(seg$error)
     for (field in expected_fields) {
       expect_type(seg[[field]], "character")
       expect_length(seg[[field]], 1L)

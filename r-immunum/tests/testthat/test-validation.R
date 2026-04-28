@@ -1,17 +1,14 @@
 .fixtures_dir <- function() {
-  # From source tree: tests/testthat -> r-immunum -> repo root -> fixtures
   src <- file.path(testthat::test_path(), "..", "..", "..", "fixtures", "validation")
   if (dir.exists(src)) return(normalizePath(src))
-  # From installed tests: try IMMUNUM_FIXTURES env var or repo working directory
   env <- Sys.getenv("IMMUNUM_FIXTURES", "")
   if (nzchar(env) && dir.exists(env)) return(normalizePath(env))
   normalizePath(src, mustWork = FALSE)
 }
 
 skip_if_no_fixtures <- function() {
-  d <- .fixtures_dir()
   testthat::skip_if(
-    !dir.exists(d),
+    !dir.exists(.fixtures_dir()),
     "validation fixtures not available (not in repo tree)"
   )
 }
@@ -48,8 +45,7 @@ test_that("all manifest fixtures exist in the repo tree", {
   skip_if_no_fixtures()
   fx <- validation_fixtures()
   for (stem in fx$stem) {
-    path <- .fixture_path(stem)
-    expect_true(file.exists(path),
+    expect_true(file.exists(.fixture_path(stem)),
                 info = sprintf("missing fixture %s", stem))
   }
 })
@@ -57,36 +53,35 @@ test_that("all manifest fixtures exist in the repo tree", {
 # ── Accuracy validation ────────────────────────────────────────────────────
 
 .compare_fixture <- function(path, chains, scheme) {
-  pl <- polars::pl
-  df <- pl$read_csv(path, infer_schema_length = 0L)
+  df   <- utils::read.csv(path, colClasses = "character",
+                         na.strings = c("", "NA"), check.names = FALSE)
   meta <- c("header", "sequence", "species")
-  position_cols <- setdiff(df$columns, meta)
+  pos_cols <- setdiff(names(df), meta)
 
-  numbered <- polars_number(pl$col("sequence"),
-                            chains = chains, scheme = scheme,
-                            min_confidence = 0.0)$alias("numbered")
-  result <- df$with_columns(numbered)$unnest("numbered")
-  rdf <- as.data.frame(result)
+  rows <- immunum:::numbering_batch(df$sequence, chains, scheme,
+                                    min_confidence = 0.0)
 
-  n <- nrow(rdf)
+  n <- nrow(df)
   mismatches <- 0L
   for (i in seq_len(n)) {
-    expected <- character(0)
-    for (p in position_cols) {
-      aa <- rdf[[p]][i]
-      if (!is.null(aa) && !is.na(aa) && nzchar(aa)) {
-        expected[p] <- aa
-      }
-    }
-    pos_vec <- rdf$positions[[i]]
-    res_vec <- rdf$residues[[i]]
-    if (is.null(pos_vec) || length(pos_vec) == 0L) {
+    # Expected: non-empty cells in position columns
+    mask <- !is.na(df[i, pos_cols]) & nzchar(df[i, pos_cols])
+    exp_pos <- pos_cols[mask]
+    exp_res <- unlist(df[i, pos_cols[mask]], use.names = FALSE)
+
+    got_pos <- rows$positions[[i]]
+    got_res <- rows$residues[[i]]
+
+    if (is.null(got_pos) || length(got_pos) == 0L) {
       mismatches <- mismatches + 1L
       next
     }
-    got <- stats::setNames(res_vec, pos_vec)
-    if (!identical(sort(names(got)), sort(names(expected))) ||
-        !identical(unname(got[names(expected)]), unname(expected))) {
+
+    ord <- sort(exp_pos)
+    got <- stats::setNames(got_res, got_pos)
+
+    if (!identical(sort(got_pos), ord) ||
+        !identical(unname(got[ord]), unname(exp_res[match(ord, exp_pos)]))) {
       mismatches <- mismatches + 1L
     }
   }
@@ -102,12 +97,10 @@ test_that("all manifest fixtures exist in the repo tree", {
 
 test_that("fixtures match BENCHMARKS.toml thresholds", {
   skip_if_no_fixtures()
-  testthat::skip_if_not_installed("polars")
   fx <- validation_fixtures()
   for (i in seq_len(nrow(fx))) {
-    row <- fx[i, ]
-    path <- .fixture_path(row$stem)
-    out <- .compare_fixture(path, row$chains[[1]], row$scheme)
+    row       <- fx[i, ]
+    out       <- .compare_fixture(.fixture_path(row$stem), row$chains[[1]], row$scheme)
     threshold <- benchmark_threshold(row$benchmark)
     expect_gte(
       round(out$perfect_pct, 2),
