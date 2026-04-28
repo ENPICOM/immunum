@@ -136,19 +136,15 @@ impl AlignBuffer {
 /// Performs semi-global Needleman-Wunsch alignment of a query amino acid sequence
 /// against position-specific scoring matrices derived from consensus sequences.
 ///
-/// Leading/trailing gaps in the consensus and query are free (semi-global).
-/// Returns the optimal [`Alignment`] with scored positions, or an error if the sequence is empty.
-pub fn align(
+/// Leading/trailing gaps in the consensus and query are free (semi-global). Runs
+/// [`align_region`] over the full consensus with [`ALIGN_FULL_PARAMS`] and pads
+/// the windowed result into a query-indexed [`Alignment`] (one entry per query
+/// residue, with `Insertion()` placeholders outside the aligned subrange).
+pub fn align_full(
     query: &str,
     positions: &[PositionScores],
     align_buffer: Option<&mut AlignBuffer>,
 ) -> Alignment {
-    let query_bytes = query.as_bytes();
-    let query_len = query_bytes.len();
-    let cons_len = positions.len();
-    let stride = cons_len + 1;
-
-    // Use provided buffer or allocate a local one
     let mut local_buf;
     let buf = match align_buffer {
         Some(buf) => buf,
@@ -158,117 +154,45 @@ pub fn align(
         }
     };
 
-    // Reuse buffer, growing only if needed
-    let total = (query_len + 1) * stride;
-    buf.ensure_capacity(total);
-    let dp_scores = &mut buf.dp_scores[..total];
-    let dp_traceback = &mut buf.dp_traceback[..total];
+    let qlen = query.len();
+    let region = align_region(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf);
 
-    // Initialize first row: all zeros for scores, gaps in query are free (semi-global)
-    dp_scores[0] = 0.0;
-    dp_traceback[0] = Direction::Match.as_u8();
-    for j in 1..stride {
-        dp_scores[j] = 0.0;
-        dp_traceback[j] = Direction::GapInQuery.as_u8();
+    let mut padded = Vec::with_capacity(qlen);
+    for _ in 0..region.query_start {
+        padded.push(AlignedPosition::Insertion());
     }
-
-    // Initialize first column: gaps in consensus are free (semi-global)
-    for i in 1..=query_len {
-        dp_scores[i * stride] = 0.0;
-        dp_traceback[i * stride] = Direction::GapInConsensus.as_u8();
+    padded.extend_from_slice(&region.positions);
+    let trailing_start = if region.has_alignment {
+        region.query_end + 1
+    } else {
+        region.query_start
+    };
+    for _ in trailing_start..qlen {
+        padded.push(AlignedPosition::Insertion());
     }
+    debug_assert_eq!(padded.len(), qlen);
 
-    // Track per-row maximum score and its column index during the fill.
-    // This enables true semi-global alignment with free end gaps on all four ends:
-    // - Free leading query/consensus gaps: via first row/column = 0 initialization
-    // - Free trailing consensus gaps: by picking best j per row (not forcing j = cons_len)
-    // - Free trailing query gaps: by picking the row i with the highest per-row max score
-    //   (if trailing query residues degrade the score, best_i < query_len)
-    let mut row_max_score = vec![f32::NEG_INFINITY; query_len + 1];
-    let mut row_best_j = vec![0usize; query_len + 1];
+    let cons_start = first_aligned_imgt(&padded).unwrap_or(1);
+    let cons_end = last_aligned_imgt(&padded).unwrap_or(128);
 
-    // Fill DP matrix
-    for i in 1..=query_len {
-        let aa = query_bytes[i - 1].to_ascii_uppercase();
-        let curr_row = i * stride;
-        let prev_row = curr_row - stride;
-
-        for j in 1..=cons_len {
-            let cons_pos = &positions[j - 1];
-
-            // Match/mismatch score using direct array index
-            let match_score = cons_pos.score_for(aa);
-            let from_match = dp_scores[prev_row + j - 1] + match_score;
-
-            // Gap in query (skip consensus position)
-            let from_gap_query = dp_scores[curr_row + j - 1] + cons_pos.gap_penalty;
-
-            // Gap in consensus (insertion in query sequence)
-            let from_gap_cons = dp_scores[prev_row + j] + cons_pos.insertion_penalty;
-
-            // Choose best
-            let (best_score, best_dir) =
-                if from_match >= from_gap_query && from_match >= from_gap_cons {
-                    (from_match, Direction::Match.as_u8())
-                } else if from_gap_query >= from_gap_cons {
-                    (from_gap_query, Direction::GapInQuery.as_u8())
-                } else {
-                    (from_gap_cons, Direction::GapInConsensus.as_u8())
-                };
-
-            dp_scores[curr_row + j] = best_score;
-            dp_traceback[curr_row + j] = best_dir;
-
-            if best_score > row_max_score[i] {
-                row_max_score[i] = best_score;
-                row_best_j[i] = j;
-            }
-        }
-    }
-
-    // Default: full query consumption (standard semi-global behavior).
-    // Override only if early termination gives meaningfully better score (clips suffix).
-    // The threshold prevents clipping valid antibody endings that score slightly negative.
-    const SUFFIX_CLIP_THRESHOLD: f32 = 50.0;
-    let mut best_i = query_len;
-    let mut best_j = row_best_j[query_len];
-    for i in 1..query_len {
-        if row_max_score[i] > row_max_score[query_len] + SUFFIX_CLIP_THRESHOLD
-            && row_max_score[i] > row_max_score[best_i]
-        {
-            best_i = i;
-            best_j = row_best_j[i];
-        }
-    }
-    let best_score = row_max_score[best_i];
-
-    let (
-        aligned_positions,
-        confidence_score,
-        max_confidence_score,
-        cons_start,
-        cons_end,
-        query_start,
-        query_end,
-    ) = build_traceback(
-        dp_traceback,
-        stride,
-        query_bytes,
-        positions,
-        query_len,
-        best_i,
-        best_j,
-    );
+    // Preserve the legacy semi-global contract: degenerate inputs (empty query
+    // or empty consensus) score NEG_INFINITY rather than the 0.0 that
+    // align_region returns for an empty DP matrix.
+    let score = if region.has_alignment {
+        region.score
+    } else {
+        f32::NEG_INFINITY
+    };
 
     Alignment {
-        score: best_score,
-        positions: aligned_positions,
+        score,
+        positions: padded,
         cons_start,
         cons_end,
-        confidence_score,
-        max_confidence_score,
-        query_start,
-        query_end,
+        confidence_score: region.confidence_score,
+        max_confidence_score: region.max_confidence_score,
+        query_start: region.query_start,
+        query_end: region.query_end,
     }
 }
 
@@ -467,12 +391,24 @@ const FR1_PARAMS: RegionAlignParams = RegionAlignParams {
 };
 
 /// FR4 params: full query consumption is the natural answer; only clip for
-/// clearly non-AB suffixes (threshold = 50, mirroring the legacy `align()`).
+/// clearly non-AB suffixes (threshold = 50, mirroring [`align_full`]).
 /// Free cons suffix tolerates truncated C-term.
 const FR4_PARAMS: RegionAlignParams = RegionAlignParams {
     free_query_prefix: true,
     free_query_suffix: true,
     free_cons_prefix: false,
+    free_cons_suffix: true,
+    suffix_clip_threshold: 50.0,
+};
+
+/// Full-sequence semi-global params: every corner free, with the suffix-clip
+/// threshold of 50 inherited from the original semi-global aligner. Drives
+/// [`align_full`], which is used as the fallback for sequences too short to
+/// span FR1..FR4 in the FR-anchored pipeline.
+const ALIGN_FULL_PARAMS: RegionAlignParams = RegionAlignParams {
+    free_query_prefix: true,
+    free_query_suffix: true,
+    free_cons_prefix: true,
     free_cons_suffix: true,
     suffix_clip_threshold: 50.0,
 };
@@ -780,96 +716,6 @@ fn build_region_traceback(
     )
 }
 
-fn build_traceback(
-    dp_traceback: &[u8],
-    stride: usize,
-    query_bytes: &[u8],
-    positions: &[PositionScores],
-    query_len: usize,
-    traceback_end_i: usize,
-    cons_end: usize,
-) -> (Vec<AlignedPosition>, f32, f32, u8, u8, usize, usize) {
-    // positions.len() == query_len always; trailing suffix residues become Insertion()
-    let mut aligned_positions = Vec::with_capacity(query_len);
-
-    let mut confidence_score = 0.0f32;
-    let mut max_confidence_score = 0.0f32;
-
-    // Tracked during backward traversal: first Aligned seen = cons_end, last = cons_start
-    let mut cons_start: u8 = 1;
-    let mut cons_end_pos: u8 = 128;
-    let mut found_aligned = false;
-
-    let mut i = traceback_end_i;
-    let mut j = cons_end;
-
-    while i > 0 && j > 0 {
-        match Direction::from_u8(dp_traceback[i * stride + j]) {
-            Direction::Match => {
-                let pos = &positions[j - 1];
-                aligned_positions.push(AlignedPosition::Aligned(pos.position));
-
-                if pos.counts_for_confidence {
-                    let aa = query_bytes[i - 1].to_ascii_uppercase();
-                    confidence_score += pos.score_for(aa);
-                    max_confidence_score += pos.max_score;
-                }
-
-                // Going backwards: first Aligned = cons_end, every Aligned updates cons_start
-                if !found_aligned {
-                    cons_end_pos = pos.position;
-                    found_aligned = true;
-                }
-                cons_start = pos.position;
-
-                i -= 1;
-                j -= 1;
-            }
-
-            Direction::GapInQuery => {
-                let pos = &positions[j - 1];
-
-                if pos.counts_for_confidence {
-                    confidence_score += pos.gap_penalty;
-                    max_confidence_score += pos.max_score;
-                }
-
-                // No query residue consumed — do not push to aligned_positions
-                j -= 1;
-            }
-
-            Direction::GapInConsensus => {
-                aligned_positions.push(AlignedPosition::Insertion());
-                i -= 1;
-            }
-        }
-    }
-
-    // i > 0 && j == 0: remaining query residues are the leading prefix (free via first column)
-    let query_start = i;
-    while i > 0 {
-        aligned_positions.push(AlignedPosition::Insertion());
-        i -= 1;
-    }
-
-    aligned_positions.reverse();
-
-    // Append trailing Insertion() for suffix residues beyond traceback_end_i
-    let query_end = traceback_end_i.saturating_sub(1);
-    for _ in traceback_end_i..query_len {
-        aligned_positions.push(AlignedPosition::Insertion());
-    }
-
-    (
-        aligned_positions,
-        confidence_score,
-        max_confidence_score,
-        cons_start,
-        cons_end_pos,
-        query_start,
-        query_end,
-    )
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -877,7 +723,7 @@ mod tests {
     use crate::Chain;
 
     fn test_align(query: &str, positions: &[PositionScores]) -> Alignment {
-        align(query, positions, None)
+        align_full(query, positions, None)
     }
     #[test]
     fn test_align_simple() {
@@ -1027,31 +873,68 @@ mod tests {
     }
 
     #[test]
-    fn test_align_region_full_matches_align() {
-        // When called over the entire consensus with every corner free, align_region
-        // should reach the same score as align() — the recurrence is identical.
+    fn test_align_region_full_matches_align_full() {
+        // align_full is a thin wrapper around align_region over the full consensus
+        // with all corners free + suffix-clip threshold 50. Padding the windowed
+        // result with leading/trailing Insertion() must produce the same vec
+        // align_full returns; cons_start/cons_end derived from the padded vec must
+        // match the values align_full exposes.
+        let cases: &[(&str, &str)] = &[
+            ("FULL_IGH", FULL_IGH),
+            ("with_prefix", "AAAAAA\
+                EVQLVESGGGLVQPGGSLRLSCAASGFNVSYSSIHWVRQAPGKGLEWVAYIYPSSGYTSYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCARSYSTKLAMDYWGQGTLVTVSS"),
+            ("with_suffix", "EVQLVESGGGLVQPGGSLRLSCAASGFNVSYSSIHWVRQAPGKGLEWVAYIYPSSGYTSYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCARSYSTKLAMDYWGQGTLVTVSS\
+                AAAAAAA"),
+        ];
+
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let mut buf = AlignBuffer::new();
 
-        let full = align(FULL_IGH, &matrix.positions, Some(&mut buf));
-        let region = align_region(
-            FULL_IGH.as_bytes(),
-            0,
-            FULL_IGH.len(),
-            &matrix.positions,
-            all_free(),
-            &mut buf,
-        );
+        for (label, seq) in cases {
+            let full = align_full(seq, &matrix.positions, Some(&mut buf));
+            let region = align_region(
+                seq.as_bytes(),
+                0,
+                seq.len(),
+                &matrix.positions,
+                all_free(),
+                &mut buf,
+            );
 
-        assert!(region.has_alignment);
-        assert!(
-            (region.score - full.score).abs() < 1e-3,
-            "scores differ: region={} full={}",
-            region.score,
-            full.score
-        );
-        assert_eq!(region.query_start, full.query_start);
-        assert_eq!(region.query_end, full.query_end);
+            assert!(region.has_alignment, "{label}: region should align");
+            assert!(
+                (region.score - full.score).abs() < 1e-3,
+                "{label}: scores differ: region={} full={}",
+                region.score,
+                full.score
+            );
+            assert_eq!(region.query_start, full.query_start, "{label}: query_start");
+            assert_eq!(region.query_end, full.query_end, "{label}: query_end");
+
+            // Padding the region's windowed positions with leading + trailing
+            // Insertion() must reproduce align_full's full-query positions vec.
+            let mut expected = Vec::with_capacity(seq.len());
+            for _ in 0..region.query_start {
+                expected.push(AlignedPosition::Insertion());
+            }
+            expected.extend_from_slice(&region.positions);
+            for _ in (region.query_end + 1)..seq.len() {
+                expected.push(AlignedPosition::Insertion());
+            }
+            assert_eq!(full.positions, expected, "{label}: padded positions differ");
+
+            // cons_start/cons_end derived from the padded vec must match align_full's.
+            let first = expected.iter().find_map(|p| match p {
+                AlignedPosition::Aligned(n) => Some(*n),
+                _ => None,
+            });
+            let last = expected.iter().rev().find_map(|p| match p {
+                AlignedPosition::Aligned(n) => Some(*n),
+                _ => None,
+            });
+            assert_eq!(first, Some(full.cons_start), "{label}: cons_start");
+            assert_eq!(last, Some(full.cons_end), "{label}: cons_end");
+        }
     }
 
     #[test]
@@ -1126,8 +1009,7 @@ mod tests {
         let suffix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}{suffix}");
         let fr1 = align_fr1(&sequence, &matrix, &mut buf);
-        let result =
-            align_remaining_frs(&sequence, &matrix, &fr1, &mut buf).expect("should align");
+        let result = align_remaining_frs(&sequence, &matrix, &fr1, &mut buf).expect("should align");
 
         assert_eq!(result.query_start, prefix.len());
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);

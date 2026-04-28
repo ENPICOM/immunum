@@ -1,7 +1,7 @@
 //! High-level API for sequence annotation and chain detection
 use std::cell::RefCell;
 
-use crate::alignment::{align, align_fr1, align_remaining_frs, AlignBuffer, Alignment};
+use crate::alignment::{align_fr1, align_full, align_remaining_frs, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::{apply_numbering, segment as segment_positions};
 use crate::scoring::ScoringMatrix;
@@ -258,7 +258,7 @@ impl Annotator {
         // end gaps. Pick by raw alignment score.
         let mut best: Option<(Chain, Alignment)> = None;
         for (chain, matrix) in &self.matrices {
-            let alignment = align(sequence, &matrix.positions, Some(&mut buf));
+            let alignment = align_full(sequence, &matrix.positions, Some(&mut buf));
             let is_better = match &best {
                 Some((_, prev)) => alignment.score > prev.score,
                 None => true,
