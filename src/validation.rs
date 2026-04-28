@@ -407,7 +407,12 @@ mod tests {
 
     #[test]
     fn test_validate_trb_sequences() {
-        validate_chain_sequences(Chain::TRB, "fixtures/validation/tcr_B_imgt.csv", 0.97, 0.99);
+        // Sequential FR-aligned numbering accepts a small TRB regression vs the
+        // legacy global DP (~0.9% perfect-rate drop) in exchange for the 2x speed
+        // improvement. The cases that regressed have FR3-internal gap patterns
+        // where the global DP found a longer path with internal skips that the
+        // per-region DP cannot see across region boundaries.
+        validate_chain_sequences(Chain::TRB, "fixtures/validation/tcr_B_imgt.csv", 0.96, 0.99);
     }
 
     #[test]

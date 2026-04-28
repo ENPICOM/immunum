@@ -206,6 +206,23 @@ pub enum Region {
     FR4,
 }
 
+impl Region {
+    /// Inclusive IMGT position range for this region.
+    /// All consensus matrices are IMGT-indexed contiguously 1..=128, so
+    /// `(imgt_pos - 1)` is the index into `ScoringMatrix::positions`.
+    pub const fn imgt_range(self) -> (u8, u8) {
+        match self {
+            Region::FR1 => (1, 26),
+            Region::CDR1 => (27, 38),
+            Region::FR2 => (39, 55),
+            Region::CDR2 => (56, 65),
+            Region::FR3 => (66, 104),
+            Region::CDR3 => (105, 117),
+            Region::FR4 => (118, 128),
+        }
+    }
+}
+
 /// A rule mapping a range of alignment positions to numbering positions
 ///
 /// Defines how to handle insertions and deletions when the alignment length doesn't match the numbering range.

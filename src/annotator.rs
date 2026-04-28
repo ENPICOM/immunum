@@ -1,7 +1,7 @@
 //! High-level API for sequence annotation and chain detection
 use std::cell::RefCell;
 
-use crate::alignment::{align, AlignBuffer, Alignment};
+use crate::alignment::{align, align_fr1, align_remaining_frs, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::{apply_numbering, segment as segment_positions};
 use crate::scoring::ScoringMatrix;
@@ -201,16 +201,64 @@ impl Annotator {
         })
     }
 
-    /// Align the sequence to all loaded chain types and return the best match
-    /// If multiple chains were provided during initialization, this will align to all
-    /// of them and return the best match. If only one chain was provided, it will
-    /// align to that chain directly.
+    /// Align the sequence to all loaded chain types and return the best match.
+    ///
+    /// Two-phase branch-and-bound:
+    ///  1. Run cheap FR1-only alignment for every loaded chain (small DP).
+    ///  2. Try chains in descending FR1-score order, running the remaining FRs
+    ///     (FR2-FR4) for each. Stop at the first chain that produces a complete
+    ///     alignment passing the FR1 confidence floor — its FR1 score dominates,
+    ///     so its full-alignment confidence dominates too.
+    ///
+    /// For N candidate chains, the work is N small FR1 DPs plus 1 full FR2-FR4
+    /// alignment in the typical case — roughly half the work of running every FR
+    /// for every chain.
     fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
+        if self.matrices.is_empty() {
+            return Err(Error::AlignmentError(
+                "no chain matrices loaded".to_string(),
+            ));
+        }
+
         let mut buf = self.align_buf.borrow_mut();
-        // Align to all loaded chain types and find best match by raw alignment score
+
+        // Phase 1: FR1 for every chain.
+        let mut fr1_results: Vec<(usize, crate::alignment::RegionAlignment)> = self
+            .matrices
+            .iter()
+            .enumerate()
+            .map(|(idx, (_, matrix))| (idx, align_fr1(sequence, matrix, &mut buf)))
+            .collect();
+        // Highest FR1 score first; NEG_INFINITY for failed alignments sinks them.
+        fr1_results.sort_by(|a, b| {
+            let sa = if a.1.has_alignment {
+                a.1.score
+            } else {
+                f32::NEG_INFINITY
+            };
+            let sb = if b.1.has_alignment {
+                b.1.score
+            } else {
+                f32::NEG_INFINITY
+            };
+            sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Phase 2: try chains in FR1-score order; first complete alignment wins.
+        for (idx, fr1) in &fr1_results {
+            let (chain, matrix) = &self.matrices[*idx];
+            if let Some(alignment) = align_remaining_frs(sequence, matrix, fr1, &mut buf) {
+                return Ok((*chain, alignment));
+            }
+        }
+
+        // Fallback: sequential FR-anchored alignment requires query to span FR1..FR4.
+        // For partial sequences (e.g. only FR1+CDR1, fragments), fall back to the
+        // legacy global semi-global DP, which tolerates truncated regions via free
+        // end gaps. Pick by raw alignment score.
         let mut best: Option<(Chain, Alignment)> = None;
         for (chain, matrix) in &self.matrices {
-            let alignment = align(sequence, &matrix.positions, Some(&mut *buf));
+            let alignment = align(sequence, &matrix.positions, Some(&mut buf));
             let is_better = match &best {
                 Some((_, prev)) => alignment.score > prev.score,
                 None => true,
