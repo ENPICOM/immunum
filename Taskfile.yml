@@ -268,9 +268,9 @@ tasks:
             - rm -f immunum_*.tar.gz
 
     r:bench:
-        desc: "Run R benchmarks (polars throughput + scaling)"
+        desc: "Run R benchmarks (single-seq + batch throughput)"
         dir: r-immunum
-        cmd: Rscript ../benches/bench_scaling.R
+        cmd: Rscript bench/bench-annotate.R
 
     default:
         cmds:

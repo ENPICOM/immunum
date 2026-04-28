@@ -14,6 +14,7 @@
 # the R extension links correctly on darwin. Do not add it to the ignore
 # list. The file lives at src/extendr/cargo-overrides.toml (non-hidden) and
 # is loaded by Makevars/Makevars.win via cargo's `--config <PATH>` flag.
+^bench$
 ^cran-comments\.md$
 ^CRAN-RELEASE$
 ^revdep$
