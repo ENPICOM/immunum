@@ -15,7 +15,8 @@ $(SHLIB): $(STATLIB)
 CARGOTMP = $(CURDIR)/.cargo
 
 $(STATLIB):
-	export CARGO_HOME=$(CARGOTMP) && \
+	export PATH="$${HOME}/.cargo/bin:$${PATH}" && \
+		export CARGO_HOME=$(CARGOTMP) && \
 		cd ./extendr && \
 		cargo build --lib --release \
 			--config $(CARGO_OVERRIDES) \
