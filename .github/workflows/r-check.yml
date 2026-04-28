@@ -61,16 +61,6 @@ jobs:
           r-version: ${{ matrix.r-version }}
           use-public-rspm: true
 
-      # polars is not on CRAN — it's published on r-multiverse.
-      # Register that repo so pak can resolve it as a dependency.
-      - name: Register r-multiverse (for polars dependency)
-        run: |
-          writeLines(
-            'options(repos = c("r-multiverse" = "https://community.r-multiverse.org", CRAN = "https://cloud.r-project.org"))',
-            Sys.getenv("R_PROFILE_USER", "~/.Rprofile")
-          )
-        shell: Rscript {0}
-
       - name: Install R dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
         with:

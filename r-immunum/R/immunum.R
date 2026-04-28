@@ -10,7 +10,6 @@
 #'
 #' @section Main entry points:
 #' - [Annotator]: R6 class for numbering and segmenting sequences.
-#' - [polars_number()], [polars_segment()]: Polars batch expressions.
 #' - [immunum_version()]: Version of the linked Rust core.
 #'
 #' @keywords internal

@@ -19,7 +19,7 @@ Available as:
 
 - **Rust crate** — core library and CLI
 - **Python package** — with a [Polars](https://pola.rs) plugin for vectorized batch processing
-- **R package** — with [r-polars](https://rpolars.github.io/) batch processing, distributed via r-universe
+- **R package** — with rayon-parallel batch processing, distributed via r-universe
 - **npm package** — for Node.js and browsers
 
 ### Supported chains
@@ -51,7 +51,6 @@ Chain type is automatically detected by aligning against all loaded chains and s
   - [Installation](#installation-1)
   - [Numbering](#numbering-1)
   - [Segmentation](#segmentation-1)
-  - [Polars batch processing](#polars-batch-processing)
 - [JavaScript / npm](#javascript--npm)
   - [Installation](#installation-2)
   - [Usage](#usage)
@@ -145,12 +144,6 @@ The `number` expression returns a struct with fields `chain`, `scheme`, `confide
 remotes::install_github("ENPICOM/immunum", subdir = "r-immunum", build = FALSE)
 ```
 
-For batch processing with polars (optional):
-
-```r
-install.packages("polars", repos = "https://community.r-multiverse.org")
-```
-
 <details>
 <summary>Building from source</summary>
 
@@ -200,30 +193,6 @@ result$cdr3  # "AREGTTGKPIGAFAH"
 result$fr4   # "WGQGTLVTVSS"
 ```
 
-### Polars batch processing
-
-For high-throughput batch processing, use [r-polars](https://rpolars.github.io/) expressions:
-
-```r
-library(immunum)
-library(polars)
-
-df <- pl$DataFrame(sequence = c(
-  "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
-  "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
-))
-
-# Number sequences (returns struct with chain, scheme, confidence, positions, residues, error)
-result <- df$with_columns(
-  polars_number(pl$col("sequence"), chains = c("H", "K", "L"), scheme = "imgt")$alias("numbered")
-)
-
-# Segment sequences (returns struct with fr1-fr4, cdr1-cdr3, prefix, postfix, error)
-result <- df$with_columns(
-  polars_segment(pl$col("sequence"), chains = c("H", "K", "L"), scheme = "imgt")$alias("segmented")
-)
-```
-
 ## JavaScript / npm
 
 ### Installation
@@ -261,7 +230,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-immunum = "0.9"
+immunum = "1.1"
 ```
 
 ### Usage
