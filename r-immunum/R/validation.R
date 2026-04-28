@@ -43,10 +43,16 @@
 
 #' List the available validation fixtures
 #'
-#' Returns the manifest of upstream validation fixtures.
+#' Returns the manifest of upstream validation fixtures known to this
+#' release of `immunum`. The fixtures live at `fixtures/validation/` in
+#' the source repository and are available when running tests from the
+#' repo tree (they are not shipped inside the installed package).
 #'
-#' @return A `data.frame` with columns `stem`, `chains` (list-column),
-#'   `scheme`, and `benchmark`.
+#' @return A `data.frame` with columns:
+#'   - `stem` -- fixture identifier without extension (e.g. `"ab_H_imgt"`)
+#'   - `chains` -- list-column of canonical chain codes (IGH, TRA, ...)
+#'   - `scheme` -- `"IMGT"` or `"Kabat"`
+#'   - `benchmark` -- key into the BENCHMARKS.toml table (e.g. `"imgt.H"`)
 #' @examples
 #' validation_fixtures()
 #' @export
@@ -55,6 +61,12 @@ validation_fixtures <- function() {
 }
 
 #' Look up the benchmark perfect-percentage threshold
+#'
+#' Returns the `perfect_pct` from the repo-root `BENCHMARKS.toml` for
+#' the requested benchmark key (the `benchmark` column of
+#' [validation_fixtures()]). The values are baked into the package as
+#' a static R constant; see `R/validation.R` for the source-of-truth
+#' comment.
 #'
 #' @param benchmark_key Dotted key, e.g. `"imgt.H"` or `"kabat.K"`.
 #' @return A single numeric in `[0, 100]`.

@@ -88,12 +88,6 @@ seg$fr4      # "WGQGTLVTVSS"
 Prefix and postfix residues that fall outside the numbered domain are
 returned in `seg$prefix` and `seg$postfix`.
 
-## Polars batch processing
-
-For large datasets, immunum integrates with
-[polars](https://pola.rs/) for vectorized, multi-threaded processing.
-See `vignette("batch-processing")` for details.
-
 ## Validation
 
 immunum provides access to benchmark accuracy thresholds from the

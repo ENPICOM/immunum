@@ -17,7 +17,7 @@ A \code{data.frame} with columns:
 }
 \description{
 Returns the manifest of upstream validation fixtures known to this
-release of \code{immunum}. The fixtures live at \code{fixtures/validation/} in
+release of \code{immunum}. The fixtures live at \verb{fixtures/validation/} in
 the source repository and are available when running tests from the
 repo tree (they are not shipped inside the installed package).
 }

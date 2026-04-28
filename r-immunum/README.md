@@ -41,8 +41,7 @@ result$confidence   # 0.78
 result$numbering    # named character vector "1"="Q", "2"="V", ...
 ```
 
-See the package vignettes (`browseVignettes("immunum")`) for batch processing,
-the polars integration, and benchmarks.
+See `vignette("getting-started", package = "immunum")` for the full walkthrough.
 
 ## License
 

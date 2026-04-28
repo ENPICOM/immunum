@@ -16,9 +16,6 @@ src/entrypoint.o
 
 # Cargo artifacts
 src/extendr/target/
-src/extendr/immunum-source/
-src/rust/target/
-src/rust/.cargo/
 src/.cargo/
 
 # Internal dev notes

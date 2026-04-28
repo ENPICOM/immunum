@@ -10,7 +10,7 @@ benchmark_threshold(benchmark_key)
 \item{benchmark_key}{Dotted key, e.g. \code{"imgt.H"} or \code{"kabat.K"}.}
 }
 \value{
-A single numeric in \code{[0, 100]}.
+A single numeric in \verb{[0, 100]}.
 }
 \description{
 Returns the \code{perfect_pct} from the repo-root \code{BENCHMARKS.toml} for
