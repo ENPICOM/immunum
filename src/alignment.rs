@@ -175,9 +175,9 @@ pub fn align_full(
         }
     };
 
-    align(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf).and_then(|alignment| {
+    align(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf).map(|alignment| {
         let (cons_start, cons_end) = aligned_imgt_bounds(&alignment.positions).unwrap_or((1, 128));
-        Some(Alignment {
+        Alignment {
             score: alignment.score,
             positions: alignment.positions,
             cons_start,
@@ -186,7 +186,7 @@ pub fn align_full(
             max_confidence_score: alignment.max_confidence_score,
             query_start: alignment.query_start,
             query_end: alignment.query_end,
-        })
+        }
     })
 }
 
