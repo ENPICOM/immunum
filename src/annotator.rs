@@ -1,5 +1,6 @@
 //! High-level API for sequence annotation and chain detection
 use std::cell::RefCell;
+use std::collections::{HashMap};
 
 use crate::alignment::{align_fr1, align_full, align_remaining_frs, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
@@ -100,7 +101,7 @@ fn validate_sequence(sequence: &str) -> Result<()> {
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip_typescript))]
 #[derive(Serialize, Deserialize)]
 pub struct Annotator {
-    pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
+    pub(crate) matrices: HashMap<Chain, ScoringMatrix>,
     pub(crate) scheme: Scheme,
     pub(crate) chains: Vec<Chain>,
     pub(crate) min_confidence: f32,
@@ -134,10 +135,10 @@ impl Annotator {
             ));
         }
 
-        let mut matrices = Vec::new();
+        let mut matrices = HashMap::with_capacity(chains.len());
         for &chain in chains {
             let matrix = ScoringMatrix::load(chain)?;
-            matrices.push((chain, matrix));
+            matrices.insert(chain, matrix);
         }
 
         Ok(Self {
@@ -155,9 +156,7 @@ impl Annotator {
 
         let (chain, alignment) = self.get_best_alignment(sequence)?;
 
-        // Apply numbering only to the aligned subregion of the query
-        let aligned_positions = &alignment.positions[alignment.query_start..=alignment.query_end];
-        let positions = apply_numbering(aligned_positions, self.scheme, chain);
+        let positions = apply_numbering(&alignment.positions, self.scheme, chain);
         let confidence = if alignment.max_confidence_score > 0.0 {
             (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
         } else {
@@ -214,39 +213,19 @@ impl Annotator {
     /// alignment in the typical case — roughly half the work of running every FR
     /// for every chain.
     fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
-        if self.matrices.is_empty() {
-            return Err(Error::AlignmentError(
-                "no chain matrices loaded".to_string(),
-            ));
-        }
-
         let mut buf = self.align_buf.borrow_mut();
 
-        // Phase 1: FR1 for every chain.
-        let mut fr1_results: Vec<(usize, crate::alignment::RegionAlignment)> = self
+        // Phase 1: FR1 for every chain; drop those that fail, sort highest score first.
+        let mut fr1_results: Vec<(Chain, crate::alignment::RegionAlignment)> = self
             .matrices
             .iter()
-            .enumerate()
-            .map(|(idx, (_, matrix))| (idx, align_fr1(sequence, matrix, &mut buf)))
+            .filter_map(|(chain, matrix)| align_fr1(sequence, matrix, &mut buf).map(|fr1| (*chain, fr1)))
             .collect();
-        // Highest FR1 score first; NEG_INFINITY for failed alignments sinks them.
-        fr1_results.sort_by(|a, b| {
-            let sa = if a.1.has_alignment {
-                a.1.score
-            } else {
-                f32::NEG_INFINITY
-            };
-            let sb = if b.1.has_alignment {
-                b.1.score
-            } else {
-                f32::NEG_INFINITY
-            };
-            sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        fr1_results.sort_by(|a, b| b.1.score.partial_cmp(&a.1.score).unwrap_or(std::cmp::Ordering::Equal));
 
         // Phase 2: try chains in FR1-score order; first complete alignment wins.
-        for (idx, fr1) in &fr1_results {
-            let (chain, matrix) = &self.matrices[*idx];
+        for (chain, fr1) in &fr1_results {
+            let matrix = &self.matrices[chain];
             if let Some(alignment) = align_remaining_frs(sequence, matrix, fr1, &mut buf) {
                 return Ok((*chain, alignment));
             }
@@ -256,18 +235,13 @@ impl Annotator {
         // For partial sequences (e.g. only FR1+CDR1, fragments), fall back to the
         // legacy global semi-global DP, which tolerates truncated regions via free
         // end gaps. Pick by raw alignment score.
-        let mut best: Option<(Chain, Alignment)> = None;
-        for (chain, matrix) in &self.matrices {
-            let alignment = align_full(sequence, &matrix.positions, Some(&mut buf));
-            let is_better = match &best {
-                Some((_, prev)) => alignment.score > prev.score,
-                None => true,
-            };
-            if is_better {
-                best = Some((*chain, alignment));
-            }
-        }
-        best.ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
+        self.matrices
+            .iter()
+            .filter_map(|(chain, matrix)| {
+                align_full(sequence, &matrix.positions, Some(&mut buf)).map(|a| (*chain, a))
+            })
+            .max_by(|a, b| a.1.score.partial_cmp(&b.1.score).unwrap_or(std::cmp::Ordering::Equal))
+            .ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
     }
 }
 

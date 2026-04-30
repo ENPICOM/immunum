@@ -59,7 +59,8 @@ pub enum AlignedPosition {
 pub struct Alignment {
     /// Alignment score
     pub score: f32,
-    /// Aligned positions (length == query length; flanking residues are Insertion())
+    /// Aligned positions for the antibody subrange of the query
+    /// (length == `query_end - query_start + 1`; covers `query[query_start..=query_end]`).
     pub positions: Vec<AlignedPosition>,
     /// First aligned consensus position (IMGT position number)
     pub cons_start: u8,
@@ -90,8 +91,6 @@ pub struct RegionAlignment {
     pub positions: Vec<AlignedPosition>,
     pub confidence_score: f32,
     pub max_confidence_score: f32,
-    /// True iff at least one query residue was matched against a consensus position.
-    pub has_alignment: bool,
 }
 
 /// Free-gap parameters for a region alignment. Each flag corresponds to one of
@@ -151,15 +150,15 @@ impl AlignBuffer {
 /// Performs semi-global Needleman-Wunsch alignment of a query amino acid sequence
 /// against position-specific scoring matrices derived from consensus sequences.
 ///
-/// Leading/trailing gaps in the consensus and query are free (semi-global). Runs
-/// [`align`] over the full consensus with [`ALIGN_FULL_PARAMS`] and pads
-/// the windowed result into a query-indexed [`Alignment`] (one entry per query
-/// residue, with `Insertion()` placeholders outside the aligned subrange).
+/// Leading/trailing gaps in the consensus and query are free (semi-global). Thin
+/// wrapper around [`align`] over the full consensus with [`ALIGN_FULL_PARAMS`];
+/// derives `cons_start`/`cons_end` from the resulting positions. The returned
+/// `Alignment.positions` covers exactly the antibody subrange of the query.
 pub fn align_full(
     query: &str,
     positions: &[PositionScores],
     align_buffer: Option<&mut AlignBuffer>,
-) -> Alignment {
+) -> Option<Alignment> {
     let qlen = query.len();
     assert!(qlen > 0, "align_full requires a non-empty query");
     assert!(
@@ -176,35 +175,19 @@ pub fn align_full(
         }
     };
 
-    let full_alignment = align(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf);
-
-    let mut padded = Vec::with_capacity(qlen);
-    for _ in 0..full_alignment.query_start {
-        padded.push(AlignedPosition::Insertion());
-    }
-    padded.extend_from_slice(&full_alignment.positions);
-    let trailing_start = if full_alignment.has_alignment {
-        full_alignment.query_end + 1
-    } else {
-        full_alignment.query_start
-    };
-    for _ in trailing_start..qlen {
-        padded.push(AlignedPosition::Insertion());
-    }
-    debug_assert_eq!(padded.len(), qlen);
-
-    let (cons_start, cons_end) = aligned_imgt_bounds(&padded).unwrap_or((1, 128));
-
-    Alignment {
-        score: full_alignment.score,
-        positions: padded,
-        cons_start,
-        cons_end,
-        confidence_score: full_alignment.confidence_score,
-        max_confidence_score: full_alignment.max_confidence_score,
-        query_start: full_alignment.query_start,
-        query_end: full_alignment.query_end,
-    }
+    align(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf).and_then(|alignment| {
+        let (cons_start, cons_end) = aligned_imgt_bounds(&alignment.positions).unwrap_or((1, 128));
+        Some(Alignment {
+            score: alignment.score,
+            positions: alignment.positions,
+            cons_start,
+            cons_end,
+            confidence_score: alignment.confidence_score,
+            max_confidence_score: alignment.max_confidence_score,
+            query_start: alignment.query_start,
+            query_end: alignment.query_end,
+        })
+    })
 }
 
 /// Align a query window to a contiguous slice of consensus positions.
@@ -219,7 +202,7 @@ pub fn align(
     region_positions: &[PositionScores],
     params: RegionAlignParams,
     buf: &mut AlignBuffer,
-) -> RegionAlignment {
+) -> Option<RegionAlignment> {
     debug_assert!(window_end >= window_start);
     debug_assert!(window_end <= query.len());
 
@@ -228,15 +211,7 @@ pub fn align(
     let stride = cons_len + 1;
 
     if qlen == 0 || cons_len == 0 {
-        return RegionAlignment {
-            score: 0.0,
-            query_start: window_start,
-            query_end: window_start.saturating_sub(1),
-            positions: Vec::new(),
-            confidence_score: 0.0,
-            max_confidence_score: 0.0,
-            has_alignment: false,
-        };
+        return None;
     }
 
     let total = (qlen + 1) * stride;
@@ -327,15 +302,14 @@ pub fn align(
         window_start + best_i - 1
     };
 
-    RegionAlignment {
+    Some(RegionAlignment {
         score: best_score,
         query_start: query_start_abs,
         query_end: query_end_abs,
         positions: traceback.positions,
         confidence_score: traceback.confidence_score,
         max_confidence_score: traceback.max_confidence_score,
-        has_alignment: traceback.has_alignment,
-    }
+    })
 }
 
 // =============================================================================
@@ -415,7 +389,11 @@ const ALIGN_FULL_PARAMS: RegionAlignParams = RegionAlignParams {
 /// Align FR1 only — used for cheap chain triage. Returns the FR1
 /// [`RegionAlignment`] which can be compared across chains before deciding which
 /// chain to run the remaining FR2-FR4 alignments for.
-pub fn align_fr1(query: &str, matrix: &ScoringMatrix, buf: &mut AlignBuffer) -> RegionAlignment {
+pub fn align_fr1(
+    query: &str,
+    matrix: &ScoringMatrix,
+    buf: &mut AlignBuffer,
+) -> Option<RegionAlignment> {
     let qbytes = query.as_bytes();
     let qlen = qbytes.len();
     assert!(qlen > 0, "align_fr1 requires a non-empty query");
@@ -437,7 +415,7 @@ pub fn align_remaining_frs(
 ) -> Option<Alignment> {
     let qbytes = query.as_bytes();
     let qlen = qbytes.len();
-    if qlen == 0 || !fr1.has_alignment {
+    if qlen == 0 {
         return None;
     }
 
@@ -466,8 +444,9 @@ pub fn align_remaining_frs(
         fr2_slice,
         INNER_FR_PARAMS,
         buf,
-    );
-    if !fr2.has_alignment || fr2.query_start <= fr1.query_end {
+    )?;
+
+    if fr2.query_start <= fr1.query_end {
         return None;
     }
 
@@ -483,8 +462,8 @@ pub fn align_remaining_frs(
         fr3_slice,
         INNER_FR_PARAMS,
         buf,
-    );
-    if !fr3.has_alignment || fr3.query_start <= fr2.query_end {
+    )?;
+    if fr3.query_start <= fr2.query_end {
         return None;
     }
 
@@ -492,8 +471,8 @@ pub fn align_remaining_frs(
     if fr4_window_start >= qlen {
         return None;
     }
-    let fr4 = align(qbytes, fr4_window_start, qlen, fr4_slice, FR4_PARAMS, buf);
-    if !fr4.has_alignment || fr4.query_start <= fr3.query_end {
+    let fr4 = align(qbytes, fr4_window_start, qlen, fr4_slice, FR4_PARAMS, buf)?;
+    if fr4.query_start <= fr3.query_end {
         return None;
     }
 
@@ -504,7 +483,7 @@ pub fn align_remaining_frs(
         return None;
     }
 
-    Some(stitch_alignment(qlen, fr1, &fr2, &fr3, &fr4))
+    Some(stitch_alignment(fr1, &fr2, &fr3, &fr4))
 }
 
 /// Stitch FR alignments into a single query-indexed `Alignment`.
@@ -513,18 +492,15 @@ pub fn align_remaining_frs(
 /// downstream `apply_numbering` rules pick them up by IMGT range. Residues outside
 /// the antibody region (before FR1, after FR4) are `Insertion()`.
 fn stitch_alignment(
-    qlen: usize,
     fr1: &RegionAlignment,
     fr2: &RegionAlignment,
     fr3: &RegionAlignment,
     fr4: &RegionAlignment,
 ) -> Alignment {
-    let mut positions: Vec<AlignedPosition> = Vec::with_capacity(qlen);
-
-    // Leading prefix (before FR1).
-    for _ in 0..fr1.query_start {
-        positions.push(AlignedPosition::Insertion());
-    }
+    // Output covers exactly query[fr1.query_start..=fr4.query_end] — no padding
+    // outside the antibody region.
+    let antibody_len = fr4.query_end + 1 - fr1.query_start;
+    let mut positions: Vec<AlignedPosition> = Vec::with_capacity(antibody_len);
 
     // FR1 residues.
     positions.extend_from_slice(&fr1.positions);
@@ -553,12 +529,7 @@ fn stitch_alignment(
     // FR4.
     positions.extend_from_slice(&fr4.positions);
 
-    // Trailing suffix (after FR4).
-    for _ in (fr4.query_end + 1)..qlen {
-        positions.push(AlignedPosition::Insertion());
-    }
-
-    debug_assert_eq!(positions.len(), qlen);
+    debug_assert_eq!(positions.len(), antibody_len);
 
     let (cons_start, cons_end) = aligned_imgt_bounds(&positions).unwrap_or((1, 128));
 
@@ -647,7 +618,6 @@ struct RegionTraceback {
     /// First in-window query index covered by the traced path; residues before
     /// this index are leading prefix and are kept out of `positions`.
     query_start_in_window: usize,
-    has_alignment: bool,
 }
 
 fn build_region_traceback(
@@ -662,7 +632,6 @@ fn build_region_traceback(
     let mut positions = Vec::new();
     let mut confidence_score = 0.0f32;
     let mut max_confidence_score = 0.0f32;
-    let mut has_alignment = false;
 
     let mut i = end_i;
     let mut j = end_j;
@@ -677,7 +646,6 @@ fn build_region_traceback(
                     confidence_score += pos.score_for(aa);
                     max_confidence_score += pos.max_score;
                 }
-                has_alignment = true;
                 i -= 1;
                 j -= 1;
             }
@@ -704,7 +672,6 @@ fn build_region_traceback(
         confidence_score,
         max_confidence_score,
         query_start_in_window,
-        has_alignment,
     }
 }
 
@@ -714,18 +681,15 @@ mod tests {
     use crate::scoring::ScoringMatrix;
     use crate::Chain;
 
-    fn test_align(query: &str, positions: &[PositionScores]) -> Alignment {
-        align_full(query, positions, None)
-    }
     #[test]
-    fn test_align_simple() {
+    fn align_full_simple() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
 
         // A simple sequence that should align
         let sequence =
             "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
-        let result = test_align(sequence, &matrix.positions);
+        let result = align_full(sequence, &matrix.positions, None).unwrap();
 
         // Alignment should produce a score (may be negative for partial sequences)
         assert!(!result.positions.is_empty());
@@ -739,7 +703,7 @@ mod tests {
         // Empty queries are caller-side bugs: Annotator validates MIN_SEQUENCE_LENGTH
         // before reaching the aligner. align_full asserts and panics loudly.
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        let _ = test_align("", &matrix.positions);
+        let _ = align_full("", &matrix.positions, None).unwrap();
     }
 
     #[test]
@@ -748,7 +712,7 @@ mod tests {
 
         // A sequence starting from middle of framework should align without heavy penalty
         let partial_seq = "GLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
-        let result = test_align(partial_seq, &matrix.positions);
+        let result = align_full(partial_seq, &matrix.positions, None).unwrap();
 
         // Should have a reasonable score (not heavily penalized for missing start)
         assert!(
@@ -769,7 +733,7 @@ mod tests {
 
         // A sequence ending in middle should align without heavy penalty
         let partial_seq = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVS";
-        let result = test_align(partial_seq, &matrix.positions);
+        let result = align_full(partial_seq, &matrix.positions, None).unwrap();
 
         // Should have a reasonable score
         assert!(
@@ -784,7 +748,7 @@ mod tests {
 
         // A small fragment from the middle should align
         let fragment = "GLEWVSAISKSGGSTYY";
-        let result = test_align(fragment, &matrix.positions);
+        let result = align_full(fragment, &matrix.positions, None).unwrap();
 
         // Should align without extreme penalties for missing ends
         assert!(
@@ -807,7 +771,7 @@ mod tests {
     #[test]
     fn test_normal_antibody_no_flanking() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        let result = test_align(FULL_IGH, &matrix.positions);
+        let result = align_full(FULL_IGH, &matrix.positions, None).unwrap();
 
         assert_eq!(result.query_start, 0, "No prefix: query_start should be 0");
         assert_eq!(
@@ -823,7 +787,7 @@ mod tests {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let suffix = "AAAAAAA";
         let sequence = format!("{FULL_IGH}{suffix}");
-        let result = test_align(&sequence, &matrix.positions);
+        let result = align_full(&sequence, &matrix.positions, None).unwrap();
 
         assert_eq!(
             result.query_end,
@@ -831,11 +795,8 @@ mod tests {
             "Trailing suffix should be excluded: query_end should point to last antibody residue"
         );
         assert_eq!(result.query_start, 0);
-        assert_eq!(result.positions.len(), sequence.len());
-        // Suffix positions should be Insertion()
-        for pos in &result.positions[FULL_IGH.len()..] {
-            assert_eq!(*pos, AlignedPosition::Insertion());
-        }
+        // positions cover only the antibody subrange (no trailing-suffix padding).
+        assert_eq!(result.positions.len(), FULL_IGH.len());
     }
 
     #[test]
@@ -843,7 +804,7 @@ mod tests {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let prefix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}");
-        let result = test_align(&sequence, &matrix.positions);
+        let result = align_full(&sequence, &matrix.positions, None).unwrap();
 
         assert_eq!(
             result.query_start,
@@ -851,7 +812,8 @@ mod tests {
             "Leading prefix should be identified: query_start should point past the prefix"
         );
         assert_eq!(result.query_end, sequence.len() - 1);
-        assert_eq!(result.positions.len(), sequence.len());
+        // positions cover only the antibody subrange (no leading-prefix padding).
+        assert_eq!(result.positions.len(), FULL_IGH.len());
     }
 
     fn all_free() -> RegionAlignParams {
@@ -865,12 +827,11 @@ mod tests {
     }
 
     #[test]
-    fn test_align_full_matches_align_full() {
+    fn align_full_full_matches_align() {
         // align_full is a thin wrapper around align over the full consensus
-        // with all corners free + suffix-clip threshold 50. Padding the windowed
-        // result with leading/trailing Insertion() must produce the same vec
-        // align_full returns; cons_start/cons_end derived from the padded vec must
-        // match the values align_full exposes.
+        // with all corners free + suffix-clip threshold 50. Both should produce
+        // the same windowed positions; align_full additionally derives
+        // cons_start/cons_end from those positions.
         let cases: &[(&str, &str)] = &[
             ("FULL_IGH", FULL_IGH),
             ("with_prefix", "AAAAAA\
@@ -883,7 +844,7 @@ mod tests {
         let mut buf = AlignBuffer::new();
 
         for (label, seq) in cases {
-            let full = align_full(seq, &matrix.positions, Some(&mut buf));
+            let full = align_full(seq, &matrix.positions, Some(&mut buf)).unwrap();
             let region = align(
                 seq.as_bytes(),
                 0,
@@ -891,9 +852,8 @@ mod tests {
                 &matrix.positions,
                 all_free(),
                 &mut buf,
-            );
+            ).unwrap();
 
-            assert!(region.has_alignment, "{label}: region should align");
             assert!(
                 (region.score - full.score).abs() < 1e-3,
                 "{label}: scores differ: region={} full={}",
@@ -902,25 +862,17 @@ mod tests {
             );
             assert_eq!(region.query_start, full.query_start, "{label}: query_start");
             assert_eq!(region.query_end, full.query_end, "{label}: query_end");
+            assert_eq!(
+                full.positions, region.positions,
+                "{label}: positions differ"
+            );
 
-            // Padding the region's windowed positions with leading + trailing
-            // Insertion() must reproduce align_full's full-query positions vec.
-            let mut expected = Vec::with_capacity(seq.len());
-            for _ in 0..region.query_start {
-                expected.push(AlignedPosition::Insertion());
-            }
-            expected.extend_from_slice(&region.positions);
-            for _ in (region.query_end + 1)..seq.len() {
-                expected.push(AlignedPosition::Insertion());
-            }
-            assert_eq!(full.positions, expected, "{label}: padded positions differ");
-
-            // cons_start/cons_end derived from the padded vec must match align_full's.
-            let first = expected.iter().find_map(|p| match p {
+            // cons_start/cons_end derived from the windowed positions.
+            let first = region.positions.iter().find_map(|p| match p {
                 AlignedPosition::Aligned(n) => Some(*n),
                 _ => None,
             });
-            let last = expected.iter().rev().find_map(|p| match p {
+            let last = region.positions.iter().rev().find_map(|p| match p {
                 AlignedPosition::Aligned(n) => Some(*n),
                 _ => None,
             });
@@ -930,7 +882,7 @@ mod tests {
     }
 
     #[test]
-    fn test_align_fr1_only() {
+    fn align_full_fr1_only() {
         // FR1 is IMGT 1..=26, so positions[0..26].
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let mut buf = AlignBuffer::new();
@@ -951,9 +903,8 @@ mod tests {
             fr1_slice,
             params,
             &mut buf,
-        );
+        ).unwrap();
 
-        assert!(result.has_alignment);
         // FR1 of FULL_IGH should align starting near IMGT pos 1 and reach pos 26.
         assert!(
             result.score > 0.0,
@@ -976,7 +927,7 @@ mod tests {
     fn test_partial_alignment_full_igh() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let mut buf = AlignBuffer::new();
-        let fr1 = align_fr1(FULL_IGH, &matrix, &mut buf);
+        let fr1 = align_fr1(FULL_IGH, &matrix, &mut buf).unwrap();
         let result = align_remaining_frs(FULL_IGH, &matrix, &fr1, &mut buf).expect("should align");
 
         assert_eq!(result.query_start, 0, "no prefix expected");
@@ -1000,31 +951,29 @@ mod tests {
         let prefix = "AAAAAA";
         let suffix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}{suffix}");
-        let fr1 = align_fr1(&sequence, &matrix, &mut buf);
+        let fr1 = align_fr1(&sequence, &matrix, &mut buf).unwrap();
         let result = align_remaining_frs(&sequence, &matrix, &fr1, &mut buf).expect("should align");
 
         assert_eq!(result.query_start, prefix.len());
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
-        assert_eq!(result.positions.len(), sequence.len());
+        // positions cover only the antibody subrange.
+        assert_eq!(result.positions.len(), FULL_IGH.len());
     }
 
     #[test]
     fn test_partial_alignment_rejects_non_antibody() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let mut buf = AlignBuffer::new();
-        // Random non-antibody sequence: FR1 should score below FR1_CONFIDENCE_THRESHOLD,
+        // Non-antibody sequence: FR1 scores below FR1_CONFIDENCE_THRESHOLD,
         // so align_remaining_frs returns None without aligning FR2-FR4.
         let junk = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-        let fr1 = align_fr1(junk, &matrix, &mut buf);
+        let fr1 = align_fr1(junk, &matrix, &mut buf).expect("align_fr1 returns a result");
         let result = align_remaining_frs(junk, &matrix, &fr1, &mut buf);
-        assert!(
-            result.is_none(),
-            "non-antibody junk should fail FR1 threshold"
-        );
+        assert!(result.is_none(), "non-antibody junk should fail FR1 confidence threshold");
     }
 
     #[test]
-    fn test_align_empty_window() {
+    fn align_full_empty_window() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let mut buf = AlignBuffer::new();
         let result = align(
@@ -1035,8 +984,7 @@ mod tests {
             all_free(),
             &mut buf,
         );
-        assert!(!result.has_alignment);
-        assert!(result.positions.is_empty());
+        assert!(result.is_none())
     }
 
     #[test]
@@ -1045,10 +993,11 @@ mod tests {
         let prefix = "AAAAAAA";
         let suffix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}{suffix}");
-        let result = test_align(&sequence, &matrix.positions);
+        let result = align_full(&sequence, &matrix.positions, None).unwrap();
 
         assert_eq!(result.query_start, prefix.len());
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
-        assert_eq!(result.positions.len(), sequence.len());
+        // positions cover only the antibody subrange.
+        assert_eq!(result.positions.len(), FULL_IGH.len());
     }
 }

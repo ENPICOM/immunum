@@ -10,7 +10,7 @@ use strum_macros::{Display, EnumString};
 use pyo3::prelude::*;
 
 #[cfg_attr(feature = "python", pyclass(get_all))]
-#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy, Eq, Hash)]
 pub enum Chain {
     #[strum(
         serialize = "IGH",
