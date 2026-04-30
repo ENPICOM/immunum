@@ -71,10 +71,7 @@ pub struct Alignment {
     pub max_confidence_score: f32,
     /// 0-based index of the first antibody residue in the query (0 when no prefix)
     pub query_start: usize,
-    /// Last absolute query index covered by this region (inclusive).
-    /// Underflows below `query_start` (saturating) when `has_alignment` is false;
-    /// callers should check `has_alignment` before using this for slicing.
-    /// TODO Can we do this in a cleaner way, like making this optional?
+    /// 0-based index of the last antibody residue in the query (query.len()-1 when no suffix)
     pub query_end: usize,
 }
 
@@ -163,6 +160,13 @@ pub fn align_full(
     positions: &[PositionScores],
     align_buffer: Option<&mut AlignBuffer>,
 ) -> Alignment {
+    let qlen = query.len();
+    assert!(qlen > 0, "align_full requires a non-empty query");
+    assert!(
+        !positions.is_empty(),
+        "align_full requires a non-empty consensus"
+    );
+
     let mut local_buf;
     let buf = match align_buffer {
         Some(buf) => buf,
@@ -172,18 +176,17 @@ pub fn align_full(
         }
     };
 
-    let qlen = query.len();
-    let region = align(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf);
+    let full_alignment = align(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf);
 
     let mut padded = Vec::with_capacity(qlen);
-    for _ in 0..region.query_start {
+    for _ in 0..full_alignment.query_start {
         padded.push(AlignedPosition::Insertion());
     }
-    padded.extend_from_slice(&region.positions);
-    let trailing_start = if region.has_alignment {
-        region.query_end + 1
+    padded.extend_from_slice(&full_alignment.positions);
+    let trailing_start = if full_alignment.has_alignment {
+        full_alignment.query_end + 1
     } else {
-        region.query_start
+        full_alignment.query_start
     };
     for _ in trailing_start..qlen {
         padded.push(AlignedPosition::Insertion());
@@ -193,14 +196,14 @@ pub fn align_full(
     let (cons_start, cons_end) = aligned_imgt_bounds(&padded).unwrap_or((1, 128));
 
     Alignment {
-        score: region.score,
+        score: full_alignment.score,
         positions: padded,
         cons_start,
         cons_end,
-        confidence_score: region.confidence_score,
-        max_confidence_score: region.max_confidence_score,
-        query_start: region.query_start,
-        query_end: region.query_end,
+        confidence_score: full_alignment.confidence_score,
+        max_confidence_score: full_alignment.max_confidence_score,
+        query_start: full_alignment.query_start,
+        query_end: full_alignment.query_end,
     }
 }
 
@@ -415,18 +418,7 @@ const ALIGN_FULL_PARAMS: RegionAlignParams = RegionAlignParams {
 pub fn align_fr1(query: &str, matrix: &ScoringMatrix, buf: &mut AlignBuffer) -> RegionAlignment {
     let qbytes = query.as_bytes();
     let qlen = qbytes.len();
-    if qlen == 0 {
-        // TODO this should not be possible, we can panic
-        return RegionAlignment {
-            score: f32::NEG_INFINITY,
-            query_start: 0,
-            query_end: 0,
-            positions: Vec::new(),
-            confidence_score: 0.0,
-            max_confidence_score: 0.0,
-            has_alignment: false,
-        };
-    }
+    assert!(qlen > 0, "align_fr1 requires a non-empty query");
     let fr1_slice = region_slice(matrix, Region::FR1);
     let fr1_window_end = (fr1_slice.len() + CDR1_MAX_LEN).min(qlen);
     align(qbytes, 0, fr1_window_end, fr1_slice, FR1_PARAMS, buf)
@@ -596,7 +588,7 @@ fn aligned_imgt_bounds(positions: &[AlignedPosition]) -> Option<(u8, u8)> {
         _ => None,
     });
     let first = iter.next()?;
-    let last = iter.last().unwrap_or(first);
+    let last = iter.next_back().unwrap_or(first);
     Some((first, last))
 }
 
@@ -742,12 +734,12 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_sequence() {
+    #[should_panic(expected = "align_full requires a non-empty query")]
+    fn test_empty_sequence_panics() {
+        // Empty queries are caller-side bugs: Annotator validates MIN_SEQUENCE_LENGTH
+        // before reaching the aligner. align_full asserts and panics loudly.
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
-        let result = test_align("", &matrix.positions);
-        // Empty sequence is degenerate: no positions, score is whatever align
-        // returns for an empty DP (currently 0.0).
-        assert!(result.positions.is_empty());
+        let _ = test_align("", &matrix.positions);
     }
 
     #[test]
