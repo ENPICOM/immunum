@@ -1,4 +1,11 @@
-//! Sequence alignment using Needleman-Wunsch algorithm
+//! Sequence alignment using Needleman-Wunsch algorithm.
+//!
+//! Two entry points share the core DP in [`align`]:
+//! - [`align_full`] — semi-global over the entire consensus. Used as the
+//!   fallback when a sequence is too short to span FR1..FR4.
+//! - [`align_fr1`] + [`align_remaining_frs`] — FR-anchored: triage chains
+//!   cheaply via FR1, then align FR2-FR4 only for the winning chain. CDR
+//!   residues are inferred from gaps between FR alignments.
 
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +71,10 @@ pub struct Alignment {
     pub max_confidence_score: f32,
     /// 0-based index of the first antibody residue in the query (0 when no prefix)
     pub query_start: usize,
-    /// 0-based index of the last antibody residue in the query (query.len()-1 when no suffix)
+    /// Last absolute query index covered by this region (inclusive).
+    /// Underflows below `query_start` (saturating) when `has_alignment` is false;
+    /// callers should check `has_alignment` before using this for slicing.
+    /// TODO Can we do this in a cleaner way, like making this optional?
     pub query_end: usize,
 }
 
@@ -145,7 +155,7 @@ impl AlignBuffer {
 /// against position-specific scoring matrices derived from consensus sequences.
 ///
 /// Leading/trailing gaps in the consensus and query are free (semi-global). Runs
-/// [`align_region`] over the full consensus with [`ALIGN_FULL_PARAMS`] and pads
+/// [`align`] over the full consensus with [`ALIGN_FULL_PARAMS`] and pads
 /// the windowed result into a query-indexed [`Alignment`] (one entry per query
 /// residue, with `Insertion()` placeholders outside the aligned subrange).
 pub fn align_full(
@@ -163,7 +173,7 @@ pub fn align_full(
     };
 
     let qlen = query.len();
-    let region = align_region(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf);
+    let region = align(query.as_bytes(), 0, qlen, positions, ALIGN_FULL_PARAMS, buf);
 
     let mut padded = Vec::with_capacity(qlen);
     for _ in 0..region.query_start {
@@ -180,8 +190,7 @@ pub fn align_full(
     }
     debug_assert_eq!(padded.len(), qlen);
 
-    let cons_start = first_aligned_imgt(&padded).unwrap_or(1);
-    let cons_end = last_aligned_imgt(&padded).unwrap_or(128);
+    let (cons_start, cons_end) = aligned_imgt_bounds(&padded).unwrap_or((1, 128));
 
     Alignment {
         score: region.score,
@@ -195,12 +204,12 @@ pub fn align_full(
     }
 }
 
-/// Align a query window to a contiguous slice of consensus positions (one region).
+/// Align a query window to a contiguous slice of consensus positions.
 ///
 /// Free-gap behavior at each corner is controlled by [`RegionAlignParams`]. Returns a
 /// [`RegionAlignment`] whose `positions` covers exactly `query[query_start..=query_end]`
 /// (no leading/trailing `Insertion()` padding outside that range).
-pub fn align_region(
+pub fn align(
     query: &[u8],
     window_start: usize,
     window_end: usize,
@@ -266,7 +275,7 @@ pub fn align_region(
         }
     }
 
-    // DP fill (same recurrence as `align`).
+    // DP fill (standard Needleman-Wunsch recurrence).
     for i in 1..=qlen {
         let aa = query[window_start + i - 1].to_ascii_uppercase();
         let curr_row = i * stride;
@@ -297,19 +306,17 @@ pub fn align_region(
     let (best_i, best_j) = pick_endpoint(dp_scores, stride, qlen, cons_len, params);
     let best_score = dp_scores[best_i * stride + best_j];
 
-    // Traceback.
-    let (positions, confidence_score, max_confidence_score, query_start_in_window, has_alignment) =
-        build_region_traceback(
-            dp_traceback,
-            stride,
-            query,
-            window_start,
-            region_positions,
-            best_i,
-            best_j,
-        );
+    let traceback = build_region_traceback(
+        dp_traceback,
+        stride,
+        query,
+        window_start,
+        region_positions,
+        best_i,
+        best_j,
+    );
 
-    let query_start_abs = window_start + query_start_in_window;
+    let query_start_abs = window_start + traceback.query_start_in_window;
     let query_end_abs = if best_i == 0 {
         // No query residue consumed (degenerate / unaligned).
         query_start_abs.saturating_sub(1)
@@ -321,10 +328,10 @@ pub fn align_region(
         score: best_score,
         query_start: query_start_abs,
         query_end: query_end_abs,
-        positions,
-        confidence_score,
-        max_confidence_score,
-        has_alignment,
+        positions: traceback.positions,
+        confidence_score: traceback.confidence_score,
+        max_confidence_score: traceback.max_confidence_score,
+        has_alignment: traceback.has_alignment,
     }
 }
 
@@ -340,6 +347,11 @@ pub const CDR2_MAX_LEN: usize = 20;
 /// Maximum slack for the variable-length region between FR3 and FR4 (CDR3).
 /// Tested against 30+; 40 covers all observed cases.
 pub const CDR3_MAX_LEN: usize = 40;
+
+// CDR3 middle (between FR3-ext anchor at IMGT 105 and FR4-ext anchor at IMGT 117).
+// Use IMGT 110 — a center CDR3 position contained by all rule sets:
+// IMGT (105..=117), Kabat heavy CDR3 (106..=117), Kabat light CDR3 (105..=116).
+const CDR3_MIDDLE: u8 = 110;
 
 /// Per-FR confidence floor. If FR1's alignment scores below this, the chain is
 /// rejected immediately without aligning subsequent FRs. Set well below the
@@ -404,6 +416,7 @@ pub fn align_fr1(query: &str, matrix: &ScoringMatrix, buf: &mut AlignBuffer) -> 
     let qbytes = query.as_bytes();
     let qlen = qbytes.len();
     if qlen == 0 {
+        // TODO this should not be possible, we can panic
         return RegionAlignment {
             score: f32::NEG_INFINITY,
             query_start: 0,
@@ -416,7 +429,7 @@ pub fn align_fr1(query: &str, matrix: &ScoringMatrix, buf: &mut AlignBuffer) -> 
     }
     let fr1_slice = region_slice(matrix, Region::FR1);
     let fr1_window_end = (fr1_slice.len() + CDR1_MAX_LEN).min(qlen);
-    align_region(qbytes, 0, fr1_window_end, fr1_slice, FR1_PARAMS, buf)
+    align(qbytes, 0, fr1_window_end, fr1_slice, FR1_PARAMS, buf)
 }
 
 /// Continue from a previously-computed FR1 alignment to produce the full
@@ -454,7 +467,7 @@ pub fn align_remaining_frs(
         return None;
     }
     let fr2_window_end = (fr2_window_start + fr2_slice.len() + CDR1_MAX_LEN).min(qlen);
-    let fr2 = align_region(
+    let fr2 = align(
         qbytes,
         fr2_window_start,
         fr2_window_end,
@@ -471,7 +484,7 @@ pub fn align_remaining_frs(
         return None;
     }
     let fr3_window_end = (fr3_window_start + fr3_slice.len() + CDR2_MAX_LEN).min(qlen);
-    let fr3 = align_region(
+    let fr3 = align(
         qbytes,
         fr3_window_start,
         fr3_window_end,
@@ -487,7 +500,7 @@ pub fn align_remaining_frs(
     if fr4_window_start >= qlen {
         return None;
     }
-    let fr4 = align_region(qbytes, fr4_window_start, qlen, fr4_slice, FR4_PARAMS, buf);
+    let fr4 = align(qbytes, fr4_window_start, qlen, fr4_slice, FR4_PARAMS, buf);
     if !fr4.has_alignment || fr4.query_start <= fr3.query_end {
         return None;
     }
@@ -540,12 +553,9 @@ fn stitch_alignment(
     // FR3.
     positions.extend_from_slice(&fr3.positions);
 
-    // CDR3 middle (between FR3-ext anchor at IMGT 105 and FR4-ext anchor at IMGT 117).
-    // Use IMGT 110 — a center CDR3 position contained by all rule sets:
-    // IMGT (105..=117), Kabat heavy CDR3 (106..=117), Kabat light CDR3 (105..=116).
-    const CDR3_MIDDLE_PLACEHOLDER: u8 = 110;
+    // CDR3.
     for _ in (fr3.query_end + 1)..fr4.query_start {
-        positions.push(AlignedPosition::Aligned(CDR3_MIDDLE_PLACEHOLDER));
+        positions.push(AlignedPosition::Aligned(CDR3_MIDDLE));
     }
 
     // FR4.
@@ -558,8 +568,7 @@ fn stitch_alignment(
 
     debug_assert_eq!(positions.len(), qlen);
 
-    let cons_start = first_aligned_imgt(&positions).unwrap_or(1);
-    let cons_end = last_aligned_imgt(&positions).unwrap_or(128);
+    let (cons_start, cons_end) = aligned_imgt_bounds(&positions).unwrap_or((1, 128));
 
     Alignment {
         score: fr1.score + fr2.score + fr3.score + fr4.score,
@@ -579,18 +588,16 @@ fn stitch_alignment(
     }
 }
 
-fn first_aligned_imgt(positions: &[AlignedPosition]) -> Option<u8> {
-    positions.iter().find_map(|p| match p {
+/// First and last `Aligned(imgt)` positions in the vec, in iteration order.
+/// Returns `None` if there are no `Aligned` entries.
+fn aligned_imgt_bounds(positions: &[AlignedPosition]) -> Option<(u8, u8)> {
+    let mut iter = positions.iter().filter_map(|p| match p {
         AlignedPosition::Aligned(n) => Some(*n),
         _ => None,
-    })
-}
-
-fn last_aligned_imgt(positions: &[AlignedPosition]) -> Option<u8> {
-    positions.iter().rev().find_map(|p| match p {
-        AlignedPosition::Aligned(n) => Some(*n),
-        _ => None,
-    })
+    });
+    let first = iter.next()?;
+    let last = iter.last().unwrap_or(first);
+    Some((first, last))
 }
 
 fn pick_endpoint(
@@ -638,7 +645,19 @@ fn pick_endpoint(
     (best_i, best_j)
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Result of walking the DP traceback for one region alignment.
+struct RegionTraceback {
+    /// Aligned positions in query order, covering `query[query_start_in_window..end_i]`.
+    /// Leading prefix residues (those reached after j=0) are intentionally omitted.
+    positions: Vec<AlignedPosition>,
+    confidence_score: f32,
+    max_confidence_score: f32,
+    /// First in-window query index covered by the traced path; residues before
+    /// this index are leading prefix and are kept out of `positions`.
+    query_start_in_window: usize,
+    has_alignment: bool,
+}
+
 fn build_region_traceback(
     dp_traceback: &[u8],
     stride: usize,
@@ -647,7 +666,7 @@ fn build_region_traceback(
     region_positions: &[PositionScores],
     end_i: usize,
     end_j: usize,
-) -> (Vec<AlignedPosition>, f32, f32, usize, bool) {
+) -> RegionTraceback {
     let mut positions = Vec::new();
     let mut confidence_score = 0.0f32;
     let mut max_confidence_score = 0.0f32;
@@ -685,19 +704,16 @@ fn build_region_traceback(
         }
     }
 
-    // Remaining query residues (if any) are the leading window prefix — kept out
-    // of `positions` since RegionAlignment only covers query_start..=query_end.
     let query_start_in_window = i;
-
     positions.reverse();
 
-    (
+    RegionTraceback {
         positions,
         confidence_score,
         max_confidence_score,
         query_start_in_window,
         has_alignment,
-    )
+    }
 }
 
 #[cfg(test)]
@@ -729,7 +745,7 @@ mod tests {
     fn test_empty_sequence() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let result = test_align("", &matrix.positions);
-        // Empty sequence is degenerate: no positions, score is whatever align_region
+        // Empty sequence is degenerate: no positions, score is whatever align
         // returns for an empty DP (currently 0.0).
         assert!(result.positions.is_empty());
     }
@@ -857,8 +873,8 @@ mod tests {
     }
 
     #[test]
-    fn test_align_region_full_matches_align_full() {
-        // align_full is a thin wrapper around align_region over the full consensus
+    fn test_align_full_matches_align_full() {
+        // align_full is a thin wrapper around align over the full consensus
         // with all corners free + suffix-clip threshold 50. Padding the windowed
         // result with leading/trailing Insertion() must produce the same vec
         // align_full returns; cons_start/cons_end derived from the padded vec must
@@ -876,7 +892,7 @@ mod tests {
 
         for (label, seq) in cases {
             let full = align_full(seq, &matrix.positions, Some(&mut buf));
-            let region = align_region(
+            let region = align(
                 seq.as_bytes(),
                 0,
                 seq.len(),
@@ -922,7 +938,7 @@ mod tests {
     }
 
     #[test]
-    fn test_align_region_fr1_only() {
+    fn test_align_fr1_only() {
         // FR1 is IMGT 1..=26, so positions[0..26].
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let mut buf = AlignBuffer::new();
@@ -936,7 +952,7 @@ mod tests {
             suffix_clip_threshold: 0.0,
         };
 
-        let result = align_region(
+        let result = align(
             FULL_IGH.as_bytes(),
             0,
             (26 + 16).min(FULL_IGH.len()),
@@ -1016,10 +1032,10 @@ mod tests {
     }
 
     #[test]
-    fn test_align_region_empty_window() {
+    fn test_align_empty_window() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let mut buf = AlignBuffer::new();
-        let result = align_region(
+        let result = align(
             FULL_IGH.as_bytes(),
             10,
             10,
