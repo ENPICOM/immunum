@@ -71,7 +71,7 @@ pub mod validation;
 pub use numbering::imgt;
 pub use numbering::kabat;
 
-pub use alignment::{align, Alignment};
+pub use alignment::{align_full, Alignment};
 pub use annotator::{Annotator, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE};
 pub use error::{Error, Result};
 pub use scoring::ScoringMatrix;
