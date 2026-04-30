@@ -87,16 +87,24 @@ pub struct RegionAlignment {
     pub has_alignment: bool,
 }
 
-/// Per-corner free-gap parameters for a region alignment.
+/// Free-gap parameters for a region alignment. Each flag corresponds to one of
+/// the four endpoints of the alignment path — leading/trailing on the query
+/// axis and leading/trailing on the consensus axis — controlling whether the
+/// path can enter/exit at that endpoint without paying gap penalties.
 #[derive(Debug, Clone, Copy)]
 pub struct RegionAlignParams {
-    /// Allow alignment to start at any position in the query window for free.
+    /// Leading query endpoint: allow the path to enter at any query position
+    /// for free (skip leading query residues — initializes the j=0 column to 0).
     pub free_query_prefix: bool,
-    /// Allow alignment to end at any position in the query window for free.
+    /// Trailing query endpoint: allow the path to exit before consuming the
+    /// whole query window (clip trailing residues, subject to `suffix_clip_threshold`).
     pub free_query_suffix: bool,
-    /// Allow alignment to start at any consensus position for free.
+    /// Leading consensus endpoint: allow the path to enter at any consensus
+    /// position for free (skip leading consensus positions — initializes the
+    /// i=0 row to 0).
     pub free_cons_prefix: bool,
-    /// Allow alignment to end at any consensus position for free.
+    /// Trailing consensus endpoint: allow the path to exit before reaching the
+    /// last consensus position.
     pub free_cons_suffix: bool,
     /// Score margin a smaller-i endpoint must exceed full-query consumption by
     /// before we clip trailing query residues. Use 0 for inner FRs (window
@@ -175,17 +183,8 @@ pub fn align_full(
     let cons_start = first_aligned_imgt(&padded).unwrap_or(1);
     let cons_end = last_aligned_imgt(&padded).unwrap_or(128);
 
-    // Preserve the legacy semi-global contract: degenerate inputs (empty query
-    // or empty consensus) score NEG_INFINITY rather than the 0.0 that
-    // align_region returns for an empty DP matrix.
-    let score = if region.has_alignment {
-        region.score
-    } else {
-        f32::NEG_INFINITY
-    };
-
     Alignment {
-        score,
+        score: region.score,
         positions: padded,
         cons_start,
         cons_end,
@@ -334,7 +333,7 @@ pub fn align_region(
 // =============================================================================
 
 /// Maximum slack for the variable-length region between FR1 and FR2 (CDR1).
-/// Empirical max in the validation set is around 12; 16 leaves room.
+/// Empirical max in the validation set is around 12; 20 leaves room.
 pub const CDR1_MAX_LEN: usize = 20;
 /// Maximum slack for the variable-length region between FR2 and FR3 (CDR2).
 pub const CDR2_MAX_LEN: usize = 20;
@@ -352,23 +351,8 @@ pub const CDR3_MAX_LEN: usize = 40;
 pub const FR1_CONFIDENCE_THRESHOLD: f32 = 0.15;
 
 fn region_slice(matrix: &ScoringMatrix, region: Region) -> &[PositionScores] {
-    let (start, end) = region.imgt_range();
+    let (start, end) = region.consensus_range();
     &matrix.positions[(start as usize - 1)..(end as usize)]
-}
-
-/// FR3 alignment extends 1 position into CDR3 to anchor IMGT 105 — needed because
-/// Kabat heavy treats IMGT 105 as FR3-last while IMGT scheme treats it as CDR3-first.
-fn fr3_extended_slice(matrix: &ScoringMatrix) -> &[PositionScores] {
-    // IMGT 66..=105 → indices 65..=104 → slice 65..105
-    &matrix.positions[65..105]
-}
-
-/// FR4 alignment extends 1 position upstream into CDR3 to anchor IMGT 117 — needed
-/// because Kabat (both light and heavy) treats IMGT 117 as FR4-first while IMGT
-/// scheme treats it as CDR3-last.
-fn fr4_extended_slice(matrix: &ScoringMatrix) -> &[PositionScores] {
-    // IMGT 117..=128 → indices 116..=127 → slice 116..128
-    &matrix.positions[116..128]
 }
 
 /// Inner FR params: window deliberately extends past the region end into the
@@ -462,8 +446,8 @@ pub fn align_remaining_frs(
     }
 
     let fr2_slice = region_slice(matrix, Region::FR2);
-    let fr3_slice = fr3_extended_slice(matrix);
-    let fr4_slice = fr4_extended_slice(matrix);
+    let fr3_slice = region_slice(matrix, Region::FR3);
+    let fr4_slice = region_slice(matrix, Region::FR4);
 
     let fr2_window_start = fr1.query_end + 1;
     if fr2_window_start >= qlen {
@@ -542,7 +526,7 @@ fn stitch_alignment(
 
     // CDR1: between fr1.query_end and fr2.query_start.
     for _ in (fr1.query_end + 1)..fr2.query_start {
-        positions.push(AlignedPosition::Aligned(Region::CDR1.imgt_range().0));
+        positions.push(AlignedPosition::Aligned(Region::CDR1.consensus_range().0));
     }
 
     // FR2.
@@ -550,7 +534,7 @@ fn stitch_alignment(
 
     // CDR2.
     for _ in (fr2.query_end + 1)..fr3.query_start {
-        positions.push(AlignedPosition::Aligned(Region::CDR2.imgt_range().0));
+        positions.push(AlignedPosition::Aligned(Region::CDR2.consensus_range().0));
     }
 
     // FR3.
@@ -745,8 +729,8 @@ mod tests {
     fn test_empty_sequence() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
         let result = test_align("", &matrix.positions);
-        // Empty sequence should align with negative infinity score and no positions
-        assert_eq!(result.score, f32::NEG_INFINITY);
+        // Empty sequence is degenerate: no positions, score is whatever align_region
+        // returns for an empty DP (currently 0.0).
         assert!(result.positions.is_empty());
     }
 

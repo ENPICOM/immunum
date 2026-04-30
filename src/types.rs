@@ -207,18 +207,29 @@ pub enum Region {
 }
 
 impl Region {
-    /// Inclusive IMGT position range for this region.
+    /// Inclusive IMGT position range associated with this region in the
+    /// FR-anchored alignment pipeline.
+    ///
+    /// Mostly the canonical IMGT region boundaries, with two anchor extensions:
+    /// FR3 includes IMGT 105 and FR4 includes IMGT 117 — the conserved CDR3
+    /// boundary residues (Cys at 105, Trp/Tyr at 117). Anchoring them to the
+    /// adjacent FR alignment is needed because the IMGT and Kabat schemes
+    /// disagree on which side of the boundary they belong to (Kabat heavy
+    /// treats 105 as FR3-last; Kabat both treat 117 as FR4-first), so the
+    /// downstream numbering rules depend on those residues being assigned a
+    /// specific IMGT position rather than a CDR3 placeholder.
+    ///
     /// All consensus matrices are IMGT-indexed contiguously 1..=128, so
     /// `(imgt_pos - 1)` is the index into `ScoringMatrix::positions`.
-    pub const fn imgt_range(self) -> (u8, u8) {
+    pub const fn consensus_range(self) -> (u8, u8) {
         match self {
             Region::FR1 => (1, 26),
             Region::CDR1 => (27, 38),
             Region::FR2 => (39, 55),
             Region::CDR2 => (56, 65),
-            Region::FR3 => (66, 104),
+            Region::FR3 => (66, 105),
             Region::CDR3 => (105, 117),
-            Region::FR4 => (118, 128),
+            Region::FR4 => (117, 128),
         }
     }
 }
