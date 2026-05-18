@@ -63,7 +63,7 @@ pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.5;
 pub const MIN_SEQUENCE_LENGTH: usize = 30;
 
 /// Maximum allowed input sequence length.
-pub const MAX_SEQUENCE_LENGTH: usize = 1000;
+pub const MAX_SEQUENCE_LENGTH: usize = 10000;
 
 /// Validate that `sequence` contains only standard amino acid characters
 /// (case-insensitive) and that its length is within the allowed bounds.
