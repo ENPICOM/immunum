@@ -48,7 +48,7 @@ dev = [
     "pandas>=2.3.3",
     "pre-commit>=4.3.0",
     "pyrefly>=0.53.0",
-    "pysentry-rs>=0.3.10",
+    "pysentry-rs>=0.4.6",
     "pytest-benchmark>=5.2.3",
     "pytest-markdown-docs>=0.9.1",
     "pytest-xdist>=3.8.0",
@@ -112,7 +112,7 @@ include = ["src/**", "tests/**"]
 enabled = ["pypa", "pypi", "osv"]
 
 [tool.pysentry.defaults]
-fail_on = "high"
+groups = ["polars", "dev"]
 
 [tool.ty.src]
 include = ["immunum"]

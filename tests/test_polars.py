@@ -170,9 +170,16 @@ class TestPolarsSegment:
             )
         ).unnest("segmented")
         expected_fields = {
-            "fr1", "fr2", "fr3", "fr4",
-            "cdr1", "cdr2", "cdr3",
-            "prefix", "postfix", "error",
+            "fr1",
+            "fr2",
+            "fr3",
+            "fr4",
+            "cdr1",
+            "cdr2",
+            "cdr3",
+            "prefix",
+            "postfix",
+            "error",
         }
         assert expected_fields.issubset(set(result.columns))
 
