@@ -54,8 +54,11 @@ pub fn segment(
     for (position, ch) in positions.iter().zip(aligned_seq.chars()) {
         let key = match region_for_position(position.number, scheme) {
             Some(region) => region.to_string().to_lowercase(),
-            None if position.number == 0 => "prefix".to_string(),
-            None => "postfix".to_string(),
+            // number_by_rules only emits in-range numbers
+            None => unreachable!(
+                "numbered position {} has no region under {scheme:?}",
+                position.number
+            ),
         };
         segments.get_mut(&key).unwrap().push(ch);
     }
