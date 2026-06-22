@@ -31,10 +31,15 @@ pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
 
 /// Segment a numbered sequence into its constituent regions
 ///
-/// Returns a HashMap with keys for all Region variants plus "Prefix" and "Postfix".
-/// Prefix collects residues before the numbered region, Postfix those after.
+/// Returns a HashMap with keys for all Region variants plus "prefix" and "postfix".
 /// All keys are always present, with empty strings for absent regions.
-pub fn segment(positions: &[Position], sequence: &str, scheme: Scheme) -> HashMap<String, String> {
+pub fn segment(
+    positions: &[Position],
+    sequence: &str,
+    query_start: usize,
+    query_end: usize,
+    scheme: Scheme,
+) -> HashMap<String, String> {
     let mut segments: HashMap<String, String> = [
         "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix",
     ]
@@ -42,14 +47,24 @@ pub fn segment(positions: &[Position], sequence: &str, scheme: Scheme) -> HashMa
     .map(|&s| (s.to_string(), String::new()))
     .collect();
 
-    for (position, ch) in positions.iter().zip(sequence.chars()) {
+    let prefix = &sequence[..query_start];
+    segments.insert("prefix".to_string(), prefix.to_string());
+
+    let aligned_seq = &sequence[query_start..=query_end];
+    for (position, ch) in positions.iter().zip(aligned_seq.chars()) {
         let key = match region_for_position(position.number, scheme) {
-            Some(region) => region.to_string(),
-            None if position.number == 0 => "Prefix".to_string(),
-            None => "Postfix".to_string(),
+            Some(region) => region.to_string().to_lowercase(),
+            None if position.number == 0 => "prefix".to_string(),
+            None => "postfix".to_string(),
         };
-        segments.get_mut(&key.to_lowercase()).unwrap().push(ch);
+        segments.get_mut(&key).unwrap().push(ch);
     }
+
+    let postfix = &sequence[query_end + 1..];
+    segments
+        .get_mut("postfix")
+        .unwrap()
+        .push_str(postfix);
 
     segments
 }

@@ -79,8 +79,13 @@ impl Annotator {
         let dict = PyDict::new(py);
         match self.number(sequence) {
             Ok(result) => {
-                let aligned_seq = &sequence[result.query_start..=result.query_end];
-                let segments = segment(&result.positions, aligned_seq, result.scheme);
+                let segments = segment(
+                    &result.positions,
+                    sequence,
+                    result.query_start,
+                    result.query_end,
+                    result.scheme,
+                );
                 for (region, seq) in segments {
                     dict.set_item(region, seq)?;
                 }

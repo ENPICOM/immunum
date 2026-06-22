@@ -186,8 +186,13 @@ impl Annotator {
     /// Segment a sequence into FR/CDR regions
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
         let result = self.number(sequence)?;
-        let aligned_seq = &sequence[result.query_start..=result.query_end];
-        let mut map = segment_positions(&result.positions, aligned_seq, result.scheme);
+        let mut map = segment_positions(
+            &result.positions,
+            sequence,
+            result.query_start,
+            result.query_end,
+            result.scheme,
+        );
         Ok(SegmentResult {
             prefix: map.remove("prefix").unwrap_or_default(),
             fr1: map.remove("fr1").unwrap_or_default(),
