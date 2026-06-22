@@ -145,6 +145,30 @@ class TestNumbering:
         } | {"prefix", "postfix"}
         assert result.error is None
 
+    def test_segmentation_partitions_full_input(self, annotator_and_seq):
+        """The segments must reconstruct the input exactly, in order — no residue
+        may be dropped, including any flanking residues."""
+        annotator, seq = annotator_and_seq
+        result = annotator.segment(seq)
+        order = ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"]
+        reconstructed = "".join(getattr(result, k) or "" for k in order)
+        assert reconstructed == seq
+
+    def test_segmentation_captures_flanking_regions(self):
+        """A leading signal peptide and a trailing constant region must land in
+        prefix/postfix rather than being silently dropped (regression: previously
+        everything outside the aligned region was discarded, leaving an empty
+        postfix while fr4 did not reach the end of the sequence)."""
+        annotator = immunum.Annotator(["IGH"], "IMGT")
+        prefix = "MGWSCIILFLVATATG"  # signal peptide
+        postfix = "ASTKGPSVFPLAPSSKSTSGGTAALGCLVKDYFPEPVTVS"  # CH1 start
+        result = annotator.segment(prefix + IGH_SEQ + postfix)
+        assert result.error is None
+        assert result.prefix == prefix
+        assert result.fr1.startswith("QVQLV")
+        assert result.fr4 == "WGQGTLVTVSS"
+        assert result.postfix == postfix
+
     def test_segmentation_invalid_sequence_returns_error(self):
         annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
         result = annotator.segment("AAAAAAAAAAAAAAAA")
