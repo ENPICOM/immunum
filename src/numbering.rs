@@ -4,29 +4,24 @@ pub mod kabat;
 use std::collections::HashMap;
 
 use crate::alignment::AlignedPosition;
-use crate::imgt::IMGT_RULES;
-use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
+use crate::imgt::{IMGT_REGIONS, IMGT_RULES};
+use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES, KABAT_REGIONS};
 use crate::types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
+
+/// Region boundary table (numbering space) for a scheme
+fn regions_for_scheme(scheme: Scheme) -> &'static [(Region, u8, u8)] {
+    match scheme {
+        Scheme::IMGT => IMGT_REGIONS,
+        Scheme::Kabat => KABAT_REGIONS,
+    }
+}
 
 /// Get the region for a position number under the given scheme, or None if outside numbered range
 pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
-    match (scheme, pos) {
-        (Scheme::IMGT, 1..=26) => Some(Region::FR1),
-        (Scheme::IMGT, 27..=38) => Some(Region::CDR1),
-        (Scheme::IMGT, 39..=55) => Some(Region::FR2),
-        (Scheme::IMGT, 56..=65) => Some(Region::CDR2),
-        (Scheme::IMGT, 66..=104) => Some(Region::FR3),
-        (Scheme::IMGT, 105..=117) => Some(Region::CDR3),
-        (Scheme::IMGT, 118..=128) => Some(Region::FR4),
-        (Scheme::Kabat, 1..=25) => Some(Region::FR1),
-        (Scheme::Kabat, 26..=35) => Some(Region::CDR1),
-        (Scheme::Kabat, 36..=50) => Some(Region::FR2),
-        (Scheme::Kabat, 51..=57) => Some(Region::CDR2),
-        (Scheme::Kabat, 58..=92) => Some(Region::FR3),
-        (Scheme::Kabat, 93..=100) => Some(Region::CDR3),
-        (Scheme::Kabat, 101..=113) => Some(Region::FR4),
-        _ => None,
-    }
+    regions_for_scheme(scheme)
+        .iter()
+        .find(|(_, start, end)| pos >= *start && pos <= *end)
+        .map(|(region, _, _)| *region)
 }
 
 /// Segment a numbered sequence into its constituent regions

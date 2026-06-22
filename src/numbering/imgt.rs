@@ -1,5 +1,21 @@
-use crate::types::NumberingRule;
+use crate::types::{NumberingRule, Region};
 use crate::Insertion;
+
+// =============================================================================
+// IMGT Region Boundaries (numbering space, same for all chain types)
+// =============================================================================
+
+/// Maps each functional region to its inclusive numbering-position range under
+/// IMGT. Ranges are contiguous and cover the full numbered range 1..=128.
+pub const IMGT_REGIONS: &[(Region, u8, u8)] = &[
+    (Region::FR1, 1, 26),
+    (Region::CDR1, 27, 38),
+    (Region::FR2, 39, 55),
+    (Region::CDR2, 56, 65),
+    (Region::FR3, 66, 104),
+    (Region::CDR3, 105, 117),
+    (Region::FR4, 118, 128),
+];
 
 // =============================================================================
 // IMGT Chain Numbering Rules (same for all chain types)
@@ -49,6 +65,45 @@ pub const IMGT_RULES: &[NumberingRule] = &[
 mod tests {
     use super::*;
     use crate::numbering::number_with_rules;
+
+    #[test]
+    fn test_regions_are_contiguous() {
+        let mut expected = IMGT_REGIONS[0].1;
+        for (region, start, end) in IMGT_REGIONS {
+            assert_eq!(
+                *start, expected,
+                "gap or overlap before region {region:?}: expected start {expected}, got {start}"
+            );
+            assert!(start <= end, "region {region:?} has inverted range");
+            expected = end + 1;
+        }
+    }
+
+    #[test]
+    fn test_rule_numbering_ranges_have_no_gaps() {
+        let mut ranges: Vec<(u8, u8)> =
+            IMGT_RULES.iter().map(|r| (r.num_start, r.num_end)).collect();
+        ranges.sort();
+        let mut expected = ranges[0].0;
+        for (start, end) in ranges {
+            assert_eq!(start, expected, "gap in rule numbering ranges at {expected}");
+            expected = end + 1;
+        }
+    }
+
+    #[test]
+    fn test_every_rule_position_has_a_region() {
+        use crate::numbering::region_for_position;
+        use crate::Scheme;
+        for rule in IMGT_RULES {
+            for pos in rule.num_start..=rule.num_end {
+                assert!(
+                    region_for_position(pos, Scheme::IMGT).is_some(),
+                    "numbering position {pos} maps to no IMGT region"
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_cdr1_numbering() {
