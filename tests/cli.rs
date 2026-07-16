@@ -290,7 +290,7 @@ fn invalid_scheme_shows_error() {
         .args([
             "number",
             "-s",
-            "chothia",
+            "nonsense",
             "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
         ])
         .assert()

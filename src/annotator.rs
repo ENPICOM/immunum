@@ -127,11 +127,14 @@ impl Annotator {
             return Err(Error::InvalidChain("chains cannot be empty".to_string()));
         }
 
-        // Validate: Kabat only supported for antibody chains
-        if scheme == Scheme::Kabat && chains.iter().any(|c| TCR_CHAINS.contains(c)) {
-            return Err(Error::InvalidScheme(
-                "Kabat scheme only supported for antibody chains (IGH, IGK, IGL)".to_string(),
-            ));
+        // Validate: Kabat, Chothia and Martin are only supported for antibody chains
+        if matches!(scheme, Scheme::Kabat | Scheme::Chothia | Scheme::Martin)
+            && chains.iter().any(|c| TCR_CHAINS.contains(c))
+        {
+            return Err(Error::InvalidScheme(format!(
+                "{} scheme only supported for antibody chains (IGH, IGK, IGL)",
+                scheme
+            )));
         }
 
         let mut matrices = Vec::new();

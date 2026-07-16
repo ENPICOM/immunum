@@ -68,8 +68,10 @@ pub mod io;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod validation;
 
+pub use numbering::chothia;
 pub use numbering::imgt;
 pub use numbering::kabat;
+pub use numbering::martin;
 
 pub use alignment::{align, Alignment};
 pub use annotator::{Annotator, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE};

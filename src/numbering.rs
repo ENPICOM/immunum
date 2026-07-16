@@ -1,11 +1,15 @@
+pub mod chothia;
 pub mod imgt;
 pub mod kabat;
+pub mod martin;
 
 use std::collections::HashMap;
 
 use crate::alignment::AlignedPosition;
+use crate::chothia::{CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_RULES};
 use crate::imgt::IMGT_RULES;
 use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
+use crate::martin::{MARTIN_HEAVY_RULES, MARTIN_LIGHT_RULES};
 use crate::types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
 
 /// Get the region for a position number under the given scheme, or None if outside numbered range
@@ -25,6 +29,22 @@ pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
         (Scheme::Kabat, 58..=92) => Some(Region::FR3),
         (Scheme::Kabat, 93..=100) => Some(Region::CDR3),
         (Scheme::Kabat, 101..=113) => Some(Region::FR4),
+        // Chothia heavy/light region boundaries (Chothia CDR definitions)
+        (Scheme::Chothia, 1..=25) => Some(Region::FR1),
+        (Scheme::Chothia, 26..=32) => Some(Region::CDR1),
+        (Scheme::Chothia, 33..=51) => Some(Region::FR2),
+        (Scheme::Chothia, 52..=56) => Some(Region::CDR2),
+        (Scheme::Chothia, 57..=95) => Some(Region::FR3),
+        (Scheme::Chothia, 96..=101) => Some(Region::CDR3),
+        (Scheme::Chothia, 102..=113) => Some(Region::FR4),
+        // Martin uses the same region boundaries as Chothia
+        (Scheme::Martin, 1..=25) => Some(Region::FR1),
+        (Scheme::Martin, 26..=32) => Some(Region::CDR1),
+        (Scheme::Martin, 33..=51) => Some(Region::FR2),
+        (Scheme::Martin, 52..=56) => Some(Region::CDR2),
+        (Scheme::Martin, 57..=95) => Some(Region::FR3),
+        (Scheme::Martin, 96..=101) => Some(Region::CDR3),
+        (Scheme::Martin, 102..=113) => Some(Region::FR4),
         _ => None,
     }
 }
@@ -66,6 +86,10 @@ pub fn apply_numbering(
         (Scheme::IMGT, _) => IMGT_RULES,
         (Scheme::Kabat, Chain::IGH) => KABAT_HEAVY_RULES,
         (Scheme::Kabat, Chain::IGK) | (Scheme::Kabat, Chain::IGL) => KABAT_LIGHT_RULES,
+        (Scheme::Chothia, Chain::IGH) => CHOTHIA_HEAVY_RULES,
+        (Scheme::Chothia, Chain::IGK) | (Scheme::Chothia, Chain::IGL) => CHOTHIA_LIGHT_RULES,
+        (Scheme::Martin, Chain::IGH) => MARTIN_HEAVY_RULES,
+        (Scheme::Martin, Chain::IGK) | (Scheme::Martin, Chain::IGL) => MARTIN_LIGHT_RULES,
         _ => unreachable!("invalid scheme/chain combination should be prevented by Annotator"),
     };
     number_by_rules(&consensus_positions, rules)
@@ -100,6 +124,26 @@ fn number_by_rules(consensus_positions: &[u8], rules: &[NumberingRule]) -> Vec<P
     let mut idx = 0;
 
     for rule in rules {
+        // Skip consensus positions that fall in an inter-rule gap (a scheme "hole",
+        // e.g. IMGT position 10 or 73 which some schemes omit). These are treated as
+        // insertions of the previously numbered position so that a residue present in
+        // the alignment is never silently dropped, which would otherwise stall the
+        // scanner and truncate the whole tail of the numbering.
+        while idx < consensus_positions.len()
+            && consensus_positions[idx] < rule.align_start
+            && !rule.contains(consensus_positions[idx])
+        {
+            if let Some(last) = numbered_positions.last().copied() {
+                let last: Position = last;
+                let next_letter = match last.insertion {
+                    Some(c) => (c as u8 + 1) as char,
+                    None => 'A',
+                };
+                numbered_positions.push(Position::with_insertion(last.number, next_letter));
+            }
+            idx += 1;
+        }
+
         let rule_start = idx;
 
         // Find all positions belonging to this rule's source range

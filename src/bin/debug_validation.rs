@@ -185,8 +185,14 @@ fn main() {
         (Chain::IGH, Scheme::Kabat) => "fixtures/validation/ab_H_kabat.csv",
         (Chain::IGK, Scheme::Kabat) => "fixtures/validation/ab_K_kabat.csv",
         (Chain::IGL, Scheme::Kabat) => "fixtures/validation/ab_L_kabat.csv",
-        (chain, Scheme::Kabat) => {
-            eprintln!("Error: Kabat scheme not supported for chain {}", chain);
+        (Chain::IGH, Scheme::Chothia) => "fixtures/validation/ab_H_chothia.csv",
+        (Chain::IGK, Scheme::Chothia) => "fixtures/validation/ab_K_chothia.csv",
+        (Chain::IGL, Scheme::Chothia) => "fixtures/validation/ab_L_chothia.csv",
+        (Chain::IGH, Scheme::Martin) => "fixtures/validation/ab_H_martin.csv",
+        (Chain::IGK, Scheme::Martin) => "fixtures/validation/ab_K_martin.csv",
+        (Chain::IGL, Scheme::Martin) => "fixtures/validation/ab_L_martin.csv",
+        (chain, scheme) => {
+            eprintln!("Error: {} scheme not supported for chain {}", scheme, chain);
             process::exit(1);
         }
     };
