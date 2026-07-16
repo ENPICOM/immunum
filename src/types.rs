@@ -112,6 +112,15 @@ pub enum Scheme {
     /// Kabat numbering (derived from IMGT)
     #[strum(to_string = "Kabat", serialize = "k", ascii_case_insensitive)]
     Kabat,
+    /// Chothia numbering (derived from IMGT)
+    #[strum(to_string = "Chothia", serialize = "c", ascii_case_insensitive)]
+    Chothia,
+    /// Martin / extended Chothia numbering (derived from IMGT)
+    #[strum(to_string = "Martin", serialize = "m", ascii_case_insensitive)]
+    Martin,
+    /// AHo numbering (derived from IMGT)
+    #[strum(to_string = "Aho", serialize = "a", ascii_case_insensitive)]
+    Aho,
 }
 
 /// Position in a numbered sequence
