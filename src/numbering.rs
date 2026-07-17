@@ -6,57 +6,24 @@ pub mod martin;
 
 use std::collections::HashMap;
 
-use crate::aho::{AHO_HEAVY_RULES, AHO_KAPPA_RULES, AHO_LAMBDA_RULES};
+use crate::aho::{AHO_HEAVY_RULES, AHO_KAPPA_RULES, AHO_LAMBDA_RULES, AHO_REGIONS};
 use crate::alignment::AlignedPosition;
-use crate::chothia::{CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_RULES};
-use crate::imgt::IMGT_RULES;
-use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
-use crate::martin::{MARTIN_HEAVY_RULES, MARTIN_LIGHT_RULES};
+use crate::chothia::{CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_RULES, CHOTHIA_REGIONS};
+use crate::imgt::{IMGT_REGIONS, IMGT_RULES};
+use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES, KABAT_REGIONS};
+use crate::martin::{MARTIN_HEAVY_RULES, MARTIN_LIGHT_RULES, MARTIN_REGIONS};
 use crate::types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
 
 /// Get the region for a position number under the given scheme, or None if outside numbered range
 pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
-    match (scheme, pos) {
-        (Scheme::IMGT, 1..=26) => Some(Region::FR1),
-        (Scheme::IMGT, 27..=38) => Some(Region::CDR1),
-        (Scheme::IMGT, 39..=55) => Some(Region::FR2),
-        (Scheme::IMGT, 56..=65) => Some(Region::CDR2),
-        (Scheme::IMGT, 66..=104) => Some(Region::FR3),
-        (Scheme::IMGT, 105..=117) => Some(Region::CDR3),
-        (Scheme::IMGT, 118..=128) => Some(Region::FR4),
-        (Scheme::Kabat, 1..=25) => Some(Region::FR1),
-        (Scheme::Kabat, 26..=35) => Some(Region::CDR1),
-        (Scheme::Kabat, 36..=50) => Some(Region::FR2),
-        (Scheme::Kabat, 51..=57) => Some(Region::CDR2),
-        (Scheme::Kabat, 58..=92) => Some(Region::FR3),
-        (Scheme::Kabat, 93..=100) => Some(Region::CDR3),
-        (Scheme::Kabat, 101..=113) => Some(Region::FR4),
-        // Chothia heavy/light region boundaries (Chothia CDR definitions)
-        (Scheme::Chothia, 1..=25) => Some(Region::FR1),
-        (Scheme::Chothia, 26..=32) => Some(Region::CDR1),
-        (Scheme::Chothia, 33..=51) => Some(Region::FR2),
-        (Scheme::Chothia, 52..=56) => Some(Region::CDR2),
-        (Scheme::Chothia, 57..=95) => Some(Region::FR3),
-        (Scheme::Chothia, 96..=101) => Some(Region::CDR3),
-        (Scheme::Chothia, 102..=113) => Some(Region::FR4),
-        // Martin uses the same region boundaries as Chothia
-        (Scheme::Martin, 1..=25) => Some(Region::FR1),
-        (Scheme::Martin, 26..=32) => Some(Region::CDR1),
-        (Scheme::Martin, 33..=51) => Some(Region::FR2),
-        (Scheme::Martin, 52..=56) => Some(Region::CDR2),
-        (Scheme::Martin, 57..=95) => Some(Region::FR3),
-        (Scheme::Martin, 96..=101) => Some(Region::CDR3),
-        (Scheme::Martin, 102..=113) => Some(Region::FR4),
-        // AHo region boundaries (1-149 space; AHo CDR definitions)
-        (Scheme::Aho, 1..=24) => Some(Region::FR1),
-        (Scheme::Aho, 25..=42) => Some(Region::CDR1),
-        (Scheme::Aho, 43..=56) => Some(Region::FR2),
-        (Scheme::Aho, 57..=77) => Some(Region::CDR2),
-        (Scheme::Aho, 78..=108) => Some(Region::FR3),
-        (Scheme::Aho, 109..=138) => Some(Region::CDR3),
-        (Scheme::Aho, 139..=149) => Some(Region::FR4),
-        _ => None,
-    }
+    let regions = match scheme {
+        Scheme::IMGT => IMGT_REGIONS,
+        Scheme::Kabat => KABAT_REGIONS,
+        Scheme::Chothia => CHOTHIA_REGIONS,
+        Scheme::Martin => MARTIN_REGIONS,
+        Scheme::Aho => AHO_REGIONS,
+    };
+    regions.region(pos)
 }
 
 /// Segment a numbered sequence into its constituent regions

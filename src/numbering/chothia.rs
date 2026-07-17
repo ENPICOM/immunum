@@ -10,8 +10,19 @@
 //! - FR3 insertions on 82 (heavy) / 68 (light)
 //! - CDR3 insertions on 100 (heavy) / 95 (light)
 
-use crate::types::NumberingRule;
+use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
+
+/// Chothia region definition
+pub const CHOTHIA_REGIONS: RegionDefinition = RegionDefinition {
+    fr1_end: 25,
+    cdr1_end: 32,
+    fr2_end: 51,
+    cdr2_end: 56,
+    fr3_end: 95,
+    cdr3_end: 101,
+    fr4_end: 113,
+};
 
 // =============================================================================
 // Chothia Heavy Chain Numbering Rules

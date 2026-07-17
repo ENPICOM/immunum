@@ -4,8 +4,19 @@
 //! - Insertions: all at a single position (35A, 35B, 35C, ...)
 //! - Deletions: from end or a custom order
 
-use crate::types::NumberingRule;
+use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
+
+/// Kabat region definition
+pub const KABAT_REGIONS: RegionDefinition = RegionDefinition {
+    fr1_end: 25,
+    cdr1_end: 35,
+    fr2_end: 50,
+    cdr2_end: 57,
+    fr3_end: 92,
+    cdr3_end: 100,
+    fr4_end: 113,
+};
 
 // =============================================================================
 // Kabat Heavy Chain Numbering Rules

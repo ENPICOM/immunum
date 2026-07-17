@@ -11,8 +11,19 @@
 //! `number_martin_light` by delegating to `number_chothia_light`), so we reuse
 //! `CHOTHIA_LIGHT_RULES`.
 
-use crate::types::NumberingRule;
+use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
+
+/// Martin region definition (identical to Chothia's).
+pub const MARTIN_REGIONS: RegionDefinition = RegionDefinition {
+    fr1_end: 25,
+    cdr1_end: 32,
+    fr2_end: 51,
+    cdr2_end: 56,
+    fr3_end: 95,
+    cdr3_end: 101,
+    fr4_end: 113,
+};
 
 // =============================================================================
 // Martin Heavy Chain Numbering Rules

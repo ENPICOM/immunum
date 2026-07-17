@@ -21,8 +21,19 @@
 //! Per the project decision, each chain has its own rule table rather than extending
 //! `NumberingRule` with a per-chain deletion order.
 
-use crate::types::NumberingRule;
+use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
+
+/// AHo region definition
+pub const AHO_REGIONS: RegionDefinition = RegionDefinition {
+    fr1_end: 24,
+    cdr1_end: 42,
+    fr2_end: 56,
+    cdr2_end: 77,
+    fr3_end: 108,
+    cdr3_end: 138,
+    fr4_end: 149,
+};
 
 /// FR1 rule for heavy and lambda: IMGT 1-10 -> AHo 1-10 with the scheme indel on 8. Heavy and
 /// lambda AHo reserve position 8 as an empty gap (IMGT 8 shifts to AHo 9), so the count-based
