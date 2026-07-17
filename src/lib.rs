@@ -68,6 +68,7 @@ pub mod io;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod validation;
 
+pub use numbering::aho;
 pub use numbering::chothia;
 pub use numbering::imgt;
 pub use numbering::kabat;

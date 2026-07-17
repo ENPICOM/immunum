@@ -24,7 +24,7 @@ struct NumberArgs {
     input: Option<String>,
     /// Output file path (default: stdout)
     output: Option<String>,
-    /// Numbering scheme: imgt (i), kabat (k), chothia (c), martin (m)
+    /// Numbering scheme: imgt (i), kabat (k), chothia (c), martin (m), aho (a)
     #[arg(short, long, default_value = "imgt")]
     scheme: String,
     /// Chain filter: h,k,l,a,b,g,d or groups: ig, tcr, all

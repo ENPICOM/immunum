@@ -191,6 +191,9 @@ fn main() {
         (Chain::IGH, Scheme::Martin) => "fixtures/validation/ab_H_martin.csv",
         (Chain::IGK, Scheme::Martin) => "fixtures/validation/ab_K_martin.csv",
         (Chain::IGL, Scheme::Martin) => "fixtures/validation/ab_L_martin.csv",
+        (Chain::IGH, Scheme::Aho) => "fixtures/validation/ab_H_aho.csv",
+        (Chain::IGK, Scheme::Aho) => "fixtures/validation/ab_K_aho.csv",
+        (Chain::IGL, Scheme::Aho) => "fixtures/validation/ab_L_aho.csv",
         (chain, scheme) => {
             eprintln!("Error: {} scheme not supported for chain {}", scheme, chain);
             process::exit(1);

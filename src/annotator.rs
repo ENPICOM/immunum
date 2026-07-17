@@ -127,9 +127,12 @@ impl Annotator {
             return Err(Error::InvalidChain("chains cannot be empty".to_string()));
         }
 
-        // Validate: Kabat, Chothia and Martin are only supported for antibody chains
-        if matches!(scheme, Scheme::Kabat | Scheme::Chothia | Scheme::Martin)
-            && chains.iter().any(|c| TCR_CHAINS.contains(c))
+        // Validate: Kabat, Chothia, Martin and AHo are only supported for antibody chains.
+        // (AHo is defined for TCR chains too, but immunum does not ship TCR AHo rules yet.)
+        if matches!(
+            scheme,
+            Scheme::Kabat | Scheme::Chothia | Scheme::Martin | Scheme::Aho
+        ) && chains.iter().any(|c| TCR_CHAINS.contains(c))
         {
             return Err(Error::InvalidScheme(format!(
                 "{} scheme only supported for antibody chains (IGH, IGK, IGL)",

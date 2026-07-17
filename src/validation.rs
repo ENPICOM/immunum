@@ -524,4 +524,22 @@ mod tests {
             0.99,
         );
     }
+
+    // AHo validation tests
+    #[test]
+    fn test_validate_igh_aho_sequences() {
+        // Per-position accuracy is >=0.99, but ~17% of sequences differ by a single
+        // residue at the CDR1/FR2 or CDR2 boundary. These are alignment-level
+        // disagreements: immunum's HMM places CDR-boundary gaps in a slightly
+        // different column than the AntPack/ANARCI alignment used to build the AHo
+        // fixtures, and AHo's tight per-position CDR gapping amplifies that. The AHo
+        // renumbering rules themselves reproduce the deep-loop positions cleanly.
+        validate_chain_sequences_with_scheme(
+            Chain::IGH,
+            "fixtures/validation/ab_H_aho.csv",
+            Scheme::Aho,
+            0.99,
+            0.99,
+        );
+    }
 }

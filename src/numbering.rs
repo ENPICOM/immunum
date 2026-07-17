@@ -1,3 +1,4 @@
+pub mod aho;
 pub mod chothia;
 pub mod imgt;
 pub mod kabat;
@@ -5,6 +6,7 @@ pub mod martin;
 
 use std::collections::HashMap;
 
+use crate::aho::AHO_HEAVY_RULES;
 use crate::alignment::AlignedPosition;
 use crate::chothia::{CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_RULES};
 use crate::imgt::IMGT_RULES;
@@ -45,6 +47,14 @@ pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
         (Scheme::Martin, 57..=95) => Some(Region::FR3),
         (Scheme::Martin, 96..=101) => Some(Region::CDR3),
         (Scheme::Martin, 102..=113) => Some(Region::FR4),
+        // AHo region boundaries (1-149 space; AHo CDR definitions)
+        (Scheme::Aho, 1..=24) => Some(Region::FR1),
+        (Scheme::Aho, 25..=42) => Some(Region::CDR1),
+        (Scheme::Aho, 43..=56) => Some(Region::FR2),
+        (Scheme::Aho, 57..=77) => Some(Region::CDR2),
+        (Scheme::Aho, 78..=108) => Some(Region::FR3),
+        (Scheme::Aho, 109..=138) => Some(Region::CDR3),
+        (Scheme::Aho, 139..=149) => Some(Region::FR4),
         _ => None,
     }
 }
@@ -90,6 +100,7 @@ pub fn apply_numbering(
         (Scheme::Chothia, Chain::IGK) | (Scheme::Chothia, Chain::IGL) => CHOTHIA_LIGHT_RULES,
         (Scheme::Martin, Chain::IGH) => MARTIN_HEAVY_RULES,
         (Scheme::Martin, Chain::IGK) | (Scheme::Martin, Chain::IGL) => MARTIN_LIGHT_RULES,
+        (Scheme::Aho, Chain::IGH) => AHO_HEAVY_RULES,
         _ => unreachable!("invalid scheme/chain combination should be prevented by Annotator"),
     };
     number_by_rules(&consensus_positions, rules)
