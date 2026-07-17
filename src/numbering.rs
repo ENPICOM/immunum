@@ -6,7 +6,7 @@ pub mod martin;
 
 use std::collections::HashMap;
 
-use crate::aho::AHO_HEAVY_RULES;
+use crate::aho::{AHO_HEAVY_RULES, AHO_KAPPA_RULES, AHO_LAMBDA_RULES};
 use crate::alignment::AlignedPosition;
 use crate::chothia::{CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_RULES};
 use crate::imgt::IMGT_RULES;
@@ -101,6 +101,8 @@ pub fn apply_numbering(
         (Scheme::Martin, Chain::IGH) => MARTIN_HEAVY_RULES,
         (Scheme::Martin, Chain::IGK) | (Scheme::Martin, Chain::IGL) => MARTIN_LIGHT_RULES,
         (Scheme::Aho, Chain::IGH) => AHO_HEAVY_RULES,
+        (Scheme::Aho, Chain::IGK) => AHO_KAPPA_RULES,
+        (Scheme::Aho, Chain::IGL) => AHO_LAMBDA_RULES,
         _ => unreachable!("invalid scheme/chain combination should be prevented by Annotator"),
     };
     number_by_rules(&consensus_positions, rules)

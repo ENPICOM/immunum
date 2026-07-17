@@ -163,7 +163,22 @@ impl Annotator {
 
         // Apply numbering only to the aligned subregion of the query
         let aligned_positions = &alignment.positions[alignment.query_start..=alignment.query_end];
-        let positions = apply_numbering(aligned_positions, self.scheme, chain);
+        let mut positions = apply_numbering(aligned_positions, self.scheme, chain);
+        let mut query_end = alignment.query_end;
+
+        // AHo light chains carry one extra C-terminal position (149) beyond the IMGT-numbered
+        // region: IMGT ends light chains at 127 -> AHo 148, so the 149 residue has no IMGT
+        // state and is appended here when a residue follows, matching ANARCI's number_aho tail
+        // rule. Heavy chains populate IMGT 128 -> AHo 149 directly and need no append.
+        if self.scheme == Scheme::Aho
+            && matches!(chain, Chain::IGK | Chain::IGL)
+            && positions.last() == Some(&Position::new(148))
+            && query_end + 1 < sequence.len()
+        {
+            positions.push(Position::new(149));
+            query_end += 1;
+        }
+
         let confidence = if alignment.max_confidence_score > 0.0 {
             (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
         } else {
@@ -185,7 +200,7 @@ impl Annotator {
             cons_end: alignment.cons_end as usize,
             confidence,
             query_start: alignment.query_start,
-            query_end: alignment.query_end,
+            query_end,
         })
     }
 
