@@ -104,26 +104,6 @@ fn number_by_rules(consensus_positions: &[u8], rules: &[NumberingRule]) -> Vec<P
     let mut idx = 0;
 
     for rule in rules {
-        // Skip consensus positions that fall in an inter-rule gap (a scheme "hole",
-        // e.g. IMGT position 10 or 73 which some schemes omit). These are treated as
-        // insertions of the previously numbered position so that a residue present in
-        // the alignment is never silently dropped, which would otherwise stall the
-        // scanner and truncate the whole tail of the numbering.
-        while idx < consensus_positions.len()
-            && consensus_positions[idx] < rule.align_start
-            && !rule.contains(consensus_positions[idx])
-        {
-            if let Some(last) = numbered_positions.last().copied() {
-                let last: Position = last;
-                let next_letter = match last.insertion {
-                    Some(c) => (c as u8 + 1) as char,
-                    None => 'A',
-                };
-                numbered_positions.push(Position::with_insertion(last.number, next_letter));
-            }
-            idx += 1;
-        }
-
         let rule_start = idx;
 
         // Find all positions belonging to this rule's source range
