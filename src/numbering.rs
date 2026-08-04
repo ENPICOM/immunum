@@ -219,3 +219,74 @@ pub fn number_with_rules(len: usize, rule: &NumberingRule) -> Vec<Position> {
 
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numbering::imgt::IMGT_RULES;
+    use crate::numbering::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
+
+    /// Only rules with an insertion strategy reach `number_with_rules`; `number_by_rules` sends the
+    /// framework rules down the offset path instead, where `deletion_order` is never consulted.
+    fn variable_rules() -> Vec<(&'static str, &'static NumberingRule)> {
+        [
+            ("KABAT_HEAVY_RULES", KABAT_HEAVY_RULES),
+            ("KABAT_LIGHT_RULES", KABAT_LIGHT_RULES),
+            ("IMGT_RULES", IMGT_RULES),
+        ]
+        .into_iter()
+        .flat_map(|(name, rules)| {
+            rules
+                .iter()
+                .filter(|rule| !matches!(rule.insertion, Insertion::None))
+                .map(move |rule| (name, rule))
+        })
+        .collect()
+    }
+
+    /// A region one residue long asks to delete every base position but one, so `deletion_order`
+    /// needs `base_len - 1` entries. Three Kabat rules were short of that and sliced out of bounds
+    /// (`&rule.deletion_order[..to_remove]`), which surfaced as a panic on truncated reads.
+    #[test]
+    fn deletion_order_covers_the_shortest_possible_region() {
+        for (table, rule) in variable_rules() {
+            let base_len = (rule.num_end - rule.num_start + 1) as usize;
+            assert!(
+                rule.deletion_order.len() >= base_len - 1,
+                "{table} rule {}-{} has {} deletion positions but needs {} to represent a \
+                 single-residue region",
+                rule.num_start,
+                rule.num_end,
+                rule.deletion_order.len(),
+                base_len - 1,
+            );
+        }
+    }
+
+    /// The contract of `number_with_rules`: one position per residue, for every length a region can
+    /// take. Exercises the deletion path (below base length) and the insertion path (above it).
+    #[test]
+    fn every_region_length_yields_one_position_per_residue() {
+        for (table, rule) in variable_rules() {
+            let base_len = (rule.num_end - rule.num_start + 1) as usize;
+            for len in 1..=base_len + 4 {
+                let positions = number_with_rules(len, rule);
+                assert_eq!(
+                    positions.len(),
+                    len,
+                    "{table} rule {}-{} returned {} positions for a region of {len} residues",
+                    rule.num_start,
+                    rule.num_end,
+                    positions.len(),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn empty_region_yields_no_positions() {
+        for (_, rule) in variable_rules() {
+            assert!(number_with_rules(0, rule).is_empty());
+        }
+    }
+}
