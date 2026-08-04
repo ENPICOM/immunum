@@ -239,12 +239,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Read toolchain version
+        id: toolchain
+        # Read from rust-toolchain.toml so the pin lives in one place.
+        run: |
+          CHANNEL=$(grep '^channel = ' rust-toolchain.toml | head -1 | sed 's/channel = "\(.*\)"/\1/')
+          if [ -z "$CHANNEL" ]; then
+            echo "::error::Could not read channel from rust-toolchain.toml"
+            exit 1
+          fi
+          echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          echo "Using Rust toolchain: $CHANNEL"
+
       - name: Install Rust
-        # Pinned to match rust-toolchain.toml. Tracking `stable` meant a release could be published
-        # with whichever toolchain happened to be current that day.
         uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: "1.97"
+          toolchain: ${{ steps.toolchain.outputs.channel }}
 
       - name: Publish to crates.io
         env:
