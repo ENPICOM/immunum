@@ -1,0 +1,25 @@
+.github/workflows/release.yml
+  h_acea35c6bbea0b 244
+  s_11e154e00059cc::t_0b9f70830392b1 242-243,245-253,257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "b797089cdeaf6f8d1ba5c2f9d311a10a2f7c7fb9",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_11e154e00059cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd3d13eb-c74d-4d64-9e83-f07d1b0a30d1",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
