@@ -1,2 +1,6 @@
 [toolchain]
-channel = "stable"
+# Pinned rather than "stable": CI floating onto each new release turned a latent unsoundness in a
+# transitive dependency into a hard build error with no change on our side. Minor precision, so
+# patch-level fixes are still picked up. Bump deliberately.
+channel = "1.97"
+components = ["rustfmt", "clippy"]

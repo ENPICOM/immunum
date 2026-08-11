@@ -360,4 +360,48 @@ mod tests {
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
     }
+
+    /// Truncated but productive camel VHH reads from the Observed Antibody Space (Li et al. 2017,
+    /// bactrian camel, run SRR3544217). Each aligns such that a Kabat heavy CDR1 or CDR3 collapses to
+    /// a single residue, which asks `number_with_rules` to delete every base position but one. Three
+    /// Kabat `deletion_order` tables were one entry short of that and sliced out of bounds, so these
+    /// panicked at `numbering.rs:175` under Kabat while numbering fine under IMGT.
+    const TRUNCATED_VHH_READS: &[(&str, &str)] = &[
+        ("CDR1", "GWFRQAPGKEREGGAYIYTSDGIARYSDSVKGRFTISVDGVKKILFLQMNELKAEDTATYYCASTGRSNDCGPAQKLLLHSARGGRDFGIWGQGTQVTVS"),
+        ("CDR3", "QLVESGGGLVQPGGSLRLSCAATGFTFSNNWMHWVRQAPGKGLEWVASISRSGGNTDYADSVKGRFTISRDNAKNTLYLHLNSLKPEDTAMYYCTNWGQGTQVTVS"),
+        ("CDR1", "GWFRQAPGKEREGVAFISSEGAPTYADSVQGRFTISRNVLPERLSLQMTRLKAEDTAMYYCALDPSWDGRRIVLHGTFAAWECPREERQAFGVWGLGTQVTVS"),
+        ("CDR3", "QLVESGGGLVQPGGSLRLSCAASGLTFSSHAMSWVRQAPGKGLEWVSGITGGGTSYYADPVKGRFTISRDNAKNSVYLQLNSLKAEDSAMYYCAKWGQGTQVTVS"),
+        ("CDR1", "TWVRQAPGKGLEWVSTINSGGDSTYYADSVKGRFTISQDSAKNILYLQMRSLKPEDTAMYYCAARSVGWCPLFEHWLGKRAYTPGGYFANWGQGTQVTVS"),
+        ("CDR1", "GWFRQAPGKEREGVAVIHKNIYVASNTPGAVFYADSVKGRFTISRDSAKNTLYLQMNSLKPEDAAMYSCAADSRYASCGWLLDRFRDFAYRGQGTQVTVS"),
+    ];
+
+    #[test]
+    fn numbers_truncated_reads_under_kabat() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::Kabat, None).unwrap();
+
+        for (region, sequence) in TRUNCATED_VHH_READS {
+            let result = annotator
+                .number(sequence)
+                .unwrap_or_else(|err| panic!("{region} read failed to number: {err}"));
+
+            assert_eq!(result.scheme, Scheme::Kabat);
+            assert_eq!(
+                result.positions.len(),
+                result.query_end - result.query_start + 1,
+                "{region} read got {} positions for {} aligned residues",
+                result.positions.len(),
+                result.query_end - result.query_start + 1,
+            );
+        }
+    }
+
+    #[test]
+    fn numbers_truncated_reads_under_imgt_too() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        for (region, sequence) in TRUNCATED_VHH_READS {
+            annotator
+                .number(sequence)
+                .unwrap_or_else(|err| panic!("{region} read failed to number under IMGT: {err}"));
+        }
+    }
 }
