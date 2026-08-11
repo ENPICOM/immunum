@@ -14,7 +14,7 @@ const DEFAULT_SCORE: f32 = -4.0;
 #[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoringMatrix {
-    /// Scoring data for each position
+    /// Scoring data for each position. Always 128 entries indexed by `imgt_position - 1`.
     pub positions: Vec<PositionScores>,
 }
 
