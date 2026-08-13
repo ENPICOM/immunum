@@ -39,8 +39,14 @@ pub const AHO_REGIONS: RegionDefinition = RegionDefinition {
 /// lambda AHo reserve position 8 as an empty gap (IMGT 8 shifts to AHo 9), so the count-based
 /// deletion order drops 8 first. Kappa does NOT gap 8 (its FR1 is a true 1:1), so it uses
 /// `fr(1,10)` instead.
-const AHO_FR1_INDEL8: NumberingRule =
-    NumberingRule::variable(1, 10, 1, 10, &[8, 1, 2, 3, 4, 5, 6, 7, 9, 10], Insertion::Sequential(8));
+const AHO_FR1_INDEL8: NumberingRule = NumberingRule::variable(
+    1,
+    10,
+    1,
+    10,
+    &[8, 1, 2, 3, 4, 5, 6, 7, 9, 10],
+    Insertion::Sequential(8),
+);
 
 /// CDR2 rule shared by all antibody chains: IMGT 56-75 -> AHo 58-77, insertions on 63,
 /// deletions symmetric around 63.
@@ -49,7 +55,9 @@ const AHO_CDR2: NumberingRule = NumberingRule::variable(
     75,
     58,
     77,
-    &[63, 62, 64, 61, 65, 60, 66, 59, 67, 58, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77],
+    &[
+        63, 62, 64, 61, 65, 60, 66, 59, 67, 58, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77,
+    ],
     Insertion::Sequential(63),
 );
 
@@ -60,7 +68,9 @@ const AHO_FR3: NumberingRule = NumberingRule::variable(
     91,
     78,
     93,
-    &[86, 85, 87, 84, 88, 83, 89, 82, 90, 81, 91, 80, 92, 79, 93, 78],
+    &[
+        86, 85, 87, 84, 88, 83, 89, 82, 90, 81, 91, 80, 92, 79, 93, 78,
+    ],
     Insertion::Sequential(85),
 );
 
@@ -72,8 +82,14 @@ const AHO_CDR3_DELETIONS: &[u8] = &[
 ];
 
 /// CDR3 rule shared by all chains: IMGT 105-117 -> AHo 107-138, insertions on 123.
-const AHO_CDR3: NumberingRule =
-    NumberingRule::variable(105, 117, 107, 138, AHO_CDR3_DELETIONS, Insertion::Sequential(123));
+const AHO_CDR3: NumberingRule = NumberingRule::variable(
+    105,
+    117,
+    107,
+    138,
+    AHO_CDR3_DELETIONS,
+    Insertion::Sequential(123),
+);
 
 // =============================================================================
 // AHo Heavy Chain Numbering Rules
@@ -90,7 +106,9 @@ pub const AHO_HEAVY_RULES: &[NumberingRule] = &[
         40,
         25,
         42,
-        &[28, 36, 35, 37, 34, 38, 27, 33, 39, 32, 40, 29, 26, 30, 25, 31, 41, 42],
+        &[
+            28, 36, 35, 37, 34, 38, 27, 33, 39, 32, 40, 29, 26, 30, 25, 31, 41, 42,
+        ],
         Insertion::Sequential(36),
     ),
     // FR2 (region E): IMGT 41-55 -> AHo 43-57 (offset +2).
@@ -121,7 +139,9 @@ pub const AHO_KAPPA_RULES: &[NumberingRule] = &[
         40,
         25,
         42,
-        &[28, 27, 36, 35, 37, 34, 38, 33, 39, 32, 40, 29, 26, 30, 25, 31, 41, 42],
+        &[
+            28, 27, 36, 35, 37, 34, 38, 33, 39, 32, 40, 29, 26, 30, 25, 31, 41, 42,
+        ],
         Insertion::Sequential(36),
     ),
     NumberingRule::offset(41, 55, 2),
@@ -146,7 +166,9 @@ pub const AHO_LAMBDA_RULES: &[NumberingRule] = &[
         40,
         25,
         42,
-        &[28, 36, 35, 37, 34, 38, 27, 29, 33, 39, 32, 40, 26, 30, 25, 31, 41, 42],
+        &[
+            28, 36, 35, 37, 34, 38, 27, 29, 33, 39, 32, 40, 26, 30, 25, 31, 41, 42,
+        ],
         Insertion::Sequential(36),
     ),
     NumberingRule::offset(41, 55, 2),

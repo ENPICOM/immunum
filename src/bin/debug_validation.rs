@@ -14,7 +14,9 @@ fn print_usage() {
     eprintln!();
     eprintln!("Arguments:");
     eprintln!("  CHAIN    Chain type (TRA, TRB, TRG, TRD, IGH, IGK, IGL)");
-    eprintln!("  SCHEME   Optional: Numbering scheme (imgt, kabat, chothia, martin, aho). Default: imgt");
+    eprintln!(
+        "  SCHEME   Optional: Numbering scheme (imgt, kabat, chothia, martin, aho). Default: imgt"
+    );
     eprintln!("  HEADER   Optional: Specific sequence header to debug");
     eprintln!("           If not provided, shows all sequences with imperfect alignment");
     eprintln!();
