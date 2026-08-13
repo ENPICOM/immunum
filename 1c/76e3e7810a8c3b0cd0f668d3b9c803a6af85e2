@@ -1,0 +1,26 @@
+src/bin/debug_validation.rs
+  s_70781876e86bd2::t_aaf046047442e0 17-19
+src/numbering/aho.rs
+  s_70781876e86bd2::t_aaf046047442e0 42-49,58-60,71-73,85-92,109-111,142-144,169-171
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1c76e3e7810a8c3b0cd0f668d3b9c803a6af85e2",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_70781876e86bd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "428ada6e-cf19-46ed-8f12-cb632433e088",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
