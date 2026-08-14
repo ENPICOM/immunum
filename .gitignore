@@ -13,3 +13,6 @@ site
 docs/assets/wasm/
 .task
 results.json
+
+# ANARCI source for local benchmarking
+ANARCI/
