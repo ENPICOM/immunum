@@ -1,0 +1,14 @@
+.gitignore
+  h_acea35c6bbea0b 16-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "15c73315a80d26dda0d3429113989a6ceb71b613",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
