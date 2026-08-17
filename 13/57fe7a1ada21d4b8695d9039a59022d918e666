@@ -1,0 +1,43 @@
+src/polars.rs
+  s_70781876e86bd2::t_7dcba996b0da68 306,415
+src/annotator.rs
+  s_70781876e86bd2::t_e67843384beb64 211-212
+  s_70781876e86bd2::t_e14a9b9e9e618b 338-407
+src/numbering/martin.rs
+  s_70781876e86bd2::t_fd6e5568376433 18-20,25-26,30-37
+  s_70781876e86bd2::t_151b6ea40e8f95 38-39
+src/numbering.rs
+  s_70781876e86bd2::t_7dcba996b0da68 11-13,15-46,54-59,68
+  s_70781876e86bd2::t_e67843384beb64 258-264,269-409
+  s_70781876e86bd2::t_6258aa613a7892 265-268
+src/numbering/kabat.rs
+  s_70781876e86bd2::t_fd6e5568376433 11-16,18-21,25-32
+  s_70781876e86bd2::t_e42f72602f5aa8 33-34
+src/numbering/chothia.rs
+  s_70781876e86bd2::t_fd6e5568376433 17-22,27-28,32-39
+  s_70781876e86bd2::t_98f6d59a47b062 40-41
+src/wasm.rs
+  s_70781876e86bd2::t_7dcba996b0da68 158
+src/python.rs
+  s_70781876e86bd2::t_7dcba996b0da68 83
+src/bin/debug_validation.rs
+  s_70781876e86bd2::t_7572868f9f4fd9 330
+  s_70781876e86bd2::t_bef69725b9d833 36
+  s_70781876e86bd2::t_1e3179f1a45fea 84,88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1357fe7a1ada21d4b8695d9039a59022d918e666",
+  "prompts": {},
+  "sessions": {
+    "s_70781876e86bd2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "428ada6e-cf19-46ed-8f12-cb632433e088",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
