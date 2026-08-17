@@ -15,14 +15,26 @@ use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
 
 /// Martin region definition (identical to Chothia's).
-pub const MARTIN_REGIONS: RegionDefinition = RegionDefinition {
+/// Martin (enhanced Chothia) changes where insertions are placed, not where the CDRs start and end,
+/// so its region boundaries are Chothia's -- per chain.
+pub const MARTIN_HEAVY_REGIONS: RegionDefinition = RegionDefinition {
     fr1_end: 25,
     cdr1_end: 32,
     fr2_end: 51,
     cdr2_end: 56,
-    fr3_end: 95,
-    cdr3_end: 101,
+    fr3_end: 94,
+    cdr3_end: 102,
     fr4_end: 113,
+};
+
+pub const MARTIN_LIGHT_REGIONS: RegionDefinition = RegionDefinition {
+    fr1_end: 23,
+    cdr1_end: 34,
+    fr2_end: 49,
+    cdr2_end: 56,
+    fr3_end: 88,
+    cdr3_end: 97,
+    fr4_end: 107,
 };
 
 // =============================================================================

@@ -155,7 +155,7 @@ impl Annotator {
         match self.number(sequence) {
             Ok(result) => {
                 let aligned_seq = &sequence[result.query_start..=result.query_end];
-                let segments = segment(&result.positions, aligned_seq, result.scheme);
+                let segments = segment(&result.positions, aligned_seq, result.scheme, result.chain);
                 for (region, seq) in &segments {
                     Reflect::set(&dict, &JsValue::from_str(region), &JsValue::from_str(seq))
                         .unwrap();

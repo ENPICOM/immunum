@@ -33,6 +33,7 @@ pub fn print_alignment_comparison(
     expected_positions: &[(Position, char)],
     actual_positions: &[Position],
     scheme: Scheme,
+    chain: Chain,
 ) {
     let seq_len = sequence.len();
 
@@ -80,11 +81,11 @@ pub fn print_alignment_comparison(
 
             // Determine region from expected position (or actual if no expected)
             let current_region = if let Some(pos) = expected_pos {
-                region_for_position(pos.number, scheme)
+                region_for_position(pos.number, scheme, chain)
                     .map(|r| r.to_string())
                     .unwrap_or_else(|| "?".to_string())
             } else if let Some(pos) = actual_pos {
-                region_for_position(pos.number, scheme)
+                region_for_position(pos.number, scheme, chain)
                     .map(|r| r.to_string())
                     .unwrap_or_else(|| "?".to_string())
             } else {
@@ -326,5 +327,6 @@ fn debug_entry(
         &entry.expected_positions,
         &result.numbering,
         scheme,
+        result.detected_chain,
     );
 }

@@ -8,22 +8,42 @@ use std::collections::HashMap;
 
 use crate::aho::{AHO_HEAVY_RULES, AHO_KAPPA_RULES, AHO_LAMBDA_RULES, AHO_REGIONS};
 use crate::alignment::AlignedPosition;
-use crate::chothia::{CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_RULES, CHOTHIA_REGIONS};
+use crate::chothia::{
+    CHOTHIA_HEAVY_REGIONS, CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_REGIONS, CHOTHIA_LIGHT_RULES,
+};
 use crate::imgt::{IMGT_REGIONS, IMGT_RULES};
-use crate::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES, KABAT_REGIONS};
-use crate::martin::{MARTIN_HEAVY_RULES, MARTIN_LIGHT_RULES, MARTIN_REGIONS};
-use crate::types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
+use crate::kabat::{
+    KABAT_HEAVY_REGIONS, KABAT_HEAVY_RULES, KABAT_LIGHT_REGIONS, KABAT_LIGHT_RULES,
+};
+use crate::martin::{
+    MARTIN_HEAVY_REGIONS, MARTIN_HEAVY_RULES, MARTIN_LIGHT_REGIONS, MARTIN_LIGHT_RULES,
+};
+use crate::types::{Chain, Insertion, NumberingRule, Position, Region, RegionDefinition, Scheme};
 
-/// Get the region for a position number under the given scheme, or None if outside numbered range
-pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
-    let regions = match scheme {
-        Scheme::IMGT => IMGT_REGIONS,
-        Scheme::Kabat => KABAT_REGIONS,
-        Scheme::Chothia => CHOTHIA_REGIONS,
-        Scheme::Martin => MARTIN_REGIONS,
-        Scheme::Aho => AHO_REGIONS,
-    };
-    regions.region(pos)
+/// Region layout for a scheme and chain.
+///
+/// Kabat, Chothia and Martin define their CDRs differently for heavy and light chains -- CDR1 is
+/// 31-35 on a heavy chain but 24-34 on a light one, and light numbering stops at 107 rather than
+/// 113 -- so the chain is required, not incidental. IMGT and AHo are deliberately chain-agnostic:
+/// both align positions so that one number means one structural position across chain types.
+pub fn regions_for(scheme: Scheme, chain: Chain) -> RegionDefinition {
+    let heavy = matches!(chain, Chain::IGH);
+    match (scheme, heavy) {
+        (Scheme::IMGT, _) => IMGT_REGIONS,
+        (Scheme::Aho, _) => AHO_REGIONS,
+        (Scheme::Kabat, true) => KABAT_HEAVY_REGIONS,
+        (Scheme::Kabat, false) => KABAT_LIGHT_REGIONS,
+        (Scheme::Chothia, true) => CHOTHIA_HEAVY_REGIONS,
+        (Scheme::Chothia, false) => CHOTHIA_LIGHT_REGIONS,
+        (Scheme::Martin, true) => MARTIN_HEAVY_REGIONS,
+        (Scheme::Martin, false) => MARTIN_LIGHT_REGIONS,
+    }
+}
+
+/// Get the region for a position number under the given scheme and chain, or None if outside the
+/// numbered range.
+pub fn region_for_position(pos: u8, scheme: Scheme, chain: Chain) -> Option<Region> {
+    regions_for(scheme, chain).region(pos)
 }
 
 /// Segment a numbered sequence into its constituent regions
@@ -31,7 +51,12 @@ pub fn region_for_position(pos: u8, scheme: Scheme) -> Option<Region> {
 /// Returns a HashMap with keys for all Region variants plus "Prefix" and "Postfix".
 /// Prefix collects residues before the numbered region, Postfix those after.
 /// All keys are always present, with empty strings for absent regions.
-pub fn segment(positions: &[Position], sequence: &str, scheme: Scheme) -> HashMap<String, String> {
+pub fn segment(
+    positions: &[Position],
+    sequence: &str,
+    scheme: Scheme,
+    chain: Chain,
+) -> HashMap<String, String> {
     let mut segments: HashMap<String, String> = [
         "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix",
     ]
@@ -40,7 +65,7 @@ pub fn segment(positions: &[Position], sequence: &str, scheme: Scheme) -> HashMa
     .collect();
 
     for (position, ch) in positions.iter().zip(sequence.chars()) {
-        let key = match region_for_position(position.number, scheme) {
+        let key = match region_for_position(position.number, scheme, chain) {
             Some(region) => region.to_string(),
             None if position.number == 0 => "Prefix".to_string(),
             None => "Postfix".to_string(),
@@ -229,6 +254,158 @@ mod tests {
     use super::*;
     use crate::numbering::imgt::IMGT_RULES;
     use crate::numbering::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
+
+    /// Published CDR boundaries, per scheme and chain. Sources: AbNumber's `SCHEME_BORDERS`
+    /// (github.com/prihoda/AbNumber) and the Kabat/Chothia definitions as tabulated by the Martin
+    /// group (bioinf.org.uk/abs). These were chain-agnostic and wrong for Kabat in both chains
+    /// before: CDR1 was 26-35 (the AbM definition) and CDR-H2 was 51-57 against Kabat's 50-65,
+    /// which put nine CDR-H2 residues in FR3.
+    #[test]
+    fn region_boundaries_match_published_definitions() {
+        /// Scheme, chain, the three CDR spans as (first, last), and the last numbered position.
+        type Case = (Scheme, Chain, [(u8, u8); 3], u8);
+
+        let cases: &[Case] = &[
+            (
+                Scheme::IMGT,
+                Chain::IGH,
+                [(27, 38), (56, 65), (105, 117)],
+                128,
+            ),
+            (
+                Scheme::IMGT,
+                Chain::IGK,
+                [(27, 38), (56, 65), (105, 117)],
+                128,
+            ),
+            (
+                Scheme::Kabat,
+                Chain::IGH,
+                [(31, 35), (50, 65), (95, 102)],
+                113,
+            ),
+            (
+                Scheme::Kabat,
+                Chain::IGK,
+                [(24, 34), (50, 56), (89, 97)],
+                107,
+            ),
+            (
+                Scheme::Kabat,
+                Chain::IGL,
+                [(24, 34), (50, 56), (89, 97)],
+                107,
+            ),
+            (
+                Scheme::Chothia,
+                Chain::IGH,
+                [(26, 32), (52, 56), (95, 102)],
+                113,
+            ),
+            (
+                Scheme::Chothia,
+                Chain::IGK,
+                [(24, 34), (50, 56), (89, 97)],
+                107,
+            ),
+            (
+                Scheme::Martin,
+                Chain::IGH,
+                [(26, 32), (52, 56), (95, 102)],
+                113,
+            ),
+            (
+                Scheme::Martin,
+                Chain::IGL,
+                [(24, 34), (50, 56), (89, 97)],
+                107,
+            ),
+        ];
+
+        for &(scheme, chain, cdrs, fr4_end) in cases {
+            let regions = regions_for(scheme, chain);
+            let expected = [Region::CDR1, Region::CDR2, Region::CDR3];
+            for (&(first, last), region) in cdrs.iter().zip(expected) {
+                assert_eq!(
+                    region_for_position(first, scheme, chain),
+                    Some(region),
+                    "{scheme:?} {chain} position {first} should open {region:?}"
+                );
+                assert_eq!(
+                    region_for_position(last, scheme, chain),
+                    Some(region),
+                    "{scheme:?} {chain} position {last} should close {region:?}"
+                );
+                // The residue either side must fall in the flanking framework, which is what
+                // catches an off-by-one at a boundary.
+                assert_ne!(
+                    region_for_position(first - 1, scheme, chain),
+                    Some(region),
+                    "{scheme:?} {chain} {region:?} starts too early: {} is inside it",
+                    first - 1
+                );
+                assert_ne!(
+                    region_for_position(last + 1, scheme, chain),
+                    Some(region),
+                    "{scheme:?} {chain} {region:?} ends too late: {} is inside it",
+                    last + 1
+                );
+            }
+            assert_eq!(regions.fr4_end, fr4_end, "{scheme:?} {chain} FR4 end");
+            assert_eq!(region_for_position(fr4_end + 1, scheme, chain), None);
+            assert_eq!(region_for_position(0, scheme, chain), None);
+        }
+    }
+
+    /// The regions tile 1..=fr4_end with no gap and no overlap, for every scheme and chain.
+    #[test]
+    fn regions_tile_the_numbered_range() {
+        for scheme in [
+            Scheme::IMGT,
+            Scheme::Kabat,
+            Scheme::Chothia,
+            Scheme::Martin,
+            Scheme::Aho,
+        ] {
+            for chain in [Chain::IGH, Chain::IGK, Chain::IGL] {
+                let regions = regions_for(scheme, chain);
+                for pos in 1..=regions.fr4_end {
+                    assert!(
+                        region_for_position(pos, scheme, chain).is_some(),
+                        "{scheme:?} {chain} position {pos} falls in no region"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Heavy and light must not share a table where the scheme distinguishes them, which is the
+    /// bug this replaced: one table served both.
+    #[test]
+    fn chain_specific_schemes_differ_between_heavy_and_light() {
+        for scheme in [Scheme::Kabat, Scheme::Chothia, Scheme::Martin] {
+            let heavy = regions_for(scheme, Chain::IGH);
+            let light = regions_for(scheme, Chain::IGK);
+            assert_ne!(
+                (heavy.cdr1_end, heavy.fr1_end),
+                (light.cdr1_end, light.fr1_end),
+                "{scheme:?} CDR1 should differ between heavy and light"
+            );
+        }
+        // IMGT and AHo align positions structurally across chain types, so sharing is correct.
+        for scheme in [Scheme::IMGT, Scheme::Aho] {
+            let heavy = regions_for(scheme, Chain::IGH);
+            let light = regions_for(scheme, Chain::IGK);
+            assert_eq!(
+                heavy.cdr1_end, light.cdr1_end,
+                "{scheme:?} should be chain-agnostic"
+            );
+            assert_eq!(
+                heavy.fr4_end, light.fr4_end,
+                "{scheme:?} should be chain-agnostic"
+            );
+        }
+    }
 
     /// Only rules with an insertion strategy reach `number_with_rules`; `number_by_rules` sends the
     /// framework rules down the offset path instead, where `deletion_order` is never consulted.

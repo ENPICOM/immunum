@@ -208,7 +208,8 @@ impl Annotator {
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
         let result = self.number(sequence)?;
         let aligned_seq = &sequence[result.query_start..=result.query_end];
-        let mut map = segment_positions(&result.positions, aligned_seq, result.scheme);
+        let mut map =
+            segment_positions(&result.positions, aligned_seq, result.scheme, result.chain);
         Ok(SegmentResult {
             prefix: map.remove("prefix").unwrap_or_default(),
             fr1: map.remove("fr1").unwrap_or_default(),
@@ -332,6 +333,76 @@ mod tests {
         assert_eq!(result.query_start, 0);
         assert_eq!(result.query_end, FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    /// Kabat segmentation, heavy and light. Guards the chain-specific region tables end to end:
+    /// under Kabat, CDR-H2 is 50-65 (16 positions) while CDR-L2 is 50-56 (7), and light numbering
+    /// stops at 107. A single shared table cannot produce both, which is what this catches.
+    #[test]
+    fn test_segment_kabat_heavy_and_light_differ() {
+        let heavy_seq = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+        let heavy = Annotator::new(&[Chain::IGH], Scheme::Kabat, None)
+            .unwrap()
+            .segment(heavy_seq)
+            .unwrap();
+
+        // Every residue lands in exactly one region, and nothing spills into prefix/postfix.
+        let rebuilt = format!(
+            "{}{}{}{}{}{}{}",
+            heavy.fr1, heavy.cdr1, heavy.fr2, heavy.cdr2, heavy.fr3, heavy.cdr3, heavy.fr4
+        );
+        assert_eq!(
+            rebuilt, heavy_seq,
+            "Kabat heavy segments must reconstruct the input"
+        );
+        assert!(heavy.prefix.is_empty() && heavy.postfix.is_empty());
+
+        // CDR-H1 is Kabat's five-residue 31-35, not the ten-residue AbM 26-35.
+        assert!(
+            heavy.cdr1.len() <= 7,
+            "Kabat CDR-H1 should be ~5 residues (31-35, plus any 35A/35B), got {} in {:?}",
+            heavy.cdr1.len(),
+            heavy.cdr1
+        );
+        // CDR-H2 spans 50-65, so it is far longer than the seven-residue light CDR2.
+        assert!(
+            heavy.cdr2.len() >= 14,
+            "Kabat CDR-H2 spans 50-65, expected >=14 residues, got {} in {:?}",
+            heavy.cdr2.len(),
+            heavy.cdr2
+        );
+
+        let light_seq = "DIQMTQSPSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQSYSTPPTFGQGTKVEIK";
+        let light = Annotator::new(&[Chain::IGK], Scheme::Kabat, None)
+            .unwrap()
+            .segment(light_seq)
+            .unwrap();
+        let rebuilt = format!(
+            "{}{}{}{}{}{}{}",
+            light.fr1, light.cdr1, light.fr2, light.cdr2, light.fr3, light.cdr3, light.fr4
+        );
+        assert_eq!(
+            rebuilt, light_seq,
+            "Kabat light segments must reconstruct the input"
+        );
+
+        // CDR-L1 is 24-34: eleven positions, so clearly longer than CDR-H1.
+        assert!(
+            light.cdr1.len() >= 9,
+            "Kabat CDR-L1 spans 24-34, expected >=9 residues, got {} in {:?}",
+            light.cdr1.len(),
+            light.cdr1
+        );
+        assert!(
+            light.cdr2.len() <= 8,
+            "Kabat CDR-L2 spans 50-56, expected <=8 residues, got {} in {:?}",
+            light.cdr2.len(),
+            light.cdr2
+        );
+        assert!(
+            heavy.cdr2.len() > light.cdr2.len(),
+            "Kabat CDR-H2 (50-65) must be longer than CDR-L2 (50-56)"
+        );
     }
 
     #[test]

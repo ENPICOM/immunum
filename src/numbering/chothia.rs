@@ -14,14 +14,29 @@ use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
 
 /// Chothia region definition
-pub const CHOTHIA_REGIONS: RegionDefinition = RegionDefinition {
+/// Chothia moves CDR1 and CDR2 to the structural loops but keeps Kabat's CDR3, and like Kabat its
+/// boundaries differ by chain.
+///
+/// Heavy: CDR-H1 26-32, CDR-H2 52-56, CDR-H3 95-102.
+/// Light: identical to Kabat light -- CDR-L1 24-34, CDR-L2 50-56, CDR-L3 89-97, ending at 107.
+pub const CHOTHIA_HEAVY_REGIONS: RegionDefinition = RegionDefinition {
     fr1_end: 25,
     cdr1_end: 32,
     fr2_end: 51,
     cdr2_end: 56,
-    fr3_end: 95,
-    cdr3_end: 101,
+    fr3_end: 94,
+    cdr3_end: 102,
     fr4_end: 113,
+};
+
+pub const CHOTHIA_LIGHT_REGIONS: RegionDefinition = RegionDefinition {
+    fr1_end: 23,
+    cdr1_end: 34,
+    fr2_end: 49,
+    cdr2_end: 56,
+    fr3_end: 88,
+    cdr3_end: 97,
+    fr4_end: 107,
 };
 
 // =============================================================================
