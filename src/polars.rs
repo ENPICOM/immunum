@@ -106,10 +106,11 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
                     Ok(r) => r,
                     Err(e) => return Some(Err(e.to_string())),
                 };
+                let aligned_seq = &value[result.query_start..=result.query_end];
                 let (positions, residues): (Vec<String>, Vec<String>) = result
                     .positions
                     .iter()
-                    .zip(value.chars())
+                    .zip(aligned_seq.chars())
                     .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                     .unzip();
                 let n = positions.len();
@@ -210,10 +211,11 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
                     Ok(r) => r,
                     Err(e) => return Some(Err(e.to_string())),
                 };
+                let aligned_seq = &value[result.query_start..=result.query_end];
                 let (positions, residues): (Vec<String>, Vec<String>) = result
                     .positions
                     .iter()
-                    .zip(value.chars())
+                    .zip(aligned_seq.chars())
                     .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                     .unzip();
                 Some(Ok((
@@ -303,7 +305,8 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                     Ok(r) => r,
                     Err(e) => return Some(Err(e.to_string())),
                 };
-                let s = segment(&result.positions, value, result.scheme);
+                let aligned_seq = &value[result.query_start..=result.query_end];
+                let s = segment(&result.positions, aligned_seq, result.scheme);
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
                 Some(Ok([
                     get("prefix"),
@@ -412,7 +415,8 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                     Ok(r) => r,
                     Err(e) => return Some(Err(e.to_string())),
                 };
-                let s = segment(&result.positions, value, result.scheme);
+                let aligned_seq = &value[result.query_start..=result.query_end];
+                let s = segment(&result.positions, aligned_seq, result.scheme);
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
                 Some(Ok([
                     get("prefix"),
