@@ -127,6 +127,25 @@ class TestPolarsNumber:
         )
         assert result.height == 2
 
+    def test_number_aligns_to_query_start_not_string_start(self):
+        """Regression test: residues must be read from the aligned region
+        (sequence[query_start:query_end+1]), not from index 0 of the raw
+        string. A flanking prefix before the real domain used to shift every
+        residue by len(prefix) in the polars path specifically."""
+        prefix = "MAG"
+        df = polars.DataFrame({"sequence": [prefix + IGH_SEQ]})
+        result = df.select(
+            imp.number(
+                polars.col("sequence"),
+                chains=["IGH"],
+                scheme="IMGT",
+                min_confidence=0.0,
+            ).alias("numbered")
+        ).unnest("numbered")
+        numbering = dict(zip(result["positions"][0], result["residues"][0]))
+        assert numbering["1"] == IGH_SEQ[0]
+        assert numbering["2"] == IGH_SEQ[1]
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
@@ -210,6 +229,25 @@ class TestPolarsSegment:
             ).alias("segmented")
         )
         assert result.height == 2
+
+    def test_segment_aligns_to_query_start_not_string_start(self):
+        """Regression test: same class of bug as
+        test_number_aligns_to_query_start_not_string_start, but for segment()."""
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        expected = df.select(
+            imp.segment(
+                polars.col("sequence"), chains=["IGH"], scheme="IMGT", min_confidence=0.0
+            ).alias("s")
+        ).unnest("s")["fr1"][0]
+
+        prefixed = polars.DataFrame({"sequence": ["MAG" + IGH_SEQ]})
+        got = prefixed.select(
+            imp.segment(
+                polars.col("sequence"), chains=["IGH"], scheme="IMGT", min_confidence=0.0
+            ).alias("s")
+        ).unnest("s")["fr1"][0]
+
+        assert got == expected
 
 
 class TestPolarsNumberingMethod:
