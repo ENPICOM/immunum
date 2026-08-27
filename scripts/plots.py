@@ -16,22 +16,32 @@ import altair as alt
 
 
 # ── Load data ────────────────────────────────────────────────────────────────
-accuracy_files = glob.glob("resources/benchmark_results/results_*_imgt.csv")
+# sabdab2paired_*/sabdab2nano_* results are separate, much harder datasets (full PDB
+# SEQRES chains, not pre-trimmed to the variable domain -- see docs/benchmarks/index.md)
+# and are kept out of the primary accuracy plot so they don't get averaged in with it.
+accuracy_files = [
+    f
+    for f in glob.glob("resources/benchmark_results/results_*_imgt.csv")
+    if "sabdab2paired" not in f and "sabdab2nano" not in f
+]
 acc_df = pl.concat([pl.read_csv(f) for f in accuracy_files])
+
+
+def _load_dataset(pattern: str) -> pl.DataFrame | None:
+    files = glob.glob(pattern)
+    return pl.concat([pl.read_csv(f) for f in files]) if files else None
+
+
+sabdab2paired_df = _load_dataset(
+    "resources/benchmark_results/results_sabdab2paired_*_imgt.csv"
+)
+sabdab2nano_df = _load_dataset(
+    "resources/benchmark_results/results_sabdab2nano_*_imgt.csv"
+)
 
 speed_df = pl.read_csv("resources/benchmark_results/results_speed.csv")
 
-# Derive available values from data
-acc_sizes = sorted(acc_df["sample_size"].unique().to_list())
-acc_size_label = ", ".join(f"n={s:,}" for s in acc_sizes)
-
-# Summarise accuracy data (mean per tool/chain/segment)
 segments = ["FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4"]
-acc_summary = (
-    acc_df.group_by(["tool", "chain"])
-    .agg([pl.col(s).mean() for s in segments])
-    .sort(["chain", "tool"])
-)
 
 # ── Plots 1 & 3: Performance boxplots at fixed batch size ────────────────────
 BATCH_SIZE = 10_000
@@ -198,85 +208,110 @@ plot_scaling = (
 ).resolve_scale(y="shared", color="shared")
 
 # ── Plot 2: Correctness by chain and segment ──────────────────────────────────
-p2_data = (
-    acc_df.filter(
-        ~pl.col("tool").str.ends_with("_parallel")
-        & ~pl.col("tool").str.ends_with("_multithreaded")
-    )
-    .with_columns(pl.col("tool").replace(single_label_map).alias("method"))
-    .drop("tool")
-    .unpivot(
-        index=["method", "chain", "round", "sample_size"],
-        on=segments,
-        variable_name="segment",
-        value_name="pct_correct",
-    )
-)
-
 CHAIN_ORDER = ["H", "K", "L", "A", "B", "G", "D"]
 METHOD_ORDER = ["immunum", "antpack", "anarci", "anarcii2"]
 
-p2_pdf = p2_data.to_pandas()
 
-_method_cols = []
-for i, method in enumerate(METHOD_ORDER):
-    sub = p2_pdf[p2_pdf["method"] == method]
-    if sub.empty:
-        continue
-    base = alt.Chart(sub)
-    bars = base.mark_bar(opacity=0.7).encode(
-        y=alt.Y(
-            "mean(pct_correct):Q",
-            title="% Correct" if i == 0 else "",
-            axis=alt.Axis(labelFontSize=8, titleFontSize=9),
-        ),
-        x=alt.X(
-            "segment:N",
-            title=None,
-            sort=segments,
-            axis=alt.Axis(labelAngle=-60, labelFontSize=7),
-            scale=alt.Scale(paddingInner=0.3),
-        ),
-        color=alt.Color("method:N", legend=None),
-        tooltip=[
-            "method",
-            "chain",
-            "segment",
-            alt.Tooltip("mean(pct_correct):Q", format=".2f", title="Mean %"),
-            alt.Tooltip("stdev(pct_correct):Q", format=".2f", title="Std %"),
-        ],
-    )
-    errorbars = base.mark_errorbar(extent="stdev").encode(
-        x=alt.X("segment:N", sort=segments),
-        y=alt.Y("pct_correct:Q"),
-        color=alt.Color("method:N", legend=None),
-    )
-    c = (
-        (bars + errorbars)
-        .properties(width=90, height=60, title=alt.TitleParams(method, fontSize=11))
-        .facet(
-            row=alt.Row(
-                "chain:N",
-                sort=CHAIN_ORDER,
-                header=alt.Header(
-                    labelAngle=0,
-                    labelAlign="right",
-                    labelFontSize=10,
-                    title="Chain" if i == 0 else None,
-                    titleFontSize=10,
-                ),
-            ),
+def build_correctness_plot(
+    df: pl.DataFrame, chain_order: list[str], title: str
+) -> alt.Chart:
+    sizes = sorted(df["sample_size"].unique().to_list())
+    size_label = ", ".join(f"n={s:,}" for s in sizes)
+
+    p2_data = (
+        df.filter(
+            ~pl.col("tool").str.ends_with("_parallel")
+            & ~pl.col("tool").str.ends_with("_multithreaded")
         )
-        .resolve_scale(y="shared")
+        .with_columns(pl.col("tool").replace(single_label_map).alias("method"))
+        .drop("tool")
+        .unpivot(
+            index=["method", "chain", "round", "sample_size"],
+            on=segments,
+            variable_name="segment",
+            value_name="pct_correct",
+        )
     )
-    _method_cols.append(c)
+    p2_pdf = p2_data.to_pandas()
 
-plot2 = alt.hconcat(
-    *_method_cols,
-    title=alt.TitleParams(
-        f"Correctness by segment ({acc_size_label})", fontSize=13, anchor="middle"
-    ),
-    spacing=10,
+    method_cols = []
+    for i, method in enumerate(METHOD_ORDER):
+        sub = p2_pdf[p2_pdf["method"] == method]
+        if sub.empty:
+            continue
+        base = alt.Chart(sub)
+        bars = base.mark_bar(opacity=0.7).encode(
+            y=alt.Y(
+                "mean(pct_correct):Q",
+                title="% Correct" if i == 0 else "",
+                axis=alt.Axis(labelFontSize=8, titleFontSize=9),
+            ),
+            x=alt.X(
+                "segment:N",
+                title=None,
+                sort=segments,
+                axis=alt.Axis(labelAngle=-60, labelFontSize=7),
+                scale=alt.Scale(paddingInner=0.3),
+            ),
+            color=alt.Color("method:N", legend=None),
+            tooltip=[
+                "method",
+                "chain",
+                "segment",
+                alt.Tooltip("mean(pct_correct):Q", format=".2f", title="Mean %"),
+                alt.Tooltip("stdev(pct_correct):Q", format=".2f", title="Std %"),
+            ],
+        )
+        errorbars = base.mark_errorbar(extent="stdev").encode(
+            x=alt.X("segment:N", sort=segments),
+            y=alt.Y("pct_correct:Q"),
+            color=alt.Color("method:N", legend=None),
+        )
+        c = (
+            (bars + errorbars)
+            .properties(width=90, height=60, title=alt.TitleParams(method, fontSize=11))
+            .facet(
+                row=alt.Row(
+                    "chain:N",
+                    sort=chain_order,
+                    header=alt.Header(
+                        labelAngle=0,
+                        labelAlign="right",
+                        labelFontSize=10,
+                        title="Chain" if i == 0 else None,
+                        titleFontSize=10,
+                    ),
+                ),
+            )
+            .resolve_scale(y="shared")
+        )
+        method_cols.append(c)
+
+    return alt.hconcat(
+        *method_cols,
+        title=alt.TitleParams(f"{title} ({size_label})", fontSize=13, anchor="middle"),
+        spacing=10,
+    )
+
+
+plot2 = build_correctness_plot(acc_df, CHAIN_ORDER, "Correctness by segment")
+plot2_sabdab2paired = (
+    build_correctness_plot(
+        sabdab2paired_df,
+        ["H", "K", "L"],
+        "Correctness by segment (SAbDab2-paired, full PDB chains)",
+    )
+    if sabdab2paired_df is not None
+    else None
+)
+plot2_sabdab2nano = (
+    build_correctness_plot(
+        sabdab2nano_df,
+        ["VHH"],
+        "Correctness by segment (SAbDab2-nano, full PDB chains)",
+    )
+    if sabdab2nano_df is not None
+    else None
 )
 
 # ── Save ─────────────────────────────────────────────────────────────────────
@@ -309,11 +344,21 @@ chart = (
     .configure_view(stroke=BLACK)
 )
 
-for name, p in [
+plots_to_save = [
     ("plot1_performance", plot_perf),
     ("plot2_correctness", _configure_for_export(plot2)),
     ("plot3_scaling", _configure_for_export(plot_scaling)),
-]:
+]
+if plot2_sabdab2paired is not None:
+    plots_to_save.append(
+        ("plot2_correctness_sabdab2paired", _configure_for_export(plot2_sabdab2paired))
+    )
+if plot2_sabdab2nano is not None:
+    plots_to_save.append(
+        ("plot2_correctness_sabdab2nano", _configure_for_export(plot2_sabdab2nano))
+    )
+
+for name, p in plots_to_save:
     svg_path = f"docs/assets/benchmark_{name}.svg"
     p.save(svg_path)
     print(f"Saved {svg_path}")

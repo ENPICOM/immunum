@@ -25,6 +25,14 @@ VALIDATION_FIXTURES = [
     # ("tcr_B_imgt", ["TRB"], "IMGT", "imgt.B"),
     ("tcr_G_imgt", ["TRG"], "IMGT", "imgt.G"),
     ("tcr_D_imgt", ["TRD"], "IMGT", "imgt.D"),
+    # Full PDB SEQRES chains (not pre-trimmed to the variable domain), ANARCI ground
+    # truth -- see BENCHMARKS.toml for why perfect_pct is far below the fixtures above.
+    ("sabdab2paired_H_imgt", ["IGH"], "IMGT", "imgt_sabdab2paired.H"),
+    ("sabdab2paired_K_imgt", ["IGK"], "IMGT", "imgt_sabdab2paired.K"),
+    ("sabdab2paired_L_imgt", ["IGL"], "IMGT", "imgt_sabdab2paired.L"),
+    # VHH has no paired light chain to distinguish it as a chain type of its own; it's
+    # numbered as heavy (immunum has no separate VHH chain type either).
+    ("sabdab2nano_H_imgt", ["IGH"], "IMGT", "imgt_sabdab2nano.VHH"),
 ]
 
 

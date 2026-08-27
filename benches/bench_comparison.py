@@ -491,10 +491,32 @@ def main(
             help="Skip extract and correctness computation; only time the run step.",
         ),
     ] = False,
+    fixture_stem: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Fixture file stem (without .csv) under fixtures/validation/ to use "
+            "instead of the default {ab,tcr}_<chain>_imgt.csv, e.g. sabdab2pdb_H_imgt. "
+            "--chain is still used for tool setup (antpack/anarci chain letter, "
+            "immunum chain mapping) and must match the fixture's own chain."
+        ),
+    ] = None,
+    chain_label: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Override the 'chain' column written to the output rows, e.g. VHH for "
+            "a nanobody fixture numbered as heavy (--chain H). Purely cosmetic -- all "
+            "tool setup still uses --chain."
+        ),
+    ] = None,
 ) -> None:
     chain = chain.upper()
     mol_type = "tcr" if chain in TCR_CHAINS else "ab"
-    fixture = FIXTURES / f"{mol_type}_{chain}_imgt.csv"
+    fixture = (
+        FIXTURES / f"{fixture_stem}.csv"
+        if fixture_stem
+        else FIXTURES / f"{mol_type}_{chain}_imgt.csv"
+    )
+    display_chain = chain_label or chain
     if not fixture.exists():
         typer.echo(f"Fixture not found: {fixture}", err=True)
         raise typer.Exit(1)
@@ -662,7 +684,7 @@ def main(
                 rows.append(
                     {
                         "tool": name,
-                        "chain": chain,
+                        "chain": display_chain,
                         "sample_size": size,
                         "round": r,
                         "time_s": elapsed,
