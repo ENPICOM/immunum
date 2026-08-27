@@ -24,7 +24,11 @@
 use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
 
-/// AHo region definition
+/// AHo regions, tiling all 149 positions.
+/// Unverified, unlike the other schemes, and the sources conflict. Honegger & Plueckthun give
+/// CDR-H1 27-42 / CDR-H2 57-76 and CDR-L1 24-42 / CDR-L2 58-72, both with CDR3 107-138. The CDR3
+/// start below (109) matches neither, so check this table against the Honegger paper before relying
+/// on AHo segmentation.
 pub const AHO_REGIONS: RegionDefinition = RegionDefinition {
     fr1_end: 24,
     cdr1_end: 42,

@@ -14,14 +14,29 @@
 use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
 
-/// Martin region definition (identical to Chothia's).
-/// Martin (enhanced Chothia) changes where insertions are placed, not where the CDRs start and end,
-/// so its region boundaries are Chothia's -- per chain.
+/// Martin region definition
+/// Martin CDR spans come from that page's AbM column, and are chain-specific the way Kabat's are,
+/// so each chain gets its own table.
+///
+/// Source: table of CDR definitions, Martin group, UCL -- <http://bioinf.org.uk/abs/info.html>
+///
+/// | loop | AbM definition |
+/// |------|----------------|
+/// | H1   | H26-H35        |
+/// | H2   | H50-H58        |
+/// | H3   | H95-H102       |
+/// | L1   | L24-L34        |
+/// | L2   | L50-L56        |
+/// | L3   | L89-L97        |
+///
+/// AbM compromises between Kabat's sequence-variability windows and Chothia's structural loops,
+/// from the Oxford Molecular modelling package written by the same group -- is the definition this
+/// crate pairs with Martin numbering.
 pub const MARTIN_HEAVY_REGIONS: RegionDefinition = RegionDefinition {
     fr1_end: 25,
-    cdr1_end: 32,
-    fr2_end: 51,
-    cdr2_end: 56,
+    cdr1_end: 35,
+    fr2_end: 49,
+    cdr2_end: 58,
     fr3_end: 94,
     cdr3_end: 102,
     fr4_end: 113,

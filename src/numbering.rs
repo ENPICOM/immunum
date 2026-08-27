@@ -255,10 +255,14 @@ mod tests {
     use crate::numbering::imgt::IMGT_RULES;
     use crate::numbering::kabat::{KABAT_HEAVY_RULES, KABAT_LIGHT_RULES};
 
-    /// Published CDR boundaries, per scheme and chain. Sources: AbNumber's `SCHEME_BORDERS`
-    /// (github.com/prihoda/AbNumber) and the Kabat/Chothia definitions as tabulated by the Martin
-    /// group (bioinf.org.uk/abs). These were chain-agnostic and wrong for Kabat in both chains
-    /// before: CDR1 was 26-35 (the AbM definition) and CDR-H2 was 51-57 against Kabat's 50-65,
+    /// Published CDR boundaries, per scheme and chain, from the Martin group's table of CDR
+    /// definitions <http://bioinf.org.uk/abs/info.html>: the Kabat columns, the post-June-2021
+    /// Chothia consensus, and the AbM column for Martin. That table names no "Martin" definition --
+    /// "Martin (Enhanced Chothia)" is a numbering scheme there -- so Martin numbering is paired with
+    /// AbM, whose H1 row for that numbering convention reads H26-H35. The Kabat and Chothia rows
+    /// were cross-checked against AbNumber's `SCHEME_BORDERS` (github.com/prihoda/AbNumber). These
+    /// were chain-agnostic and wrong for Kabat in both chains before: CDR1 was 26-35 (the AbM
+    /// definition, correct for Martin but not Kabat) and CDR-H2 was 51-57 against Kabat's 50-65,
     /// which put nine CDR-H2 residues in FR3.
     #[test]
     fn region_boundaries_match_published_definitions() {
@@ -299,19 +303,19 @@ mod tests {
             (
                 Scheme::Chothia,
                 Chain::IGH,
-                [(26, 32), (52, 56), (95, 102)],
+                [(26, 32), (52, 56), (96, 101)],
                 113,
             ),
             (
                 Scheme::Chothia,
                 Chain::IGK,
-                [(24, 34), (50, 56), (89, 97)],
+                [(26, 32), (50, 52), (91, 96)],
                 107,
             ),
             (
                 Scheme::Martin,
                 Chain::IGH,
-                [(26, 32), (52, 56), (95, 102)],
+                [(26, 35), (50, 58), (95, 102)],
                 113,
             ),
             (
@@ -357,9 +361,23 @@ mod tests {
         }
     }
 
-    /// The regions tile 1..=fr4_end with no gap and no overlap, for every scheme and chain.
+    /// The regions tile `1..=fr4_end` with no gap and no overlap, for every scheme and chain, and
+    /// the tiles sum to the scheme's canonical domain length.
+    ///
+    /// Numbering is 1-based: position 1 opens FR1 and 0 is not a numbered position at all. Zero is
+    /// the sentinel for a residue ahead of the domain -- `extract_consensus_positions` seeds its
+    /// carry at 0, and `segment` routes 0 to the prefix bucket -- so it must keep mapping to `None`.
     #[test]
     fn regions_tile_the_numbered_range() {
+        // Canonical domain length per scheme and chain class: IMGT 128, AHo 149, and 113/107 for
+        // the Kabat-derived schemes on heavy/light.
+        let expected_len = |scheme: Scheme, heavy: bool| match (scheme, heavy) {
+            (Scheme::IMGT, _) => 128,
+            (Scheme::Aho, _) => 149,
+            (_, true) => 113,
+            (_, false) => 107,
+        };
+
         for scheme in [
             Scheme::IMGT,
             Scheme::Kabat,
@@ -369,27 +387,54 @@ mod tests {
         ] {
             for chain in [Chain::IGH, Chain::IGK, Chain::IGL] {
                 let regions = regions_for(scheme, chain);
+
+                assert_eq!(
+                    region_for_position(1, scheme, chain),
+                    Some(Region::FR1),
+                    "{scheme:?} {chain} numbering must be 1-based: position 1 opens FR1"
+                );
+                assert_eq!(
+                    region_for_position(0, scheme, chain),
+                    None,
+                    "{scheme:?} {chain} position 0 is the prefix sentinel, not a numbered position"
+                );
+
                 for pos in 1..=regions.fr4_end {
                     assert!(
                         region_for_position(pos, scheme, chain).is_some(),
                         "{scheme:?} {chain} position {pos} falls in no region"
                     );
                 }
+                assert_eq!(
+                    region_for_position(regions.fr4_end + 1, scheme, chain),
+                    None,
+                    "{scheme:?} {chain} position past FR4 must be postfix"
+                );
+                assert_eq!(
+                    regions.fr4_end,
+                    expected_len(scheme, matches!(chain, Chain::IGH)),
+                    "{scheme:?} {chain} regions should tile the scheme's full domain length"
+                );
             }
         }
     }
 
     /// Heavy and light must not share a table where the scheme distinguishes them, which is the
     /// bug this replaced: one table served both.
+    ///
+    /// Compared on CDR2 and the last numbered position rather than CDR1, because Chothia places
+    /// CDR1 at 26-32 in *both* chains -- for it only CDR2, CDR3 and the FR4 end diverge. Kabat's
+    /// CDR1 does differ (31-35 heavy, 24-34 light), as does Martin's AbM-derived one (26-35 heavy,
+    /// 24-34 light), and the boundary test above covers both.
     #[test]
     fn chain_specific_schemes_differ_between_heavy_and_light() {
         for scheme in [Scheme::Kabat, Scheme::Chothia, Scheme::Martin] {
             let heavy = regions_for(scheme, Chain::IGH);
             let light = regions_for(scheme, Chain::IGK);
             assert_ne!(
-                (heavy.cdr1_end, heavy.fr1_end),
-                (light.cdr1_end, light.fr1_end),
-                "{scheme:?} CDR1 should differ between heavy and light"
+                (heavy.cdr2_end, heavy.fr4_end),
+                (light.cdr2_end, light.fr4_end),
+                "{scheme:?} CDR2/FR4 should differ between heavy and light"
             );
         }
         // IMGT and AHo align positions structurally across chain types, so sharing is correct.

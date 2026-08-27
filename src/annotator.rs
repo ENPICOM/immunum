@@ -405,6 +405,93 @@ mod tests {
         );
     }
 
+    /// Martin segmentation uses the AbM CDR definition, not Chothia's. On heavy chains AbM widens
+    /// both loops -- H1 26-35 against Chothia's 26-32, H2 50-58 against 52-56 -- so the extra
+    /// residues are exactly the ones Chothia hands to the flanking frameworks. On light chains AbM
+    /// coincides with Kabat (24-34 / 50-56 / 89-97), which is what the light half checks.
+    #[test]
+    fn test_segment_martin_follows_abm_definition() {
+        let heavy_seq = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+        let martin = Annotator::new(&[Chain::IGH], Scheme::Martin, None)
+            .unwrap()
+            .segment(heavy_seq)
+            .unwrap();
+        let chothia = Annotator::new(&[Chain::IGH], Scheme::Chothia, None)
+            .unwrap()
+            .segment(heavy_seq)
+            .unwrap();
+
+        let rebuilt = format!(
+            "{}{}{}{}{}{}{}{}{}",
+            martin.prefix,
+            martin.fr1,
+            martin.cdr1,
+            martin.fr2,
+            martin.cdr2,
+            martin.fr3,
+            martin.cdr3,
+            martin.fr4,
+            martin.postfix
+        );
+        assert_eq!(
+            rebuilt, heavy_seq,
+            "Martin heavy segments must reconstruct the input"
+        );
+
+        // CDR-H1: AbM 26-35 = Chothia 26-32 plus 33, 34, 35, the first three Chothia FR2 residues.
+        assert_eq!(
+            martin.cdr1,
+            format!("{}{}", chothia.cdr1, &chothia.fr2[..3]),
+            "Martin CDR-H1 should extend Chothia's 26-32 to AbM's 26-35"
+        );
+        // CDR-H2: AbM 50-58 = Chothia 52-56 plus 50, 51 in front and 57, 58 behind.
+        assert_eq!(
+            martin.cdr2,
+            format!(
+                "{}{}{}",
+                &chothia.fr2[chothia.fr2.len() - 2..],
+                chothia.cdr2,
+                &chothia.fr3[..2]
+            ),
+            "Martin CDR-H2 should span AbM's 50-58, not Chothia's 52-56"
+        );
+        // CDR-H3: AbM 95-102 opens one residue earlier than Chothia's 96-101 and closes one later.
+        assert_eq!(
+            martin.cdr3,
+            format!(
+                "{}{}{}",
+                &chothia.fr3[chothia.fr3.len() - 1..],
+                chothia.cdr3,
+                &chothia.fr4[..1]
+            ),
+            "Martin CDR-H3 should span AbM's 95-102"
+        );
+
+        // AbM light is Kabat light, so both schemes must cut the same light chain identically.
+        let light_seq = "DIQMTQSPSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQSYSTPPTFGQGTKVEIK";
+        let martin_light = Annotator::new(&[Chain::IGK], Scheme::Martin, None)
+            .unwrap()
+            .segment(light_seq)
+            .unwrap();
+        let kabat_light = Annotator::new(&[Chain::IGK], Scheme::Kabat, None)
+            .unwrap()
+            .segment(light_seq)
+            .unwrap();
+        assert_eq!(
+            (
+                martin_light.cdr1.as_str(),
+                martin_light.cdr2.as_str(),
+                martin_light.cdr3.as_str()
+            ),
+            (
+                kabat_light.cdr1.as_str(),
+                kabat_light.cdr2.as_str(),
+                kabat_light.cdr3.as_str()
+            ),
+            "AbM light (24-34 / 50-56 / 89-97) coincides with Kabat light"
+        );
+    }
+
     #[test]
     fn test_segment_igh_sequence() {
         let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();

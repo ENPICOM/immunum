@@ -14,28 +14,41 @@ use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
 
 /// Chothia region definition
-/// Chothia moves CDR1 and CDR2 to the structural loops but keeps Kabat's CDR3, and like Kabat its
-/// boundaries differ by chain.
+/// Chothia CDR spans: the structural loops rather than Kabat's sequence-variability windows.
 ///
-/// Heavy: CDR-H1 26-32, CDR-H2 52-56, CDR-H3 95-102.
-/// Light: identical to Kabat light -- CDR-L1 24-34, CDR-L2 50-56, CDR-L3 89-97, ending at 107.
+/// Source: table of CDR definitions, Martin group, UCL -- <http://bioinf.org.uk/abs/info.html>
+///
+/// | loop | Chothia definition |
+/// |------|--------------------|
+/// | H1   | H26-H32            |
+/// | H2   | H52-H56            |
+/// | H3   | H96-H101           |
+/// | L1   | L26-L32            |
+/// | L2   | L50-L52            |
+/// | L3   | L91-L96            |
+///
+/// These are the *consensus* values that page adopted on 28 June 2021, after surveying the Chothia
+/// papers -- which disagree with each other, as its per-paper table shows. It deliberately narrowed
+/// the earlier, wider set (H3 95-102; light 24-34 / 50-56 / 89-97). AbNumber and SADIE still ship
+/// that wider set, where Chothia light happens to coincide with Kabat light, so Chothia segments
+/// from this crate are tighter than those tools report.
 pub const CHOTHIA_HEAVY_REGIONS: RegionDefinition = RegionDefinition {
     fr1_end: 25,
     cdr1_end: 32,
     fr2_end: 51,
     cdr2_end: 56,
-    fr3_end: 94,
-    cdr3_end: 102,
+    fr3_end: 95,
+    cdr3_end: 101,
     fr4_end: 113,
 };
 
 pub const CHOTHIA_LIGHT_REGIONS: RegionDefinition = RegionDefinition {
-    fr1_end: 23,
-    cdr1_end: 34,
+    fr1_end: 25,
+    cdr1_end: 32,
     fr2_end: 49,
-    cdr2_end: 56,
-    fr3_end: 88,
-    cdr3_end: 97,
+    cdr2_end: 52,
+    fr3_end: 90,
+    cdr3_end: 96,
     fr4_end: 107,
 };
 

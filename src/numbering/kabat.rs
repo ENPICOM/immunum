@@ -8,10 +8,20 @@ use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
 
 /// Kabat region definition
-/// Kabat CDR boundaries differ between heavy and light chains, so each gets its own table.
+/// Kabat CDR boundaries differ between heavy and light chains, so each chain gets its own table.
 ///
-/// Heavy: CDR-H1 31-35 (plus insertions 35A/35B), CDR-H2 50-65, CDR-H3 95-102.
-/// Light: CDR-L1 24-34, CDR-L2 50-56, CDR-L3 89-97; light numbering ends at 107, not 113.
+/// Source: table of CDR definitions, Martin group, UCL -- <http://bioinf.org.uk/abs/info.html>
+///
+/// | loop | Kabat definition |
+/// |------|------------------|
+/// | H1   | H31-H35B         |
+/// | H2   | H50-H65          |
+/// | H3   | H95-H102         |
+/// | L1   | L24-L34          |
+/// | L2   | L50-L56          |
+/// | L3   | L89-L97          |
+///
+/// H35A/H35B are insertion codes on position 35, so `cdr1_end: 35` covers them
 pub const KABAT_HEAVY_REGIONS: RegionDefinition = RegionDefinition {
     fr1_end: 30,
     cdr1_end: 35,

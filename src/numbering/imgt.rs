@@ -2,6 +2,11 @@ use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
 
 /// IMGT region definition
+/// | loop | definition |
+/// |------|------------|
+/// | HL1  | 27-38      |
+/// | HL2  | 56-65      |
+/// | HL3  | 105-117    |
 pub const IMGT_REGIONS: RegionDefinition = RegionDefinition {
     fr1_end: 26,
     cdr1_end: 38,
