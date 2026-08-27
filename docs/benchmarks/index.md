@@ -51,33 +51,18 @@ above.
 
 ### SAbDab2-paired: full PDB chains
 
-`fixtures/validation/sabdab2paired_{H,K,L}_imgt.csv` numbers full PDB SEQRES chains from
-paired antibody structures in
-[SAbDab](http://opig.stats.ox.ac.uk/webapps/newsabdab/sabdab/)
-(`resources/opig/sabdab2_paired_and_vhh_pdb_sequences.csv`, `chain_type` "heavy"/"light",
-sourced from `sabdab2_ab_split.csv`), numbered with legacy/original ANARCI.
-Unlike the fixtures above, these sequences are **not** pre-trimmed to the variable
-domain — most rows include the constant region (CH1/CL) appended directly after FR4, so
-a tool has to locate the domain boundary itself rather than being handed just the domain.
+This benchmarks tests a slightly harder task than numbering pre-trimmed sequences. Namely, it takes PDB SEQRES (i.e. full sequences of chains in a PDB file) from [SAbDab2 database](https://sabdab.opig.stats.ox.ac.uk/) (paired antibodies), takes ANARCI numbering as ground truth, and compares other tools to it.
+
+In more detail, most sequences include the constant region (CH1/CL) or some kind of a tag (e.g. His-tag) appended directly after FR4, so a tool has to locate the domain boundary itself rather than being handed just the domain.
 Light chains are split into kappa/lambda based on ANARCI's own chain-type call, not known
 ahead of time.
-
-Ground truth here comes from legacy/original ANARCI alone (`anarci_original`), not from
-antpack/ANARCI agreement like the fixtures above — there's no cross-tool agreement check,
-so **ANARCI scores 100% by construction on this dataset** (it is the ground truth), the
-same limitation noted above but for a single tool rather than two.
 
 <iframe src="../assets/benchmark_plot2_correctness_sabdab2paired.html" width="100%" height="500px" frameborder="0" scrolling="yes"></iframe>
 
 ### SAbDab2-nano: full PDB chains, VHH
 
-`fixtures/validation/sabdab2nano_H_imgt.csv` numbers full PDB SEQRES chains from
-single-domain (nanobody) structures in SAbDab
-(`resources/opig/sabdab2_paired_and_vhh_pdb_sequences.csv`, `chain_type` "VHH", sourced
-from `sabdab_summary_all_single_domain`). Same "not pre-trimmed to the variable domain"
-caveat as SAbDab2-paired above. A VHH has no paired light chain but is otherwise a
-heavy-chain fold, so it's numbered as heavy (`--chain H`) both by ANARCI (ground truth)
-and by every tool below; the row is labelled "VHH" in the plot purely for display.
+This one is the same as above, but VHH sequences come from [SAbDab2-nano](https://sabdab.opig.stats.ox.ac.uk/search-nanobodies) database. Rest of the pipeline is the same.
+
 
 <iframe src="../assets/benchmark_plot2_correctness_sabdab2nano.html" width="100%" height="250px" frameborder="0" scrolling="yes"></iframe>
 
