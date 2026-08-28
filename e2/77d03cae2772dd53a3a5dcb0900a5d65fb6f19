@@ -1,0 +1,18 @@
+build.rs
+  h_acea35c6bbea0b 19
+BENCHMARKS.toml
+  h_acea35c6bbea0b 1-2,14,102-104
+src/alignment.rs
+  h_acea35c6bbea0b 485-506
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "e277d03cae2772dd53a3a5dcb0900a5d65fb6f19",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
