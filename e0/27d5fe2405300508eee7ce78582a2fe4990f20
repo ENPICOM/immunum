@@ -1,0 +1,40 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 8-35
+Cargo.lock
+  h_acea35c6bbea0b 1304
+Cargo.toml
+  h_acea35c6bbea0b 3
+README.md
+  h_acea35c6bbea0b 41-46,213,330-333
+docs/assets/immunum-webtool.js
+  h_acea35c6bbea0b 20-22,25
+docs/demo.md
+  h_acea35c6bbea0b 50-61
+docs/usage/index.md
+  h_acea35c6bbea0b 3-4
+docs/usage/python.md
+  h_acea35c6bbea0b 5-6
+immunum/__init__.py
+  h_acea35c6bbea0b 34-39,187,209-211,213-214,232-233,238-240,253
+immunum/_internal.pyi
+  h_acea35c6bbea0b 17-19
+src/wasm.rs
+  h_acea35c6bbea0b 21,53,72-77
+tests/test_polars.py
+  h_acea35c6bbea0b 24-32
+tests/test_python.py
+  h_acea35c6bbea0b 33-38,57-59,79-84,87,89,172,174-196,200,203-205,207
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 49-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "e027d5fe2405300508eee7ce78582a2fe4990f20",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
