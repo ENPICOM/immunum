@@ -1,0 +1,28 @@
+src/alignment.rs
+  s_b04922fe470712::t_f6b09ddc4458f3 207
+  s_b04922fe470712::t_44050111a49cd2 200-203
+  s_b04922fe470712::t_bc66c01d392c77 195
+  h_1c1f81aae19bb9 198-199,388-395
+  h_1c1f81aae19bb9 387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "87fdae07e451c7a80b3395e0ee65b6b2a78b173e",
+  "prompts": {},
+  "humans": {
+    "h_1c1f81aae19bb9": {
+      "author": "rickbeeloo <r.beeloo@outlook.com>"
+    }
+  },
+  "sessions": {
+    "s_b04922fe470712": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "daa26c27-55fd-48ad-8d08-239044d7a718",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "rickbeeloo <r.beeloo@outlook.com>"
+    }
+  }
+}
