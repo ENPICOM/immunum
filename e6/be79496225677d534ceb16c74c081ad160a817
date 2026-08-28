@@ -1,0 +1,14 @@
+src/alignment.rs
+  h_1c1f81aae19bb9 391
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "e6be79496225677d534ceb16c74c081ad160a817",
+  "prompts": {},
+  "humans": {
+    "h_1c1f81aae19bb9": {
+      "author": "rickbeeloo <r.beeloo@outlook.com>"
+    }
+  }
+}
