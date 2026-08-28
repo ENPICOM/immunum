@@ -30,6 +30,12 @@ TRD_SEQ = "QKVTQAQSSVSMPVRKAVTLNCLYETSWWSYYIFWYKQLPSKEMIFLIRQGSDEQNAKSGRYSVNFKKA
         pytest.param((ALL_CHAINS, "IMGT", IGL_SEQ), id="all_chains_imgt"),
         pytest.param((["IGH"], "Kabat", IGH_SEQ), id="single_IGH_kabat"),
         pytest.param((AB_CHAINS, "Kabat", IGL_SEQ), id="all_ab_chains_kabat"),
+        pytest.param((["IGH"], "Chothia", IGH_SEQ), id="single_IGH_chothia"),
+        pytest.param((AB_CHAINS, "Chothia", IGL_SEQ), id="all_ab_chains_chothia"),
+        pytest.param((["IGH"], "Martin", IGH_SEQ), id="single_IGH_martin"),
+        pytest.param((AB_CHAINS, "Martin", IGL_SEQ), id="all_ab_chains_martin"),
+        pytest.param((["IGH"], "Aho", IGH_SEQ), id="single_IGH_aho"),
+        pytest.param((AB_CHAINS, "Aho", IGL_SEQ), id="all_ab_chains_aho"),
         # Case-insensitive chain/scheme aliases
         pytest.param((["igh"], "imgt", IGH_SEQ), id="lowercase_chain_and_scheme"),
         pytest.param((["H"], "IMGT", IGH_SEQ), id="short_chain_alias_H"),
@@ -48,6 +54,9 @@ TRD_SEQ = "QKVTQAQSSVSMPVRKAVTLNCLYETSWWSYYIFWYKQLPSKEMIFLIRQGSDEQNAKSGRYSVNFKKA
         pytest.param((["delta"], "IMGT", TRD_SEQ), id="named_chain_alias_delta"),
         pytest.param((["IGH"], "i", IGH_SEQ), id="scheme_alias_i"),
         pytest.param((AB_CHAINS, "k", IGL_SEQ), id="scheme_alias_k"),
+        pytest.param((AB_CHAINS, "c", IGL_SEQ), id="scheme_alias_c"),
+        pytest.param((AB_CHAINS, "m", IGL_SEQ), id="scheme_alias_m"),
+        pytest.param((AB_CHAINS, "a", IGL_SEQ), id="scheme_alias_a"),
     ]
 )
 def annotator_and_seq(request):
@@ -67,11 +76,17 @@ class TestAnnotatorInit:
             (["TRB"], "Kabat"),
             (["IGH", "TRA"], "Kabat"),
             (ALL_CHAINS, "Kabat"),
+            (["TRA"], "Chothia"),
+            (ALL_CHAINS, "Chothia"),
+            (["TRA"], "Martin"),
+            (ALL_CHAINS, "Martin"),
+            (["TRA"], "Aho"),
+            (ALL_CHAINS, "Aho"),
         ],
     )
-    def test_kabat_tcr_raises(self, chains, scheme):
+    def test_non_imgt_tcr_raises(self, chains, scheme):
         with pytest.raises(
-            ValueError, match="Kabat scheme only supported for antibody chains"
+            ValueError, match=f"{scheme} scheme only supported for antibody chains"
         ):
             immunum.Annotator(chains, scheme)
 
@@ -154,35 +169,42 @@ class TestNumbering:
 
 class TestNormalization:
     @pytest.mark.parametrize(
-        "alias_chains,canonical_chains,scheme,seq",
+        "alias_chains,canonical_chains,scheme,canonical_scheme,seq",
         [
-            (["H"], ["IGH"], "IMGT", IGH_SEQ),
-            (["K"], ["IGK"], "IMGT", IGL_SEQ),
-            (["L"], ["IGL"], "IMGT", IGL_SEQ),
-            (["A"], ["TRA"], "IMGT", TRA_SEQ),
-            (["B"], ["TRB"], "IMGT", TRB_SEQ),
-            (["G"], ["TRG"], "IMGT", TRG_SEQ),
-            (["D"], ["TRD"], "IMGT", TRD_SEQ),
-            (["heavy"], ["IGH"], "IMGT", IGH_SEQ),
-            (["kappa"], ["IGK"], "IMGT", IGL_SEQ),
-            (["lambda"], ["IGL"], "IMGT", IGL_SEQ),
-            (["alpha"], ["TRA"], "IMGT", TRA_SEQ),
-            (["beta"], ["TRB"], "IMGT", TRB_SEQ),
-            (["gamma"], ["TRG"], "IMGT", TRG_SEQ),
-            (["delta"], ["TRD"], "IMGT", TRD_SEQ),
-            (["igh"], ["IGH"], "imgt", IGH_SEQ),
-            (["IGH"], ["IGH"], "i", IGH_SEQ),
-            (AB_CHAINS, AB_CHAINS, "k", IGL_SEQ),
+            (["H"], ["IGH"], "IMGT", "IMGT", IGH_SEQ),
+            (["K"], ["IGK"], "IMGT", "IMGT", IGL_SEQ),
+            (["L"], ["IGL"], "IMGT", "IMGT", IGL_SEQ),
+            (["A"], ["TRA"], "IMGT", "IMGT", TRA_SEQ),
+            (["B"], ["TRB"], "IMGT", "IMGT", TRB_SEQ),
+            (["G"], ["TRG"], "IMGT", "IMGT", TRG_SEQ),
+            (["D"], ["TRD"], "IMGT", "IMGT", TRD_SEQ),
+            (["heavy"], ["IGH"], "IMGT", "IMGT", IGH_SEQ),
+            (["kappa"], ["IGK"], "IMGT", "IMGT", IGL_SEQ),
+            (["lambda"], ["IGL"], "IMGT", "IMGT", IGL_SEQ),
+            (["alpha"], ["TRA"], "IMGT", "IMGT", TRA_SEQ),
+            (["beta"], ["TRB"], "IMGT", "IMGT", TRB_SEQ),
+            (["gamma"], ["TRG"], "IMGT", "IMGT", TRG_SEQ),
+            (["delta"], ["TRD"], "IMGT", "IMGT", TRD_SEQ),
+            (["igh"], ["IGH"], "imgt", "IMGT", IGH_SEQ),
+            (["IGH"], ["IGH"], "i", "IMGT", IGH_SEQ),
+            (AB_CHAINS, AB_CHAINS, "k", "Kabat", IGL_SEQ),
+            (AB_CHAINS, AB_CHAINS, "c", "Chothia", IGL_SEQ),
+            (AB_CHAINS, AB_CHAINS, "m", "Martin", IGL_SEQ),
+            (AB_CHAINS, AB_CHAINS, "a", "Aho", IGL_SEQ),
+            (["igh"], ["IGH"], "chothia", "Chothia", IGH_SEQ),
+            (["igh"], ["IGH"], "martin", "Martin", IGH_SEQ),
+            (["igh"], ["IGH"], "aho", "Aho", IGH_SEQ),
         ],
     )
     def test_alias_produces_identical_result(
-        self, alias_chains, canonical_chains, scheme, seq
+        self, alias_chains, canonical_chains, scheme, canonical_scheme, seq
     ):
         alias_result = immunum.Annotator(alias_chains, scheme).number(seq)
-        canonical_result = immunum.Annotator(
-            canonical_chains, "IMGT" if scheme in ("i", "imgt", "IMGT") else "Kabat"
-        ).number(seq)
+        canonical_result = immunum.Annotator(canonical_chains, canonical_scheme).number(
+            seq
+        )
         assert alias_result.chain == canonical_result.chain
+        assert alias_result.scheme == canonical_scheme
         assert alias_result.scheme == canonical_result.scheme
         assert alias_result.numbering == canonical_result.numbering
 

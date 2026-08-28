@@ -18,7 +18,7 @@ export type Numbering = Map<string, string>;
 export interface NumberingResult {
     /** Detected chain type: `"H"`, `"K"`, `"L"`, `"A"`, `"B"`, `"G"`, or `"D"`. Null on failure. */
     chain: string | null;
-    /** Numbering scheme used: `"imgt"` or `"kabat"`. Null on failure. */
+    /** Numbering scheme used: `"IMGT"`, `"Kabat"`, `"Chothia"`, `"Martin"` or `"Aho"`. Null on failure. */
     scheme: string | null;
     /** Alignment confidence score between 0 and 1. Null on failure. */
     confidence: number | null;
@@ -50,7 +50,7 @@ export interface SegmentationResult {
 }
 
 /**
- * Annotates antibody and T-cell receptor sequences with IMGT or Kabat position numbers.
+ * Annotates antibody and T-cell receptor sequences with scheme-specific position numbers.
  *
  * @param chains - Chain types to consider during auto-detection. Each entry is a
  *   case-insensitive string. Accepted values:
@@ -69,6 +69,12 @@ export interface SegmentationResult {
  *   (case-insensitive):
  *   - `"IMGT"` / `"i"` — IMGT numbering (recommended; used internally)
  *   - `"Kabat"` / `"k"` — Kabat numbering (derived from IMGT)
+ *   - `"Chothia"` / `"c"` — Chothia numbering (derived from IMGT)
+ *   - `"Martin"` / `"m"` — Martin / extended Chothia numbering (derived from IMGT)
+ *   - `"Aho"` / `"a"` — AHo numbering (derived from IMGT)
+ *
+ *   Only IMGT supports TCR chains; the other schemes are restricted to antibody
+ *   chains (IGH, IGK, IGL).
  *
  * @param min_confidence - Optional minimum alignment confidence threshold in the
  *   range `[0, 1]`. Sequences scoring below this value are rejected with an error.

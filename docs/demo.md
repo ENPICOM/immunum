@@ -47,6 +47,18 @@ hide:
             <input type="radio" name="scheme" value="kabat">
             <span>Kabat</span>
           </label>
+          <label class="immunum-scheme-radio">
+            <input type="radio" name="scheme" value="chothia">
+            <span>Chothia</span>
+          </label>
+          <label class="immunum-scheme-radio">
+            <input type="radio" name="scheme" value="martin">
+            <span>Martin</span>
+          </label>
+          <label class="immunum-scheme-radio">
+            <input type="radio" name="scheme" value="aho">
+            <span>AHo</span>
+          </label>
         </div>
       </fieldset>
 
