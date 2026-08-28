@@ -1,5 +1,5 @@
-last_updated = "2026-07-20"
-execution_time_secs = 1.3
+last_updated = "2026-08-28"
+execution_time_secs = 1.31
 
 [imgt.A]
 total_sequences = 865
@@ -11,7 +11,7 @@ overall_accuracy = 99.41
 total_sequences = 934
 perfect_sequences = 911
 perfect_pct = 97.54
-overall_accuracy = 99.79
+overall_accuracy = 99.8
 
 [imgt.D]
 total_sequences = 23
@@ -99,9 +99,9 @@ overall_accuracy = 99.98
 
 [aho.H]
 total_sequences = 2461
-perfect_sequences = 2451
-perfect_pct = 99.59
-overall_accuracy = 99.87
+perfect_sequences = 2457
+perfect_pct = 99.84
+overall_accuracy = 100.0
 
 [aho.K]
 total_sequences = 1491
