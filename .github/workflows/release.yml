@@ -188,7 +188,9 @@ jobs:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
-    environment: pypi
+    environment:
+      name: pypi
+      url: https://pypi.org/project/immunum/
     permissions:
       id-token: write
     steps:
@@ -210,8 +212,11 @@ jobs:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    environment:
+      name: npmjs
+      url: https://www.npmjs.com/package/immunum/
     permissions:
-      id-token: write  # Required for OIDC
+      id-token: write # Required for OIDC
       contents: read
     steps:
       - uses: actions/checkout@v6
@@ -236,6 +241,9 @@ jobs:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    environment:
+      name: crates.io
+      url: https://crates.io/crates/immunum/
     steps:
       - uses: actions/checkout@v6
 
