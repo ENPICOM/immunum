@@ -1,0 +1,15 @@
+.github/workflows/release.yml
+  h_acea35c6bbea0b 192-193,215-217,244-246
+  h_acea35c6bbea0b 191,219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "2842ddec4902f1fe34a575004b27b499ff54bef2",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
