@@ -388,7 +388,7 @@ mod tests {
     fn test_long_sequence_issue() {
         let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
 
-        let long_seq = "MASNNTASIAQARKLVEQLKMEANIDRIKVSKAAADLMAYCEAHAKEDPLLTPVPASENPFREKKFFC";
+        let long_seq = "QVQLQESGGGLVQPGGSLRLSCAASGFTFSNYKMNWVRQAPGKGLEWVSDISQSGASISYTGSVKGRFTISRDNAKNTLYLQMNSLKPEDTAVYYCARCPAPFTRDCFDVTSTTYAYRGQGTQVTVSSHHHHHHEPEA";
         let result = test_align(long_seq, &matrix.positions);
         assert_eq!(result.query_end, 127);
     }
