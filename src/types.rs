@@ -112,6 +112,15 @@ pub enum Scheme {
     /// Kabat numbering (derived from IMGT)
     #[strum(to_string = "Kabat", serialize = "k", ascii_case_insensitive)]
     Kabat,
+    /// Chothia numbering (derived from IMGT)
+    #[strum(to_string = "Chothia", serialize = "c", ascii_case_insensitive)]
+    Chothia,
+    /// Martin / extended Chothia numbering (derived from IMGT)
+    #[strum(to_string = "Martin", serialize = "m", ascii_case_insensitive)]
+    Martin,
+    /// AHo numbering (derived from IMGT)
+    #[strum(to_string = "Aho", serialize = "a", ascii_case_insensitive)]
+    Aho,
 }
 
 /// Position in a numbered sequence
@@ -204,6 +213,48 @@ pub enum Region {
     FR3,
     CDR3,
     FR4,
+}
+
+/// Region definition for a numbering scheme.
+///
+/// The seven regions are contiguous starting at position 1, so a scheme's region layout is
+/// fully described by the last position number of each region: FR1 = `1..=fr1_end`,
+/// CDR1 = `fr1_end+1..=cdr1_end`, and so on. Positions of 0 (prefix) or beyond `fr4_end`
+/// (postfix) are outside the numbered range. Each scheme defines its own in its rule module.
+#[derive(Debug, Clone, Copy)]
+pub struct RegionDefinition {
+    pub fr1_end: u8,
+    pub cdr1_end: u8,
+    pub fr2_end: u8,
+    pub cdr2_end: u8,
+    pub fr3_end: u8,
+    pub cdr3_end: u8,
+    pub fr4_end: u8,
+}
+
+impl RegionDefinition {
+    /// Region for a position number, or `None` if outside the numbered range.
+    pub const fn region(&self, pos: u8) -> Option<Region> {
+        if pos == 0 {
+            None
+        } else if pos <= self.fr1_end {
+            Some(Region::FR1)
+        } else if pos <= self.cdr1_end {
+            Some(Region::CDR1)
+        } else if pos <= self.fr2_end {
+            Some(Region::FR2)
+        } else if pos <= self.cdr2_end {
+            Some(Region::CDR2)
+        } else if pos <= self.fr3_end {
+            Some(Region::FR3)
+        } else if pos <= self.cdr3_end {
+            Some(Region::CDR3)
+        } else if pos <= self.fr4_end {
+            Some(Region::FR4)
+        } else {
+            None
+        }
+    }
 }
 
 /// A rule mapping a range of alignment positions to numbering positions

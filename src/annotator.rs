@@ -127,11 +127,17 @@ impl Annotator {
             return Err(Error::InvalidChain("chains cannot be empty".to_string()));
         }
 
-        // Validate: Kabat only supported for antibody chains
-        if scheme == Scheme::Kabat && chains.iter().any(|c| TCR_CHAINS.contains(c)) {
-            return Err(Error::InvalidScheme(
-                "Kabat scheme only supported for antibody chains (IGH, IGK, IGL)".to_string(),
-            ));
+        // Validate: Kabat, Chothia, Martin and AHo are only supported for antibody chains.
+        // (AHo is defined for TCR chains too, but immunum does not ship TCR AHo rules yet.)
+        if matches!(
+            scheme,
+            Scheme::Kabat | Scheme::Chothia | Scheme::Martin | Scheme::Aho
+        ) && chains.iter().any(|c| TCR_CHAINS.contains(c))
+        {
+            return Err(Error::InvalidScheme(format!(
+                "{} scheme only supported for antibody chains (IGH, IGK, IGL)",
+                scheme
+            )));
         }
 
         let mut matrices = Vec::new();
@@ -157,7 +163,22 @@ impl Annotator {
 
         // Apply numbering only to the aligned subregion of the query
         let aligned_positions = &alignment.positions[alignment.query_start..=alignment.query_end];
-        let positions = apply_numbering(aligned_positions, self.scheme, chain);
+        let mut positions = apply_numbering(aligned_positions, self.scheme, chain);
+        let mut query_end = alignment.query_end;
+
+        // AHo light chains carry one extra C-terminal position (149) beyond the IMGT-numbered
+        // region: IMGT ends light chains at 127 -> AHo 148, so the 149 residue has no IMGT
+        // state and is appended here when a residue follows, matching ANARCI's number_aho tail
+        // rule. Heavy chains populate IMGT 128 -> AHo 149 directly and need no append.
+        if self.scheme == Scheme::Aho
+            && matches!(chain, Chain::IGK | Chain::IGL)
+            && positions.last() == Some(&Position::new(148))
+            && query_end + 1 < sequence.len()
+        {
+            positions.push(Position::new(149));
+            query_end += 1;
+        }
+
         let confidence = if alignment.max_confidence_score > 0.0 {
             (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
         } else {
@@ -179,7 +200,7 @@ impl Annotator {
             cons_end: alignment.cons_end as usize,
             confidence,
             query_start: alignment.query_start,
-            query_end: alignment.query_end,
+            query_end,
         })
     }
 
@@ -187,7 +208,8 @@ impl Annotator {
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
         let result = self.number(sequence)?;
         let aligned_seq = &sequence[result.query_start..=result.query_end];
-        let mut map = segment_positions(&result.positions, aligned_seq, result.scheme);
+        let mut map =
+            segment_positions(&result.positions, aligned_seq, result.scheme, result.chain);
         Ok(SegmentResult {
             prefix: map.remove("prefix").unwrap_or_default(),
             fr1: map.remove("fr1").unwrap_or_default(),
@@ -311,6 +333,163 @@ mod tests {
         assert_eq!(result.query_start, 0);
         assert_eq!(result.query_end, FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    /// Kabat segmentation, heavy and light. Guards the chain-specific region tables end to end:
+    /// under Kabat, CDR-H2 is 50-65 (16 positions) while CDR-L2 is 50-56 (7), and light numbering
+    /// stops at 107. A single shared table cannot produce both, which is what this catches.
+    #[test]
+    fn test_segment_kabat_heavy_and_light_differ() {
+        let heavy_seq = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+        let heavy = Annotator::new(&[Chain::IGH], Scheme::Kabat, None)
+            .unwrap()
+            .segment(heavy_seq)
+            .unwrap();
+
+        // Every residue lands in exactly one region, and nothing spills into prefix/postfix.
+        let rebuilt = format!(
+            "{}{}{}{}{}{}{}",
+            heavy.fr1, heavy.cdr1, heavy.fr2, heavy.cdr2, heavy.fr3, heavy.cdr3, heavy.fr4
+        );
+        assert_eq!(
+            rebuilt, heavy_seq,
+            "Kabat heavy segments must reconstruct the input"
+        );
+        assert!(heavy.prefix.is_empty() && heavy.postfix.is_empty());
+
+        // CDR-H1 is Kabat's five-residue 31-35, not the ten-residue AbM 26-35.
+        assert!(
+            heavy.cdr1.len() <= 7,
+            "Kabat CDR-H1 should be ~5 residues (31-35, plus any 35A/35B), got {} in {:?}",
+            heavy.cdr1.len(),
+            heavy.cdr1
+        );
+        // CDR-H2 spans 50-65, so it is far longer than the seven-residue light CDR2.
+        assert!(
+            heavy.cdr2.len() >= 14,
+            "Kabat CDR-H2 spans 50-65, expected >=14 residues, got {} in {:?}",
+            heavy.cdr2.len(),
+            heavy.cdr2
+        );
+
+        let light_seq = "DIQMTQSPSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQSYSTPPTFGQGTKVEIK";
+        let light = Annotator::new(&[Chain::IGK], Scheme::Kabat, None)
+            .unwrap()
+            .segment(light_seq)
+            .unwrap();
+        let rebuilt = format!(
+            "{}{}{}{}{}{}{}",
+            light.fr1, light.cdr1, light.fr2, light.cdr2, light.fr3, light.cdr3, light.fr4
+        );
+        assert_eq!(
+            rebuilt, light_seq,
+            "Kabat light segments must reconstruct the input"
+        );
+
+        // CDR-L1 is 24-34: eleven positions, so clearly longer than CDR-H1.
+        assert!(
+            light.cdr1.len() >= 9,
+            "Kabat CDR-L1 spans 24-34, expected >=9 residues, got {} in {:?}",
+            light.cdr1.len(),
+            light.cdr1
+        );
+        assert!(
+            light.cdr2.len() <= 8,
+            "Kabat CDR-L2 spans 50-56, expected <=8 residues, got {} in {:?}",
+            light.cdr2.len(),
+            light.cdr2
+        );
+        assert!(
+            heavy.cdr2.len() > light.cdr2.len(),
+            "Kabat CDR-H2 (50-65) must be longer than CDR-L2 (50-56)"
+        );
+    }
+
+    /// Martin segmentation uses the AbM CDR definition, not Chothia's. On heavy chains AbM widens
+    /// both loops -- H1 26-35 against Chothia's 26-32, H2 50-58 against 52-56 -- so the extra
+    /// residues are exactly the ones Chothia hands to the flanking frameworks. On light chains AbM
+    /// coincides with Kabat (24-34 / 50-56 / 89-97), which is what the light half checks.
+    #[test]
+    fn test_segment_martin_follows_abm_definition() {
+        let heavy_seq = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+        let martin = Annotator::new(&[Chain::IGH], Scheme::Martin, None)
+            .unwrap()
+            .segment(heavy_seq)
+            .unwrap();
+        let chothia = Annotator::new(&[Chain::IGH], Scheme::Chothia, None)
+            .unwrap()
+            .segment(heavy_seq)
+            .unwrap();
+
+        let rebuilt = format!(
+            "{}{}{}{}{}{}{}{}{}",
+            martin.prefix,
+            martin.fr1,
+            martin.cdr1,
+            martin.fr2,
+            martin.cdr2,
+            martin.fr3,
+            martin.cdr3,
+            martin.fr4,
+            martin.postfix
+        );
+        assert_eq!(
+            rebuilt, heavy_seq,
+            "Martin heavy segments must reconstruct the input"
+        );
+
+        // CDR-H1: AbM 26-35 = Chothia 26-32 plus 33, 34, 35, the first three Chothia FR2 residues.
+        assert_eq!(
+            martin.cdr1,
+            format!("{}{}", chothia.cdr1, &chothia.fr2[..3]),
+            "Martin CDR-H1 should extend Chothia's 26-32 to AbM's 26-35"
+        );
+        // CDR-H2: AbM 50-58 = Chothia 52-56 plus 50, 51 in front and 57, 58 behind.
+        assert_eq!(
+            martin.cdr2,
+            format!(
+                "{}{}{}",
+                &chothia.fr2[chothia.fr2.len() - 2..],
+                chothia.cdr2,
+                &chothia.fr3[..2]
+            ),
+            "Martin CDR-H2 should span AbM's 50-58, not Chothia's 52-56"
+        );
+        // CDR-H3: AbM 95-102 opens one residue earlier than Chothia's 96-101 and closes one later.
+        assert_eq!(
+            martin.cdr3,
+            format!(
+                "{}{}{}",
+                &chothia.fr3[chothia.fr3.len() - 1..],
+                chothia.cdr3,
+                &chothia.fr4[..1]
+            ),
+            "Martin CDR-H3 should span AbM's 95-102"
+        );
+
+        // AbM light is Kabat light, so both schemes must cut the same light chain identically.
+        let light_seq = "DIQMTQSPSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQSYSTPPTFGQGTKVEIK";
+        let martin_light = Annotator::new(&[Chain::IGK], Scheme::Martin, None)
+            .unwrap()
+            .segment(light_seq)
+            .unwrap();
+        let kabat_light = Annotator::new(&[Chain::IGK], Scheme::Kabat, None)
+            .unwrap()
+            .segment(light_seq)
+            .unwrap();
+        assert_eq!(
+            (
+                martin_light.cdr1.as_str(),
+                martin_light.cdr2.as_str(),
+                martin_light.cdr3.as_str()
+            ),
+            (
+                kabat_light.cdr1.as_str(),
+                kabat_light.cdr2.as_str(),
+                kabat_light.cdr3.as_str()
+            ),
+            "AbM light (24-34 / 50-56 / 89-97) coincides with Kabat light"
+        );
     }
 
     #[test]

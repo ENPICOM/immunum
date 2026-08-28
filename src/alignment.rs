@@ -482,4 +482,26 @@ mod tests {
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), sequence.len());
     }
+
+    // Bovine ultralong-CDR3 heavy chain (PDB 4k3e chain H): ~48 residues are absorbed as
+    // insertions at IMGT 111/112. Terminating the alignment early is free, so the CDR-center
+    // insertion penalty has to stay cheap enough that reaching FR4 still wins.
+    const ULTRALONG_IGH: &str = "VQLRESGPSLVQPSQTLSLTCTASGFSKAVGWVRQAPGKALEWLGSIDTGGSTGYNPGLKSRLSITKDNSKSQVSLSVSSVTTEDSATYYCTTVHQETRKTCSDGYIAVDSCGRGQSDGCVNDCNSCYYGWRNCRRQPAIHSYEFHVDAWGRGLLVTVSS";
+
+    #[test]
+    fn test_ultralong_cdr3_is_not_clipped() {
+        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let result = test_align(ULTRALONG_IGH, &matrix.positions);
+
+        assert_eq!(result.query_start, 0);
+        assert_eq!(
+            result.query_end,
+            ULTRALONG_IGH.len() - 1,
+            "Ultralong CDR3 must not be suffix-clipped: the C-terminal FR4 belongs to the domain"
+        );
+        assert_eq!(
+            result.cons_end, 128,
+            "Alignment should reach the end of FR4"
+        );
+    }
 }

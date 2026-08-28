@@ -1,5 +1,21 @@
-use crate::types::NumberingRule;
+use crate::types::{NumberingRule, RegionDefinition};
 use crate::Insertion;
+
+/// IMGT region definition
+/// | loop | definition |
+/// |------|------------|
+/// | HL1  | 27-38      |
+/// | HL2  | 56-65      |
+/// | HL3  | 105-117    |
+pub const IMGT_REGIONS: RegionDefinition = RegionDefinition {
+    fr1_end: 26,
+    cdr1_end: 38,
+    fr2_end: 55,
+    cdr2_end: 65,
+    fr3_end: 104,
+    cdr3_end: 117,
+    fr4_end: 128,
+};
 
 // =============================================================================
 // IMGT Chain Numbering Rules (same for all chain types)

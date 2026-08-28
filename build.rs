@@ -16,7 +16,7 @@ const CONSERVED_MULTIPLIER: f32 = 2.0;
 const VARIABLE_MULTIPLIER: f32 = 1.0;
 
 const NO_INSERTION_PENALTY: f32 = -50.0;
-const CDR_INSERTION_PENALTY: f32 = -3.0;
+const CDR_INSERTION_PENALTY: f32 = -2.0;
 
 // IMGT CDR center positions where insertions are absorbed
 const CDR_CENTER_POSITIONS: &[u32] = &[32, 33, 60, 61, 111, 112];

@@ -303,7 +303,7 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                     Ok(r) => r,
                     Err(e) => return Some(Err(e.to_string())),
                 };
-                let s = segment(&result.positions, value, result.scheme);
+                let s = segment(&result.positions, value, result.scheme, result.chain);
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
                 Some(Ok([
                     get("prefix"),
@@ -412,7 +412,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                     Ok(r) => r,
                     Err(e) => return Some(Err(e.to_string())),
                 };
-                let s = segment(&result.positions, value, result.scheme);
+                let s = segment(&result.positions, value, result.scheme, result.chain);
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
                 Some(Ok([
                     get("prefix"),
