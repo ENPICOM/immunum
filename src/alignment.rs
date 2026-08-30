@@ -192,14 +192,19 @@ pub fn align(
     // Override only if early termination gives meaningfully better score (clips suffix).
     // The threshold prevents clipping valid antibody endings that score slightly negative.
     const SUFFIX_CLIP_THRESHOLD: f32 = 50.0;
+    let full_score = row_max_score[query_len];
     let mut best_i = query_len;
     let mut best_j = row_best_j[query_len];
-    for i in 1..query_len {
-        if row_max_score[i] > row_max_score[query_len] + SUFFIX_CLIP_THRESHOLD
-            && row_max_score[i] > row_max_score[best_i]
+    // Find first local maximum from the alignment end. This is not ideal cause ideally
+    // it would have a "junk" background like HMM's have so there are not strict cut-offs
+    for i in (1..query_len).rev() {
+        if row_max_score[i] >= row_max_score[i - 1]
+            && row_max_score[i] > row_max_score[i + 1]
+            && row_max_score[i] > full_score + SUFFIX_CLIP_THRESHOLD
         {
             best_i = i;
             best_j = row_best_j[i];
+            break;
         }
     }
     let best_score = row_max_score[best_i];
@@ -377,6 +382,15 @@ mod tests {
             partial_seq.len(),
             "Positions length should equal query length"
         );
+    }
+
+    #[test]
+    fn test_long_sequence_issue() {
+        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+
+        let long_seq = "QVQLQESGGGLVQPGGSLRLSCAASGFTFSNYKMNWVRQAPGKGLEWVSDISQSGASISYTGSVKGRFTISRDNAKNTLYLQMNSLKPEDTAVYYCARCPAPFTRDCFDVTSTTYAYRGQGTQVTVSSHHHHHHEPEA";
+        let result = test_align(long_seq, &matrix.positions);
+        assert_eq!(result.query_end, 127);
     }
 
     #[test]
