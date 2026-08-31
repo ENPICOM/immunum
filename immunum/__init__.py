@@ -31,6 +31,12 @@ _SCHEME_ALIASES: dict[str, str] = {
     "i": "IMGT",
     "kabat": "Kabat",
     "k": "Kabat",
+    "chothia": "Chothia",
+    "c": "Chothia",
+    "martin": "Martin",
+    "m": "Martin",
+    "aho": "Aho",
+    "a": "Aho",
 }
 
 
@@ -178,7 +184,7 @@ class NumberingResult:
 
 
 class Annotator:
-    """Annotates antibody and T-cell receptor sequences with IMGT or Kabat position numbers.
+    """Annotates antibody and T-cell receptor sequences with scheme-specific position numbers.
 
     Args:
         chains: Chain types to consider during auto-detection. Each entry is a
@@ -200,8 +206,12 @@ class Annotator:
 
             - ``"IMGT"`` / ``"i"`` — IMGT numbering (recommended; used internally)
             - ``"Kabat"`` / ``"k"`` — Kabat numbering (derived from IMGT)
+            - ``"Chothia"`` / ``"c"`` — Chothia numbering (derived from IMGT)
+            - ``"Martin"`` / ``"m"`` — Martin / extended Chothia numbering (derived from IMGT)
+            - ``"Aho"`` / ``"a"`` — AHo numbering (derived from IMGT)
 
-            Note: Kabat is only supported for antibody chains (IGH, IGK, IGL).
+            Note: only IMGT supports TCR chains. Kabat, Chothia, Martin and AHo are
+            restricted to antibody chains (IGH, IGK, IGL).
 
         min_confidence: Minimum alignment confidence threshold in the range ``[0, 1]``.
             Sequences scoring below this value raise a ``ValueError``. Defaults to
@@ -219,13 +229,15 @@ class Annotator:
 
         Args:
             chains: Chain types to consider. See class docstring for accepted values.
-            scheme: Numbering scheme — ``"imgt"`` (default) or ``"kabat"``.
+            scheme: Numbering scheme — ``"imgt"``, ``"kabat"``, ``"chothia"``,
+                ``"martin"`` or ``"aho"``. See class docstring for aliases.
             min_confidence: Reject sequences with alignment confidence below this
                 threshold. Defaults to ``0.5``; pass ``0.0`` to disable.
 
         Raises:
-            ValueError: If any chain or scheme value is unrecognised, if Kabat is
-                requested for TCR chains, or if ``min_confidence`` is outside ``[0, 1]``.
+            ValueError: If any chain or scheme value is unrecognised, if a
+                non-IMGT scheme is requested for TCR chains, or if
+                ``min_confidence`` is outside ``[0, 1]``.
         """
         if min_confidence is not None and not (0 <= min_confidence <= 1.0):
             raise ValueError(
@@ -238,7 +250,7 @@ class Annotator:
         )
 
     def number(self, sequence: str) -> NumberingResult:
-        """Assign IMGT or Kabat position numbers to every residue in a sequence.
+        """Assign scheme-specific position numbers to every residue in a sequence.
 
         Args:
             sequence: Amino-acid sequence string (single-letter codes).

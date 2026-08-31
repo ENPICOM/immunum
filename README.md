@@ -38,6 +38,12 @@ Chain type is automatically detected by aligning against all loaded chains and s
 
 - **IMGT** — all 7 chain types
 - **Kabat** — antibody chains (IGH, IGK, IGL)
+- **Chothia** — antibody chains (IGH, IGK, IGL)
+- **Martin** (extended Chothia) — antibody chains (IGH, IGK, IGL)
+- **AHo** — antibody chains (IGH, IGK, IGL)
+
+Every scheme is derived from the internal IMGT numbering. Region (FR/CDR) boundaries follow each
+scheme's own definition and differ between heavy and light chains.
 
 ## Table of Contents
 
@@ -204,7 +210,7 @@ immunum number [OPTIONS] [INPUT] [OUTPUT]
 
 | Flag           | Description                                                                                                                        | Default |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`)                                                                                      | `imgt`  |
+| `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`), `chothia` (`c`), `martin` (`m`), `aho` (`a`)                                          | `imgt`  |
 | `-c, --chain`  | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig`    |
 | `-f, --format` | Output format: `tsv`, `json`, `jsonl`                                                                                              | `tsv`   |
 
@@ -321,7 +327,10 @@ src/
 ├── numbering.rs     # Numbering module entry point
 ├── numbering/
 │   ├── imgt.rs      # IMGT numbering rules
-│   └── kabat.rs     # Kabat numbering rules
+│   ├── kabat.rs     # Kabat numbering rules
+│   ├── chothia.rs   # Chothia numbering rules
+│   ├── martin.rs    # Martin (extended Chothia) numbering rules
+│   └── aho.rs       # AHo numbering rules
 ├── scoring.rs       # PSSM and scoring matrices
 ├── types.rs         # Core domain types (Chain, Scheme, Position)
 ├── validation.rs    # Validation utilities

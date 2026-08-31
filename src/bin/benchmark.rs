@@ -18,6 +18,12 @@ struct BenchmarkReport {
     imgt: BTreeMap<String, ChainEntry>,
     #[serde(default)]
     kabat: BTreeMap<String, ChainEntry>,
+    #[serde(default)]
+    martin: BTreeMap<String, ChainEntry>,
+    #[serde(default)]
+    chothia: BTreeMap<String, ChainEntry>,
+    #[serde(default)]
+    aho: BTreeMap<String, ChainEntry>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -66,8 +72,29 @@ fn main() {
         (Chain::IGL, "fixtures/validation/ab_L_kabat.csv"),
     ];
 
+    let martin_chains = vec![
+        (Chain::IGH, "fixtures/validation/ab_H_martin.csv"),
+        (Chain::IGK, "fixtures/validation/ab_K_martin.csv"),
+        (Chain::IGL, "fixtures/validation/ab_L_martin.csv"),
+    ];
+
+    let chothia_chains = vec![
+        (Chain::IGH, "fixtures/validation/ab_H_chothia.csv"),
+        (Chain::IGK, "fixtures/validation/ab_K_chothia.csv"),
+        (Chain::IGL, "fixtures/validation/ab_L_chothia.csv"),
+    ];
+
+    let aho_chains = vec![
+        (Chain::IGH, "fixtures/validation/ab_H_aho.csv"),
+        (Chain::IGK, "fixtures/validation/ab_K_aho.csv"),
+        (Chain::IGL, "fixtures/validation/ab_L_aho.csv"),
+    ];
+
     let imgt_metrics = collect_metrics(&imgt_chains, Scheme::IMGT);
     let kabat_metrics = collect_metrics(&kabat_chains, Scheme::Kabat);
+    let martin_metrics = collect_metrics(&martin_chains, Scheme::Martin);
+    let chothia_metrics = collect_metrics(&chothia_chains, Scheme::Chothia);
+    let aho_metrics = collect_metrics(&aho_chains, Scheme::Aho);
 
     let end_time = Local::now();
     let elapsed = end_time.signed_duration_since(start_time);
@@ -78,11 +105,25 @@ fn main() {
         execution_time_secs: round2(elapsed_secs),
         imgt: metrics_to_map(&imgt_metrics),
         kabat: metrics_to_map(&kabat_metrics),
+        martin: metrics_to_map(&martin_metrics),
+        chothia: metrics_to_map(&chothia_metrics),
+        aho: metrics_to_map(&aho_metrics),
     };
 
     // Print comparison to terminal
     print_comparison(&imgt_metrics, "IMGT", previous.as_ref().map(|p| &p.imgt));
     print_comparison(&kabat_metrics, "Kabat", previous.as_ref().map(|p| &p.kabat));
+    print_comparison(
+        &martin_metrics,
+        "Martin",
+        previous.as_ref().map(|p| &p.martin),
+    );
+    print_comparison(
+        &chothia_metrics,
+        "Chothia",
+        previous.as_ref().map(|p| &p.chothia),
+    );
+    print_comparison(&aho_metrics, "AHo", previous.as_ref().map(|p| &p.aho));
 
     // Write TOML
     let toml_str = toml::to_string_pretty(&report).expect("Failed to serialize TOML");

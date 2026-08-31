@@ -46,8 +46,26 @@ describe("Annotator init", () => {
     assert.throws(() => new Annotator(["H"], "INVALID"));
   });
 
-  it("throws on Kabat + TCR", () => {
-    assert.throws(() => new Annotator(["A"], "kabat"));
+  it("throws on antibody-only scheme + TCR", () => {
+    for (const scheme of ["kabat", "chothia", "martin", "aho"]) {
+      assert.throws(() => new Annotator(["A"], scheme));
+    }
+  });
+
+  it("accepts every scheme name and its short alias", () => {
+    for (const [scheme, alias, canonical] of [
+      ["imgt", "i", "IMGT"],
+      ["kabat", "k", "Kabat"],
+      ["chothia", "c", "Chothia"],
+      ["martin", "m", "Martin"],
+      ["aho", "a", "Aho"],
+    ]) {
+      const byName = new Annotator(AB_CHAINS, scheme).number(IGH_SEQ);
+      const byAlias = new Annotator(AB_CHAINS, alias).number(IGH_SEQ);
+      assert.equal(byName.scheme, canonical);
+      assert.equal(byAlias.scheme, canonical);
+      assert.deepEqual([...byAlias.numbering], [...byName.numbering]);
+    }
   });
 });
 

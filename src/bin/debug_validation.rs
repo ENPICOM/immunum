@@ -14,7 +14,9 @@ fn print_usage() {
     eprintln!();
     eprintln!("Arguments:");
     eprintln!("  CHAIN    Chain type (TRA, TRB, TRG, TRD, IGH, IGK, IGL)");
-    eprintln!("  SCHEME   Optional: Numbering scheme (imgt, kabat). Default: imgt");
+    eprintln!(
+        "  SCHEME   Optional: Numbering scheme (imgt, kabat, chothia, martin, aho). Default: imgt"
+    );
     eprintln!("  HEADER   Optional: Specific sequence header to debug");
     eprintln!("           If not provided, shows all sequences with imperfect alignment");
     eprintln!();
@@ -31,6 +33,7 @@ pub fn print_alignment_comparison(
     expected_positions: &[(Position, char)],
     actual_positions: &[Position],
     scheme: Scheme,
+    chain: Chain,
 ) {
     let seq_len = sequence.len();
 
@@ -78,11 +81,11 @@ pub fn print_alignment_comparison(
 
             // Determine region from expected position (or actual if no expected)
             let current_region = if let Some(pos) = expected_pos {
-                region_for_position(pos.number, scheme)
+                region_for_position(pos.number, scheme, chain)
                     .map(|r| r.to_string())
                     .unwrap_or_else(|| "?".to_string())
             } else if let Some(pos) = actual_pos {
-                region_for_position(pos.number, scheme)
+                region_for_position(pos.number, scheme, chain)
                     .map(|r| r.to_string())
                     .unwrap_or_else(|| "?".to_string())
             } else {
@@ -167,6 +170,9 @@ fn main() {
         match args[2].to_lowercase().as_str() {
             "imgt" => (Scheme::IMGT, 3),
             "kabat" => (Scheme::Kabat, 3),
+            "chothia" => (Scheme::Chothia, 3),
+            "martin" => (Scheme::Martin, 3),
+            "aho" => (Scheme::Aho, 3),
             _ => (Scheme::IMGT, 2), // Not a scheme, treat as header
         }
     } else {
@@ -185,8 +191,18 @@ fn main() {
         (Chain::IGH, Scheme::Kabat) => "fixtures/validation/ab_H_kabat.csv",
         (Chain::IGK, Scheme::Kabat) => "fixtures/validation/ab_K_kabat.csv",
         (Chain::IGL, Scheme::Kabat) => "fixtures/validation/ab_L_kabat.csv",
-        (chain, Scheme::Kabat) => {
-            eprintln!("Error: Kabat scheme not supported for chain {}", chain);
+        (Chain::IGH, Scheme::Chothia) => "fixtures/validation/ab_H_chothia.csv",
+        (Chain::IGK, Scheme::Chothia) => "fixtures/validation/ab_K_chothia.csv",
+        (Chain::IGL, Scheme::Chothia) => "fixtures/validation/ab_L_chothia.csv",
+        (Chain::IGH, Scheme::Martin) => "fixtures/validation/ab_H_martin.csv",
+        (Chain::IGK, Scheme::Martin) => "fixtures/validation/ab_K_martin.csv",
+        (Chain::IGL, Scheme::Martin) => "fixtures/validation/ab_L_martin.csv",
+        (Chain::IGH, Scheme::Aho) => "fixtures/validation/ab_H_aho.csv",
+        (Chain::IGK, Scheme::Aho) => "fixtures/validation/ab_K_aho.csv",
+        (Chain::IGL, Scheme::Aho) => "fixtures/validation/ab_L_aho.csv",
+        // note: TCR AHo fixtures are not available (tools lack TCR AHo support)
+        (chain, scheme) => {
+            eprintln!("Error: {} scheme not supported for chain {}", scheme, chain);
             process::exit(1);
         }
     };
@@ -311,5 +327,6 @@ fn debug_entry(
         &entry.expected_positions,
         &result.numbering,
         scheme,
+        result.detected_chain,
     );
 }

@@ -17,11 +17,12 @@ const ALL_CHAINS = [
   { value: "D", label: "Delta (TRD)" },
 ];
 
-// Kabat is only defined for antibody chains.
-const KABAT_CHAINS = new Set(["H", "K", "L"]);
+// Only IMGT is defined for TCR chains; every derived scheme is antibody-only.
+const ANTIBODY_CHAINS = new Set(["H", "K", "L"]);
+const ANTIBODY_ONLY_SCHEMES = new Set(["kabat", "chothia", "martin", "aho"]);
 
 function isChainAllowed(chain, scheme) {
-  return scheme === "kabat" ? KABAT_CHAINS.has(chain) : true;
+  return ANTIBODY_ONLY_SCHEMES.has(scheme) ? ANTIBODY_CHAINS.has(chain) : true;
 }
 
 const REGIONS = ["fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4"];

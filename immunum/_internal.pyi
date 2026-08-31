@@ -14,7 +14,9 @@ class _Annotator:
                 Antibody: ``"H"`` (heavy), ``"K"`` (kappa), ``"L"`` (lambda).
                 TCR: ``"A"``, ``"B"``, ``"G"``, ``"D"``.
                 Pass multiple to enable auto-detection across them.
-            scheme: Numbering scheme. Supported: ``"imgt"``, ``"kabat"``.
+            scheme: Numbering scheme. Supported: ``"imgt"``, ``"kabat"``,
+                ``"chothia"``, ``"martin"``, ``"aho"``. Only ``"imgt"`` supports
+                TCR chains.
             min_confidence: Minimum confidence score (0.0–1.0) below which
                 sequences are treated as unrecognized.
         """

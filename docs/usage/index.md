@@ -1,6 +1,7 @@
 # Introduction
 
-As advertised, immunum annotates antibody and T-cell receptor sequences with IMGT or Kabat position
+As advertised, immunum annotates antibody and T-cell receptor sequences with IMGT, Kabat, Chothia,
+Martin or AHo position
 numbers (`number` functions), or segments them into FR/CDR regions plus optional prefixes (if sequence contains more than `immunum` is confident about). Segmentation is guaranteed to cover the whole sequence, i.e. string sum of segments always equals input sequence.
 
 Two interfaces are provided:

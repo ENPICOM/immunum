@@ -2,7 +2,8 @@
 
 Here, interface is very simple: first you create an `Annotator` object with fixed chain types and numbering scheme you need (and optional `min_confidence` value), then call `number()` or `segment()` on each sequence.
 
-**Numbering** assigns an IMGT or Kabat position label to every residue:
+**Numbering** assigns a position label to every residue, in the scheme you selected (`imgt`,
+`kabat`, `chothia`, `martin` or `aho`; only `imgt` covers TCR chains):
 
 ```python
 from immunum import Annotator
