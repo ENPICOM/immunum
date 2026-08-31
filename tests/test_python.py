@@ -166,6 +166,36 @@ class TestNumbering:
         assert result.error is not None
         assert result.fr1 is None
 
+    def test_segmentation_prefix_and_postfix_capture_flanking_residues(self):
+        """Regression test: a leading prefix and a trailing tag (e.g. a His-tag)
+        outside the aligned domain must land in `prefix`/`postfix`, not be dropped."""
+        annotator = immunum.Annotator(["IGH"], "IMGT")
+        sequence = (
+            "AAAAA"
+            "QVQLQESGGGLVQPGGSLRLSCAASGFTFSNYKMNWVRQAPGKGLEWVSDISQSGASISYTGSVKGRFTIS"
+            "RDNAKNTLYLQMNSLKPEDTAVYYCARCPAPFTRDCFDVTSTTYAYRGQGTQVTVSS"
+            "HHHHHHEPEA"
+        )
+        result = annotator.segment(sequence)
+        assert result.error is None
+        assert result.prefix == "AAAAA"
+        assert result.postfix == "HHHHHHEPEA"
+        assert result.fr4 == "RGQGTQVTVSS"
+        rebuilt = "".join(
+            [
+                result.prefix,
+                result.fr1,
+                result.cdr1,
+                result.fr2,
+                result.cdr2,
+                result.fr3,
+                result.cdr3,
+                result.fr4,
+                result.postfix,
+            ]
+        )
+        assert rebuilt == sequence
+
 
 class TestNormalization:
     @pytest.mark.parametrize(

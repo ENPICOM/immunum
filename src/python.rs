@@ -5,7 +5,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::annotator::Annotator;
-use crate::numbering::segment;
 use crate::types::{Chain, Scheme};
 
 #[pymethods]
@@ -77,13 +76,17 @@ impl Annotator {
     #[pyo3(signature = (sequence), name = "segment")]
     pub fn _segment<'py>(&self, py: Python<'py>, sequence: &str) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        match self.number(sequence) {
-            Ok(result) => {
-                let aligned_seq = &sequence[result.query_start..=result.query_end];
-                let segments = segment(&result.positions, aligned_seq, result.scheme, result.chain);
-                for (region, seq) in segments {
-                    dict.set_item(region, seq)?;
-                }
+        match self.segment(sequence) {
+            Ok(s) => {
+                dict.set_item("prefix", s.prefix)?;
+                dict.set_item("fr1", s.fr1)?;
+                dict.set_item("cdr1", s.cdr1)?;
+                dict.set_item("fr2", s.fr2)?;
+                dict.set_item("cdr2", s.cdr2)?;
+                dict.set_item("fr3", s.fr3)?;
+                dict.set_item("cdr3", s.cdr3)?;
+                dict.set_item("fr4", s.fr4)?;
+                dict.set_item("postfix", s.postfix)?;
                 dict.set_item("error", py.None())?;
             }
             Err(e) => {

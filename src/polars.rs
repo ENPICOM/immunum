@@ -308,8 +308,12 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                 let aligned_seq = &value[result.query_start..=result.query_end];
                 let s = segment(&result.positions, aligned_seq, result.scheme, result.chain);
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
+                // `s` only covers the aligned span; residues the aligner excluded entirely
+                // (e.g. a leading tag or a trailing His-tag) must be added back here.
+                let prefix = format!("{}{}", &value[..result.query_start], get("prefix"));
+                let postfix = format!("{}{}", get("postfix"), &value[result.query_end + 1..]);
                 Some(Ok([
-                    get("prefix"),
+                    prefix,
                     get("fr1"),
                     get("cdr1"),
                     get("fr2"),
@@ -317,7 +321,7 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
                     get("fr3"),
                     get("cdr3"),
                     get("fr4"),
-                    get("postfix"),
+                    postfix,
                 ]))
             })
             .collect()
@@ -420,8 +424,12 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                 let s = segment(&result.positions, aligned_seq, result.scheme, result.chain);
 
                 let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
+                // `s` only covers the aligned span; residues the aligner excluded entirely
+                // (e.g. a leading tag or a trailing His-tag) must be added back here.
+                let prefix = format!("{}{}", &value[..result.query_start], get("prefix"));
+                let postfix = format!("{}{}", get("postfix"), &value[result.query_end + 1..]);
                 Some(Ok([
-                    get("prefix"),
+                    prefix,
                     get("fr1"),
                     get("cdr1"),
                     get("fr2"),
@@ -429,7 +437,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
                     get("fr3"),
                     get("cdr3"),
                     get("fr4"),
-                    get("postfix"),
+                    postfix,
                 ]))
             })
             .collect()

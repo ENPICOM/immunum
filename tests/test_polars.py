@@ -266,6 +266,41 @@ class TestPolarsSegment:
 
         assert got == expected
 
+    def test_segment_prefix_and_postfix_capture_flanking_residues(self):
+        """Regression test: a leading prefix and a trailing tag (e.g. a His-tag)
+        outside the aligned domain must land in `prefix`/`postfix`, not be dropped."""
+        sequence = (
+            "AAAAA"
+            "QVQLQESGGGLVQPGGSLRLSCAASGFTFSNYKMNWVRQAPGKGLEWVSDISQSGASISYTGSVKGRFTIS"
+            "RDNAKNTLYLQMNSLKPEDTAVYYCARCPAPFTRDCFDVTSTTYAYRGQGTQVTVSS"
+            "HHHHHHEPEA"
+        )
+        df = polars.DataFrame({"sequence": [sequence]})
+        result = df.select(
+            imp.segment(
+                polars.col("sequence"), chains=["IGH"], scheme="IMGT", min_confidence=0.0
+            ).alias("s")
+        ).unnest("s")
+        assert result["error"][0] is None
+        assert result["prefix"][0] == "AAAAA"
+        assert result["postfix"][0] == "HHHHHHEPEA"
+        assert result["fr4"][0] == "RGQGTQVTVSS"
+        rebuilt = "".join(
+            result[field][0]
+            for field in (
+                "prefix",
+                "fr1",
+                "cdr1",
+                "fr2",
+                "cdr2",
+                "fr3",
+                "cdr3",
+                "fr4",
+                "postfix",
+            )
+        )
+        assert rebuilt == sequence
+
 
 class TestPolarsNumberingMethod:
     def test_segmentation_method_returns_expr(self):
