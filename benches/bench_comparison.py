@@ -553,7 +553,7 @@ def main(
                 _run_immunum_singlethreaded,
                 lambda raw, seqs: _extract_numbering_immunum_singlethreaded(raw),
                 (lambda ann: lambda df, seqs: (seqs, ann))(
-                    Annotator(chains=[immunum_chain], scheme="IMGT")
+                    Annotator(chains=[immunum_chain], scheme="IMGT", min_confidence=0.0)
                 ),
             ),
         ]

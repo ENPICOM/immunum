@@ -239,6 +239,29 @@ tasks:
                     --timeout 1m
                 done
 
+    benchmark-accuracy-sabdab:
+        desc: "Accuracy benchmark on SAbDab2 fixtures only, excluding anarci itself from the comparison"
+        cmds:
+            - |
+                for f in fixtures/validation/sabdab2*_imgt.csv; do
+                  base=$(basename "$f" .csv)
+                  chain=$(echo "$base" | cut -d_ -f2)
+                  label_args=()
+                  # sabdab2nano is numbered as heavy (no paired light chain to distinguish
+                  # it as a chain type of its own) but displayed as VHH in the plot.
+                  if [ "$base" = "sabdab2nano_H_imgt" ]; then
+                    label_args=(--chain-label VHH)
+                  fi
+                  uv run --group benchmark python benches/bench_comparison.py \
+                    --chain "$chain" \
+                    --fixture-stem "$base" \
+                    "${label_args[@]}" \
+                    --tools immunum --tools antpack --tools anarcii2 \
+                    --sizes 1000 --rounds 7 \
+                    --output "./resources/benchmark_results/results_${base}.csv" \
+                    --timeout 1m {{.CLI_ARGS}}
+                done
+
     benchmark-speed:
         desc: "Speed benchmark: sizes 100..10M (10x steps), 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
         cmd: |
