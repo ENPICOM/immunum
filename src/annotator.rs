@@ -210,8 +210,14 @@ impl Annotator {
         let aligned_seq = &sequence[result.query_start..=result.query_end];
         let mut map =
             segment_positions(&result.positions, aligned_seq, result.scheme, result.chain);
+        // segment_positions only ever sees the aligned span (query_start..=query_end), so it
+        // can't know about residues the aligner excluded entirely -- prepend/append those here.
+        let prefix =
+            sequence[..result.query_start].to_string() + &map.remove("prefix").unwrap_or_default();
+        let postfix =
+            map.remove("postfix").unwrap_or_default() + &sequence[result.query_end + 1..];
         Ok(SegmentResult {
-            prefix: map.remove("prefix").unwrap_or_default(),
+            prefix,
             fr1: map.remove("fr1").unwrap_or_default(),
             cdr1: map.remove("cdr1").unwrap_or_default(),
             fr2: map.remove("fr2").unwrap_or_default(),
@@ -219,7 +225,7 @@ impl Annotator {
             fr3: map.remove("fr3").unwrap_or_default(),
             cdr3: map.remove("cdr3").unwrap_or_default(),
             fr4: map.remove("fr4").unwrap_or_default(),
-            postfix: map.remove("postfix").unwrap_or_default(),
+            postfix,
         })
     }
 
@@ -504,6 +510,30 @@ mod tests {
         assert_eq!(segments.fr4, "WGQGTLVTVSS");
         assert!(segments.prefix.is_empty());
         assert!(segments.postfix.is_empty());
+    }
+
+    #[test]
+    fn test_segment_with_prefix_and_tag_postfix() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let sequence = "AAAAAQVQLQESGGGLVQPGGSLRLSCAASGFTFSNYKMNWVRQAPGKGLEWVSDISQSGASISYTGSVKGRFTISRDNAKNTLYLQMNSLKPEDTAVYYCARCPAPFTRDCFDVTSTTYAYRGQGTQVTVSSHHHHHHEPEA";
+        let segments = annotator.segment(sequence).unwrap();
+        assert_eq!(segments.prefix, "AAAAA");
+        assert_eq!(segments.postfix, "HHHHHHEPEA");
+        assert_eq!(segments.fr4, "RGQGTQVTVSS");
+
+        let rebuilt = format!(
+            "{}{}{}{}{}{}{}{}{}",
+            segments.prefix,
+            segments.fr1,
+            segments.cdr1,
+            segments.fr2,
+            segments.cdr2,
+            segments.fr3,
+            segments.cdr3,
+            segments.fr4,
+            segments.postfix,
+        );
+        assert_eq!(rebuilt, sequence);
     }
 
     #[test]
