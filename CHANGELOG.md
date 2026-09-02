@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-09-02
+
+### Added
+- `regions_for(scheme, chain)` in Python, returning a scheme's FR/CDR boundaries as
+  `{region: (start, end)}` with both ends inclusive and keyed by the lowercase region names
+  `segment()` uses. These are the same tables numbering assigns residues to, now readable without
+  numbering a sequence. Raises `ValueError` for an unknown scheme or chain, and for a pair immunum
+  cannot number (Kabat, Chothia, Martin and AHo on TCR chains).
+- Rust: `RegionDefinition::spans()` reads the stored region ends back as inclusive `(start, end)`
+  pairs, and `Scheme::validate_chain()` is the scheme/chain check `Annotator::new` previously did
+  inline.
+
 ## [1.3.0] - 2026-08-28
 
 ### Added

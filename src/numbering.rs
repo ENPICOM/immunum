@@ -419,6 +419,46 @@ mod tests {
         }
     }
 
+    /// `spans` and `region` read the same seven `*_end` fields two different ways -- one
+    /// reconstructs the starts arithmetically, the other compares -- so a span must hold exactly
+    /// the positions that map to its region, and neither neighbour. The tiling of the numbered
+    /// range is covered above; this pins the start arithmetic against the lookup.
+    #[test]
+    fn spans_agree_with_region_lookup() {
+        for scheme in [
+            Scheme::IMGT,
+            Scheme::Kabat,
+            Scheme::Chothia,
+            Scheme::Martin,
+            Scheme::Aho,
+        ] {
+            for chain in [Chain::IGH, Chain::IGK, Chain::IGL] {
+                for (region, (start, end)) in regions_for(scheme, chain).spans() {
+                    for pos in start..=end {
+                        assert_eq!(
+                            region_for_position(pos, scheme, chain),
+                            Some(region),
+                            "{scheme:?} {chain} {region:?} spans {start}-{end} but {pos} maps \
+                             elsewhere"
+                        );
+                    }
+                    assert_ne!(
+                        region_for_position(start - 1, scheme, chain),
+                        Some(region),
+                        "{scheme:?} {chain} {region:?} starts at {start} but {} is inside it",
+                        start - 1
+                    );
+                    assert_ne!(
+                        region_for_position(end + 1, scheme, chain),
+                        Some(region),
+                        "{scheme:?} {chain} {region:?} ends at {end} but {} is inside it",
+                        end + 1
+                    );
+                }
+            }
+        }
+    }
+
     /// Heavy and light must not share a table where the scheme distinguishes them, which is the
     /// bug this replaced: one table served both.
     ///

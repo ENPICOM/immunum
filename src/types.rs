@@ -123,6 +123,23 @@ pub enum Scheme {
     Aho,
 }
 
+impl Scheme {
+    /// Kabat, Chothia, Martin and AHo rules are derived for antibody chains only. AHo is defined
+    /// for TCR chains too, but immunum does not ship TCR AHo rules yet.
+    pub fn validate_chain(self, chain: Chain) -> Result<()> {
+        if matches!(
+            self,
+            Scheme::Kabat | Scheme::Chothia | Scheme::Martin | Scheme::Aho
+        ) && TCR_CHAINS.contains(&chain)
+        {
+            return Err(Error::InvalidScheme(format!(
+                "{self} scheme only supported for antibody chains (IGH, IGK, IGL)"
+            )));
+        }
+        Ok(())
+    }
+}
+
 /// Position in a numbered sequence
 /// Can be a simple number or a number with an insertion letter (e.g., "111A")
 #[cfg_attr(feature = "python", pyclass(get_all))]
@@ -254,6 +271,19 @@ impl RegionDefinition {
         } else {
             None
         }
+    }
+
+    /// The seven regions as inclusive `(start, end)` position pairs, N- to C-terminal.
+    pub const fn spans(&self) -> [(Region, (u8, u8)); 7] {
+        [
+            (Region::FR1, (1, self.fr1_end)),
+            (Region::CDR1, (self.fr1_end + 1, self.cdr1_end)),
+            (Region::FR2, (self.cdr1_end + 1, self.fr2_end)),
+            (Region::CDR2, (self.fr2_end + 1, self.cdr2_end)),
+            (Region::FR3, (self.cdr2_end + 1, self.fr3_end)),
+            (Region::CDR3, (self.fr3_end + 1, self.cdr3_end)),
+            (Region::FR4, (self.cdr3_end + 1, self.fr4_end)),
+        ]
     }
 }
 
@@ -390,5 +420,61 @@ mod tests {
     #[test]
     fn test_parse_chain_spec_invalid() {
         assert!(Chain::parse_chain_spec("xyz").is_err());
+    }
+
+    /// A definition stores only the region ends, so the starts are arithmetic: every start is the
+    /// previous end plus one, and FR1 starts at 1. Values are the IMGT table.
+    #[test]
+    fn spans_reconstruct_starts_from_ends() {
+        let imgt = RegionDefinition {
+            fr1_end: 26,
+            cdr1_end: 38,
+            fr2_end: 55,
+            cdr2_end: 65,
+            fr3_end: 104,
+            cdr3_end: 117,
+            fr4_end: 128,
+        };
+
+        assert_eq!(
+            imgt.spans(),
+            [
+                (Region::FR1, (1, 26)),
+                (Region::CDR1, (27, 38)),
+                (Region::FR2, (39, 55)),
+                (Region::CDR2, (56, 65)),
+                (Region::FR3, (66, 104)),
+                (Region::CDR3, (105, 117)),
+                (Region::FR4, (118, 128)),
+            ]
+        );
+    }
+
+    #[test]
+    fn imgt_numbers_every_chain() {
+        for &chain in ALL_CHAINS {
+            assert!(
+                Scheme::IMGT.validate_chain(chain).is_ok(),
+                "IMGT should number {chain}"
+            );
+        }
+    }
+
+    #[test]
+    fn schemes_without_tcr_rules_reject_tcr_chains() {
+        for scheme in [Scheme::Kabat, Scheme::Chothia, Scheme::Martin, Scheme::Aho] {
+            for &chain in IG_CHAINS {
+                assert!(
+                    scheme.validate_chain(chain).is_ok(),
+                    "{scheme} should number {chain}"
+                );
+            }
+            for &chain in TCR_CHAINS {
+                assert!(
+                    scheme.validate_chain(chain).is_err(),
+                    "{scheme} has no rules for {chain}"
+                );
+            }
+        }
     }
 }

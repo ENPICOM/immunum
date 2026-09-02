@@ -5,7 +5,7 @@ use crate::alignment::{align, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::{apply_numbering, segment as segment_positions};
 use crate::scoring::ScoringMatrix;
-use crate::types::{Chain, Position, Scheme, TCR_CHAINS};
+use crate::types::{Chain, Position, Scheme};
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -127,17 +127,8 @@ impl Annotator {
             return Err(Error::InvalidChain("chains cannot be empty".to_string()));
         }
 
-        // Validate: Kabat, Chothia, Martin and AHo are only supported for antibody chains.
-        // (AHo is defined for TCR chains too, but immunum does not ship TCR AHo rules yet.)
-        if matches!(
-            scheme,
-            Scheme::Kabat | Scheme::Chothia | Scheme::Martin | Scheme::Aho
-        ) && chains.iter().any(|c| TCR_CHAINS.contains(c))
-        {
-            return Err(Error::InvalidScheme(format!(
-                "{} scheme only supported for antibody chains (IGH, IGK, IGL)",
-                scheme
-            )));
+        for &chain in chains {
+            scheme.validate_chain(chain)?;
         }
 
         let mut matrices = Vec::new();

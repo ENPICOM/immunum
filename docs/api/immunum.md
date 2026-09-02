@@ -5,6 +5,8 @@
       members: true
       filters: ["!^_"]
 
+::: immunum.regions_for
+
 ::: immunum.NumberingResult
     options:
       members: true

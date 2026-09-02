@@ -34,3 +34,16 @@ print(result.fr4)   # "WGQGTLVTVSS"
 By default, sequences with an alignment confidence below `0.5` raise a `ValueError`.
 Pass `min_confidence=0.0` to disable this check, or raise the threshold to filter
 non-immunoglobulin sequences more aggressively.
+
+**Region boundaries** come from the same tables numbering assigns residues to, and can be read
+without numbering a sequence:
+
+```python
+from immunum import regions_for
+
+print(regions_for("kabat", "H")["cdr1"])  # (31, 35)
+print(regions_for("imgt", "H")["cdr3"])  # (105, 117)
+```
+
+Both ends are inclusive. IMGT and AHo number every chain alike; Kabat, Chothia and Martin place
+their CDRs differently on heavy and light chains, and only IMGT covers TCR chains.

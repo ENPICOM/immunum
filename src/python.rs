@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::annotator::Annotator;
-use crate::numbering::segment;
+use crate::numbering::{regions_for, segment};
 use crate::types::{Chain, Scheme};
 
 #[pymethods]
@@ -124,9 +124,31 @@ impl Annotator {
     }
 }
 
+/// Region boundaries as `{region: (start, end)}`, both ends inclusive, keyed by the lowercase
+/// region name that `segment` uses.
+#[pyfunction]
+fn _regions_for<'py>(py: Python<'py>, scheme: &str, chain: &str) -> PyResult<Bound<'py, PyDict>> {
+    let parsed_chain = Chain::from_str(chain).map_err(|_| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid chain: {}", chain))
+    })?;
+    let parsed_scheme = Scheme::from_str(scheme).map_err(|_| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid scheme: {}", scheme))
+    })?;
+    parsed_scheme
+        .validate_chain(parsed_chain)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+
+    let dict = PyDict::new(py);
+    for (region, span) in regions_for(parsed_scheme, parsed_chain).spans() {
+        dict.set_item(region.to_string().to_lowercase(), span)?;
+    }
+    Ok(dict)
+}
+
 #[pymodule]
 fn _internal(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_class::<Annotator>()?;
+    m.add_function(wrap_pyfunction!(_regions_for, m)?)?;
     Ok(())
 }

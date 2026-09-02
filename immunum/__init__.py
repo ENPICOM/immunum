@@ -1,4 +1,4 @@
-from immunum._internal import _Annotator  # noqa: F401
+from immunum._internal import _Annotator, _regions_for  # noqa: F401
 from dataclasses import dataclass
 from typing import Optional
 
@@ -40,15 +40,16 @@ _SCHEME_ALIASES: dict[str, str] = {
 }
 
 
+def _normalize_chain(chain: str) -> str:
+    normalized = _CHAIN_ALIASES.get(chain.lower())
+    if normalized is None:
+        valid = sorted(set(_CHAIN_ALIASES.values()))
+        raise ValueError(f"Unknown chain {chain!r}. Valid chains: {valid}")
+    return normalized
+
+
 def _normalize_chains(chains: list[str]) -> list[str]:
-    result = []
-    for chain in chains:
-        normalized = _CHAIN_ALIASES.get(chain.lower())
-        if normalized is None:
-            valid = sorted(set(_CHAIN_ALIASES.values()))
-            raise ValueError(f"Unknown chain {chain!r}. Valid chains: {valid}")
-        result.append(normalized)
-    return result
+    return [_normalize_chain(chain) for chain in chains]
 
 
 def _normalize_scheme(scheme: str) -> str:
@@ -286,3 +287,34 @@ class Annotator:
             postfix=raw.get("postfix"),
             error=raw.get("error"),
         )
+
+
+def regions_for(scheme: str, chain: str) -> dict[str, tuple[int, int]]:
+    """Look up the FR/CDR region boundaries a scheme uses for a chain.
+
+    ```python
+    from immunum import regions_for
+
+    kabat_heavy = regions_for("kabat", "H")
+    assert kabat_heavy["cdr1"] == (31, 35)
+    assert kabat_heavy["fr4"] == (103, 113)
+    ```
+
+    Args:
+        scheme: Numbering scheme — ``"imgt"``, ``"kabat"``, ``"chothia"``,
+            ``"martin"`` or ``"aho"``. See `Annotator` for aliases.
+        chain: Chain type — ``"IGH"`` / ``"H"`` / ``"heavy"`` and so on. See
+            `Annotator` for accepted values.
+
+    Returns:
+        dict[str, tuple[int, int]]: ``{region: (start, end)}`` with both bounds
+            inclusive, in N- to C-terminal order (``fr1``, ``cdr1``, … ``fr4``).
+            IMGT and AHo number every chain alike; Kabat, Chothia and Martin
+            place their CDRs differently on heavy and light chains.
+
+    Raises:
+        ValueError: If the scheme or chain is unrecognised, or if the scheme has
+            no rules for the chain — only IMGT covers TCR chains, so there is no
+            Kabat, Chothia, Martin or AHo table to return for one.
+    """
+    return _regions_for(scheme=_normalize_scheme(scheme), chain=_normalize_chain(chain))
