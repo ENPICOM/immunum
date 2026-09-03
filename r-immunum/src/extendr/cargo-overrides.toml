@@ -1,0 +1,25 @@
+# Per-package cargo config overrides for the R extension shim crate.
+#
+# Loaded into cargo via `cargo build --config <path-to-this-file>` from
+# r-immunum/src/Makevars and Makevars.win. The `--config <PATH>` flag (stable
+# since cargo 1.63) takes precedence over any walked .cargo/config.toml files.
+#
+# Why this exists: the top-level immunum crate ships .cargo/config.toml at the
+# repo root that injects `-undefined dynamic_lookup` rustflags for both darwin
+# targets. Those flags exist so PyO3's `extension-module` link mode works on
+# macOS — Python's libpython symbols are looked up dynamically at runtime.
+# That's correct for PyO3, wrong for R: R extensions must be self-contained
+# at link time, and `-undefined dynamic_lookup` would let unresolved symbols
+# slip through and explode at dyn.load time.
+#
+# This file overrides those rustflags with empty lists so the R build links
+# normally on macOS. The file lives at src/rust/cargo-overrides.toml (no
+# leading dot) on purpose: a hidden `.cargo/config.toml` directory triggers
+# a NOTE in `R CMD check`, and shipping a hidden directory inside a tarball
+# is awkward to explain to mirror admins.
+
+[target.x86_64-apple-darwin]
+rustflags = []
+
+[target.aarch64-apple-darwin]
+rustflags = []

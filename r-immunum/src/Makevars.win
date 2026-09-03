@@ -1,0 +1,36 @@
+TARGET = $(subst 64,x86_64,$(subst 32,i686,$(WIN)))-pc-windows-gnu
+
+TARGET_DIR = ./extendr/target
+LIBDIR = $(TARGET_DIR)/$(TARGET)/release
+STATLIB = $(LIBDIR)/libimmunumr.a
+PKG_LIBS = -L$(LIBDIR) -limmunumr -lws2_32 -ladvapi32 -luserenv -lbcrypt -lntdll
+
+CARGO_OVERRIDES = $(CURDIR)/extendr/cargo-overrides.toml
+
+all: C_clean
+
+$(SHLIB): $(STATLIB)
+
+CARGOTMP = $(CURDIR)/.cargo
+
+$(STATLIB):
+	mkdir -p $(TARGET_DIR)/libgcc_mock && \
+		touch $(TARGET_DIR)/libgcc_mock/libgcc_eh.a && \
+		export PATH="$${HOME}/.cargo/bin:$${PATH}" && \
+		export CARGO_HOME=$(CARGOTMP) && \
+		export RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu && \
+		export LIBRARY_PATH="$${LIBRARY_PATH};$(CURDIR)/$(TARGET_DIR)/libgcc_mock" && \
+		cd ./extendr && \
+		cargo build --target=$(TARGET) --lib --release \
+			--config $(CARGO_OVERRIDES) \
+			--manifest-path Cargo.toml \
+			--target-dir $(CURDIR)/extendr/target && \
+		cd .. && \
+		rm -Rf $(CARGOTMP) && \
+		rm -Rf $(LIBDIR)/build $(LIBDIR)/deps/*.rlib
+
+C_clean:
+	rm -Rf $(SHLIB) $(OBJECTS) $(CARGOTMP)
+
+clean:
+	rm -Rf $(SHLIB) $(OBJECTS) $(CARGOTMP) ./extendr/target
