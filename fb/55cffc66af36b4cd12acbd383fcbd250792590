@@ -1,0 +1,18 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 8-16
+Cargo.lock
+  h_acea35c6bbea0b 1304
+Cargo.toml
+  h_acea35c6bbea0b 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fb55cffc66af36b4cd12acbd383fcbd250792590",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
