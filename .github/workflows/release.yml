@@ -268,3 +268,53 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish
+
+  publish-docs:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: docs
+      url: https://immunum.enpicom.com
+    permissions:
+      id-token: write # Required for AWS OIDC
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Setup Taskfile
+        run: uv tool install go-task-bin
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build docs site
+        # build-ci installs the Python package so mkdocstrings can import it;
+        # docs-build builds the web WASM bundle and runs mkdocs build -> site/
+        run: |
+          task build-ci
+          task docs-build -- --strict
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.DOCS_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.DOCS_AWS_REGION }}
+
+      - name: Sync site to S3
+        run: aws s3 sync site/ "s3://${{ vars.DOCS_S3_BUCKET }}/" --delete
+
+      - name: Invalidate CloudFront cache
+        if: vars.DOCS_CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.DOCS_CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"

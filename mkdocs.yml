@@ -64,6 +64,9 @@ nav:
 extra_css:
   - stylesheets/extra.css
 
+hooks:
+  - scripts/mkdocs_version.py
+
 plugins:
   - search:
       lang: en
