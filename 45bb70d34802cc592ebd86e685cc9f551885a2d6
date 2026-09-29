@@ -1,0 +1,48 @@
+src/annotator.rs
+  s_6a6caf87c2278c::t_0ef5d0349edd33 130-131
+  s_6a6caf87c2278c::t_95f639ae365553 8
+src/types.rs
+  s_6a6caf87c2278c::t_c81c6ce54b2ee1 424-479
+  s_6a6caf87c2278c::t_4059e135188de2 275-287
+  s_6a6caf87c2278c::t_d4bf7565422913 126-142
+src/python.rs
+  s_6a6caf87c2278c::t_7ac42d891dad9e 127-147,152
+  s_6a6caf87c2278c::t_c4e9352b666b78 8
+immunum/__init__.py
+  s_6a6caf87c2278c::t_d46516f3e16120 1
+  s_6a6caf87c2278c::t_d3f4bcbddffd8d 43-50,52
+  s_6a6caf87c2278c::t_983dae4fd774e4 290-320
+src/numbering.rs
+  s_6a6caf87c2278c::t_c1ebbcc37d38a8 422-425
+  s_6a6caf87c2278c::t_3f64b565ec8d2b 426-461
+CHANGELOG.md
+  s_6a6caf87c2278c::t_63f7ca9ea5e05b 8-19
+Cargo.lock
+  s_6a6caf87c2278c::t_54835748740e75 1304
+Cargo.toml
+  s_6a6caf87c2278c::t_a9d5c23d5d4861 3
+docs/api/immunum.md
+  s_6a6caf87c2278c::t_3b62fe25f55c89 8-9
+docs/usage/python.md
+  s_6a6caf87c2278c::t_1279e035879101 37-49
+immunum/_internal.pyi
+  s_6a6caf87c2278c::t_fb5c416026fb22 26-27
+tests/test_python.py
+  s_6a6caf87c2278c::t_cd8d387875457e 223-394
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "45bb70d34802cc592ebd86e685cc9f551885a2d6",
+  "prompts": {},
+  "sessions": {
+    "s_6a6caf87c2278c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1bda3db0-de02-463d-bd87-7f8260c98799",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jorrit Posthuma <git@jorritposthuma.nl>"
+    }
+  }
+}
