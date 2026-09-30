@@ -224,8 +224,16 @@ tasks:
                 for f in fixtures/validation/*_imgt.csv; do
                   base=$(basename "$f" .csv)
                   chain=$(echo "$base" | cut -d_ -f2)
+                  label_args=()
+                  # sabdab2nano is numbered as heavy (no paired light chain to distinguish
+                  # it as a chain type of its own) but displayed as VHH in the plot.
+                  if [ "$base" = "sabdab2nano_H_imgt" ]; then
+                    label_args=(--chain-label VHH)
+                  fi
                   uv run --group benchmark python benches/bench_comparison.py \
                     --chain "$chain" \
+                    --fixture-stem "$base" \
+                    "${label_args[@]}" \
                     --sizes 1000 --rounds 7 \
                     --output "./resources/benchmark_results/results_${base}.csv" \
                     --timeout 1m

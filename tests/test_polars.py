@@ -34,6 +34,14 @@ VALIDATION_FIXTURES = [
     # ("tcr_B_imgt", ["TRB"], "IMGT", "imgt.B"),
     ("tcr_G_imgt", ["TRG"], "IMGT", "imgt.G"),
     ("tcr_D_imgt", ["TRD"], "IMGT", "imgt.D"),
+    # Full PDB SEQRES chains (not pre-trimmed to the variable domain), ANARCI ground
+    # truth -- see BENCHMARKS.toml for why perfect_pct is far below the fixtures above.
+    ("sabdab2paired_H_imgt", ["IGH"], "IMGT", "imgt_sabdab2paired.H"),
+    ("sabdab2paired_K_imgt", ["IGK"], "IMGT", "imgt_sabdab2paired.K"),
+    ("sabdab2paired_L_imgt", ["IGL"], "IMGT", "imgt_sabdab2paired.L"),
+    # VHH has no paired light chain to distinguish it as a chain type of its own; it's
+    # numbered as heavy (immunum has no separate VHH chain type either).
+    ("sabdab2nano_H_imgt", ["IGH"], "IMGT", "imgt_sabdab2nano.VHH"),
 ]
 
 
@@ -136,6 +144,25 @@ class TestPolarsNumber:
         )
         assert result.height == 2
 
+    def test_number_aligns_to_query_start_not_string_start(self):
+        """Regression test: residues must be read from the aligned region
+        (sequence[query_start:query_end+1]), not from index 0 of the raw
+        string. A flanking prefix before the real domain used to shift every
+        residue by len(prefix) in the polars path specifically."""
+        prefix = "MAG"
+        df = polars.DataFrame({"sequence": [prefix + IGH_SEQ]})
+        result = df.select(
+            imp.number(
+                polars.col("sequence"),
+                chains=["IGH"],
+                scheme="IMGT",
+                min_confidence=0.0,
+            ).alias("numbered")
+        ).unnest("numbered")
+        numbering = dict(zip(result["positions"][0], result["residues"][0]))
+        assert numbering["1"] == IGH_SEQ[0]
+        assert numbering["2"] == IGH_SEQ[1]
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
@@ -219,6 +246,25 @@ class TestPolarsSegment:
             ).alias("segmented")
         )
         assert result.height == 2
+
+    def test_segment_aligns_to_query_start_not_string_start(self):
+        """Regression test: same class of bug as
+        test_number_aligns_to_query_start_not_string_start, but for segment()."""
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        expected = df.select(
+            imp.segment(
+                polars.col("sequence"), chains=["IGH"], scheme="IMGT", min_confidence=0.0
+            ).alias("s")
+        ).unnest("s")["fr1"][0]
+
+        prefixed = polars.DataFrame({"sequence": ["MAG" + IGH_SEQ]})
+        got = prefixed.select(
+            imp.segment(
+                polars.col("sequence"), chains=["IGH"], scheme="IMGT", min_confidence=0.0
+            ).alias("s")
+        ).unnest("s")["fr1"][0]
+
+        assert got == expected
 
 
 class TestPolarsNumberingMethod:
