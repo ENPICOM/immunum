@@ -61,6 +61,40 @@ perfect_sequences = 369
 perfect_pct = 99.46
 overall_accuracy = 99.99
 
+# sabdab2paired_{H,K,L}_imgt / sabdab2nano_H_imgt: full PDB SEQRES chains from
+# resources/opig/sabdab2_paired_and_vhh_pdb_sequences.csv (chain_type heavy/light/VHH),
+# light chains split into kappa/lambda by ANARCI's own chain-type call, numbered with
+# legacy/original ANARCI (anarci_original).
+# Unlike the fixtures above, these are NOT pre-trimmed to the variable domain -- most
+# rows include the constant region appended directly after FR4, so a tool has to find
+# the domain boundary itself. perfect_pct is well below the fixtures above because of
+# that: immunum sometimes clips the alignment before finishing FR4 once a long
+# constant-region tail follows (see docs/benchmarks/index.md). VHH (nano) is numbered as
+# heavy (no paired light chain to distinguish it) and scores lowest of the four, likely
+# because nanobody CDR3s are typically longer, making the same tail-clipping issue worse.
+[imgt_sabdab2paired.H]
+total_sequences = 4372
+perfect_sequences = 3579
+perfect_pct = 81.86
+overall_accuracy = 88.58
+
+[imgt_sabdab2paired.K]
+total_sequences = 3160
+perfect_sequences = 2605
+perfect_pct = 82.44
+overall_accuracy = 87.23
+
+[imgt_sabdab2paired.L]
+total_sequences = 949
+perfect_sequences = 747
+perfect_pct = 78.71
+overall_accuracy = 87.4
+
+[imgt_sabdab2nano.VHH]
+total_sequences = 1457
+perfect_sequences = 818
+perfect_pct = 56.14
+overall_accuracy = 63.76
 [martin.H]
 total_sequences = 2461
 perfect_sequences = 2451

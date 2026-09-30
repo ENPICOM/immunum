@@ -49,6 +49,23 @@ above.
 
 <iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 
+### SAbDab2-paired: full PDB chains
+
+This benchmarks tests a slightly harder task than numbering pre-trimmed sequences. Namely, it takes PDB SEQRES (i.e. full sequences of chains in a PDB file) from [SAbDab2 database](https://sabdab.opig.stats.ox.ac.uk/) (paired antibodies), takes ANARCI numbering as ground truth, and compares other tools to it.
+
+In more detail, most sequences include the constant region (CH1/CL) or some kind of a tag (e.g. His-tag) appended directly after FR4, so a tool has to locate the domain boundary itself rather than being handed just the domain.
+Light chains are split into kappa/lambda based on ANARCI's own chain-type call, not known
+ahead of time.
+
+<iframe src="../assets/benchmark_plot2_correctness_sabdab2paired.html" width="100%" height="500px" frameborder="0" scrolling="yes"></iframe>
+
+### SAbDab2-nano: full PDB chains, VHH
+
+This one is the same as above, but VHH sequences come from [SAbDab2-nano](https://sabdab.opig.stats.ox.ac.uk/search-nanobodies) database. Rest of the pipeline is the same.
+
+
+<iframe src="../assets/benchmark_plot2_correctness_sabdab2nano.html" width="100%" height="250px" frameborder="0" scrolling="yes"></iframe>
+
 ## Throughput at fixed batch size
 
 Sequences annotated per second at a fixed batch size of 10,000 IGH sequences, shown
