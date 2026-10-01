@@ -1,0 +1,33 @@
+src/alignment.rs
+  s_ff197e3ebed71e::t_e19e3356569130 260-281
+  s_ff197e3ebed71e::t_6dc8d8eb122e7b 479-524,526
+  s_ff197e3ebed71e::t_b6fe6f95cef5a8 333-335
+  s_ff197e3ebed71e::t_b42cae193650db 525
+src/annotator.rs
+  s_ff197e3ebed71e::t_b649e02860dd80 329-359,363
+  s_ff197e3ebed71e::t_dd0a9cbc88b815 360-362,364-379
+CHANGELOG.md
+  s_ff197e3ebed71e::t_e8a7c7430410e7 8-21
+Cargo.lock
+  s_ff197e3ebed71e::t_d43020501950cd 1304
+Cargo.toml
+  s_ff197e3ebed71e::t_a84076f020bbaa 3
+fixtures/validation/tcr_B_imgt.csv
+  s_ff197e3ebed71e::t_92b6e1576f5e7a 2-6,8-13,15,18-28,30-38,41-49,66-97,100-110,112-115,117-132,135-141,148-187,190-202,211-338,341-495,497-732,735-935
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0648a4d966561b0c4019a99506f3b340b785546e",
+  "prompts": {},
+  "sessions": {
+    "s_ff197e3ebed71e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cccdc7e7-bcae-4333-a2ad-7b69966d8f2f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Steven Liebregt <s.liebregt@outlook.com>"
+    }
+  }
+}
