@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - <release date>
+
+### Added
+- Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
+  It aligns, masks what aligned, and aligns again until nothing left aligns with enough confidence. An
+  alignment reaching into an earlier domain keeps only its new residues, and a run shorter than
+  `MIN_SEQUENCE_LENGTH` is skipped without ending the search. A residue the caller wrote as `X` stays
+  part of its domain.
+- Rust: `Domain::number(scheme)` numbers a found domain under any scheme from the alignment that found it,
+  without aligning again. The first domain of a single-domain sequence numbers exactly like
+  `Annotator::number`, including AHo's light-chain position 149.
+- Rust: `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions without numbering again.
+
+### Changed
+- `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
+  threads. `Annotator::number` and `Annotator::segment` are built on the pieces above; their results are
+  unchanged.
+
 ## [1.3.2] - 2026-09-29
 
 ### Added

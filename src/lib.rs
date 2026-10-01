@@ -75,7 +75,7 @@ pub use numbering::kabat;
 pub use numbering::martin;
 
 pub use alignment::{align, Alignment};
-pub use annotator::{Annotator, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE};
+pub use annotator::{Annotator, Domain, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE};
 pub use error::{Error, Result};
 pub use scoring::ScoringMatrix;
 pub use types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
