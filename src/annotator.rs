@@ -326,6 +326,57 @@ mod tests {
         assert_eq!(result.positions.len(), FULL_IGH.len());
     }
 
+    // PDB 1EFQ chain A, from fixtures/validation/ab_K_imgt.csv.
+    const KAPPA: &str = "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK";
+
+    // Expected values from ANARCI: one residue past the domain is never part of it, except that AHo
+    // numbers the residue after a light chain as position 149.
+    #[test]
+    fn test_one_trailing_residue_numbers_like_none() {
+        let chains = [Chain::IGH, Chain::IGK, Chain::IGL];
+        for scheme in [
+            Scheme::IMGT,
+            Scheme::Kabat,
+            Scheme::Chothia,
+            Scheme::Martin,
+            Scheme::Aho,
+        ] {
+            let annotator = Annotator::new(&chains, scheme, None).unwrap();
+            for domain in [FULL_IGH, KAPPA] {
+                let bare = annotator.number(domain).unwrap();
+                for residue in ["A", "G", "R", "W"] {
+                    let sequence = format!("{domain}{residue}");
+                    let with_tail = annotator.number(&sequence).unwrap();
+                    let aho_light_tail = scheme == Scheme::Aho && bare.chain == Chain::IGK;
+                    let mut expected = bare.positions.clone();
+                    if aho_light_tail {
+                        expected.push(Position::new(149));
+                    }
+
+                    assert_eq!(
+                        with_tail.positions, expected,
+                        "{scheme} {:?}+{residue}",
+                        bare.chain
+                    );
+                    assert_eq!(
+                        with_tail.query_end,
+                        bare.query_start + expected.len() - 1,
+                        "{scheme} {:?}+{residue}",
+                        bare.chain
+                    );
+                    if !aho_light_tail {
+                        assert_eq!(
+                            annotator.segment(&sequence).unwrap().fr4,
+                            annotator.segment(domain).unwrap().fr4,
+                            "{scheme} {:?}+{residue}",
+                            bare.chain
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// Kabat segmentation, heavy and light. Guards the chain-specific region tables end to end:
     /// under Kabat, CDR-H2 is 50-65 (16 positions) while CDR-L2 is 50-56 (7), and light numbering
     /// stops at 107. A single shared table cannot produce both, which is what this catches.

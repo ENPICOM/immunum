@@ -257,6 +257,28 @@ fn build_traceback(
     let mut i = traceback_end_i;
     let mut j = cons_end;
 
+    // A residue the consensus cannot place in the domain does not end it: one inserted after the
+    // last consensus position, or one at a position no reference sequence occupies (no gap
+    // penalty there). `align` keeps any tail cheaper than SUFFIX_CLIP_THRESHOLD, so a single such
+    // residue would otherwise be numbered.
+    while i > 0 && j > 0 {
+        let unoccupied = positions[j - 1].gap_penalty == 0.0;
+        match Direction::from_u8(dp_traceback[i * stride + j]) {
+            Direction::GapInConsensus if j == positions.len() => {
+                i -= 1;
+            }
+            Direction::Match if unoccupied => {
+                i -= 1;
+                j -= 1;
+            }
+            Direction::GapInQuery if unoccupied => {
+                j -= 1;
+            }
+            _ => break,
+        }
+    }
+    let domain_end_i = i;
+
     while i > 0 && j > 0 {
         match Direction::from_u8(dp_traceback[i * stride + j]) {
             Direction::Match => {
@@ -308,9 +330,9 @@ fn build_traceback(
 
     aligned_positions.reverse();
 
-    // Append trailing Insertion() for suffix residues beyond traceback_end_i
-    let query_end = traceback_end_i.saturating_sub(1);
-    for _ in traceback_end_i..query_len {
+    // Append trailing Insertion() for suffix residues beyond the domain
+    let query_end = domain_end_i.saturating_sub(1);
+    for _ in domain_end_i..query_len {
         aligned_positions.push(AlignedPosition::Insertion());
     }
 
@@ -451,6 +473,54 @@ mod tests {
         // Suffix positions should be Insertion()
         for pos in &result.positions[FULL_IGH.len()..] {
             assert_eq!(*pos, AlignedPosition::Insertion());
+        }
+    }
+
+    // PDB 1EFQ chain A. IGK consensus position 128 is unoccupied: no kappa has a residue there.
+    const KAPPA: &str = "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK";
+
+    #[test]
+    fn test_one_trailing_residue_is_not_inserted_after_the_last_position() {
+        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        for residue in ["A", "G", "R", "W"] {
+            let sequence = format!("{FULL_IGH}{residue}");
+            let result = test_align(&sequence, &matrix.positions);
+
+            assert_eq!(result.query_end, FULL_IGH.len() - 1, "{residue}");
+            assert_eq!(result.positions.len(), sequence.len());
+            assert_eq!(
+                result.positions[FULL_IGH.len()],
+                AlignedPosition::Insertion()
+            );
+            assert_eq!(result.cons_end, 128);
+        }
+    }
+
+    #[test]
+    fn test_one_trailing_residue_is_not_placed_at_an_unoccupied_position() {
+        let matrix = ScoringMatrix::load(Chain::IGK).unwrap();
+        for residue in ["A", "G", "R", "W"] {
+            let sequence = format!("{KAPPA}{residue}");
+            let result = test_align(&sequence, &matrix.positions);
+
+            assert_eq!(result.query_end, KAPPA.len() - 1, "{residue}");
+            assert_eq!(result.positions[KAPPA.len()], AlignedPosition::Insertion());
+            assert_eq!(result.cons_end, 127);
+        }
+    }
+
+    #[test]
+    fn test_one_trailing_residue_aligns_the_domain_like_none() {
+        for (chain, domain) in [(Chain::IGH, FULL_IGH), (Chain::IGK, KAPPA)] {
+            let matrix = ScoringMatrix::load(chain).unwrap();
+            let bare = test_align(domain, &matrix.positions);
+            let with_tail = test_align(&format!("{domain}A"), &matrix.positions);
+
+            assert_eq!(with_tail.positions[..domain.len()], bare.positions[..]);
+            assert_eq!(
+                (with_tail.confidence_score, with_tail.max_confidence_score),
+                (bare.confidence_score, bare.max_confidence_score)
+            );
         }
     }
 
