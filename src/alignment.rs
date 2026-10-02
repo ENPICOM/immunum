@@ -202,7 +202,31 @@ pub fn align(
             best_j = row_best_j[i];
         }
     }
-    let best_score = row_max_score[best_i];
+    let mut best_score = row_max_score[best_i];
+
+    // Drop trailing residues inserted after the last position or matched to an unoccupied one
+    // (gap_penalty == 0): a single such residue costs < SUFFIX_CLIP_THRESHOLD and would otherwise
+    // be numbered. Take the score from where the walk stops so it matches the kept alignment.
+    {
+        let (mut i, mut j) = (best_i, best_j);
+        while i > 0 && j > 0 {
+            let unoccupied = positions[j - 1].gap_penalty == 0.0;
+            match Direction::from_u8(dp_traceback[i * stride + j]) {
+                Direction::GapInConsensus if j == cons_len => i -= 1,
+                Direction::Match if unoccupied => {
+                    i -= 1;
+                    j -= 1;
+                }
+                Direction::GapInQuery if unoccupied => j -= 1,
+                _ => break,
+            }
+        }
+        if i != best_i {
+            best_i = i;
+            best_j = j;
+            best_score = dp_scores[i * stride + j];
+        }
+    }
 
     let (
         aligned_positions,
@@ -257,28 +281,6 @@ fn build_traceback(
     let mut i = traceback_end_i;
     let mut j = cons_end;
 
-    // A residue the consensus cannot place in the domain does not end it: one inserted after the
-    // last consensus position, or one at a position no reference sequence occupies (no gap
-    // penalty there). `align` keeps any tail cheaper than SUFFIX_CLIP_THRESHOLD, so a single such
-    // residue would otherwise be numbered.
-    while i > 0 && j > 0 {
-        let unoccupied = positions[j - 1].gap_penalty == 0.0;
-        match Direction::from_u8(dp_traceback[i * stride + j]) {
-            Direction::GapInConsensus if j == positions.len() => {
-                i -= 1;
-            }
-            Direction::Match if unoccupied => {
-                i -= 1;
-                j -= 1;
-            }
-            Direction::GapInQuery if unoccupied => {
-                j -= 1;
-            }
-            _ => break,
-        }
-    }
-    let domain_end_i = i;
-
     while i > 0 && j > 0 {
         match Direction::from_u8(dp_traceback[i * stride + j]) {
             Direction::Match => {
@@ -330,9 +332,9 @@ fn build_traceback(
 
     aligned_positions.reverse();
 
-    // Append trailing Insertion() for suffix residues beyond the domain
-    let query_end = domain_end_i.saturating_sub(1);
-    for _ in domain_end_i..query_len {
+    // Append trailing Insertion() for suffix residues beyond traceback_end_i
+    let query_end = traceback_end_i.saturating_sub(1);
+    for _ in traceback_end_i..query_len {
         aligned_positions.push(AlignedPosition::Insertion());
     }
 
@@ -518,8 +520,12 @@ mod tests {
 
             assert_eq!(with_tail.positions[..domain.len()], bare.positions[..]);
             assert_eq!(
-                (with_tail.confidence_score, with_tail.max_confidence_score),
-                (bare.confidence_score, bare.max_confidence_score)
+                (
+                    with_tail.score,
+                    with_tail.confidence_score,
+                    with_tail.max_confidence_score
+                ),
+                (bare.score, bare.confidence_score, bare.max_confidence_score)
             );
         }
     }
