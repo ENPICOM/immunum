@@ -86,7 +86,9 @@ tasks:
         generates:
             - docs/assets/wasm/immunum.js
         cmds:
-            - wasm-pack build --target web --out-dir docs/assets/wasm --no-default-features --features wasm {{.CLI_ARGS}}
+            # No {{.CLI_ARGS}}: it is global, so `task docs-build -- --strict` would forward
+            # --strict through wasm-pack to `cargo build`.
+            - wasm-pack build --target web --out-dir docs/assets/wasm --no-default-features --features wasm
 
     test-wasm:
         deps:
