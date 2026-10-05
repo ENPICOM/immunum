@@ -436,7 +436,15 @@ mod tests {
     #[test]
     fn a_domain_numbers_like_number_in_every_scheme() {
         let kappa_with_constant = format!("{KAPPA}{KAPPA_CONSTANT}");
-        for sequence in [FULL_IGH, KAPPA, kappa_with_constant.as_str()] {
+        let heavy_with_one = format!("{FULL_IGH}A");
+        let kappa_with_one = format!("{KAPPA}A");
+        for sequence in [
+            FULL_IGH,
+            KAPPA,
+            kappa_with_constant.as_str(),
+            heavy_with_one.as_str(),
+            kappa_with_one.as_str(),
+        ] {
             for scheme in [
                 Scheme::IMGT,
                 Scheme::Kabat,
@@ -591,6 +599,54 @@ mod tests {
         assert_eq!(result.query_start, 0);
         assert_eq!(result.query_end, FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    // Expected values from ANARCI: one residue past the domain is never part of it, except that AHo
+    // numbers the residue after a light chain as position 149.
+    #[test]
+    fn test_one_trailing_residue_numbers_like_none() {
+        let chains = [Chain::IGH, Chain::IGK, Chain::IGL];
+        for scheme in [
+            Scheme::IMGT,
+            Scheme::Kabat,
+            Scheme::Chothia,
+            Scheme::Martin,
+            Scheme::Aho,
+        ] {
+            let annotator = Annotator::new(&chains, scheme, None).unwrap();
+            for domain in [FULL_IGH, KAPPA] {
+                let bare = annotator.number(domain).unwrap();
+                for residue in ["A", "G", "R", "W"] {
+                    let sequence = format!("{domain}{residue}");
+                    let with_tail = annotator.number(&sequence).unwrap();
+                    let aho_light_tail = scheme == Scheme::Aho && bare.chain == Chain::IGK;
+                    let mut expected = bare.positions.clone();
+                    if aho_light_tail {
+                        expected.push(Position::new(149));
+                    }
+
+                    assert_eq!(
+                        with_tail.positions, expected,
+                        "{scheme} {:?}+{residue}",
+                        bare.chain
+                    );
+                    assert_eq!(
+                        with_tail.query_end,
+                        bare.query_start + expected.len() - 1,
+                        "{scheme} {:?}+{residue}",
+                        bare.chain
+                    );
+                    if !aho_light_tail {
+                        assert_eq!(
+                            annotator.segment(&sequence).unwrap().fr4,
+                            annotator.segment(domain).unwrap().fr4,
+                            "{scheme} {:?}+{residue}",
+                            bare.chain
+                        );
+                    }
+                }
+            }
+        }
     }
 
     /// Kabat segmentation, heavy and light. Guards the chain-specific region tables end to end:

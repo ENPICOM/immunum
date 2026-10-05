@@ -23,6 +23,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   threads. `Annotator::number` and `Annotator::segment` are built on the pieces above; their results are
   unchanged.
 
+## [1.3.3] - 2026-10-01
+
+### Fixed
+- A sequence ending exactly one residue past a domain's last framework position no longer gets that
+  residue numbered as part of the domain. A heavy chain + one residue numbered it as an insertion after
+  the last position (IMGT `128A`, Kabat `113A`), and a kappa or lambda chain + one residue numbered it at
+  IMGT 128, a position no light chain has. In both cases it also extended `query_end` and FR4. Two or more
+  trailing residues were already left out. Numbering now matches ANARCI, including AHo's position 149
+  after a light chain.
+- The documentation release build failed because `task docs-build -- --strict` forwarded `--strict`
+  through the `build-wasm-web` dependency into `cargo build`. The wasm-pack task no longer takes
+  `CLI_ARGS`.
+
+### Changed
+- The TRB validation fixture no longer expects a residue at IMGT 128. The residue after a TRB J-region is
+  the first residue of the constant region; TRB germline J genes and ANARCI end at 127.
+
 ## [1.3.2] - 2026-09-29
 
 ### Added
