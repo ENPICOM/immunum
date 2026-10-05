@@ -15,11 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   part of its domain.
 - Rust: `Domain::number(scheme)` numbers a found domain under any scheme from the alignment that found it,
   without aligning again. The first domain of a single-domain sequence numbers exactly like
-  `Annotator::number`, including AHo's light-chain position 149.
+  `Annotator::number`, including AHo's light-chain position 149. A `Domain`'s span, chain and confidence
+  are read through methods (`query_start()`, `chain()`, ...), so they can't drift from its alignment.
 - Rust: `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions without numbering again.
+  `sequence` is the whole sequence that was numbered or searched; one too short for the numbering is an
+  error.
 
 ### Changed
-- `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
+- Rust: `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
   threads. `Annotator::number` and `Annotator::segment` are built on the pieces above; their results are
   unchanged.
 

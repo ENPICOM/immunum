@@ -93,7 +93,6 @@ fn validate_sequence(sequence: &str) -> Result<()> {
 }
 
 thread_local! {
-    // One reusable alignment buffer per thread, so one `Annotator` can serve every thread.
     static ALIGN_BUFFER: RefCell<AlignBuffer> = RefCell::new(AlignBuffer::new());
 }
 
@@ -143,7 +142,7 @@ impl Annotator {
 
     /// Segment a sequence into FR/CDR regions
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
-        Ok(self.number(sequence)?.segment(sequence))
+        self.number(sequence)?.segment(sequence)
     }
 
     /// Every variable domain in `sequence`, ordered by position.
@@ -154,23 +153,25 @@ impl Annotator {
     /// but not reported.
     pub fn domains(&self, sequence: &str) -> Result<Vec<Domain>> {
         validate_sequence(sequence)?;
-        // Kept apart from the text: an `X` the caller wrote is a residue, not a found one.
-        let mut found = vec![false; sequence.len()];
+        // `claimed` marks the residues earlier domains hold; `masked` is the sequence with those residues
+        // replaced by `X`, and is what each round aligns. Claims can't be read back from `masked`: an `X`
+        // the caller wrote is an unclaimed residue, and can still be part of a domain.
+        let mut claimed = vec![false; sequence.len()];
         let mut masked = sequence.as_bytes().to_vec();
         let mut domains = Vec::new();
         loop {
-            let text = std::str::from_utf8(&masked).expect("validated as ASCII");
-            let domain = match self.best_domain(text) {
+            let masked_sequence = std::str::from_utf8(&masked).expect("validated as ASCII");
+            let domain = match self.best_domain(masked_sequence) {
                 Ok(domain) => domain,
                 Err(Error::LowConfidence { .. }) => break,
                 Err(error) => return Err(error),
             };
             let Some((start, end)) =
-                longest_new_run(&found, domain.query_start, domain.query_end + 1)
+                longest_unclaimed_run(&claimed, domain.query_start, domain.query_end + 1)
             else {
                 break;
             };
-            found[start..end].fill(true);
+            claimed[start..end].fill(true);
             masked[start..end].fill(b'X');
             domains.extend(domain.clipped(start, end));
         }
@@ -232,17 +233,13 @@ impl Annotator {
 /// applied. Number it under as many schemes as needed; none aligns again.
 #[derive(Debug, Clone)]
 pub struct Domain {
-    pub chain: Chain,
-    pub confidence: f32,
-    /// 0-based index of the domain's first residue in the searched sequence
-    pub query_start: usize,
-    /// 0-based index of the domain's last residue
-    pub query_end: usize,
-    /// First aligned consensus position
-    pub cons_start: usize,
-    /// Last aligned consensus position
-    pub cons_end: usize,
-    /// One alignment state per residue in `query_start..=query_end`
+    chain: Chain,
+    confidence: f32,
+    query_start: usize,
+    query_end: usize,
+    cons_start: usize,
+    cons_end: usize,
+    // One alignment state per residue in `query_start..=query_end`
     states: Vec<AlignedPosition>,
     // First index the AHo tail residue may not reach: the next domain's start, or the sequence end.
     tail_limit: usize,
@@ -260,6 +257,37 @@ impl Domain {
             states: alignment.positions[alignment.query_start..=alignment.query_end].to_vec(),
             tail_limit,
         }
+    }
+
+    pub fn chain(&self) -> Chain {
+        self.chain
+    }
+
+    /// Confidence of the alignment that found this domain. For a domain cut from an alignment that
+    /// reached into an earlier domain, it describes that whole alignment, so it can be lower than the
+    /// domain alone would score.
+    pub fn confidence(&self) -> f32 {
+        self.confidence
+    }
+
+    /// 0-based index of the domain's first residue in the searched sequence
+    pub fn query_start(&self) -> usize {
+        self.query_start
+    }
+
+    /// 0-based index of the domain's last residue
+    pub fn query_end(&self) -> usize {
+        self.query_end
+    }
+
+    /// First aligned consensus position
+    pub fn cons_start(&self) -> usize {
+        self.cons_start
+    }
+
+    /// Last aligned consensus position
+    pub fn cons_end(&self) -> usize {
+        self.cons_end
     }
 
     /// This domain numbered under `scheme`, from the alignment that found it.
@@ -320,12 +348,12 @@ impl Domain {
 }
 
 // The longest run of residues in `start..end` that no earlier domain holds.
-fn longest_new_run(found: &[bool], start: usize, end: usize) -> Option<(usize, usize)> {
+fn longest_unclaimed_run(claimed: &[bool], start: usize, end: usize) -> Option<(usize, usize)> {
     let mut longest: Option<(usize, usize)> = None;
     let mut run_start = None;
     for i in start..=end {
-        let new = i < end && found.get(i) == Some(&false);
-        match (new, run_start) {
+        let unclaimed = i < end && claimed.get(i) == Some(&false);
+        match (unclaimed, run_start) {
             (true, None) => run_start = Some(i),
             (false, Some(from)) => {
                 if longest.is_none_or(|(s, e)| i - from > e - s) {
@@ -341,11 +369,20 @@ fn longest_new_run(found: &[bool], start: usize, end: usize) -> Option<(usize, u
 
 impl NumberingResult {
     /// The FR/CDR split of the residues this result numbered, without numbering again. `sequence` is
-    /// the one it numbered.
-    pub fn segment(&self, sequence: &str) -> SegmentResult {
-        let aligned_seq = &sequence[self.query_start..=self.query_end];
+    /// the whole sequence that was numbered or searched, not a domain's own residues.
+    pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
+        let aligned_seq = sequence
+            .get(self.query_start..=self.query_end)
+            .ok_or_else(|| {
+                Error::InvalidSequence(format!(
+                    "numbered residues {}..={} lie outside a sequence of length {}",
+                    self.query_start,
+                    self.query_end,
+                    sequence.len()
+                ))
+            })?;
         let mut map = segment_positions(&self.positions, aligned_seq, self.scheme, self.chain);
-        SegmentResult {
+        Ok(SegmentResult {
             prefix: map.remove("prefix").unwrap_or_default(),
             fr1: map.remove("fr1").unwrap_or_default(),
             cdr1: map.remove("cdr1").unwrap_or_default(),
@@ -355,7 +392,7 @@ impl NumberingResult {
             cdr3: map.remove("cdr3").unwrap_or_default(),
             fr4: map.remove("fr4").unwrap_or_default(),
             postfix: map.remove("postfix").unwrap_or_default(),
-        }
+        })
     }
 }
 
@@ -554,12 +591,27 @@ mod tests {
     #[test]
     fn segment_of_a_numbering_matches_segment() {
         let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::Kabat, None).unwrap();
-        let from_numbering = annotator.number(FULL_IGH).unwrap().segment(FULL_IGH);
+        let from_numbering = annotator
+            .number(FULL_IGH)
+            .unwrap()
+            .segment(FULL_IGH)
+            .unwrap();
         let segmented = annotator.segment(FULL_IGH).unwrap();
         assert_eq!(
             (from_numbering.fr1, from_numbering.cdr3, from_numbering.fr4),
             (segmented.fr1, segmented.cdr3, segmented.fr4)
         );
+    }
+
+    #[test]
+    fn segment_of_a_later_domain_needs_the_whole_sequence() {
+        let scfv = format!("{FULL_IGH}{LINKER}{KAPPA}");
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let kappa = annotator.domains(&scfv).unwrap()[1]
+            .number(Scheme::IMGT)
+            .unwrap();
+        assert!(kappa.segment(&scfv).is_ok());
+        assert!(kappa.segment(KAPPA).is_err());
     }
 
     #[test]
