@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use crate::alignment::{align, AlignBuffer, AlignedPosition, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::{apply_numbering, segment as segment_positions};
-use crate::scoring::ScoringMatrix;
+use crate::scoring::{PositionScores, ScoringMatrix};
 use crate::types::{Chain, Position, Scheme};
 
 #[cfg(feature = "python")]
@@ -149,8 +149,8 @@ impl Annotator {
     ///
     /// Aligns the sequence, masks what the best alignment covers with `X`, and aligns again, until nothing
     /// left aligns with enough confidence. An alignment reaching into residues an earlier domain holds
-    /// keeps only its longest run of new residues; a run shorter than [`MIN_SEQUENCE_LENGTH`] is masked
-    /// but not reported.
+    /// keeps only its longest run of new residues, and its confidence is that run's own; a run shorter
+    /// than [`MIN_SEQUENCE_LENGTH`] is masked but not reported.
     pub fn domains(&self, sequence: &str) -> Result<Vec<Domain>> {
         validate_sequence(sequence)?;
         // `claimed` marks the residues earlier domains hold; `masked` is the sequence with those residues
@@ -161,19 +161,32 @@ impl Annotator {
         let mut domains = Vec::new();
         loop {
             let masked_sequence = std::str::from_utf8(&masked).expect("validated as ASCII");
-            let domain = match self.best_domain(masked_sequence) {
-                Ok(domain) => domain,
-                Err(Error::LowConfidence { .. }) => break,
-                Err(error) => return Err(error),
-            };
+            let domain = self.aligned_domain(masked_sequence)?;
             let Some((start, end)) =
                 longest_unclaimed_run(&claimed, domain.query_start, domain.query_end + 1)
             else {
                 break;
             };
+            // The masked residues score as mismatches, so an alignment reaching into them is judged
+            // by what it keeps; a run too short to keep is judged by the whole alignment.
+            let whole = (start, end) == (domain.query_start, domain.query_end + 1);
+            let alignment_confidence = domain.confidence;
+            let kept = domain.clipped(start, end).map(|mut domain| {
+                if !whole {
+                    domain.rescore(self.positions(domain.chain), sequence.as_bytes());
+                }
+                domain
+            });
+            if kept
+                .as_ref()
+                .map_or(alignment_confidence, |domain| domain.confidence)
+                < self.min_confidence
+            {
+                break;
+            }
             claimed[start..end].fill(true);
             masked[start..end].fill(b'X');
-            domains.extend(domain.clipped(start, end));
+            domains.extend(kept);
         }
         domains.sort_by_key(|domain| domain.query_start);
         let tail_limits: Vec<usize> = domains
@@ -189,19 +202,33 @@ impl Annotator {
     }
 
     fn best_domain(&self, sequence: &str) -> Result<Domain> {
+        let domain = self.aligned_domain(sequence)?;
+        if domain.confidence < self.min_confidence {
+            return Err(Error::LowConfidence {
+                confidence: domain.confidence,
+                threshold: self.min_confidence,
+            });
+        }
+        Ok(domain)
+    }
+
+    // The best alignment's domain, whatever its confidence
+    fn aligned_domain(&self, sequence: &str) -> Result<Domain> {
         let (chain, alignment) = self.get_best_alignment(sequence)?;
         let confidence = if alignment.max_confidence_score > 0.0 {
             (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        if confidence < self.min_confidence {
-            return Err(Error::LowConfidence {
-                confidence,
-                threshold: self.min_confidence,
-            });
-        }
         Ok(Domain::new(chain, alignment, confidence, sequence.len()))
+    }
+
+    fn positions(&self, chain: Chain) -> &[PositionScores] {
+        self.matrices
+            .iter()
+            .find(|(loaded, _)| *loaded == chain)
+            .map(|(_, matrix)| matrix.positions.as_slice())
+            .expect("a domain's chain is a loaded chain")
     }
 
     /// Align the sequence to all loaded chain types and return the best match
@@ -263,9 +290,8 @@ impl Domain {
         self.chain
     }
 
-    /// Confidence of the alignment that found this domain. For a domain cut from an alignment that
-    /// reached into an earlier domain, it describes that whole alignment, so it can be lower than the
-    /// domain alone would score.
+    /// Confidence of this domain's alignment. For a domain cut from an alignment that reached into an
+    /// earlier domain, it scores only the part kept.
     pub fn confidence(&self) -> f32 {
         self.confidence
     }
@@ -293,6 +319,7 @@ impl Domain {
     /// This domain numbered under `scheme`, from the alignment that found it.
     pub fn number(&self, scheme: Scheme) -> Result<NumberingResult> {
         scheme.validate_chain(self.chain)?;
+
         let mut positions = apply_numbering(&self.states, scheme, self.chain);
         let mut query_end = self.query_end;
 
@@ -325,25 +352,71 @@ impl Domain {
     // state, so leading insertions are dropped; None when too little is left to report.
     fn clipped(mut self, start: usize, end: usize) -> Option<Self> {
         let states = &self.states[start - self.query_start..end - self.query_start];
+
         let leading = states
             .iter()
             .take_while(|state| matches!(state, AlignedPosition::Insertion()))
             .count();
+
         let states = &states[leading..];
         if states.len() < MIN_SEQUENCE_LENGTH {
             return None;
         }
+
         let mut aligned = states.iter().filter_map(|state| match state {
             AlignedPosition::Aligned(position) => Some(*position as usize),
             AlignedPosition::Insertion() => None,
         });
+
         let first = aligned.next()?;
+
         self.cons_start = first;
         self.cons_end = aligned.next_back().unwrap_or(first);
         self.query_start = start + leading;
         self.query_end = end - 1;
         self.states = states.to_vec();
+
         Some(self)
+    }
+
+    // Score `states` against `positions` as the aligner scores confidence: an aligned residue by its
+    // amino acid, a consensus position skipped between two aligned residues by its gap penalty.
+    // `sequence` is the whole searched sequence.
+    fn rescore(&mut self, positions: &[PositionScores], sequence: &[u8]) {
+        let (mut score, mut max_score) = (0.0f32, 0.0f32);
+        let mut previous: Option<usize> = None;
+
+        for (offset, state) in self.states.iter().enumerate() {
+            let AlignedPosition::Aligned(position) = *state else {
+                continue;
+            };
+
+            let index = positions
+                .binary_search_by_key(&position, |scores| scores.position)
+                .expect("aligned to a position of this matrix");
+
+            for skipped in &positions[previous.map_or(index, |previous| previous + 1)..index] {
+                if skipped.counts_for_confidence {
+                    score += skipped.gap_penalty;
+                    max_score += skipped.max_score;
+                }
+            }
+
+            let scores = &positions[index];
+            if scores.counts_for_confidence {
+                let residue = sequence[self.query_start + offset].to_ascii_uppercase();
+                score += scores.score_for(residue);
+                max_score += scores.max_score;
+            }
+
+            previous = Some(index);
+        }
+
+        self.confidence = if max_score > 0.0 {
+            (score / max_score).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
     }
 }
 
@@ -351,6 +424,7 @@ impl Domain {
 fn longest_unclaimed_run(claimed: &[bool], start: usize, end: usize) -> Option<(usize, usize)> {
     let mut longest: Option<(usize, usize)> = None;
     let mut run_start = None;
+
     for i in start..=end {
         let unclaimed = i < end && claimed.get(i) == Some(&false);
         match (unclaimed, run_start) {
@@ -364,6 +438,7 @@ fn longest_unclaimed_run(claimed: &[bool], start: usize, end: usize) -> Option<(
             _ => {}
         }
     }
+
     longest
 }
 
@@ -381,7 +456,9 @@ impl NumberingResult {
                     sequence.len()
                 ))
             })?;
+
         let mut map = segment_positions(&self.positions, aligned_seq, self.scheme, self.chain);
+
         Ok(SegmentResult {
             prefix: map.remove("prefix").unwrap_or_default(),
             fr1: map.remove("fr1").unwrap_or_default(),
@@ -554,6 +631,60 @@ mod tests {
         assert_eq!((clipped.cons_start, clipped.cons_end), (1, 40));
         assert_eq!(clipped.states.len(), 40);
         assert!(domain.clipped(10, 40).is_none());
+    }
+
+    #[test]
+    fn rescoring_a_whole_domain_gives_its_confidence() {
+        for (chain, fixture) in [
+            (Chain::IGH, "ab_H_imgt"),
+            (Chain::IGK, "ab_K_imgt"),
+            (Chain::IGL, "ab_L_imgt"),
+            (Chain::TRA, "tcr_A_imgt"),
+            (Chain::TRB, "tcr_B_imgt"),
+            (Chain::TRG, "tcr_G_imgt"),
+            (Chain::TRD, "tcr_D_imgt"),
+        ] {
+            let path = format!(
+                "{}/fixtures/validation/{fixture}.csv",
+                env!("CARGO_MANIFEST_DIR")
+            );
+            let annotator = Annotator::new(&[chain], Scheme::IMGT, Some(0.0)).unwrap();
+            let csv = std::fs::read_to_string(path).unwrap();
+            for sequence in csv.lines().skip(1).filter_map(|row| row.split(',').nth(1)) {
+                let domain = annotator.best_domain(sequence).unwrap();
+                let mut rescored = domain.clone();
+                rescored.rescore(annotator.positions(chain), sequence.as_bytes());
+                assert!(
+                    (rescored.confidence - domain.confidence).abs() < 1e-5,
+                    "{chain:?} {sequence}: {} rescored as {}",
+                    domain.confidence,
+                    rescored.confidence
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rescoring_scores_the_residues_kept() {
+        let annotator = Annotator::new(&[Chain::IGK], Scheme::IMGT, None).unwrap();
+        let mut domain = annotator.best_domain(KAPPA).unwrap();
+        let junk = "W".repeat(KAPPA.len());
+        domain.rescore(annotator.positions(Chain::IGK), junk.as_bytes());
+        assert!(domain.confidence < DEFAULT_MIN_CONFIDENCE);
+    }
+
+    // The second alignment reaches back over 40 masked residues of the first domain, which drag its
+    // confidence below the minimum; the residues it keeps score well on their own.
+    #[test]
+    fn keeps_a_domain_whose_alignment_reaches_into_an_earlier_one() {
+        let sequence = format!("{FULL_IGH}{}", &FULL_IGH[40..]);
+        assert_eq!(
+            spans(&sequence),
+            vec![(0, 118, Chain::IGH), (119, 197, Chain::IGH)]
+        );
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let second = &annotator.domains(&sequence).unwrap()[1];
+        assert!(second.confidence() > 0.8, "{}", second.confidence());
     }
 
     #[test]
