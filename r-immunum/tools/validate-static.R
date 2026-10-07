@@ -1,0 +1,260 @@
+# Static validation: parse DESCRIPTION, NAMESPACE, R files, Rd files,
+# the extendr shim crate manifest, and lib.rs source. Used in lieu of a
+# full `R CMD check` when cargo isn't available locally.
+#
+# Run from the r-immunum/ directory:
+#   Rscript --vanilla tools/validate-static.R
+
+stopifnot(file.exists("DESCRIPTION"), file.exists("src/extendr/Cargo.toml"))
+
+ok <- TRUE
+fail <- function(msg) { cat("FAIL:", msg, "\n"); ok <<- FALSE }
+
+# 1. DESCRIPTION
+desc <- tryCatch(read.dcf("DESCRIPTION"), error = function(e) NULL)
+if (is.null(desc)) {
+  fail("DESCRIPTION not parseable")
+} else {
+  cat("OK: DESCRIPTION parses\n")
+  cat("    Package:", desc[, "Package"], "\n")
+  cat("    Version:", desc[, "Version"], "\n")
+  cat("    License:", desc[, "License"], "\n")
+}
+
+# 2. R files parse
+r_files <- list.files("R", pattern = "\\.R$", full.names = TRUE)
+for (f in r_files) {
+  tryCatch({
+    parse(f)
+    cat("OK: parse", f, "\n")
+  }, error = function(e) fail(sprintf("parse %s: %s", f, conditionMessage(e))))
+}
+
+# 3. Test files parse
+test_files <- list.files("tests/testthat", pattern = "\\.R$", full.names = TRUE)
+for (f in test_files) {
+  tryCatch({
+    parse(f)
+    cat("OK: parse", f, "\n")
+  }, error = function(e) fail(sprintf("parse %s: %s", f, conditionMessage(e))))
+}
+
+# 4. NAMESPACE
+ns_lines <- readLines("NAMESPACE")
+exports <- grep("^export\\(", ns_lines, value = TRUE)
+useDynLib <- grep("^useDynLib\\(", ns_lines, value = TRUE)
+if (length(exports) == 0L) fail("NAMESPACE has no export() directives")
+if (length(useDynLib) == 0L) fail("NAMESPACE missing useDynLib")
+# Phase B: Annotator must be exported
+if (!any(grepl("^export\\(Annotator\\)", ns_lines))) {
+  fail("NAMESPACE does not export Annotator")
+} else {
+  cat("OK: NAMESPACE exports Annotator\n")
+}
+if (!any(grepl("^export\\(immunum_version\\)", ns_lines))) {
+  fail("NAMESPACE does not export immunum_version")
+} else {
+  cat("OK: NAMESPACE exports immunum_version\n")
+}
+# Validation pipeline functions must be exported
+validation_exports <- c(
+  "benchmark_threshold",
+  "validation_fixtures"
+)
+for (e in validation_exports) {
+  if (!any(grepl(sprintf("^export\\(%s\\)", e), ns_lines))) {
+    fail(sprintf("NAMESPACE does not export %s", e))
+  } else {
+    cat("OK: NAMESPACE exports", e, "\n")
+  }
+}
+cat("OK: NAMESPACE has", length(exports), "export(s) and",
+    length(useDynLib), "useDynLib directive(s)\n")
+
+# 5. Cargo.toml at expected path
+if (!file.exists("src/extendr/Cargo.toml")) fail("src/extendr/Cargo.toml missing")
+if (!file.exists("src/extendr/src/lib.rs")) fail("src/extendr/src/lib.rs missing")
+if (!file.exists("src/extendr/cargo-overrides.toml")) {
+  fail("src/extendr/cargo-overrides.toml missing (PyO3 macOS rustflags override)")
+}
+
+cargo_toml <- readLines("src/extendr/Cargo.toml")
+if (any(grepl('path\\s*=', cargo_toml))) {
+  fail("src/extendr/Cargo.toml has a path dep — should use crates.io for `immunum`")
+}
+if (!any(grepl('immunum\\s*=\\s*\\{\\s*version\\s*=', cargo_toml))) {
+  fail("src/extendr/Cargo.toml does not depend on `immunum` from crates.io")
+} else {
+  cat("OK: src/extendr/Cargo.toml depends on `immunum` from crates.io\n")
+}
+
+# 6. lib.rs has the Annotator impl + module registration
+lib_rs <- readLines("src/extendr/src/lib.rs")
+core_symbols <- c(
+  "fn immunum_version",
+  "struct Annotator",
+  "fn new\\(",
+  "fn number\\(",
+  "fn segment\\(",
+  "extendr_module!",
+  "impl Annotator;"
+)
+for (sym in core_symbols) {
+  if (!any(grepl(sym, lib_rs))) {
+    fail(sprintf("src/extendr/src/lib.rs missing symbol matching /%s/", sym))
+  } else {
+    cat("OK: lib.rs has", sym, "\n")
+  }
+}
+
+# lib.rs has the four rayon-parallel batch primitives + their
+# extendr_module! lines, and the rust-side helpers they depend on.
+batch_symbols <- c(
+  "fn numbering_batch\\(",
+  "fn numbering_batch_with\\(",
+  "fn segmentation_batch\\(",
+  "fn segmentation_batch_with\\(",
+  "fn numbering_batch;",
+  "fn numbering_batch_with;",
+  "fn segmentation_batch;",
+  "fn segmentation_batch_with;",
+  "use rayon::prelude::\\*;",
+  "use immunum::numbering::segment as segment_positions;"
+)
+for (sym in batch_symbols) {
+  if (!any(grepl(sym, lib_rs))) {
+    fail(sprintf("src/extendr/src/lib.rs missing symbol matching /%s/", sym))
+  } else {
+    cat("OK: lib.rs has", sym, "\n")
+  }
+}
+
+# 7. Rd files exist and check clean
+rd_files <- list.files("man", pattern = "\\.Rd$", full.names = TRUE)
+for (rd in rd_files) {
+  problems <- tryCatch(tools::checkRd(rd), error = function(e) {
+    fail(sprintf("checkRd crashed on %s: %s", rd, conditionMessage(e)))
+    NULL
+  })
+  if (length(problems) == 0L) {
+    cat("OK: checkRd", rd, "\n")
+  } else {
+    fail(sprintf("checkRd %s reported %d issue(s)", rd, length(problems)))
+    for (p in problems) cat("    -", format(p), "\n")
+  }
+}
+
+# 8. Annotator.Rd documents the four R6 methods (so R CMD check
+# won't warn about undocumented arguments). The hand-written Rd lives at
+# man/Annotator.Rd and intentionally lacks the `Generated by roxygen2`
+# header -- see comment in R/annotator.R.
+ann_rd <- readLines("man/Annotator.Rd")
+if (any(grepl("^% Generated by roxygen2: do not edit by hand", ann_rd))) {
+  fail("man/Annotator.Rd carries roxygen2 generated header (will be clobbered)")
+}
+for (m in c("method-Annotator-new", "method-Annotator-number",
+            "method-Annotator-segment", "method-Annotator-print")) {
+  if (!any(grepl(m, ann_rd, fixed = TRUE))) {
+    fail(sprintf("man/Annotator.Rd missing %s anchor", m))
+  }
+}
+cat("OK: man/Annotator.Rd documents all four R6 methods\n")
+
+# 9. helper-fixtures.R + INIT_CASES present so the parametrized
+# test files can iterate.
+fixtures <- readLines("tests/testthat/helper-fixtures.R")
+for (k in c("INIT_CASES", "ALL_CHAINS_R", "IGH_SEQ", "TRA_SEQ")) {
+  if (!any(grepl(k, fixtures, fixed = TRUE))) {
+    fail(sprintf("tests/testthat/helper-fixtures.R missing %s", k))
+  }
+}
+cat("OK: helper-fixtures.R defines INIT_CASES + chain constants\n")
+
+# 10. validation fixtures exist at ../fixtures/validation/ in
+# the repo tree. Tests reference these directly (like the Python tests).
+# We don't bundle them inside the package.
+val_src <- readLines("R/validation.R")
+stem_lines <- grep('"(ab|tcr)_', val_src, value = TRUE)
+phase_d_stems <- unique(unlist(regmatches(
+  stem_lines,
+  gregexpr('"(ab|tcr)_[A-Z]_(imgt|kabat)"', stem_lines)
+)))
+phase_d_stems <- gsub('"', "", phase_d_stems)
+if (length(phase_d_stems) == 0L) {
+  fail("R/validation.R does not list any validation fixture stems")
+}
+if (dir.exists("../fixtures/validation")) {
+  for (stem in phase_d_stems) {
+    p <- file.path("../fixtures/validation", paste0(stem, ".csv"))
+    if (!file.exists(p)) {
+      fail(sprintf("missing fixture %s in repo tree", p))
+    }
+  }
+  cat("OK: repo fixtures/ has all", length(phase_d_stems), "validation CSV(s)\n")
+} else {
+  cat("SKIP: ../fixtures/validation not found (not in repo tree)\n")
+}
+
+# 11. BENCHMARKS.toml thresholds must match the baked-in
+# .BENCHMARK_THRESHOLDS table -- catches drift after upstream rerun
+# of the benchmark suite. Uses the same tiny TOML subset parser as
+# tools/sync-benchmarks.R; both should stay in lockstep.
+if (file.exists("../BENCHMARKS.toml")) {
+  toml <- readLines("../BENCHMARKS.toml")
+  section <- NULL
+  toml_thresholds <- list()
+  for (line in toml) {
+    line <- trimws(line)
+    if (!nzchar(line) || startsWith(line, "#")) next
+    m <- regmatches(line, regexec("^\\[(.+)\\]$", line))[[1]]
+    if (length(m) == 2L) {
+      section <- m[[2]]
+      next
+    }
+    if (!is.null(section)) {
+      kv <- regmatches(line, regexec("^perfect_pct\\s*=\\s*([0-9.]+)$", line))[[1]]
+      if (length(kv) == 2L) {
+        toml_thresholds[[section]] <- as.numeric(kv[[2]])
+      }
+    }
+  }
+  baked <- list()
+  in_block <- FALSE
+  for (line in val_src) {
+    if (grepl("^\\.BENCHMARK_THRESHOLDS <- c\\(", line)) {
+      in_block <- TRUE
+      next
+    }
+    if (in_block) {
+      if (startsWith(trimws(line), ")")) break
+      kv <- regmatches(
+        line,
+        regexec("`([^`]+)`\\s*=\\s*([0-9.]+)", line)
+      )[[1]]
+      if (length(kv) == 3L) {
+        baked[[kv[[2]]]] <- as.numeric(kv[[3]])
+      }
+    }
+  }
+  drift <- character()
+  for (k in union(names(toml_thresholds), names(baked))) {
+    a <- toml_thresholds[[k]]
+    b <- baked[[k]]
+    if (is.null(a) || is.null(b) || !isTRUE(all.equal(a, b))) {
+      drift <- c(drift, sprintf("%s (toml=%s, R=%s)",
+                                k, format(a), format(b)))
+    }
+  }
+  if (length(drift) > 0L) {
+    fail(sprintf(
+      "R/validation.R thresholds drift from BENCHMARKS.toml: %s. Run tools/sync-benchmarks.R",
+      paste(drift, collapse = "; ")
+    ))
+  } else {
+    cat("OK: R/validation.R thresholds match BENCHMARKS.toml (",
+        length(baked), "keys)\n", sep = "")
+  }
+}
+
+cat("\n", if (ok) "ALL CHECKS PASSED" else "SOME CHECKS FAILED", "\n", sep = "")
+quit(status = if (ok) 0L else 1L)
