@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
-  It aligns, masks what aligned, and aligns again until nothing left aligns with enough confidence. An
-  alignment reaching into an earlier domain keeps only its new residues, and a run shorter than
-  `MIN_SEQUENCE_LENGTH` is skipped without ending the search. A residue the caller wrote as `X` stays
-  part of its domain.
+  It keeps the best alignment's domain, then searches the residues before and after it the same way, each
+  on its own, until a part is shorter than `MIN_SEQUENCE_LENGTH` or aligns with too little confidence.
+  Each domain numbers like `Annotator::number` on the residues it was found in, so a domain missing its
+  N-terminal residues after another domain is found as it would be at the start of a sequence. A domain
+  shorter than `MIN_SEQUENCE_LENGTH` is not reported, but the residues around it are still searched.
 - Rust: `Domain::number(scheme)` numbers a found domain under any scheme from the alignment that found it,
   without aligning again. The first domain of a single-domain sequence numbers exactly like
   `Annotator::number`, including AHo's light-chain position 149. A `Domain`'s span, chain and confidence
