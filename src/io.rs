@@ -273,6 +273,8 @@ fn record_to_json(rec: &NumberedRecord) -> io::Result<serde_json::Value> {
                 "scheme": result.scheme.to_string(),
                 "confidence": result.confidence,
                 "numbering": numbering,
+                "query_start": result.query_start,
+                "query_end": result.query_end,
                 "error": null,
             })
         }
@@ -282,6 +284,8 @@ fn record_to_json(rec: &NumberedRecord) -> io::Result<serde_json::Value> {
             "scheme": null,
             "confidence": null,
             "numbering": null,
+            "query_start": null,
+            "query_end": null,
             "error": rec.error.as_deref().unwrap_or("unknown error"),
         }),
     })

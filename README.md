@@ -123,7 +123,7 @@ df = pl.DataFrame({"sequence": [
     "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
 ]})
 
-# Add a struct column with chain, scheme, confidence, numbering
+# Add a struct column with the fields Annotator.number returns
 result = df.with_columns(
     imp.number(pl.col("sequence"), chains=["H", "K", "L"], scheme="imgt").alias("numbered")
 )
@@ -134,7 +134,7 @@ result = df.with_columns(
 )
 ```
 
-The `number` expression returns a struct with fields `chain`, `scheme`, `confidence`, and `numbering` (a struct of position→residue). The `segment` expression returns a struct with fields `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `prefix`, `postfix`.
+The `number` expression returns a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and `error`. `numbering_method` returns the same. Explode `numbering` and unnest it for one row per residue. The `segment` expression returns a struct with fields `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`.
 
 ## JavaScript / npm
 

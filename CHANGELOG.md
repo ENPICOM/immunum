@@ -23,8 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust: `numbering::SEGMENT_NAMES` lists the segments in sequence order by the names every interface
   uses, and `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
   documentation's web tool take their region names and order from these instead of their own lists.
+- CLI: JSON and JSONL records carry `query_start` and `query_end`, as Python and JavaScript results do.
 
 ### Changed
+- **Breaking:** Polars `number` and `numbering_method` return the same struct, with the fields Python's
+  and JavaScript's `Annotator.number` return: `chain`, `scheme`, `confidence`, `numbering`,
+  `query_start`, `query_end` and `error`. `numbering` is a list of `{position, residue}` structs; explode
+  and unnest it for one row per residue. `number` returned `positions` and `residues` lists instead of
+  `numbering`, and had no `confidence` (#38); neither had `query_start` or `query_end`.
 - Chain and scheme names are parsed once, in Rust, for every interface. Python drops its own alias
   tables, so Python, JavaScript, Polars and the CLI accept the same names and report the same error
   message for an unknown one. The chain groups `ig`, `tcr` and `all`, which only the CLI accepted, now

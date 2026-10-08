@@ -241,6 +241,22 @@ fn valid_sequence_has_null_error_jsonl() {
 }
 
 #[test]
+fn jsonl_record_carries_the_numbered_span() {
+    let igh = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+    let leader = "MGWSCIILFLVATATGVHSX";
+    let output = immunum()
+        .args(["number", "-f", "jsonl", &format!("{leader}{igh}")])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("valid jsonl");
+    assert_eq!(parsed["query_start"], leader.len());
+    assert_eq!(parsed["query_end"], leader.len() + igh.len() - 1);
+}
+
+#[test]
 fn mixed_batch_always_emits_one_record_per_input() {
     // Two sequences: one valid IGH, one garbage
     let input = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS\nAAAAAAAAAAAAAAAAA\n";
