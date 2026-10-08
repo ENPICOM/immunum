@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Rust: `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
-  threads. `Annotator::number` and `Annotator::segment` are built on the pieces above; their results are
-  unchanged.
+  threads. A thread keeps at most about 650 KB of alignment buffer between calls, what a 1,000-residue
+  sequence needs; a longer sequence's buffer is freed when its call returns. `Annotator::number` and
+  `Annotator::segment` are built on the pieces above; their results are unchanged.
 
 ## [1.3.3] - 2026-10-01
 

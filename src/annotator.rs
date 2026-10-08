@@ -94,8 +94,14 @@ fn validate_sequence(sequence: &str) -> Result<()> {
 }
 
 thread_local! {
+    // Reused by every alignment on this thread. Kept between calls only up to `KEPT_ALIGN_CELLS`.
     static ALIGN_BUFFER: RefCell<AlignBuffer> = RefCell::new(AlignBuffer::new());
 }
+
+/// The most alignment matrix cells a thread keeps between calls: what a 1,000-residue query needs
+/// against a 128-position consensus, about 650 KB. A longer query still aligns, but its matrices are
+/// freed when its call returns.
+const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
 
 /// Annotator for numbering sequences
 #[cfg_attr(
@@ -225,6 +231,7 @@ impl Annotator {
                     best = Some((*chain, alignment));
                 }
             }
+            buf.release_above(KEPT_ALIGN_CELLS);
             best.ok_or_else(|| {
                 Error::AlignmentError("failed to align to any chain type".to_string())
             })
