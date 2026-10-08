@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
+  It keeps the best alignment's domain, then searches the residues before and after it the same way, each
+  on its own, until a part is shorter than `MIN_SEQUENCE_LENGTH` or aligns with too little confidence.
+  Each domain numbers like `Annotator::number` on the residues it was found in, so a domain missing its
+  N-terminal residues after another domain is found as it would be at the start of a sequence. A domain
+  shorter than `MIN_SEQUENCE_LENGTH` is not reported, but the residues around it are still searched.
+- Rust: `Domain::number(scheme)` numbers a found domain under any scheme from the alignment that found it,
+  without aligning again. The first domain of a single-domain sequence numbers exactly like
+  `Annotator::number`, including AHo's light-chain position 149. A `Domain`'s span, chain and confidence
+  are read through methods (`query_start()`, `chain()`, ...), so they can't drift from its alignment.
+- Rust: `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions without numbering again.
+  `sequence` is the whole sequence that was numbered or searched; one too short for the numbering is an
+  error.
+
+### Changed
+- Rust: `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
+  threads. A thread keeps at most about 650 KB of alignment buffer between calls, what a 1,000-residue
+  sequence needs; a longer sequence's buffer is freed when its call returns. `Annotator::number` and
+  `Annotator::segment` are built on the pieces above; their results are unchanged.
+
 ## [1.3.3] - 2026-10-01
 
 ### Fixed
