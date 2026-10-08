@@ -1,0 +1,18 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 27-29
+src/alignment.rs
+  h_acea35c6bbea0b 92-102
+src/annotator.rs
+  h_acea35c6bbea0b 97,101-105,234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b6fa232a4c89a279c6f728f2df5e1796e05838a2",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
