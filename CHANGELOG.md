@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the accepted values, instead of `strum::ParseError`. New: `Chain::parse_names` and
   `Annotator::from_names`, and `Error::InvalidMinConfidence`.
 
+### Removed
+- Rust: `Chain::parse_chain_spec`. Use `Chain::parse_names(spec.split(','))`.
+
 ## [1.3.3] - 2026-10-01
 
 ### Fixed

@@ -137,6 +137,29 @@ fn chain_aliases_case_insensitive() {
     }
 }
 
+#[test]
+fn chain_filter_takes_a_comma_separated_list() {
+    immunum()
+        .args([
+            "number",
+            "-c",
+            "k, h",
+            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\tH\t"));
+    immunum()
+        .args([
+            "number",
+            "-c",
+            "k,xyz",
+            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+        ])
+        .assert()
+        .failure();
+}
+
 // --- Output to file ---
 
 #[test]

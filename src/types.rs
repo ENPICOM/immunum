@@ -116,11 +116,6 @@ impl Chain {
         }
         Ok(chains)
     }
-
-    /// Parse a comma-separated list of chain names; see [`Chain::parse_names`].
-    pub fn parse_chain_spec(s: &str) -> Result<Vec<Chain>> {
-        Self::parse_names(s.split(','))
-    }
 }
 
 /// Numbering schemes for output. Parses case-insensitively from its name (`kabat`) or initial (`k`).
@@ -428,26 +423,15 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_chain_spec_groups() {
-        let ig = Chain::parse_chain_spec("ig").unwrap();
+    fn parse_names_expands_each_group() {
+        let ig = Chain::parse_names(["ig"]).unwrap();
         assert_eq!(ig, vec![Chain::IGH, Chain::IGK, Chain::IGL]);
 
-        let tcr = Chain::parse_chain_spec("tcr").unwrap();
+        let tcr = Chain::parse_names(["tcr"]).unwrap();
         assert_eq!(tcr, vec![Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD]);
 
-        let all = Chain::parse_chain_spec("all").unwrap();
-        assert_eq!(all.len(), 7);
-    }
-
-    #[test]
-    fn test_parse_chain_spec_csv() {
-        let chains = Chain::parse_chain_spec("h,k,l").unwrap();
-        assert_eq!(chains, vec![Chain::IGH, Chain::IGK, Chain::IGL]);
-    }
-
-    #[test]
-    fn test_parse_chain_spec_invalid() {
-        assert!(Chain::parse_chain_spec("xyz").is_err());
+        let all = Chain::parse_names(["all"]).unwrap();
+        assert_eq!(all, ALL_CHAINS);
     }
 
     // Groups were only accepted by the CLI; every surface now parses names through `parse_names`.
