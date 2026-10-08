@@ -1,0 +1,30 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 8-23
+src/annotator.rs
+  h_acea35c6bbea0b 200,225-274,600-635
+src/io.rs
+  h_acea35c6bbea0b 101,105,221,243-246,255,262-263,266-267,287
+src/polars.rs
+  h_acea35c6bbea0b 1,110-111,213-214,300-309,402-411
+src/python.rs
+  h_acea35c6bbea0b 8,52-55,82-92
+src/wasm.rs
+  h_acea35c6bbea0b 119-122,162-174
+tests/test_polars.py
+  h_acea35c6bbea0b 224-277
+tests/test_python.py
+  h_acea35c6bbea0b 169-189
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 212-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "40e77124929a6bbbec3ac8f5c393cf52e1b3504f",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
