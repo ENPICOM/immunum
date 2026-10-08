@@ -25,8 +25,6 @@ function isChainAllowed(chain, scheme) {
   return ANTIBODY_ONLY_SCHEMES.has(scheme) ? ANTIBODY_CHAINS.has(chain) : true;
 }
 
-const REGIONS = ["fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4"];
-
 const $ = (id) => document.getElementById(id);
 
 // Build the checkbox grid once. Subsequent scheme changes call
@@ -91,16 +89,15 @@ function clearError() {
   $("immunum-error").hidden = true;
 }
 
-function buildRegionArray(segments, alignedLen) {
-  const arr = new Array(alignedLen).fill(null);
-  let offset = 0;
-  for (const region of REGIONS) {
-    const seg = segments[region] || "";
-    for (let i = 0; i < seg.length && offset < alignedLen; i++, offset++) {
-      arr[offset] = region;
-    }
+// The region of every residue in the sequence. segment() returns its regions in sequence order,
+// flanks included, so they cover the whole sequence; `error` is its only non-string field.
+function residueRegions(segResult) {
+  const regions = [];
+  for (const [name, residues] of Object.entries(segResult)) {
+    if (typeof residues !== "string") continue;
+    for (let i = 0; i < residues.length; i++) regions.push(name);
   }
-  return arr;
+  return regions;
 }
 
 function renderResult(sequence, numberResult, segResult) {
@@ -114,12 +111,12 @@ function renderResult(sequence, numberResult, segResult) {
   const qEnd = numberResult.query_end;
   $("result-range").textContent = `Query ${qStart + 1}–${qEnd + 1} (${qEnd - qStart + 1} aa)`;
 
-  // Render the aligned region with the pre/post context dimmed.
+  // Render the aligned region with the flanks segment() left out of it dimmed.
   const alignedEl = $("result-aligned");
   alignedEl.textContent = "";
-  const prefix = sequence.slice(0, qStart);
-  const aligned = sequence.slice(qStart, qEnd + 1);
-  const suffix = sequence.slice(qEnd + 1);
+  const prefix = segResult.prefix;
+  const suffix = segResult.postfix;
+  const aligned = sequence.slice(prefix.length, sequence.length - suffix.length);
   if (prefix) {
     const s = document.createElement("span");
     s.className = "immunum-aligned-flank";
@@ -140,15 +137,14 @@ function renderResult(sequence, numberResult, segResult) {
   const conf = Math.max(0, Math.min(1, numberResult.confidence));
   $("result-confidence-value").textContent = `Confidence: ${(conf * 100).toFixed(1)}%`;
 
-  const alignedLen = qEnd - qStart + 1;
-  const regionArr = buildRegionArray(segResult, alignedLen);
+  const regionArr = residueRegions(segResult);
   const grid = $("result-grid");
   grid.textContent = "";
 
-  let offset = 0;
+  let index = qStart;
   for (const [pos, aa] of numberResult.numbering) {
-    const region = offset < alignedLen ? regionArr[offset] : null;
-    offset++;
+    const region = regionArr[index];
+    index++;
     const pill = document.createElement("div");
     pill.className = "immunum-residue" + (region ? ` region-${region}` : "");
     const posSpan = document.createElement("span");

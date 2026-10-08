@@ -46,23 +46,25 @@ pub fn region_for_position(pos: u8, scheme: Scheme, chain: Chain) -> Option<Regi
     regions_for(scheme, chain).region(pos)
 }
 
+/// The segments of a numbered sequence in sequence order, by the name every interface uses for them
+pub const SEGMENT_NAMES: [&str; 9] = [
+    "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix",
+];
+
 /// Segment a numbered sequence into its constituent regions
 ///
-/// Returns a HashMap with keys for all Region variants plus "Prefix" and "Postfix".
-/// Prefix collects residues before the numbered region, Postfix those after.
-/// All keys are always present, with empty strings for absent regions.
+/// Returns a HashMap keyed by every name in [`SEGMENT_NAMES`], with empty strings for absent
+/// regions. Prefix collects residues before the numbered region, Postfix those after.
 pub fn segment(
     positions: &[Position],
     sequence: &str,
     scheme: Scheme,
     chain: Chain,
 ) -> HashMap<String, String> {
-    let mut segments: HashMap<String, String> = [
-        "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix",
-    ]
-    .iter()
-    .map(|&s| (s.to_string(), String::new()))
-    .collect();
+    let mut segments: HashMap<String, String> = SEGMENT_NAMES
+        .iter()
+        .map(|&s| (s.to_string(), String::new()))
+        .collect();
 
     for (position, ch) in positions.iter().zip(sequence.chars()) {
         let key = match region_for_position(position.number, scheme, chain) {

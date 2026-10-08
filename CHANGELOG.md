@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions, flanks included, without
   numbering again. `sequence` is the whole sequence that was numbered; one too short for the numbering is
   an error. Python, JavaScript, Polars and the CLI now all use these.
+- Rust: `numbering::SEGMENT_NAMES` lists the segments in sequence order by the names every interface
+  uses, and `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
+  documentation's web tool take their region names and order from these instead of their own lists.
 
 ### Changed
 - Chain and scheme names are parsed once, in Rust, for every interface. Python drops its own alias

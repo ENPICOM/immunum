@@ -1,4 +1,5 @@
-use crate::annotator::Annotator;
+use crate::annotator::{Annotator, SegmentResult};
+use crate::numbering::SEGMENT_NAMES;
 use polars::chunked_array::builder::AnonymousListBuilder;
 use polars::prelude::*;
 use polars_core::utils::rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -273,206 +274,61 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
 // ── Segmentation ─────────────────────────────────────────────────────────────
 
 fn segmentation_struct_output(_input_fields: &[Field]) -> PolarsResult<Field> {
-    let fields = vec![
-        Field::new("prefix".into(), DataType::String),
-        Field::new("fr1".into(), DataType::String),
-        Field::new("cdr1".into(), DataType::String),
-        Field::new("fr2".into(), DataType::String),
-        Field::new("cdr2".into(), DataType::String),
-        Field::new("fr3".into(), DataType::String),
-        Field::new("cdr3".into(), DataType::String),
-        Field::new("fr4".into(), DataType::String),
-        Field::new("postfix".into(), DataType::String),
-        Field::new("error".into(), DataType::String),
-    ];
+    let fields = SEGMENT_NAMES
+        .into_iter()
+        .chain(["error"])
+        .map(|name| Field::new(name.into(), DataType::String))
+        .collect();
     Ok(Field::new("segmentation".into(), DataType::Struct(fields)))
 }
 
 #[polars_expr(output_type_func=segmentation_struct_output)]
 fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> PolarsResult<Series> {
-    let ca = inputs[0].str()?;
-    let len = ca.len();
-    let name = ca.name().clone();
-
-    type SegResult = Option<Result<[String; 9], String>>;
-    let values: Vec<Option<&str>> = ca.into_iter().collect();
-    let results: Vec<SegResult> = POOL.install(|| {
-        values
-            .par_iter()
-            .map_with(kwargs.annotator, |ann, opt_v| {
-                let value = (*opt_v)?;
-                Some(
-                    ann.segment(value)
-                        .map(|s| {
-                            [
-                                s.prefix, s.fr1, s.cdr1, s.fr2, s.cdr2, s.fr3, s.cdr3, s.fr4,
-                                s.postfix,
-                            ]
-                        })
-                        .map_err(|e| e.to_string()),
-                )
-            })
-            .collect()
-    });
-
-    let mut prefix_b = StringChunkedBuilder::new("prefix".into(), len);
-    let mut fr1_b = StringChunkedBuilder::new("fr1".into(), len);
-    let mut cdr1_b = StringChunkedBuilder::new("cdr1".into(), len);
-    let mut fr2_b = StringChunkedBuilder::new("fr2".into(), len);
-    let mut cdr2_b = StringChunkedBuilder::new("cdr2".into(), len);
-    let mut fr3_b = StringChunkedBuilder::new("fr3".into(), len);
-    let mut cdr3_b = StringChunkedBuilder::new("cdr3".into(), len);
-    let mut fr4_b = StringChunkedBuilder::new("fr4".into(), len);
-    let mut postfix_b = StringChunkedBuilder::new("postfix".into(), len);
-    let mut error_b = StringChunkedBuilder::new("error".into(), len);
-
-    for row in results {
-        match row {
-            None => {
-                prefix_b.append_null();
-                fr1_b.append_null();
-                cdr1_b.append_null();
-                fr2_b.append_null();
-                cdr2_b.append_null();
-                fr3_b.append_null();
-                cdr3_b.append_null();
-                fr4_b.append_null();
-                postfix_b.append_null();
-                error_b.append_null();
-            }
-            Some(Err(e)) => {
-                prefix_b.append_null();
-                fr1_b.append_null();
-                cdr1_b.append_null();
-                fr2_b.append_null();
-                cdr2_b.append_null();
-                fr3_b.append_null();
-                cdr3_b.append_null();
-                fr4_b.append_null();
-                postfix_b.append_null();
-                error_b.append_value(&e);
-            }
-            Some(Ok([prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, postfix])) => {
-                prefix_b.append_value(&prefix);
-                fr1_b.append_value(&fr1);
-                cdr1_b.append_value(&cdr1);
-                fr2_b.append_value(&fr2);
-                cdr2_b.append_value(&cdr2);
-                fr3_b.append_value(&fr3);
-                cdr3_b.append_value(&cdr3);
-                fr4_b.append_value(&fr4);
-                postfix_b.append_value(&postfix);
-                error_b.append_null();
-            }
-        }
-    }
-
-    let fields = [
-        prefix_b.finish().into_series(),
-        fr1_b.finish().into_series(),
-        cdr1_b.finish().into_series(),
-        fr2_b.finish().into_series(),
-        cdr2_b.finish().into_series(),
-        fr3_b.finish().into_series(),
-        cdr3_b.finish().into_series(),
-        fr4_b.finish().into_series(),
-        postfix_b.finish().into_series(),
-        error_b.finish().into_series(),
-    ];
-    StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
+    segmentation_series(inputs[0].str()?, kwargs.annotator)
 }
 
 #[polars_expr(output_type_func=segmentation_struct_output)]
 fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsResult<Series> {
-    let ca = inputs[0].str()?;
-    let len = ca.len();
-    let name = ca.name().clone();
-    let annotator = kwargs.annotator()?;
+    segmentation_series(inputs[0].str()?, kwargs.annotator()?)
+}
 
-    type SegResult = Option<Result<[String; 9], String>>;
+// One struct per sequence: a field per segment, and the error when the sequence couldn't be segmented
+fn segmentation_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Series> {
+    let len = ca.len();
     let values: Vec<Option<&str>> = ca.into_iter().collect();
-    let results: Vec<SegResult> = POOL.install(|| {
+    let results: Vec<Option<Result<SegmentResult, String>>> = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                Some(
-                    ann.segment(value)
-                        .map(|s| {
-                            [
-                                s.prefix, s.fr1, s.cdr1, s.fr2, s.cdr2, s.fr3, s.cdr3, s.fr4,
-                                s.postfix,
-                            ]
-                        })
-                        .map_err(|e| e.to_string()),
-                )
+                Some(ann.segment(value).map_err(|e| e.to_string()))
             })
             .collect()
     });
 
-    let mut prefix_b = StringChunkedBuilder::new("prefix".into(), len);
-    let mut fr1_b = StringChunkedBuilder::new("fr1".into(), len);
-    let mut cdr1_b = StringChunkedBuilder::new("cdr1".into(), len);
-    let mut fr2_b = StringChunkedBuilder::new("fr2".into(), len);
-    let mut cdr2_b = StringChunkedBuilder::new("cdr2".into(), len);
-    let mut fr3_b = StringChunkedBuilder::new("fr3".into(), len);
-    let mut cdr3_b = StringChunkedBuilder::new("cdr3".into(), len);
-    let mut fr4_b = StringChunkedBuilder::new("fr4".into(), len);
-    let mut postfix_b = StringChunkedBuilder::new("postfix".into(), len);
-    let mut error_b = StringChunkedBuilder::new("error".into(), len);
-
-    for row in results {
+    let mut segments = SEGMENT_NAMES.map(|name| StringChunkedBuilder::new(name.into(), len));
+    let mut errors = StringChunkedBuilder::new("error".into(), len);
+    for row in &results {
         match row {
-            None => {
-                prefix_b.append_null();
-                fr1_b.append_null();
-                cdr1_b.append_null();
-                fr2_b.append_null();
-                cdr2_b.append_null();
-                fr3_b.append_null();
-                cdr3_b.append_null();
-                fr4_b.append_null();
-                postfix_b.append_null();
-                error_b.append_null();
+            Some(Ok(s)) => {
+                for (builder, (_, residues)) in segments.iter_mut().zip(s.regions()) {
+                    builder.append_value(residues);
+                }
+                errors.append_null();
             }
-            Some(Err(e)) => {
-                prefix_b.append_null();
-                fr1_b.append_null();
-                cdr1_b.append_null();
-                fr2_b.append_null();
-                cdr2_b.append_null();
-                fr3_b.append_null();
-                cdr3_b.append_null();
-                fr4_b.append_null();
-                postfix_b.append_null();
-                error_b.append_value(&e);
-            }
-            Some(Ok([prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, postfix])) => {
-                prefix_b.append_value(&prefix);
-                fr1_b.append_value(&fr1);
-                cdr1_b.append_value(&cdr1);
-                fr2_b.append_value(&fr2);
-                cdr2_b.append_value(&cdr2);
-                fr3_b.append_value(&fr3);
-                cdr3_b.append_value(&cdr3);
-                fr4_b.append_value(&fr4);
-                postfix_b.append_value(&postfix);
-                error_b.append_null();
+            _ => {
+                segments
+                    .iter_mut()
+                    .for_each(|builder| builder.append_null());
+                errors.append_option(row.as_ref().and_then(|r| r.as_ref().err()));
             }
         }
     }
 
-    let fields = [
-        prefix_b.finish().into_series(),
-        fr1_b.finish().into_series(),
-        cdr1_b.finish().into_series(),
-        fr2_b.finish().into_series(),
-        cdr2_b.finish().into_series(),
-        fr3_b.finish().into_series(),
-        cdr3_b.finish().into_series(),
-        fr4_b.finish().into_series(),
-        postfix_b.finish().into_series(),
-        error_b.finish().into_series(),
-    ];
-    StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
+    let fields: Vec<Series> = segments
+        .into_iter()
+        .chain([errors])
+        .map(|builder| builder.finish().into_series())
+        .collect();
+    StructChunked::from_series(ca.name().clone(), len, fields.iter()).map(|ca| ca.into_series())
 }

@@ -1,5 +1,5 @@
 from immunum._internal import _Annotator, _regions_for  # noqa: F401
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Optional
 
 
@@ -70,15 +70,7 @@ class SegmenationResult:
             dict[str, str | None]: dict mapping ['fr1', 'fr2', ...] to their aminoacid sequences
         """
         return {
-            "fr1": self.fr1,
-            "cdr1": self.cdr1,
-            "fr2": self.fr2,
-            "cdr2": self.cdr2,
-            "fr3": self.fr3,
-            "cdr3": self.cdr3,
-            "fr4": self.fr4,
-            "prefix": self.prefix,
-            "postfix": self.postfix,
+            f.name: getattr(self, f.name) for f in fields(self) if f.name != "error"
         }
 
 
@@ -212,19 +204,7 @@ class Annotator:
             and any unaligned ``prefix``/``postfix`` residues. On failure,
             ``error`` is set and all region fields are ``None``.
         """
-        raw = self._annotator.segment(sequence)
-        return SegmenationResult(
-            fr1=raw.get("fr1"),
-            cdr1=raw.get("cdr1"),
-            fr2=raw.get("fr2"),
-            cdr2=raw.get("cdr2"),
-            fr3=raw.get("fr3"),
-            cdr3=raw.get("cdr3"),
-            fr4=raw.get("fr4"),
-            prefix=raw.get("prefix"),
-            postfix=raw.get("postfix"),
-            error=raw.get("error"),
-        )
+        return SegmenationResult(**self._annotator.segment(sequence))
 
 
 def regions_for(scheme: str, chain: str) -> dict[str, tuple[int, int]]:

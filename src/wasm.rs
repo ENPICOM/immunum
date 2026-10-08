@@ -151,19 +151,13 @@ impl Annotator {
         let dict = Object::new();
         match self.segment(sequence) {
             Ok(s) => {
-                for (region, seq) in [
-                    ("prefix", &s.prefix),
-                    ("fr1", &s.fr1),
-                    ("cdr1", &s.cdr1),
-                    ("fr2", &s.fr2),
-                    ("cdr2", &s.cdr2),
-                    ("fr3", &s.fr3),
-                    ("cdr3", &s.cdr3),
-                    ("fr4", &s.fr4),
-                    ("postfix", &s.postfix),
-                ] {
-                    Reflect::set(&dict, &JsValue::from_str(region), &JsValue::from_str(seq))
-                        .unwrap();
+                for (name, residues) in s.regions() {
+                    Reflect::set(
+                        &dict,
+                        &JsValue::from_str(name),
+                        &JsValue::from_str(residues),
+                    )
+                    .unwrap();
                 }
                 Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
             }

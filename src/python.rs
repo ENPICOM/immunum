@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::annotator::Annotator;
-use crate::numbering::regions_for;
+use crate::numbering::{regions_for, SEGMENT_NAMES};
 use crate::types::{Chain, Scheme};
 
 #[pymethods]
@@ -59,18 +59,15 @@ impl Annotator {
         let dict = PyDict::new(py);
         match self.segment(sequence) {
             Ok(s) => {
-                dict.set_item("prefix", s.prefix)?;
-                dict.set_item("fr1", s.fr1)?;
-                dict.set_item("cdr1", s.cdr1)?;
-                dict.set_item("fr2", s.fr2)?;
-                dict.set_item("cdr2", s.cdr2)?;
-                dict.set_item("fr3", s.fr3)?;
-                dict.set_item("cdr3", s.cdr3)?;
-                dict.set_item("fr4", s.fr4)?;
-                dict.set_item("postfix", s.postfix)?;
+                for (name, residues) in s.regions() {
+                    dict.set_item(name, residues)?;
+                }
                 dict.set_item("error", py.None())?;
             }
             Err(e) => {
+                for name in SEGMENT_NAMES {
+                    dict.set_item(name, py.None())?;
+                }
                 dict.set_item("error", e.to_string())?;
             }
         }

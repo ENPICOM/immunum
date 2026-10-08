@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 use crate::alignment::{align, AlignBuffer, Alignment};
 use crate::error::{Error, Result};
-use crate::numbering::{apply_numbering, segment as segment_positions};
+use crate::numbering::{apply_numbering, segment as segment_positions, SEGMENT_NAMES};
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme};
 
@@ -45,6 +45,24 @@ pub struct SegmentResult {
     pub cdr3: String,
     pub fr4: String,
     pub postfix: String,
+}
+
+impl SegmentResult {
+    /// Each segment's residues with its name from [`SEGMENT_NAMES`], in sequence order
+    pub fn regions(&self) -> [(&'static str, &str); 9] {
+        let segments = [
+            &self.prefix,
+            &self.fr1,
+            &self.cdr1,
+            &self.fr2,
+            &self.cdr2,
+            &self.fr3,
+            &self.cdr3,
+            &self.fr4,
+            &self.postfix,
+        ];
+        std::array::from_fn(|i| (SEGMENT_NAMES[i], segments[i].as_str()))
+    }
 }
 
 /// Default minimum confidence threshold for accepting a numbering result.
@@ -255,21 +273,20 @@ impl NumberingResult {
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
         let numbered = self.numbered(sequence)?;
         let mut map = segment_positions(&self.positions, numbered, self.scheme, self.chain);
-
-        let mut prefix = sequence[..self.query_start].to_string();
-        prefix.push_str(&map.remove("prefix").unwrap_or_default());
-        let mut postfix = map.remove("postfix").unwrap_or_default();
+        let [mut prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, mut postfix] =
+            SEGMENT_NAMES.map(|name| map.remove(name).unwrap_or_default());
+        prefix.insert_str(0, &sequence[..self.query_start]);
         postfix.push_str(&sequence[self.query_end + 1..]);
 
         Ok(SegmentResult {
             prefix,
-            fr1: map.remove("fr1").unwrap_or_default(),
-            cdr1: map.remove("cdr1").unwrap_or_default(),
-            fr2: map.remove("fr2").unwrap_or_default(),
-            cdr2: map.remove("cdr2").unwrap_or_default(),
-            fr3: map.remove("fr3").unwrap_or_default(),
-            cdr3: map.remove("cdr3").unwrap_or_default(),
-            fr4: map.remove("fr4").unwrap_or_default(),
+            fr1,
+            cdr1,
+            fr2,
+            cdr2,
+            fr3,
+            cdr3,
+            fr4,
             postfix,
         })
     }
