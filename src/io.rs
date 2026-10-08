@@ -98,11 +98,11 @@ impl OutputFormat {
                 if index > 0 {
                     writeln!(writer, ",")?;
                 }
-                let json = record_to_json(record);
+                let json = record_to_json(record)?;
                 serde_json::to_writer_pretty(&mut *writer, &json).map_err(io::Error::other)
             }
             Self::Jsonl => {
-                let json = record_to_json(record);
+                let json = record_to_json(record)?;
                 serde_json::to_writer(&mut *writer, &json).map_err(io::Error::other)?;
                 writeln!(writer)
             }
@@ -218,8 +218,7 @@ pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Res
 fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result<()> {
     match &rec.result {
         Some(result) => {
-            let aligned_seq = &rec.sequence[result.query_start..=result.query_end];
-            for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
+            for (pos, ch) in result.residues(&rec.sequence).map_err(io::Error::other)? {
                 writeln!(
                     writer,
                     "{}\t{}\t{}\t{:.4}\t{}\t{}\t",
@@ -241,7 +240,10 @@ fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result
 
 /// Write records as a JSON array
 pub fn write_json(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
-    let json_records: Vec<serde_json::Value> = records.iter().map(record_to_json).collect();
+    let json_records = records
+        .iter()
+        .map(record_to_json)
+        .collect::<io::Result<Vec<_>>>()?;
     serde_json::to_writer_pretty(&mut *writer, &json_records).map_err(io::Error::other)?;
     writeln!(writer)?;
     Ok(())
@@ -250,21 +252,19 @@ pub fn write_json(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Re
 /// Write records as JSON lines (one object per line)
 pub fn write_jsonl(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     for rec in records {
-        let json = record_to_json(rec);
+        let json = record_to_json(rec)?;
         serde_json::to_writer(&mut *writer, &json).map_err(io::Error::other)?;
         writeln!(writer)?;
     }
     Ok(())
 }
 
-fn record_to_json(rec: &NumberedRecord) -> serde_json::Value {
-    match &rec.result {
+fn record_to_json(rec: &NumberedRecord) -> io::Result<serde_json::Value> {
+    Ok(match &rec.result {
         Some(result) => {
-            let aligned_seq = &rec.sequence[result.query_start..=result.query_end];
             let numbering: serde_json::Map<String, serde_json::Value> = result
-                .positions
-                .iter()
-                .zip(aligned_seq.chars())
+                .residues(&rec.sequence)
+                .map_err(io::Error::other)?
                 .map(|(pos, ch)| (pos.to_string(), serde_json::Value::String(ch.to_string())))
                 .collect();
             serde_json::json!({
@@ -284,7 +284,7 @@ fn record_to_json(rec: &NumberedRecord) -> serde_json::Value {
             "numbering": null,
             "error": rec.error.as_deref().unwrap_or("unknown error"),
         }),
-    }
+    })
 }
 
 #[cfg(test)]

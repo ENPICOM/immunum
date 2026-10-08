@@ -166,6 +166,27 @@ class TestNumbering:
         assert result.error is not None
         assert result.fr1 is None
 
+    def test_segmentation_keeps_flanking_residues(self):
+        """Issue #58: residues before and after the domain land in prefix and postfix."""
+        annotator = immunum.Annotator(["IGH"], "IMGT")
+        sequence = "MGWSCIILFLVATATGVHSX" + IGH_SEQ + "HHHHHHEPEA"
+        result = annotator.segment(sequence)
+        assert result.error is None
+        assert result.prefix == "MGWSCIILFLVATATGVHSX"
+        assert result.postfix == "HHHHHHEPEA"
+        regions = (
+            "prefix",
+            "fr1",
+            "cdr1",
+            "fr2",
+            "cdr2",
+            "fr3",
+            "cdr3",
+            "fr4",
+            "postfix",
+        )
+        assert "".join(getattr(result, r) for r in regions) == sequence
+
 
 class TestNormalization:
     @pytest.mark.parametrize(

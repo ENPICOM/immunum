@@ -209,4 +209,14 @@ describe("segment()", () => {
     assert.equal(typeof result.error, "string");
     assert.equal(result.fr1, undefined);
   });
+
+  it("keeps flanking residues in prefix and postfix (#58)", () => {
+    const annotator = new Annotator(["H"], "IMGT");
+    const sequence = "MGWSCIILFLVATATGVHSX" + IGH_SEQ + "HHHHHHEPEA";
+    const result = annotator.segment(sequence);
+    assert.equal(result.prefix, "MGWSCIILFLVATATGVHSX");
+    assert.equal(result.postfix, "HHHHHHEPEA");
+    const regions = ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"];
+    assert.equal(regions.map((r) => result[r]).join(""), sequence);
+  });
 });

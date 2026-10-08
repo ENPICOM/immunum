@@ -197,21 +197,7 @@ impl Annotator {
 
     /// Segment a sequence into FR/CDR regions
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
-        let result = self.number(sequence)?;
-        let aligned_seq = &sequence[result.query_start..=result.query_end];
-        let mut map =
-            segment_positions(&result.positions, aligned_seq, result.scheme, result.chain);
-        Ok(SegmentResult {
-            prefix: map.remove("prefix").unwrap_or_default(),
-            fr1: map.remove("fr1").unwrap_or_default(),
-            cdr1: map.remove("cdr1").unwrap_or_default(),
-            fr2: map.remove("fr2").unwrap_or_default(),
-            cdr2: map.remove("cdr2").unwrap_or_default(),
-            fr3: map.remove("fr3").unwrap_or_default(),
-            cdr3: map.remove("cdr3").unwrap_or_default(),
-            fr4: map.remove("fr4").unwrap_or_default(),
-            postfix: map.remove("postfix").unwrap_or_default(),
-        })
+        self.number(sequence)?.segment(sequence)
     }
 
     /// Align the sequence to all loaded chain types and return the best match
@@ -233,6 +219,56 @@ impl Annotator {
             }
         }
         best.ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
+    }
+}
+
+impl NumberingResult {
+    /// Each numbered position with its residue. `sequence` is the whole sequence that was numbered,
+    /// flanking residues included.
+    pub fn residues<'a>(
+        &'a self,
+        sequence: &'a str,
+    ) -> Result<impl Iterator<Item = (&'a Position, char)> + 'a> {
+        Ok(self.positions.iter().zip(self.numbered(sequence)?.chars()))
+    }
+
+    /// The FR/CDR split of `sequence`, the whole sequence that was numbered. The residues before the
+    /// numbered ones open the prefix and the residues after them close the postfix, so the regions in
+    /// order rebuild `sequence`.
+    pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
+        let numbered = self.numbered(sequence)?;
+        let mut map = segment_positions(&self.positions, numbered, self.scheme, self.chain);
+
+        let mut prefix = sequence[..self.query_start].to_string();
+        prefix.push_str(&map.remove("prefix").unwrap_or_default());
+        let mut postfix = map.remove("postfix").unwrap_or_default();
+        postfix.push_str(&sequence[self.query_end + 1..]);
+
+        Ok(SegmentResult {
+            prefix,
+            fr1: map.remove("fr1").unwrap_or_default(),
+            cdr1: map.remove("cdr1").unwrap_or_default(),
+            fr2: map.remove("fr2").unwrap_or_default(),
+            cdr2: map.remove("cdr2").unwrap_or_default(),
+            fr3: map.remove("fr3").unwrap_or_default(),
+            cdr3: map.remove("cdr3").unwrap_or_default(),
+            fr4: map.remove("fr4").unwrap_or_default(),
+            postfix,
+        })
+    }
+
+    // The residues of `sequence` this result numbered
+    fn numbered<'a>(&self, sequence: &'a str) -> Result<&'a str> {
+        sequence
+            .get(self.query_start..=self.query_end)
+            .ok_or_else(|| {
+                Error::InvalidSequence(format!(
+                    "numbered residues {}..={} lie outside a sequence of length {}",
+                    self.query_start,
+                    self.query_end,
+                    sequence.len()
+                ))
+            })
     }
 }
 
@@ -559,6 +595,42 @@ mod tests {
         assert_eq!(result.query_start, prefix.len());
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    #[test]
+    fn residues_skip_the_flanking_residues() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let sequence = format!("MGWSCIILFLVATATGVHSX{FULL_IGH}AAAAAAA");
+        let flanked = annotator.number(&sequence).unwrap();
+        let bare = annotator.number(FULL_IGH).unwrap();
+        let got: Vec<_> = flanked.residues(&sequence).unwrap().collect();
+        let expected: Vec<_> = bare.residues(FULL_IGH).unwrap().collect();
+        assert_eq!(got, expected);
+    }
+
+    // Issue #58: residues the aligner leaves out were dropped instead of landing in prefix/postfix.
+    #[test]
+    fn segment_puts_flanking_residues_in_prefix_and_postfix() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let sequence = "AAAAAQVQLQESGGGLVQPGGSLRLSCAASGFTFSNYKMNWVRQAPGKGLEWVSDISQSGASISYTGSVKGRFTISRDNAKNTLYLQMNSLKPEDTAVYYCARCPAPFTRDCFDVTSTTYAYRGQGTQVTVSSHHHHHHEPEA";
+        let s = annotator.segment(sequence).unwrap();
+        assert_eq!(s.prefix, "AAAAA");
+        assert_eq!(s.postfix, "HHHHHHEPEA");
+        assert_eq!(s.fr4, "RGQGTQVTVSS");
+        let rebuilt = [
+            &s.prefix, &s.fr1, &s.cdr1, &s.fr2, &s.cdr2, &s.fr3, &s.cdr3, &s.fr4, &s.postfix,
+        ]
+        .map(String::as_str)
+        .concat();
+        assert_eq!(rebuilt, sequence);
+    }
+
+    #[test]
+    fn a_numbering_needs_the_sequence_it_numbered() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let result = annotator.number(&format!("AAAAAA{FULL_IGH}")).unwrap();
+        assert!(result.residues(FULL_IGH).is_err());
+        assert!(result.segment(FULL_IGH).is_err());
     }
 
     /// Truncated but productive camel VHH reads from the Observed Antibody Space (Li et al. 2017,

@@ -221,6 +221,60 @@ class TestPolarsSegment:
         assert result.height == 2
 
 
+# A signal peptide before the domain and a tag after it: residues the aligner leaves out.
+FLANKED_SEQ = "MGWSCIILFLVATATGVHSX" + IGH_SEQ + "HHHHHHEPEA"
+REGIONS = ("prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix")
+
+
+class TestPolarsMatchesAnnotator:
+    """Issues #53 and #58: every Polars expression returns what `Annotator` returns for the same
+    sequence, flanking residues included."""
+
+    @pytest.fixture
+    def annotator(self):
+        from immunum import Annotator
+
+        return Annotator(["IGH"], "IMGT")
+
+    def test_number(self, annotator):
+        df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
+        row = df.select(
+            imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias("n")
+        ).unnest("n")
+        numbering = dict(zip(row["positions"][0], row["residues"][0]))
+        assert numbering == annotator.number(FLANKED_SEQ).numbering
+
+    def test_numbering_method(self, annotator):
+        df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
+        row = df.select(
+            imp.numbering_method(polars.col("sequence"), annotator=annotator).alias("n")
+        ).unnest("n")
+        numbering = {r["position"]: r["residue"] for r in row["numbering"][0]}
+        assert numbering == annotator.number(FLANKED_SEQ).numbering
+
+    def test_segment(self, annotator):
+        df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
+        row = df.select(
+            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "s"
+            )
+        ).unnest("s")
+        expected = annotator.segment(FLANKED_SEQ)
+        assert {r: row[r][0] for r in REGIONS} == expected.as_dict()
+        assert "".join(row[r][0] for r in REGIONS) == FLANKED_SEQ
+
+    def test_segmentation_method(self, annotator):
+        df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
+        row = df.select(
+            imp.segmentation_method(polars.col("sequence"), annotator=annotator).alias(
+                "s"
+            )
+        ).unnest("s")
+        expected = annotator.segment(FLANKED_SEQ)
+        assert {r: row[r][0] for r in REGIONS} == expected.as_dict()
+        assert "".join(row[r][0] for r in REGIONS) == FLANKED_SEQ
+
+
 class TestPolarsNumberingMethod:
     def test_segmentation_method_returns_expr(self):
         from immunum import Annotator

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Polars: `number`, `segment`, `numbering_method` and `segmentation_method` paired the numbering with the
+  sequence from its first residue instead of from `query_start`, so every residue after a leader or other
+  leading flank was shifted by the length of that flank (#53).
+- `segment` dropped the residues the aligner leaves out before and after the domain instead of putting
+  them in `prefix` and `postfix`, in Rust, Python, Polars and JavaScript. The regions now always join
+  back into the input sequence, as documented (#58).
+
+### Added
+- Rust: `NumberingResult::residues(sequence)` pairs each numbered position with its residue, and
+  `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions, flanks included, without
+  numbering again. `sequence` is the whole sequence that was numbered; one too short for the numbering is
+  an error. Python, JavaScript, Polars and the CLI now all use these.
+
 ## [1.3.3] - 2026-10-01
 
 ### Fixed

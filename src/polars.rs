@@ -1,4 +1,4 @@
-use crate::{annotator::Annotator, numbering::segment, Chain, Scheme};
+use crate::{annotator::Annotator, Chain, Scheme};
 use polars::chunked_array::builder::AnonymousListBuilder;
 use polars::prelude::*;
 use polars_core::utils::rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -107,9 +107,8 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
                     Err(e) => return Some(Err(e.to_string())),
                 };
                 let (positions, residues): (Vec<String>, Vec<String>) = result
-                    .positions
-                    .iter()
-                    .zip(value.chars())
+                    .residues(value)
+                    .expect("`result` numbered `value`")
                     .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                     .unzip();
                 let n = positions.len();
@@ -211,9 +210,8 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
                     Err(e) => return Some(Err(e.to_string())),
                 };
                 let (positions, residues): (Vec<String>, Vec<String>) = result
-                    .positions
-                    .iter()
-                    .zip(value.chars())
+                    .residues(value)
+                    .expect("`result` numbered `value`")
                     .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
                     .unzip();
                 Some(Ok((
@@ -299,23 +297,16 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
             .par_iter()
             .map_with(kwargs.annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                let result = match ann.number(value) {
-                    Ok(r) => r,
-                    Err(e) => return Some(Err(e.to_string())),
-                };
-                let s = segment(&result.positions, value, result.scheme, result.chain);
-                let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
-                Some(Ok([
-                    get("prefix"),
-                    get("fr1"),
-                    get("cdr1"),
-                    get("fr2"),
-                    get("cdr2"),
-                    get("fr3"),
-                    get("cdr3"),
-                    get("fr4"),
-                    get("postfix"),
-                ]))
+                Some(
+                    ann.segment(value)
+                        .map(|s| {
+                            [
+                                s.prefix, s.fr1, s.cdr1, s.fr2, s.cdr2, s.fr3, s.cdr3, s.fr4,
+                                s.postfix,
+                            ]
+                        })
+                        .map_err(|e| e.to_string()),
+                )
             })
             .collect()
     });
@@ -408,23 +399,16 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                let result = match ann.number(value) {
-                    Ok(r) => r,
-                    Err(e) => return Some(Err(e.to_string())),
-                };
-                let s = segment(&result.positions, value, result.scheme, result.chain);
-                let get = |k: &str| s.get(k).map(|v| v.as_str()).unwrap_or("").to_string();
-                Some(Ok([
-                    get("prefix"),
-                    get("fr1"),
-                    get("cdr1"),
-                    get("fr2"),
-                    get("cdr2"),
-                    get("fr3"),
-                    get("cdr3"),
-                    get("fr4"),
-                    get("postfix"),
-                ]))
+                Some(
+                    ann.segment(value)
+                        .map(|s| {
+                            [
+                                s.prefix, s.fr1, s.cdr1, s.fr2, s.cdr2, s.fr3, s.cdr3, s.fr4,
+                                s.postfix,
+                            ]
+                        })
+                        .map_err(|e| e.to_string()),
+                )
             })
             .collect()
     });

@@ -3,7 +3,6 @@ use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 use crate::annotator::Annotator;
-use crate::numbering::segment;
 use crate::types::{Chain, Scheme};
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -116,9 +115,11 @@ impl Annotator {
         let dict = Object::new();
         match self.number(sequence) {
             Ok(result) => {
-                let aligned_seq = &sequence[result.query_start..=result.query_end];
                 let numbering = js_sys::Map::new();
-                for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
+                for (pos, ch) in result
+                    .residues(sequence)
+                    .expect("`result` numbered `sequence`")
+                {
                     numbering.set(
                         &JsValue::from_str(&pos.to_string()),
                         &JsValue::from_str(&ch.to_string()),
@@ -158,11 +159,19 @@ impl Annotator {
     #[wasm_bindgen(js_name = "segment", skip_typescript)]
     pub fn wasm_segment(&self, sequence: &str) -> JsValue {
         let dict = Object::new();
-        match self.number(sequence) {
-            Ok(result) => {
-                let aligned_seq = &sequence[result.query_start..=result.query_end];
-                let segments = segment(&result.positions, aligned_seq, result.scheme, result.chain);
-                for (region, seq) in &segments {
+        match self.segment(sequence) {
+            Ok(s) => {
+                for (region, seq) in [
+                    ("prefix", &s.prefix),
+                    ("fr1", &s.fr1),
+                    ("cdr1", &s.cdr1),
+                    ("fr2", &s.fr2),
+                    ("cdr2", &s.cdr2),
+                    ("fr3", &s.fr3),
+                    ("cdr3", &s.cdr3),
+                    ("fr4", &s.fr4),
+                    ("postfix", &s.postfix),
+                ] {
                     Reflect::set(&dict, &JsValue::from_str(region), &JsValue::from_str(seq))
                         .unwrap();
                 }
