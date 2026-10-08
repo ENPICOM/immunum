@@ -9,8 +9,10 @@ use strum_macros::{Display, EnumString};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+/// A chain type. Parses case-insensitively from its locus (`IGH`), letter (`H`) or name (`heavy`).
 #[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
+#[strum(parse_err_ty = Error, parse_err_fn = unknown_chain)]
 pub enum Chain {
     #[strum(
         serialize = "IGH",
@@ -80,31 +82,51 @@ pub const IG_CHAINS: &[Chain] = &[Chain::IGH, Chain::IGK, Chain::IGL];
 /// All T-cell receptor chains
 pub const TCR_CHAINS: &[Chain] = &[Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD];
 
+fn unknown_chain(name: &str) -> Error {
+    Error::InvalidChain(format!(
+        "unknown chain '{name}' (options: IGH/H/heavy, IGK/K/kappa, IGL/L/lambda, TRA/A/alpha, \
+         TRB/B/beta, TRG/G/gamma, TRD/D/delta)"
+    ))
+}
+
 impl Chain {
-    /// Parse a chain spec string: group aliases (ig, tcr, all) or comma-separated chains
-    pub fn parse_chain_spec(s: &str) -> Result<Vec<Chain>> {
-        match s.to_lowercase().as_str() {
-            "all" => Ok(ALL_CHAINS.to_vec()),
-            "ig" => Ok(IG_CHAINS.to_vec()),
-            "tcr" => Ok(TCR_CHAINS.to_vec()),
-            _ => s
-                .split(',')
-                .map(|c| {
-                    Chain::from_str(c.trim()).map_err(|_| {
-                        Error::InvalidChain(format!(
-                            "unknown chain '{}' (options: h,k,l,a,b,g,d,ig,tcr,all)",
-                            c.trim()
-                        ))
-                    })
-                })
-                .collect(),
+    /// Parse chain names, each a chain (see [`Chain`]) or a group of chains: `ig`, `tcr` or `all`.
+    /// Case-insensitive and trimmed. A chain named more than once is kept once, where first named.
+    pub fn parse_names<'a>(names: impl IntoIterator<Item = &'a str>) -> Result<Vec<Chain>> {
+        let mut chains = Vec::new();
+        for name in names {
+            let name = name.trim();
+            let group = [("all", ALL_CHAINS), ("ig", IG_CHAINS), ("tcr", TCR_CHAINS)]
+                .into_iter()
+                .find(|(group, _)| name.eq_ignore_ascii_case(group));
+            let named = match group {
+                Some((_, group)) => group,
+                None => &[name.parse::<Chain>().map_err(|_| {
+                    Error::InvalidChain(format!(
+                        "unknown chain '{name}' (options: h, k, l, a, b, g, d, their loci or \
+                         names such as IGH or heavy, or the groups ig, tcr, all)"
+                    ))
+                })?][..],
+            };
+            for &chain in named {
+                if !chains.contains(&chain) {
+                    chains.push(chain);
+                }
+            }
         }
+        Ok(chains)
+    }
+
+    /// Parse a comma-separated list of chain names; see [`Chain::parse_names`].
+    pub fn parse_chain_spec(s: &str) -> Result<Vec<Chain>> {
+        Self::parse_names(s.split(','))
     }
 }
 
-/// Numbering schemes for output
+/// Numbering schemes for output. Parses case-insensitively from its name (`kabat`) or initial (`k`).
 #[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
+#[strum(parse_err_ty = Error, parse_err_fn = unknown_scheme)]
 pub enum Scheme {
     /// IMGT numbering (canonical internal representation)
     #[strum(to_string = "IMGT", serialize = "i", ascii_case_insensitive)]
@@ -121,6 +143,12 @@ pub enum Scheme {
     /// AHo numbering (derived from IMGT)
     #[strum(to_string = "Aho", serialize = "a", ascii_case_insensitive)]
     Aho,
+}
+
+fn unknown_scheme(name: &str) -> Error {
+    Error::InvalidScheme(format!(
+        "unknown scheme '{name}' (options: IMGT/i, Kabat/k, Chothia/c, Martin/m, Aho/a)"
+    ))
 }
 
 impl Scheme {
@@ -420,6 +448,25 @@ mod tests {
     #[test]
     fn test_parse_chain_spec_invalid() {
         assert!(Chain::parse_chain_spec("xyz").is_err());
+    }
+
+    // Groups were only accepted by the CLI; every surface now parses names through `parse_names`.
+    #[test]
+    fn parse_names_mixes_chains_and_groups_and_drops_repeats() {
+        let chains = Chain::parse_names([" Heavy", "ig", "TCR", "b"]).unwrap();
+        assert_eq!(
+            chains,
+            vec![
+                Chain::IGH,
+                Chain::IGK,
+                Chain::IGL,
+                Chain::TRA,
+                Chain::TRB,
+                Chain::TRG,
+                Chain::TRD
+            ]
+        );
+        assert!(Chain::parse_names(["ig", "IGX"]).is_err());
     }
 
     /// A definition stores only the region ends, so the starts are arithmetic: every start is the

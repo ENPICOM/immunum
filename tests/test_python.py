@@ -102,6 +102,11 @@ class TestAnnotatorInit:
         with pytest.raises(ValueError):
             immunum.Annotator(chains, scheme)
 
+    @pytest.mark.parametrize("min_confidence", [-0.1, 1.5])
+    def test_min_confidence_out_of_range_raises(self, min_confidence):
+        with pytest.raises(ValueError):
+            immunum.Annotator(["IGH"], "IMGT", min_confidence)
+
     def test_number_smoke(self, annotator_and_seq):
         annotator, seq = annotator_and_seq
         annotator.number(seq)
@@ -215,6 +220,9 @@ class TestNormalization:
             (["igh"], ["IGH"], "chothia", "Chothia", IGH_SEQ),
             (["igh"], ["IGH"], "martin", "Martin", IGH_SEQ),
             (["igh"], ["IGH"], "aho", "Aho", IGH_SEQ),
+            (["ig"], AB_CHAINS, "IMGT", "IMGT", IGL_SEQ),
+            (["tcr"], ["TRA", "TRB", "TRG", "TRD"], "IMGT", "IMGT", TRB_SEQ),
+            (["all"], ALL_CHAINS, "IMGT", "IMGT", TRA_SEQ),
         ],
     )
     def test_alias_produces_identical_result(

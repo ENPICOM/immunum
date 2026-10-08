@@ -1,4 +1,4 @@
-use crate::{annotator::Annotator, Chain, Scheme};
+use crate::annotator::Annotator;
 use polars::chunked_array::builder::AnonymousListBuilder;
 use polars::prelude::*;
 use polars_core::utils::rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -45,9 +45,20 @@ struct NumberKwargs {
 
 #[derive(Serialize, Deserialize)]
 struct NumberFuncKwargs {
-    chains: Vec<Chain>,
-    scheme: Scheme,
+    chains: Vec<String>,
+    scheme: String,
     min_confidence: Option<f32>,
+}
+
+impl NumberFuncKwargs {
+    fn annotator(&self) -> PolarsResult<Annotator> {
+        Annotator::from_names(
+            self.chains.iter().map(String::as_str),
+            &self.scheme,
+            self.min_confidence,
+        )
+        .map_err(|e| polars_err!(InvalidOperation: "{}", e))
+    }
 }
 
 // ── Numbering ────────────────────────────────────────────────────────────────
@@ -189,14 +200,7 @@ fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsR
     let ca = inputs[0].str()?;
     let len = ca.len();
     let name = ca.name().clone();
-    let annotator: Annotator = match Annotator::new(
-        kwargs.chains.as_slice(),
-        kwargs.scheme,
-        kwargs.min_confidence,
-    ) {
-        Ok(a) => a,
-        Err(e) => polars_bail!(InvalidOperation: "{}", e),
-    };
+    let annotator = kwargs.annotator()?;
 
     type ResultType = Vec<Option<Result<(String, String, Series, Series), String>>>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();
@@ -383,14 +387,7 @@ fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> Pola
     let ca = inputs[0].str()?;
     let len = ca.len();
     let name = ca.name().clone();
-    let annotator: Annotator = match Annotator::new(
-        kwargs.chains.as_slice(),
-        kwargs.scheme,
-        kwargs.min_confidence,
-    ) {
-        Ok(a) => a,
-        Err(e) => polars_bail!(InvalidOperation: "{}", e),
-    };
+    let annotator = kwargs.annotator()?;
 
     type SegResult = Option<Result<[String; 9], String>>;
     let values: Vec<Option<&str>> = ca.into_iter().collect();

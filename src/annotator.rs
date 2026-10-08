@@ -126,6 +126,9 @@ impl Annotator {
         if chains.is_empty() {
             return Err(Error::InvalidChain("chains cannot be empty".to_string()));
         }
+        if let Some(confidence) = min_confidence.filter(|c| !(0.0..=1.0).contains(c)) {
+            return Err(Error::InvalidMinConfidence(confidence));
+        }
 
         for &chain in chains {
             scheme.validate_chain(chain)?;
@@ -144,6 +147,20 @@ impl Annotator {
             min_confidence: min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
             align_buf: RefCell::new(AlignBuffer::new()),
         })
+    }
+
+    /// An annotator from chain and scheme names, as a user writes them: see [`Chain::parse_names`]
+    /// for the chains and [`Scheme`] for the scheme.
+    pub fn from_names<'a>(
+        chains: impl IntoIterator<Item = &'a str>,
+        scheme: &str,
+        min_confidence: Option<f32>,
+    ) -> Result<Self> {
+        Self::new(
+            &Chain::parse_names(chains)?,
+            scheme.parse()?,
+            min_confidence,
+        )
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
@@ -287,6 +304,20 @@ mod tests {
     fn test_create_annotator_with_chains() {
         let annotator = Annotator::new(&[Chain::IGH, Chain::IGK], Scheme::IMGT, None).unwrap();
         assert_eq!(annotator.matrices.len(), 2);
+    }
+
+    // The range was only checked by the Python wrapper; JavaScript, Polars and the CLI accepted any value.
+    #[test]
+    fn min_confidence_must_lie_in_zero_to_one() {
+        for accepted in [None, Some(0.0), Some(1.0)] {
+            assert!(Annotator::new(&[Chain::IGH], Scheme::IMGT, accepted).is_ok());
+        }
+        for rejected in [-0.01, 1.01, f32::NAN] {
+            assert!(matches!(
+                Annotator::new(&[Chain::IGH], Scheme::IMGT, Some(rejected)),
+                Err(Error::InvalidMinConfidence(_))
+            ));
+        }
     }
 
     #[test]

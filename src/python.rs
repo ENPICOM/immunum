@@ -1,5 +1,4 @@
 use postcard::{from_bytes, to_allocvec};
-use std::str::FromStr;
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -18,29 +17,8 @@ impl Annotator {
         scheme: String,
         min_confidence: Option<f32>,
     ) -> PyResult<Self> {
-        let parsed_chains = chains
-            .iter()
-            .map(|chain| {
-                Chain::from_str(chain).map_err(|_| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid chain: {}",
-                        chain
-                    ))
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let parsed_scheme = Scheme::from_str(&scheme).map_err(|_| {
-            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid scheme: {}", scheme))
-        })?;
-        let annotator = Annotator::new(parsed_chains.as_slice(), parsed_scheme, min_confidence)
-            .map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Failed to initialize annotator: {}",
-                    e
-                ))
-            })?;
-
-        Ok(annotator)
+        Annotator::from_names(chains.iter().map(String::as_str), &scheme, min_confidence)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
     }
 
     #[pyo3(signature = (sequence), name = "number")]
@@ -134,15 +112,12 @@ impl Annotator {
 /// region name that `segment` uses.
 #[pyfunction]
 fn _regions_for<'py>(py: Python<'py>, scheme: &str, chain: &str) -> PyResult<Bound<'py, PyDict>> {
-    let parsed_chain = Chain::from_str(chain).map_err(|_| {
-        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid chain: {}", chain))
-    })?;
-    let parsed_scheme = Scheme::from_str(scheme).map_err(|_| {
-        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid scheme: {}", scheme))
-    })?;
+    let invalid = |e: crate::Error| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string());
+    let parsed_chain = chain.parse::<Chain>().map_err(invalid)?;
+    let parsed_scheme = scheme.parse::<Scheme>().map_err(invalid)?;
     parsed_scheme
         .validate_chain(parsed_chain)
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        .map_err(invalid)?;
 
     let dict = PyDict::new(py);
     for (region, span) in regions_for(parsed_scheme, parsed_chain).spans() {

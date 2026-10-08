@@ -3,7 +3,7 @@ use std::io::{self, BufWriter, IsTerminal, Write};
 use std::str::FromStr;
 
 use clap::{Args, Parser, Subcommand};
-use immunum::{Annotator, Chain, NumberedRecord, OutputFormat, Scheme, DEFAULT_MIN_CONFIDENCE};
+use immunum::{Annotator, NumberedRecord, OutputFormat, DEFAULT_MIN_CONFIDENCE};
 
 #[derive(Parser)]
 #[command(name = "immunum", about = "Immune receptor sequence numbering")]
@@ -46,12 +46,13 @@ fn run_number(args: &NumberArgs) -> Result<(), String> {
         );
     }
 
-    let scheme =
-        Scheme::from_str(&args.scheme).map_err(|_| format!("unknown scheme '{}'", args.scheme))?;
-    let chains = Chain::parse_chain_spec(&args.chain).map_err(|e| e.to_string())?;
+    let annotator = Annotator::from_names(
+        args.chain.split(','),
+        &args.scheme,
+        Some(args.min_confidence),
+    )
+    .map_err(|e| e.to_string())?;
     let format = OutputFormat::from_str(&args.format)?;
-    let annotator = Annotator::new(&chains, scheme, Some(args.min_confidence))
-        .map_err(|e| format!("failed to create annotator: {}", e))?;
 
     let records = immunum::read_input(args.input.as_deref())?;
 

@@ -2,63 +2,6 @@ from immunum._internal import _Annotator, _regions_for  # noqa: F401
 from dataclasses import dataclass
 from typing import Optional
 
-_CHAIN_ALIASES: dict[str, str] = {
-    "igh": "IGH",
-    "h": "IGH",
-    "heavy": "IGH",
-    "igk": "IGK",
-    "k": "IGK",
-    "kappa": "IGK",
-    "igl": "IGL",
-    "l": "IGL",
-    "lambda": "IGL",
-    "tra": "TRA",
-    "a": "TRA",
-    "alpha": "TRA",
-    "trb": "TRB",
-    "b": "TRB",
-    "beta": "TRB",
-    "trg": "TRG",
-    "g": "TRG",
-    "gamma": "TRG",
-    "trd": "TRD",
-    "d": "TRD",
-    "delta": "TRD",
-}
-
-_SCHEME_ALIASES: dict[str, str] = {
-    "imgt": "IMGT",
-    "i": "IMGT",
-    "kabat": "Kabat",
-    "k": "Kabat",
-    "chothia": "Chothia",
-    "c": "Chothia",
-    "martin": "Martin",
-    "m": "Martin",
-    "aho": "Aho",
-    "a": "Aho",
-}
-
-
-def _normalize_chain(chain: str) -> str:
-    normalized = _CHAIN_ALIASES.get(chain.lower())
-    if normalized is None:
-        valid = sorted(set(_CHAIN_ALIASES.values()))
-        raise ValueError(f"Unknown chain {chain!r}. Valid chains: {valid}")
-    return normalized
-
-
-def _normalize_chains(chains: list[str]) -> list[str]:
-    return [_normalize_chain(chain) for chain in chains]
-
-
-def _normalize_scheme(scheme: str) -> str:
-    normalized = _SCHEME_ALIASES.get(scheme.lower())
-    if normalized is None:
-        valid = sorted(set(_SCHEME_ALIASES.values()))
-        raise ValueError(f"Unknown scheme {scheme!r}. Valid schemes: {valid}")
-    return normalized
-
 
 @dataclass(frozen=True)
 class SegmenationResult:
@@ -199,8 +142,9 @@ class Annotator:
             - TCR gamma chain:       ``"TRG"`` / ``"G"`` / ``"gamma"``
             - TCR delta chain:       ``"TRD"`` / ``"D"`` / ``"delta"``
 
-            Pass all chains you want to consider; the annotator scores each and picks the
-            best-matching one. To consider every supported chain pass all seven values.
+            A group of chains is accepted too: ``"ig"`` (IGH, IGK, IGL), ``"tcr"``
+            (TRA, TRB, TRG, TRD) or ``"all"``. Pass all chains you want to consider;
+            the annotator scores each and picks the best-matching one.
 
         scheme: Numbering scheme to use for output positions. Accepted values
             (case-insensitive):
@@ -240,14 +184,8 @@ class Annotator:
                 non-IMGT scheme is requested for TCR chains, or if
                 ``min_confidence`` is outside ``[0, 1]``.
         """
-        if min_confidence is not None and not (0 <= min_confidence <= 1.0):
-            raise ValueError(
-                f"min_confidence should be in [0, 1], got {min_confidence=}"
-            )
         self._annotator = _Annotator(
-            chains=_normalize_chains(chains),
-            scheme=_normalize_scheme(scheme),
-            min_confidence=min_confidence,
+            chains=chains, scheme=scheme, min_confidence=min_confidence
         )
 
     def number(self, sequence: str) -> NumberingResult:
@@ -317,4 +255,4 @@ def regions_for(scheme: str, chain: str) -> dict[str, tuple[int, int]]:
             no rules for the chain — only IMGT covers TCR chains, so there is no
             Kabat, Chothia, Martin or AHo table to return for one.
     """
-    return _regions_for(scheme=_normalize_scheme(scheme), chain=_normalize_chain(chain))
+    return _regions_for(scheme=scheme, chain=chain)

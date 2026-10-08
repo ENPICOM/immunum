@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbering again. `sequence` is the whole sequence that was numbered; one too short for the numbering is
   an error. Python, JavaScript, Polars and the CLI now all use these.
 
+### Changed
+- Chain and scheme names are parsed once, in Rust, for every interface. Python drops its own alias
+  tables, so Python, JavaScript, Polars and the CLI accept the same names and report the same error
+  message for an unknown one. The chain groups `ig`, `tcr` and `all`, which only the CLI accepted, now
+  work everywhere; a chain named twice (e.g. `["ig", "H"]`) is used once.
+- `min_confidence` outside `[0, 1]` is rejected by every interface. Only Python checked it; JavaScript,
+  Polars and the CLI accepted any value.
+- Polars `number` and `segment` report an unknown chain or scheme when the expression runs, as a
+  `ComputeError`, instead of raising `ValueError` when the expression is built.
+- Rust: `Chain` and `Scheme` parse errors are `immunum::Error` (`InvalidChain`/`InvalidScheme`) naming
+  the accepted values, instead of `strum::ParseError`. New: `Chain::parse_names` and
+  `Annotator::from_names`, and `Error::InvalidMinConfidence`.
+
 ## [1.3.3] - 2026-10-01
 
 ### Fixed

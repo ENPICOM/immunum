@@ -136,6 +136,26 @@ class TestPolarsNumber:
         )
         assert result.height == 2
 
+    def test_number_accepts_aliases_and_groups(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+
+        def numbering(chains, scheme):
+            row = df.select(
+                imp.number(polars.col("sequence"), chains=chains, scheme=scheme).alias(
+                    "n"
+                )
+            ).unnest("n")
+            return dict(zip(row["positions"][0], row["residues"][0]))
+
+        canonical = numbering(["IGH", "IGK", "IGL"], "IMGT")
+        assert numbering(["ig"], "i") == canonical
+        assert numbering(["heavy", "k", "lambda"], "imgt") == canonical
+
+    def test_number_unknown_chain_raises(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        with pytest.raises(polars.exceptions.ComputeError):
+            df.select(imp.number(polars.col("sequence"), chains=["IGX"], scheme="IMGT"))
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize(

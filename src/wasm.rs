@@ -1,9 +1,7 @@
 use js_sys::{Object, Reflect};
-use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 use crate::annotator::Annotator;
-use crate::types::{Chain, Scheme};
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_TYPES: &str = r#"
@@ -61,8 +59,9 @@ export interface SegmentationResult {
  *   - TCR gamma chain:       `"TRG"` / `"G"` / `"gamma"`
  *   - TCR delta chain:       `"TRD"` / `"D"` / `"delta"`
  *
- *   Pass all chains you want to consider; the annotator scores each and picks the
- *   best-matching one. To consider every supported chain pass all seven values.
+ *   A group of chains is accepted too: `"ig"` (IGH, IGK, IGL), `"tcr"` (TRA, TRB, TRG,
+ *   TRD) or `"all"`. Pass all chains you want to consider; the annotator scores each and
+ *   picks the best-matching one.
  *
  * @param scheme - Numbering scheme to use for output positions. Accepted values
  *   (case-insensitive):
@@ -97,16 +96,7 @@ impl Annotator {
         scheme: String,
         min_confidence: Option<f32>,
     ) -> Result<Annotator, JsValue> {
-        let parsed_chains = chains
-            .iter()
-            .map(|chain| {
-                Chain::from_str(chain)
-                    .map_err(|_| JsValue::from_str(&format!("Invalid chain: {}", chain)))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let parsed_scheme = Scheme::from_str(&scheme)
-            .map_err(|_| JsValue::from_str(&format!("Invalid scheme: {}", scheme)))?;
-        Annotator::new(&parsed_chains, parsed_scheme, min_confidence)
+        Annotator::from_names(chains.iter().map(String::as_str), &scheme, min_confidence)
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 

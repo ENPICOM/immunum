@@ -297,6 +297,19 @@ fn invalid_scheme_shows_error() {
         .failure();
 }
 
+#[test]
+fn out_of_range_min_confidence_shows_error() {
+    immunum()
+        .args([
+            "number",
+            "--min-confidence",
+            "1.5",
+            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+        ])
+        .assert()
+        .failure();
+}
+
 // --- JSON output is valid ---
 
 #[test]

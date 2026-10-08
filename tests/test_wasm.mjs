@@ -67,6 +67,18 @@ describe("Annotator init", () => {
       assert.deepEqual([...byAlias.numbering], [...byName.numbering]);
     }
   });
+
+  it("accepts chain groups like every other interface", () => {
+    const byGroup = new Annotator(["ig"], "imgt").number(IGH_SEQ);
+    const byChains = new Annotator(AB_CHAINS, "imgt").number(IGH_SEQ);
+    assert.deepEqual([...byGroup.numbering], [...byChains.numbering]);
+  });
+
+  it("throws on min_confidence outside [0, 1]", () => {
+    for (const minConfidence of [-0.1, 1.5]) {
+      assert.throws(() => new Annotator(["H"], "imgt", minConfidence));
+    }
+  });
 });
 
 describe("number()", () => {
