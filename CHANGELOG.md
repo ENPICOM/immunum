@@ -16,10 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back into the input sequence, as documented (#58).
 
 ### Added
+- Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
+  It keeps the best alignment's domain, then searches the residues before and after it the same way, each
+  on its own, until a part is shorter than `MIN_SEQUENCE_LENGTH` or aligns with too little confidence.
+  Each domain numbers like `Annotator::number` on the residues it was found in, so a domain missing its
+  N-terminal residues after another domain is found as it would be at the start of a sequence. A domain
+  shorter than `MIN_SEQUENCE_LENGTH` is not reported, but the residues around it are still searched.
+- Rust: `Domain::number(scheme)` numbers a found domain under any scheme from the alignment that found it,
+  without aligning again. The first domain of a single-domain sequence numbers exactly like
+  `Annotator::number`, including AHo's light-chain position 149. A `Domain`'s span, chain and confidence
+  are read through methods (`query_start()`, `chain()`, ...), so they can't drift from its alignment.
 - Rust: `NumberingResult::residues(sequence)` pairs each numbered position with its residue, and
   `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions, flanks included, without
-  numbering again. `sequence` is the whole sequence that was numbered; one too short for the numbering is
-  an error. Python, JavaScript, Polars and the CLI now all use these.
+  numbering again. `sequence` is the whole sequence that was numbered or searched; one too short for the
+  numbering is an error. Python, JavaScript, Polars and the CLI now all use these.
 - Rust: `numbering::SEGMENT_NAMES` lists the segments in sequence order by the names every interface
   uses, and `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
   documentation's web tool take their region names and order from these instead of their own lists.
@@ -42,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust: `Chain` and `Scheme` parse errors are `immunum::Error` (`InvalidChain`/`InvalidScheme`) naming
   the accepted values, instead of `strum::ParseError`. New: `Chain::parse_names` and
   `Annotator::from_names`, and `Error::InvalidMinConfidence`.
+- Rust: `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
+  threads. A thread keeps at most about 650 KB of alignment buffer between calls, what a 1,000-residue
+  sequence needs; a longer sequence's buffer is freed when its call returns. `Annotator::number` and
+  `Annotator::segment` are built on the pieces above; apart from the flanks fixed above, their results
+  are unchanged.
 
 ### Removed
 - Rust: `Chain::parse_chain_spec`. Use `Chain::parse_names(spec.split(','))`.

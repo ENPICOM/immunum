@@ -89,8 +89,17 @@ impl AlignBuffer {
 
     fn ensure_capacity(&mut self, total: usize) {
         if self.dp_scores.len() < total {
-            self.dp_scores.resize(total, 0.0);
-            self.dp_traceback.resize(total, 0);
+            // Exactly `total`, so the memory held is what the longest query needed. The old contents
+            // aren't copied: `align` writes every cell before reading it.
+            self.dp_scores = vec![0.0; total];
+            self.dp_traceback = vec![0; total];
+        }
+    }
+
+    /// Free the matrices if they take more than `cells` cells
+    pub(crate) fn release_above(&mut self, cells: usize) {
+        if self.dp_scores.capacity() > cells {
+            *self = Self::new();
         }
     }
 }

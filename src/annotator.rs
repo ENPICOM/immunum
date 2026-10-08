@@ -1,7 +1,8 @@
 //! High-level API for sequence annotation and chain detection
 use std::cell::RefCell;
+use std::ops::Range;
 
-use crate::alignment::{align, AlignBuffer, Alignment};
+use crate::alignment::{align, AlignBuffer, AlignedPosition, Alignment};
 use crate::error::{Error, Result};
 use crate::numbering::{apply_numbering, segment as segment_positions, SEGMENT_NAMES};
 use crate::scoring::ScoringMatrix;
@@ -110,33 +111,28 @@ fn validate_sequence(sequence: &str) -> Result<()> {
     Ok(())
 }
 
+thread_local! {
+    // Reused by every alignment on this thread. Kept between calls only up to `KEPT_ALIGN_CELLS`.
+    static ALIGN_BUFFER: RefCell<AlignBuffer> = RefCell::new(AlignBuffer::new());
+}
+
+/// The most alignment matrix cells a thread keeps between calls: what a 1,000-residue query needs
+/// against a 128-position consensus, about 650 KB. A longer query still aligns, but its matrices are
+/// freed when its call returns.
+const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
+
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",
     pyclass(name = "_Annotator", module = "immunum._internal", unsendable)
 )]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip_typescript))]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Annotator {
     pub(crate) matrices: Vec<(Chain, ScoringMatrix)>,
     pub(crate) scheme: Scheme,
     pub(crate) chains: Vec<Chain>,
     pub(crate) min_confidence: f32,
-    /// Reusable alignment buffer to avoid per-alignment allocation
-    #[serde(skip)]
-    align_buf: RefCell<AlignBuffer>,
-}
-
-impl Clone for Annotator {
-    fn clone(&self) -> Self {
-        Self {
-            matrices: self.matrices.clone(),
-            scheme: self.scheme,
-            chains: self.chains.clone(),
-            min_confidence: self.min_confidence,
-            align_buf: RefCell::new(AlignBuffer::new()),
-        }
-    }
 }
 
 impl Annotator {
@@ -163,7 +159,6 @@ impl Annotator {
             scheme,
             chains: chains.to_vec(),
             min_confidence: min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
-            align_buf: RefCell::new(AlignBuffer::new()),
         })
     }
 
@@ -184,50 +179,7 @@ impl Annotator {
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
     pub fn number(&self, sequence: &str) -> Result<NumberingResult> {
         validate_sequence(sequence)?;
-
-        let (chain, alignment) = self.get_best_alignment(sequence)?;
-
-        // Apply numbering only to the aligned subregion of the query
-        let aligned_positions = &alignment.positions[alignment.query_start..=alignment.query_end];
-        let mut positions = apply_numbering(aligned_positions, self.scheme, chain);
-        let mut query_end = alignment.query_end;
-
-        // AHo light chains carry one extra C-terminal position (149) beyond the IMGT-numbered
-        // region: IMGT ends light chains at 127 -> AHo 148, so the 149 residue has no IMGT
-        // state and is appended here when a residue follows, matching ANARCI's number_aho tail
-        // rule. Heavy chains populate IMGT 128 -> AHo 149 directly and need no append.
-        if self.scheme == Scheme::Aho
-            && matches!(chain, Chain::IGK | Chain::IGL)
-            && positions.last() == Some(&Position::new(148))
-            && query_end + 1 < sequence.len()
-        {
-            positions.push(Position::new(149));
-            query_end += 1;
-        }
-
-        let confidence = if alignment.max_confidence_score > 0.0 {
-            (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-
-        if confidence < self.min_confidence {
-            return Err(Error::LowConfidence {
-                confidence,
-                threshold: self.min_confidence,
-            });
-        }
-
-        Ok(NumberingResult {
-            chain,
-            scheme: self.scheme,
-            positions,
-            cons_start: alignment.cons_start as usize,
-            cons_end: alignment.cons_end as usize,
-            confidence,
-            query_start: alignment.query_start,
-            query_end,
-        })
+        self.best_domain(sequence)?.number(self.scheme)
     }
 
     /// Segment a sequence into FR/CDR regions
@@ -235,25 +187,189 @@ impl Annotator {
         self.number(sequence)?.segment(sequence)
     }
 
+    /// Every variable domain in `sequence`, ordered by position.
+    ///
+    /// Aligns the sequence and keeps the best alignment's domain, then searches the residues before and
+    /// after it the same way, each on its own, so every domain is the best alignment of the residues
+    /// around it that no other domain holds. A part stops being searched once it is shorter than
+    /// [`MIN_SEQUENCE_LENGTH`] or its best alignment falls below the minimum confidence. A domain
+    /// shorter than [`MIN_SEQUENCE_LENGTH`] is not reported, but the residues around it are searched.
+    pub fn domains(&self, sequence: &str) -> Result<Vec<Domain>> {
+        validate_sequence(sequence)?;
+        let mut domains = Vec::new();
+        let mut parts = Vec::new();
+        parts.push(0..sequence.len());
+        while let Some(part) = parts.pop() {
+            if part.len() < MIN_SEQUENCE_LENGTH {
+                continue;
+            }
+            let domain = self.aligned_domain(sequence, part.clone())?;
+            if domain.confidence < self.min_confidence {
+                continue;
+            }
+            parts.push(part.start..domain.query_start);
+            parts.push(domain.query_end + 1..part.end);
+            if domain.query_end + 1 - domain.query_start >= MIN_SEQUENCE_LENGTH {
+                domains.push(domain);
+            }
+        }
+        domains.sort_by_key(|domain| domain.query_start);
+        for i in 1..domains.len() {
+            domains[i - 1].tail_limit = domains[i].query_start;
+        }
+        Ok(domains)
+    }
+
+    fn best_domain(&self, sequence: &str) -> Result<Domain> {
+        let domain = self.aligned_domain(sequence, 0..sequence.len())?;
+        if domain.confidence < self.min_confidence {
+            return Err(Error::LowConfidence {
+                confidence: domain.confidence,
+                threshold: self.min_confidence,
+            });
+        }
+        Ok(domain)
+    }
+
+    // The domain of the best alignment of `sequence[part]`, whatever its confidence, placed in `sequence`
+    fn aligned_domain(&self, sequence: &str, part: Range<usize>) -> Result<Domain> {
+        let (chain, alignment) = self.get_best_alignment(&sequence[part.clone()])?;
+        let confidence = if alignment.max_confidence_score > 0.0 {
+            (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        Ok(Domain::new(
+            chain,
+            alignment,
+            confidence,
+            part.start,
+            sequence.len(),
+        ))
+    }
+
     /// Align the sequence to all loaded chain types and return the best match
     /// If multiple chains were provided during initialization, this will align to all
     /// of them and return the best match. If only one chain was provided, it will
     /// align to that chain directly.
     fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
-        let mut buf = self.align_buf.borrow_mut();
-        // Align to all loaded chain types and find best match by raw alignment score
-        let mut best: Option<(Chain, Alignment)> = None;
-        for (chain, matrix) in &self.matrices {
-            let alignment = align(sequence, &matrix.positions, Some(&mut *buf));
-            let is_better = match &best {
-                Some((_, prev)) => alignment.score > prev.score,
-                None => true,
-            };
-            if is_better {
-                best = Some((*chain, alignment));
+        ALIGN_BUFFER.with_borrow_mut(|buf| {
+            // Align to all loaded chain types and find best match by raw alignment score
+            let mut best: Option<(Chain, Alignment)> = None;
+            for (chain, matrix) in &self.matrices {
+                let alignment = align(sequence, &matrix.positions, Some(&mut *buf));
+                let is_better = match &best {
+                    Some((_, prev)) => alignment.score > prev.score,
+                    None => true,
+                };
+                if is_better {
+                    best = Some((*chain, alignment));
+                }
             }
+            buf.release_above(KEPT_ALIGN_CELLS);
+            best.ok_or_else(|| {
+                Error::AlignmentError("failed to align to any chain type".to_string())
+            })
+        })
+    }
+}
+
+/// A variable domain found in a sequence: the alignment that found it, before a numbering scheme is
+/// applied. Number it under as many schemes as needed; none aligns again.
+#[derive(Debug, Clone)]
+pub struct Domain {
+    chain: Chain,
+    confidence: f32,
+    query_start: usize,
+    query_end: usize,
+    cons_start: usize,
+    cons_end: usize,
+    // One alignment state per residue in `query_start..=query_end`
+    states: Vec<AlignedPosition>,
+    // First index the AHo tail residue may not reach: the next domain's start, or the sequence end.
+    tail_limit: usize,
+}
+
+impl Domain {
+    // `alignment` aligned the residues of the searched sequence from `offset` on
+    fn new(
+        chain: Chain,
+        alignment: Alignment,
+        confidence: f32,
+        offset: usize,
+        tail_limit: usize,
+    ) -> Self {
+        Self {
+            chain,
+            confidence,
+            query_start: offset + alignment.query_start,
+            query_end: offset + alignment.query_end,
+            cons_start: alignment.cons_start as usize,
+            cons_end: alignment.cons_end as usize,
+            states: alignment.positions[alignment.query_start..=alignment.query_end].to_vec(),
+            tail_limit,
         }
-        best.ok_or_else(|| Error::AlignmentError("failed to align to any chain type".to_string()))
+    }
+
+    pub fn chain(&self) -> Chain {
+        self.chain
+    }
+
+    /// Confidence of this domain's alignment
+    pub fn confidence(&self) -> f32 {
+        self.confidence
+    }
+
+    /// 0-based index of the domain's first residue in the searched sequence
+    pub fn query_start(&self) -> usize {
+        self.query_start
+    }
+
+    /// 0-based index of the domain's last residue
+    pub fn query_end(&self) -> usize {
+        self.query_end
+    }
+
+    /// First aligned consensus position
+    pub fn cons_start(&self) -> usize {
+        self.cons_start
+    }
+
+    /// Last aligned consensus position
+    pub fn cons_end(&self) -> usize {
+        self.cons_end
+    }
+
+    /// This domain numbered under `scheme`, from the alignment that found it.
+    pub fn number(&self, scheme: Scheme) -> Result<NumberingResult> {
+        scheme.validate_chain(self.chain)?;
+
+        let mut positions = apply_numbering(&self.states, scheme, self.chain);
+        let mut query_end = self.query_end;
+
+        // AHo light chains carry one extra C-terminal position (149) beyond the IMGT-numbered
+        // region: IMGT ends light chains at 127 -> AHo 148, so the 149 residue has no IMGT
+        // state and is appended here when a residue follows, matching ANARCI's number_aho tail
+        // rule. Heavy chains populate IMGT 128 -> AHo 149 directly and need no append.
+        if scheme == Scheme::Aho
+            && matches!(self.chain, Chain::IGK | Chain::IGL)
+            && positions.last() == Some(&Position::new(148))
+            && query_end + 1 < self.tail_limit
+        {
+            positions.push(Position::new(149));
+            query_end += 1;
+        }
+
+        Ok(NumberingResult {
+            chain: self.chain,
+            scheme,
+            positions,
+            cons_start: self.cons_start,
+            cons_end: self.cons_end,
+            confidence: self.confidence,
+            query_start: self.query_start,
+            query_end,
+        })
     }
 }
 
@@ -377,6 +493,162 @@ mod tests {
     // Full IGH from the task description (FR1 through FR4)
     const FULL_IGH: &str = "EVQLVESGGGLVQPGGSLRLSCAASGFNVSYSSIHWVRQAPGKGLEWVAYIYPSSGYTSYADSVKGRFTISADTSKNTAYLQMNSLRAEDTAVYYCARSYSTKLAMDYWGQGTLVTVSS";
 
+    // PDB 1EFQ chain A, from fixtures/validation/ab_K_imgt.csv.
+    const KAPPA: &str = "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK";
+    // The human kappa constant region. AHo numbers the residue after a kappa domain as position 149.
+    const KAPPA_CONSTANT: &str = "RTVAAPSVFIFPPSDEQLKSGTASVVCLLNNFYPREAKVQWKVDNALQSGNSQESVTEQDSKDSTYSLSSTLTLSKADYEKHKVYACEVTHQGLSSPVTKSFNRGEC";
+    const LINKER: &str = "GGGGSGGGGSGGGGS";
+    const ANTIBODY_CHAINS: &[Chain] = &[Chain::IGH, Chain::IGK, Chain::IGL];
+
+    fn spans(sequence: &str) -> Vec<(usize, usize, Chain)> {
+        Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None)
+            .unwrap()
+            .domains(sequence)
+            .unwrap()
+            .iter()
+            .map(|domain| (domain.query_start, domain.query_end, domain.chain))
+            .collect()
+    }
+
+    #[test]
+    fn a_domain_numbers_like_number_in_every_scheme() {
+        let kappa_with_constant = format!("{KAPPA}{KAPPA_CONSTANT}");
+        let heavy_with_one = format!("{FULL_IGH}A");
+        let kappa_with_one = format!("{KAPPA}A");
+        for sequence in [
+            FULL_IGH,
+            KAPPA,
+            kappa_with_constant.as_str(),
+            heavy_with_one.as_str(),
+            kappa_with_one.as_str(),
+        ] {
+            for scheme in [
+                Scheme::IMGT,
+                Scheme::Kabat,
+                Scheme::Chothia,
+                Scheme::Martin,
+                Scheme::Aho,
+            ] {
+                let annotator = Annotator::new(ANTIBODY_CHAINS, scheme, None).unwrap();
+                let expected = annotator.number(sequence).unwrap();
+                let domains = annotator.domains(sequence).unwrap();
+                assert_eq!(domains.len(), 1, "{scheme} {sequence}");
+                let got = domains[0].number(scheme).unwrap();
+                assert_eq!(got.positions, expected.positions, "{scheme} {sequence}");
+                assert_eq!(
+                    (got.query_start, got.query_end),
+                    (expected.query_start, expected.query_end)
+                );
+                assert_eq!(
+                    (got.chain, got.cons_start, got.cons_end),
+                    (expected.chain, expected.cons_start, expected.cons_end)
+                );
+                assert_eq!(got.confidence, expected.confidence);
+            }
+        }
+    }
+
+    #[test]
+    fn aho_numbers_the_residue_after_a_kappa_domain() {
+        let sequence = format!("{KAPPA}{KAPPA_CONSTANT}");
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let domain = &annotator.domains(&sequence).unwrap()[0];
+        assert_eq!(domain.number(Scheme::IMGT).unwrap().query_end, 112);
+        assert_eq!(domain.number(Scheme::Aho).unwrap().query_end, 113);
+    }
+
+    #[test]
+    fn finds_both_domains_of_an_scfv() {
+        assert_eq!(
+            spans(&format!("{FULL_IGH}{LINKER}{KAPPA}")),
+            vec![(0, 118, Chain::IGH), (134, 246, Chain::IGK)]
+        );
+    }
+
+    #[test]
+    fn a_kappa_domain_keeps_its_aho_tail_out_of_the_next_domain() {
+        let sequence = format!("{KAPPA}{FULL_IGH}");
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let domains = annotator.domains(&sequence).unwrap();
+        assert_eq!(domains.len(), 2);
+        let first = domains[0].number(Scheme::Aho).unwrap();
+        assert!(first.query_end < domains[1].query_start);
+    }
+
+    // The residues after a domain are aligned on their own, so a domain that lost its N-terminal
+    // residues can skip the consensus positions it lacks, as it can at the start of a sequence.
+    #[test]
+    fn an_n_truncated_domain_after_another_numbers_like_on_its_own() {
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        for start in [40, 60, 80] {
+            let truncated = &FULL_IGH[start..];
+            let domains = annotator
+                .domains(&format!("{FULL_IGH}{truncated}"))
+                .unwrap();
+            assert_eq!(domains.len(), 2, "FULL_IGH[{start}..]");
+            let got = domains[1].number(Scheme::IMGT).unwrap();
+            let expected = annotator.number(truncated).unwrap();
+            assert_eq!(got.positions, expected.positions, "FULL_IGH[{start}..]");
+            assert_eq!(
+                (got.query_start, got.query_end),
+                (
+                    FULL_IGH.len() + expected.query_start,
+                    FULL_IGH.len() + expected.query_end
+                )
+            );
+            assert_eq!(got.confidence, expected.confidence);
+        }
+    }
+
+    #[test]
+    fn finds_abutting_domains() {
+        assert_eq!(
+            spans(&format!("{FULL_IGH}{KAPPA}")),
+            vec![(0, 118, Chain::IGH), (119, 231, Chain::IGK)]
+        );
+    }
+
+    #[test]
+    fn keeps_a_truncated_domain_beside_a_full_one() {
+        assert_eq!(
+            spans(&format!("{FULL_IGH}{}", &KAPPA[..57])),
+            vec![(0, 118, Chain::IGH), (119, 175, Chain::IGK)]
+        );
+    }
+
+    #[test]
+    fn an_x_inside_a_domain_keeps_it_whole() {
+        let sequence = format!("{}X{}", &FULL_IGH[..60], &FULL_IGH[61..]);
+        assert_eq!(spans(&sequence), vec![(0, 118, Chain::IGH)]);
+    }
+
+    #[test]
+    fn a_constant_region_holds_no_domain() {
+        assert!(spans(KAPPA_CONSTANT).is_empty());
+    }
+
+    #[test]
+    fn an_x_run_holds_no_domain() {
+        assert!(spans(&"X".repeat(300)).is_empty());
+    }
+
+    #[test]
+    fn segment_of_a_later_domain_needs_the_whole_sequence() {
+        let scfv = format!("{FULL_IGH}{LINKER}{KAPPA}");
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let kappa = annotator.domains(&scfv).unwrap()[1]
+            .number(Scheme::IMGT)
+            .unwrap();
+        assert!(kappa.segment(&scfv).is_ok());
+        assert!(kappa.segment(KAPPA).is_err());
+    }
+
+    #[test]
+    fn an_annotator_is_shared_across_threads() {
+        fn assert_sync<T: Send + Sync>() {}
+        assert_sync::<Annotator>();
+    }
+
     #[test]
     fn test_number_no_flanking_has_zero_query_start_end() {
         let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
@@ -409,9 +681,6 @@ mod tests {
         assert_eq!(result.query_end, FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
     }
-
-    // PDB 1EFQ chain A, from fixtures/validation/ab_K_imgt.csv.
-    const KAPPA: &str = "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK";
 
     // Expected values from ANARCI: one residue past the domain is never part of it, except that AHo
     // numbers the residue after a light chain as position 149.
