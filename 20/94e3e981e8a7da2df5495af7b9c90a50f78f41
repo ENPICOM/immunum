@@ -1,0 +1,28 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 23-25
+docs/assets/immunum-webtool.js
+  h_acea35c6bbea0b 92-98,100,114,117-119,140,144,146-147
+immunum/__init__.py
+  h_acea35c6bbea0b 2,73,207
+src/annotator.rs
+  h_acea35c6bbea0b 6,50-67,276-278,283-289
+src/numbering.rs
+  h_acea35c6bbea0b 49-53,56-57,64-67
+src/polars.rs
+  h_acea35c6bbea0b 1-2,277-281,287,292-293,295-297,299,304,309-311,313-317,319-323,328-333
+src/python.rs
+  h_acea35c6bbea0b 7,62-64,68-70
+src/wasm.rs
+  h_acea35c6bbea0b 154-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2094e3e981e8a7da2df5495af7b9c90a50f78f41",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
