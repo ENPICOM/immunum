@@ -1,0 +1,45 @@
+src/numbering.rs
+  h_acea35c6bbea0b 14,50-61
+  h_acea35c6bbea0b 62-68,70-78,98-100,102
+CHANGELOG.md
+  h_acea35c6bbea0b 56-57,61-70,75-78,87-89
+README.md
+  h_acea35c6bbea0b 201,204,208
+docs/api/immunum.md
+  h_acea35c6bbea0b 10-11
+docs/usage/python.md
+  h_acea35c6bbea0b 50-58
+immunum/__init__.py
+  h_acea35c6bbea0b 1,325-348
+immunum/_internal.pyi
+  h_acea35c6bbea0b 30
+src/annotator.rs
+  h_acea35c6bbea0b 124-133
+src/lib.rs
+  h_acea35c6bbea0b 78-80,83
+src/main.rs
+  h_acea35c6bbea0b 7-8,109-113,116-121,153-157,159-162
+src/polars.rs
+  h_acea35c6bbea0b 1,76-77,203-208
+src/python.rs
+  h_acea35c6bbea0b 6-8,97-101,116-120,154-159,163-164,169-174,180
+src/types.rs
+  h_acea35c6bbea0b 7-8,15-17,88-91,93-103,105-106,117,122-124,138-149,170-172,174-175,179-192,212-217,310-325,524-556
+src/wasm.rs
+  h_acea35c6bbea0b 4-10,13-14,55,71-73,80-81,85-89,100-105,123,125-131,133,135,140-158,232,242,254,262-273
+tests/test_python.py
+  h_acea35c6bbea0b 411-431
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 13,116-142,329,333-335
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "89a65df8064ed0fb82050c49a1815fb3465412b5",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
