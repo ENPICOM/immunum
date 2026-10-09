@@ -92,7 +92,7 @@ immunum-rs = { workspace = true }
 
 [tool.pytest.ini_options]
 markers = ["slow: mark test as slow (requires full validation fixtures)"]
-addopts = "--markdown-docs --doctest-modules"
+addopts = "--markdown-docs --doctest-modules --ignore=docs/assets/wasm"
 testpaths = ["docs", "tests", "immunum"]
 
 
