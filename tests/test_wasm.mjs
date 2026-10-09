@@ -10,7 +10,7 @@
 
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { Annotator } from "../pkg/immunum.js";
+import { Annotator, schemeSupportsChain } from "../pkg/immunum.js";
 
 const ALL_CHAINS = ["H", "K", "L", "A", "B", "G", "D"];
 const AB_CHAINS = ["H", "K", "L"];
@@ -66,6 +66,50 @@ describe("Annotator init", () => {
       assert.equal(byAlias.scheme, canonical);
       assert.deepEqual([...byAlias.numbering], [...byName.numbering]);
     }
+  });
+
+  it("accepts chain groups like every other interface", () => {
+    const byGroup = new Annotator(["ig"], "imgt").number(IGH_SEQ);
+    const byChains = new Annotator(AB_CHAINS, "imgt").number(IGH_SEQ);
+    assert.deepEqual([...byGroup.numbering], [...byChains.numbering]);
+  });
+
+  it("throws on min_confidence outside [0, 1]", () => {
+    for (const minConfidence of [-0.1, 1.5]) {
+      assert.throws(() => new Annotator(["H"], "imgt", minConfidence));
+    }
+  });
+});
+
+describe("schemeSupportsChain()", () => {
+  it("allows every chain under IMGT and only antibody chains otherwise", () => {
+    for (const chain of ALL_CHAINS) {
+      assert.equal(schemeSupportsChain("imgt", chain), true);
+    }
+    for (const scheme of ["kabat", "chothia", "martin", "aho"]) {
+      for (const chain of ALL_CHAINS) {
+        assert.equal(schemeSupportsChain(scheme, chain), AB_CHAINS.includes(chain));
+      }
+    }
+  });
+
+  it("agrees with what the Annotator constructor accepts", () => {
+    for (const scheme of ["imgt", "kabat", "chothia", "martin", "aho"]) {
+      for (const chain of ALL_CHAINS) {
+        let constructs = true;
+        try {
+          new Annotator([chain], scheme).free();
+        } catch {
+          constructs = false;
+        }
+        assert.equal(schemeSupportsChain(scheme, chain), constructs);
+      }
+    }
+  });
+
+  it("throws on an unknown scheme or chain", () => {
+    assert.throws(() => schemeSupportsChain("INVALID", "H"));
+    assert.throws(() => schemeSupportsChain("imgt", "INVALID"));
   });
 });
 
@@ -208,5 +252,15 @@ describe("segment()", () => {
     const result = annotator.segment("AAAAAAAAAAAAAAAA");
     assert.equal(typeof result.error, "string");
     assert.equal(result.fr1, undefined);
+  });
+
+  it("keeps flanking residues in prefix and postfix (#58)", () => {
+    const annotator = new Annotator(["H"], "IMGT");
+    const sequence = "MGWSCIILFLVATATGVHSX" + IGH_SEQ + "HHHHHHEPEA";
+    const result = annotator.segment(sequence);
+    assert.equal(result.prefix, "MGWSCIILFLVATATGVHSX");
+    assert.equal(result.postfix, "HHHHHHEPEA");
+    const regions = ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"];
+    assert.equal(regions.map((r) => result[r]).join(""), sequence);
   });
 });

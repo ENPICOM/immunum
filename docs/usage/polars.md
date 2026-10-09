@@ -2,7 +2,7 @@
 
 Polars module uses [`polars`](https://pola.rs) dataframe library, relying on its built-in multiprocessing and query optimization engine to allow you to run your queries blazingly fast. If you have a big of data (hundreds of thousands and more), it's strongly preferred you use this interface.
 
-It's preferred that you use functional interface for the `polars` module, i.e. call `immunum.polars.number()` and `immunum.polars.segment()` directly instead of calling `immunum.polars.numbering_method(...)`. Those methods provide the same functionality, and will be used in future for runtime-buit annotators, but currently this syntax is just less convenient and requires building annotators in advance.
+There are two ways to call each operation, and they return the same fields and run equally fast. `immunum.polars.number()` and `immunum.polars.segment()` take chain and scheme names, like the examples below. `immunum.polars.numbering_method()` and `immunum.polars.segmentation_method()` take an `Annotator` you have already built, which is convenient when your code holds one anyway: its arguments are checked when you build it, so a mistake raises `ValueError` straight away instead of a `ComputeError` when the query runs.
 
 Also, note that if you don't need a column, don't materialize it afterwards -- on big dataframes, queries will get **significantly** faster. For instance, example below runs in under a second for dataset with 8M entries (200,000 of them are actual paired sequences), while full numbering would take around 10 times more.
 

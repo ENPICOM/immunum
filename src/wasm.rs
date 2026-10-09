@@ -1,9 +1,7 @@
 use js_sys::{Object, Reflect};
-use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 use crate::annotator::Annotator;
-use crate::numbering::segment;
 use crate::types::{Chain, Scheme};
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -62,8 +60,9 @@ export interface SegmentationResult {
  *   - TCR gamma chain:       `"TRG"` / `"G"` / `"gamma"`
  *   - TCR delta chain:       `"TRD"` / `"D"` / `"delta"`
  *
- *   Pass all chains you want to consider; the annotator scores each and picks the
- *   best-matching one. To consider every supported chain pass all seven values.
+ *   A group of chains is accepted too: `"ig"` (IGH, IGK, IGL), `"tcr"` (TRA, TRB, TRG,
+ *   TRD) or `"all"`. Pass all chains you want to consider; the annotator scores each and
+ *   picks the best-matching one.
  *
  * @param scheme - Numbering scheme to use for output positions. Accepted values
  *   (case-insensitive):
@@ -74,7 +73,7 @@ export interface SegmentationResult {
  *   - `"Aho"` / `"a"` — AHo numbering (derived from IMGT)
  *
  *   Only IMGT supports TCR chains; the other schemes are restricted to antibody
- *   chains (IGH, IGK, IGL).
+ *   chains (IGH, IGK, IGL). {@link schemeSupportsChain} checks a pair up front.
  *
  * @param min_confidence - Optional minimum alignment confidence threshold in the
  *   range `[0, 1]`. Sequences scoring below this value are rejected with an error.
@@ -98,16 +97,7 @@ impl Annotator {
         scheme: String,
         min_confidence: Option<f32>,
     ) -> Result<Annotator, JsValue> {
-        let parsed_chains = chains
-            .iter()
-            .map(|chain| {
-                Chain::from_str(chain)
-                    .map_err(|_| JsValue::from_str(&format!("Invalid chain: {}", chain)))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let parsed_scheme = Scheme::from_str(&scheme)
-            .map_err(|_| JsValue::from_str(&format!("Invalid scheme: {}", scheme)))?;
-        Annotator::new(&parsed_chains, parsed_scheme, min_confidence)
+        Annotator::from_names(chains.iter().map(String::as_str), &scheme, min_confidence)
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
@@ -116,9 +106,11 @@ impl Annotator {
         let dict = Object::new();
         match self.number(sequence) {
             Ok(result) => {
-                let aligned_seq = &sequence[result.query_start..=result.query_end];
                 let numbering = js_sys::Map::new();
-                for (pos, ch) in result.positions.iter().zip(aligned_seq.chars()) {
+                for (pos, ch) in result
+                    .residues(sequence)
+                    .expect("`result` numbered `sequence`")
+                {
                     numbering.set(
                         &JsValue::from_str(&pos.to_string()),
                         &JsValue::from_str(&ch.to_string()),
@@ -158,13 +150,15 @@ impl Annotator {
     #[wasm_bindgen(js_name = "segment", skip_typescript)]
     pub fn wasm_segment(&self, sequence: &str) -> JsValue {
         let dict = Object::new();
-        match self.number(sequence) {
-            Ok(result) => {
-                let aligned_seq = &sequence[result.query_start..=result.query_end];
-                let segments = segment(&result.positions, aligned_seq, result.scheme, result.chain);
-                for (region, seq) in &segments {
-                    Reflect::set(&dict, &JsValue::from_str(region), &JsValue::from_str(seq))
-                        .unwrap();
+        match self.segment(sequence) {
+            Ok(s) => {
+                for (name, residues) in s.regions() {
+                    Reflect::set(
+                        &dict,
+                        &JsValue::from_str(name),
+                        &JsValue::from_str(residues),
+                    )
+                    .unwrap();
                 }
                 Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
             }
@@ -174,6 +168,17 @@ impl Annotator {
         }
         dict.into()
     }
+}
+
+/// Whether `scheme` numbers `chain`: IMGT numbers every chain, the other schemes antibody chains
+/// (IGH, IGK, IGL) only. Takes a scheme and a single chain by the names `Annotator` accepts, and
+/// throws on an unknown one.
+#[wasm_bindgen(js_name = "schemeSupportsChain")]
+pub fn scheme_supports_chain(scheme: &str, chain: &str) -> Result<bool, JsValue> {
+    let to_js = |e: crate::Error| JsValue::from_str(&e.to_string());
+    let scheme: Scheme = scheme.parse().map_err(to_js)?;
+    let chain: Chain = chain.parse().map_err(to_js)?;
+    Ok(scheme.supports(chain))
 }
 
 #[cfg(test)]

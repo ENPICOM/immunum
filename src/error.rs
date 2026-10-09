@@ -34,4 +34,7 @@ pub enum Error {
 
     #[error("Low confidence: {confidence:.4} < threshold {threshold:.4}")]
     LowConfidence { confidence: f32, threshold: f32 },
+
+    #[error("min_confidence must be in [0, 1], got {0}")]
+    InvalidMinConfidence(f32),
 }

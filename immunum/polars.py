@@ -12,7 +12,7 @@ except ImportError as e:
     ) from e
 
 from immunum._internal import _Annotator  # noqa: F401
-from immunum import _normalize_chains, _normalize_scheme, Annotator
+from immunum import Annotator
 
 if TYPE_CHECKING:
     from immunum.typing import IntoExprColumn
@@ -28,10 +28,15 @@ def number(
     scheme: str,
     min_confidence: float | None = None,
 ) -> pl.Expr:
-    """Segment a polars expr with immunum.
+    """Number sequences as a Polars expression.
 
-    Annotator object will be initialized with chains, scheme, min_confidence.
-    Results are returned as `Struct({'chain': String, 'scheme': String, 'positions': List(String), 'residues': List(String)})`
+    Each row gets the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`,
+    `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and
+    `error`. On failure, `error` is set and every other field is null.
+
+    The annotator is built from `chains`, `scheme` and `min_confidence` when the query runs, so
+    an unknown name or an out-of-range `min_confidence` raises a `ComputeError` then.
+    `numbering_method` takes a prebuilt `Annotator` instead and returns the same fields.
 
     Example:
 
@@ -49,9 +54,8 @@ def number(
     ).select(
         imp.number(
             "sequence",
-            chains=["h"],
+            chains=["h", "k"],
             scheme="imgt",
-            min_confidence=0.0,
         ).alias("numbering")
     )
     assert df.dtypes == [
@@ -59,12 +63,17 @@ def number(
             {
                 "chain": pl.String,
                 "scheme": pl.String,
-                "positions": pl.List(
-                    pl.String
+                "confidence": pl.Float32,
+                "numbering": pl.List(
+                    pl.Struct(
+                        {
+                            "position": pl.String,
+                            "residue": pl.String,
+                        }
+                    )
                 ),
-                "residues": pl.List(
-                    pl.String
-                ),
+                "query_start": pl.UInt32,
+                "query_end": pl.UInt32,
                 "error": pl.String,
             }
         )
@@ -77,15 +86,41 @@ def number(
         )
     )
 
-    # shape: (2, 4)
-    # ┌───────┬────────┬─────────────────────┬───────────────────┐
-    # │ chain ┆ scheme ┆ positions           ┆ residues          │
-    # │ ---   ┆ ---    ┆ ---                 ┆ ---               │
-    # │ str   ┆ str    ┆ list[str]           ┆ list[str]         │
-    # ╞═══════╪════════╪═════════════════════╪═══════════════════╡
-    # │ H     ┆ IMGT   ┆ ["1", "2", … "128"] ┆ ["Q", "V", … "S"] │
-    # │ H     ┆ IMGT   ┆ ["1", "2", … "127"] ┆ ["D", "I", … "K"] │
-    # └───────┴────────┴─────────────────────┴───────────────────┘
+    # shape: (2, 7)
+    # ┌───────┬────────┬────────────┬─────────────────────────────────┬─────────────┬───────────┬───────┐
+    # │ chain ┆ scheme ┆ confidence ┆ numbering                       ┆ query_start ┆ query_end ┆ error │
+    # │ ---   ┆ ---    ┆ ---        ┆ ---                             ┆ ---         ┆ ---       ┆ ---   │
+    # │ str   ┆ str    ┆ f32        ┆ list[struct[2]]                 ┆ u32         ┆ u32       ┆ str   │
+    # ╞═══════╪════════╪════════════╪═════════════════════════════════╪═════════════╪═══════════╪═══════╡
+    # │ H     ┆ IMGT   ┆ 0.784515   ┆ [{"1","Q"}, {"2","V"}, … {"128… ┆ 0           ┆ 121       ┆ null  │
+    # │ K     ┆ IMGT   ┆ 0.878814   ┆ [{"1","D"}, {"2","I"}, … {"127… ┆ 0           ┆ 106       ┆ null  │
+    # └───────┴────────┴────────────┴─────────────────────────────────┴─────────────┴───────────┴───────┘
+
+    # One row per numbered residue
+    print(
+        df.select(
+            pl.col(
+                "numbering"
+            ).struct.field(
+                "chain",
+                "numbering",
+            )
+        )
+        .explode("numbering")
+        .unnest("numbering")
+        .head(3)
+    )
+
+    # shape: (3, 3)
+    # ┌───────┬──────────┬─────────┐
+    # │ chain ┆ position ┆ residue │
+    # │ ---   ┆ ---      ┆ ---     │
+    # │ str   ┆ str      ┆ str     │
+    # ╞═══════╪══════════╪═════════╡
+    # │ H     ┆ 1        ┆ Q       │
+    # │ H     ┆ 2        ┆ V       │
+    # │ H     ┆ 3        ┆ Q       │
+    # └───────┴──────────┴─────────┘
     ```
 
     Args:
@@ -103,8 +138,8 @@ def number(
         function_name="numbering_struct_expr",
         is_elementwise=True,
         kwargs={
-            "chains": _normalize_chains(chains),
-            "scheme": _normalize_scheme(scheme),
+            "chains": chains,
+            "scheme": scheme,
             "min_confidence": min_confidence,
         },
     )
@@ -119,8 +154,13 @@ def segment(
 ) -> pl.Expr:
     """Split sequences into FR/CDR regions as a Polars expression.
 
-    Annotator object will be initialized with chains, scheme, min_confidence.
-    Results are returned as `Struct({'fr1': String, 'cdr1': String, 'fr2': String, 'cdr2': String, 'fr3': String, 'cdr3': String, 'fr4': String, 'prefix': String, 'postfix': String})`.
+    Each row gets `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and
+    `error`. The segments join back into the sequence. On failure, `error` is set and every
+    segment is null.
+
+    The annotator is built from `chains`, `scheme` and `min_confidence` when the query runs, so
+    an unknown name or an out-of-range `min_confidence` raises a `ComputeError` then.
+    `segmentation_method` takes a prebuilt `Annotator` instead and returns the same fields.
 
     Example:
 
@@ -193,19 +233,20 @@ def segment(
         function_name="segmentation_struct_expr",
         is_elementwise=True,
         kwargs={
-            "chains": _normalize_chains(chains),
-            "scheme": _normalize_scheme(scheme),
+            "chains": chains,
+            "scheme": scheme,
             "min_confidence": min_confidence,
         },
     )
 
 
 def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
-    """Number sequences using a pre-built `Annotator` instance.
+    """Number sequences with a prebuilt `Annotator`.
 
-    Prefer this over `number` when reusing the same annotator across multiple expressions,
-    as it avoids re-initializing the annotator on each call. Returns the same struct shape
-    as `number`.
+    Returns exactly what `number` returns, and runs as fast. Use it when your code already holds
+    an `Annotator`: its chains, scheme and `min_confidence` were checked when it was built, so a
+    mistake raises `ValueError` there instead of when the query runs. The annotator travels with
+    the query and is rebuilt from it on every call, so it saves no set-up work over `number`.
 
     Example:
 
@@ -231,15 +272,17 @@ def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
             annotator=annotator,
         ).alias("numbering")
     )
-    assert set(
-        df["numbering"].struct.fields
-    ) == {
+    assert df[
+        "numbering"
+    ].struct.fields == [
         "chain",
         "scheme",
         "confidence",
         "numbering",
+        "query_start",
+        "query_end",
         "error",
-    }
+    ]
     ```
 
     Args:
@@ -259,11 +302,12 @@ def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
 
 
 def segmentation_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
-    """Segment sequences using a pre-built `Annotator` instance.
+    """Segment sequences with a prebuilt `Annotator`.
 
-    Prefer this over `segment` when reusing the same annotator across multiple expressions,
-    as it avoids re-initializing the annotator on each call. Returns the same struct shape
-    as `segment`.
+    Returns exactly what `segment` returns, and runs as fast. Use it when your code already holds
+    an `Annotator`: its chains, scheme and `min_confidence` were checked when it was built, so a
+    mistake raises `ValueError` there instead of when the query runs. The annotator travels with
+    the query and is rebuilt from it on every call, so it saves no set-up work over `segment`.
 
     Example:
 

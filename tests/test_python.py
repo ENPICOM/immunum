@@ -1,6 +1,7 @@
 import immunum
 import pytest
 import pickle
+from concurrent.futures import ThreadPoolExecutor
 
 
 ALL_CHAINS = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
@@ -102,6 +103,11 @@ class TestAnnotatorInit:
         with pytest.raises(ValueError):
             immunum.Annotator(chains, scheme)
 
+    @pytest.mark.parametrize("min_confidence", [-0.1, 1.5])
+    def test_min_confidence_out_of_range_raises(self, min_confidence):
+        with pytest.raises(ValueError):
+            immunum.Annotator(["IGH"], "IMGT", min_confidence)
+
     def test_number_smoke(self, annotator_and_seq):
         annotator, seq = annotator_and_seq
         annotator.number(seq)
@@ -110,6 +116,14 @@ class TestAnnotatorInit:
         annotator, seq = annotator_and_seq
         re_annotator = pickle.loads(pickle.dumps(annotator))
         re_annotator.number(seq)
+
+    def test_shared_across_threads(self):
+        # One annotator, used from threads other than the one that made it
+        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
+        expected = annotator.number(IGH_SEQ)
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(annotator.number, [IGH_SEQ] * 8))
+        assert results == [expected] * 8
 
 
 class TestNumbering:
@@ -166,6 +180,27 @@ class TestNumbering:
         assert result.error is not None
         assert result.fr1 is None
 
+    def test_segmentation_keeps_flanking_residues(self):
+        """Issue #58: residues before and after the domain land in prefix and postfix."""
+        annotator = immunum.Annotator(["IGH"], "IMGT")
+        sequence = "MGWSCIILFLVATATGVHSX" + IGH_SEQ + "HHHHHHEPEA"
+        result = annotator.segment(sequence)
+        assert result.error is None
+        assert result.prefix == "MGWSCIILFLVATATGVHSX"
+        assert result.postfix == "HHHHHHEPEA"
+        regions = (
+            "prefix",
+            "fr1",
+            "cdr1",
+            "fr2",
+            "cdr2",
+            "fr3",
+            "cdr3",
+            "fr4",
+            "postfix",
+        )
+        assert "".join(getattr(result, r) for r in regions) == sequence
+
 
 class TestNormalization:
     @pytest.mark.parametrize(
@@ -194,6 +229,9 @@ class TestNormalization:
             (["igh"], ["IGH"], "chothia", "Chothia", IGH_SEQ),
             (["igh"], ["IGH"], "martin", "Martin", IGH_SEQ),
             (["igh"], ["IGH"], "aho", "Aho", IGH_SEQ),
+            (["ig"], AB_CHAINS, "IMGT", "IMGT", IGL_SEQ),
+            (["tcr"], ["TRA", "TRB", "TRG", "TRD"], "IMGT", "IMGT", TRB_SEQ),
+            (["all"], ALL_CHAINS, "IMGT", "IMGT", TRA_SEQ),
         ],
     )
     def test_alias_produces_identical_result(

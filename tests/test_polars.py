@@ -66,10 +66,10 @@ def compare_fixture(csv_path: Path, chains: list[str], scheme: str) -> tuple[int
     for row in result.iter_rows(named=True):
         expected = {pos: aa for pos in position_cols if (aa := row[pos])}
         numbered = row["numbered"]
-        if numbered is None or numbered["positions"] is None:
+        if numbered is None or numbered["numbering"] is None:
             mismatches += 1
             continue
-        got = dict(zip(numbered["positions"], numbered["residues"]))
+        got = {r["position"]: r["residue"] for r in numbered["numbering"]}
         if got != expected:
             mismatches += 1
 
@@ -95,18 +95,6 @@ class TestPolarsNumber:
         )
         assert "numbered" in result.columns
         assert result.height == 1
-
-    def test_number_struct_fields(self):
-        df = polars.DataFrame({"sequence": [IGH_SEQ]})
-        result = df.select(
-            imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
-                "numbered"
-            )
-        ).unnest("numbered")
-        assert "chain" in result.columns
-        assert "positions" in result.columns
-        assert "residues" in result.columns
-        assert "error" in result.columns
 
     def test_number_error_field_null_on_success(self):
         df = polars.DataFrame({"sequence": [IGH_SEQ]})
@@ -135,6 +123,26 @@ class TestPolarsNumber:
             ).alias("numbered")
         )
         assert result.height == 2
+
+    def test_number_accepts_aliases_and_groups(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+
+        def numbering(chains, scheme):
+            row = df.select(
+                imp.number(polars.col("sequence"), chains=chains, scheme=scheme).alias(
+                    "n"
+                )
+            ).unnest("n")
+            return {r["position"]: r["residue"] for r in row["numbering"][0]}
+
+        canonical = numbering(["IGH", "IGK", "IGL"], "IMGT")
+        assert numbering(["ig"], "i") == canonical
+        assert numbering(["heavy", "k", "lambda"], "imgt") == canonical
+
+    def test_number_unknown_chain_raises(self):
+        df = polars.DataFrame({"sequence": [IGH_SEQ]})
+        with pytest.raises(polars.exceptions.ComputeError):
+            df.select(imp.number(polars.col("sequence"), chains=["IGX"], scheme="IMGT"))
 
 
 @pytest.mark.slow
@@ -221,6 +229,73 @@ class TestPolarsSegment:
         assert result.height == 2
 
 
+# A signal peptide before the domain and a tag after it: residues the aligner leaves out.
+FLANKED_SEQ = "MGWSCIILFLVATATGVHSX" + IGH_SEQ + "HHHHHHEPEA"
+REGIONS = ("prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix")
+
+
+def as_numbering_result(row: dict) -> dict:
+    """A Polars numbering row in the shape of `Annotator.number`'s result."""
+    numbering = row["numbering"]
+    if numbering is not None:
+        numbering = {r["position"]: r["residue"] for r in numbering}
+    return {**row, "numbering": numbering}
+
+
+class TestPolarsMatchesAnnotator:
+    """Issues #53 and #58: every Polars expression returns what `Annotator` returns for the same
+    sequence, flanking residues included, with the same fields."""
+
+    SEQUENCES = [FLANKED_SEQ, "A" * 40]
+
+    @pytest.fixture
+    def annotator(self):
+        from immunum import Annotator
+
+        return Annotator(["IGH"], "IMGT")
+
+    def assert_matches_annotator(self, expr, annotator):
+        from dataclasses import asdict, fields
+        from immunum import NumberingResult
+
+        df = polars.DataFrame({"sequence": self.SEQUENCES})
+        rows = df.select(expr.alias("n")).unnest("n").to_dicts()
+        assert list(rows[0]) == [f.name for f in fields(NumberingResult)]
+        assert [as_numbering_result(row) for row in rows] == [
+            asdict(annotator.number(s)) for s in self.SEQUENCES
+        ]
+
+    def test_number(self, annotator):
+        expr = imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT")
+        self.assert_matches_annotator(expr, annotator)
+
+    def test_numbering_method(self, annotator):
+        expr = imp.numbering_method(polars.col("sequence"), annotator=annotator)
+        self.assert_matches_annotator(expr, annotator)
+
+    def test_segment(self, annotator):
+        df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
+        row = df.select(
+            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
+                "s"
+            )
+        ).unnest("s")
+        expected = annotator.segment(FLANKED_SEQ)
+        assert {r: row[r][0] for r in REGIONS} == expected.as_dict()
+        assert "".join(row[r][0] for r in REGIONS) == FLANKED_SEQ
+
+    def test_segmentation_method(self, annotator):
+        df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
+        row = df.select(
+            imp.segmentation_method(polars.col("sequence"), annotator=annotator).alias(
+                "s"
+            )
+        ).unnest("s")
+        expected = annotator.segment(FLANKED_SEQ)
+        assert {r: row[r][0] for r in REGIONS} == expected.as_dict()
+        assert "".join(row[r][0] for r in REGIONS) == FLANKED_SEQ
+
+
 class TestPolarsNumberingMethod:
     def test_segmentation_method_returns_expr(self):
         from immunum import Annotator
@@ -261,19 +336,3 @@ class TestPolarsNumberingMethod:
         )
         assert "numbered" in result.columns
         assert result.height == 1
-
-    def test_numbering_method_struct_fields(self):
-        from immunum import Annotator
-
-        annotator = Annotator(["IGH"], "IMGT")
-        df = polars.DataFrame({"sequence": [IGH_SEQ]})
-        result = df.select(
-            imp.numbering_method(polars.col("sequence"), annotator=annotator).alias(
-                "numbered"
-            )
-        ).unnest("numbered")
-        assert "chain" in result.columns
-        assert "scheme" in result.columns
-        assert "confidence" in result.columns
-        assert "numbering" in result.columns
-        assert "error" in result.columns

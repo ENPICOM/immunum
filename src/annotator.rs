@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use crate::alignment::{align, AlignBuffer, AlignedPosition, Alignment};
 use crate::error::{Error, Result};
-use crate::numbering::{apply_numbering, segment as segment_positions};
+use crate::numbering::{apply_numbering, segment as segment_positions, SEGMENT_NAMES};
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme};
 
@@ -46,6 +46,24 @@ pub struct SegmentResult {
     pub cdr3: String,
     pub fr4: String,
     pub postfix: String,
+}
+
+impl SegmentResult {
+    /// Each segment's residues with its name from [`SEGMENT_NAMES`], in sequence order
+    pub fn regions(&self) -> [(&'static str, &str); 9] {
+        let segments = [
+            &self.prefix,
+            &self.fr1,
+            &self.cdr1,
+            &self.fr2,
+            &self.cdr2,
+            &self.fr3,
+            &self.cdr3,
+            &self.fr4,
+            &self.postfix,
+        ];
+        std::array::from_fn(|i| (SEGMENT_NAMES[i], segments[i].as_str()))
+    }
 }
 
 /// Default minimum confidence threshold for accepting a numbering result.
@@ -106,7 +124,7 @@ const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",
-    pyclass(name = "_Annotator", module = "immunum._internal", unsendable)
+    pyclass(name = "_Annotator", module = "immunum._internal")
 )]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip_typescript))]
 #[derive(Clone, Serialize, Deserialize)]
@@ -121,6 +139,9 @@ impl Annotator {
     pub fn new(chains: &[Chain], scheme: Scheme, min_confidence: Option<f32>) -> Result<Self> {
         if chains.is_empty() {
             return Err(Error::InvalidChain("chains cannot be empty".to_string()));
+        }
+        if let Some(confidence) = min_confidence.filter(|c| !(0.0..=1.0).contains(c)) {
+            return Err(Error::InvalidMinConfidence(confidence));
         }
 
         for &chain in chains {
@@ -139,6 +160,20 @@ impl Annotator {
             chains: chains.to_vec(),
             min_confidence: min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
         })
+    }
+
+    /// An annotator from chain and scheme names, as a user writes them: see [`Chain::parse_names`]
+    /// for the chains and [`Scheme`] for the scheme.
+    pub fn from_names<'a>(
+        chains: impl IntoIterator<Item = &'a str>,
+        scheme: &str,
+        min_confidence: Option<f32>,
+    ) -> Result<Self> {
+        Self::new(
+            &Chain::parse_names(chains)?,
+            scheme.parse()?,
+            min_confidence,
+        )
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
@@ -339,10 +374,42 @@ impl Domain {
 }
 
 impl NumberingResult {
-    /// The FR/CDR split of the residues this result numbered, without numbering again. `sequence` is
-    /// the whole sequence that was numbered or searched, not a domain's own residues.
+    /// Each numbered position with its residue. `sequence` is the whole sequence that was numbered,
+    /// flanking residues included.
+    pub fn residues<'a>(
+        &'a self,
+        sequence: &'a str,
+    ) -> Result<impl Iterator<Item = (&'a Position, char)> + 'a> {
+        Ok(self.positions.iter().zip(self.numbered(sequence)?.chars()))
+    }
+
+    /// The FR/CDR split of `sequence`, the whole sequence that was numbered. The residues before the
+    /// numbered ones open the prefix and the residues after them close the postfix, so the regions in
+    /// order rebuild `sequence`.
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
-        let aligned_seq = sequence
+        let numbered = self.numbered(sequence)?;
+        let mut map = segment_positions(&self.positions, numbered, self.scheme, self.chain);
+        let [mut prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, mut postfix] =
+            SEGMENT_NAMES.map(|name| map.remove(name).unwrap_or_default());
+        prefix.insert_str(0, &sequence[..self.query_start]);
+        postfix.push_str(&sequence[self.query_end + 1..]);
+
+        Ok(SegmentResult {
+            prefix,
+            fr1,
+            cdr1,
+            fr2,
+            cdr2,
+            fr3,
+            cdr3,
+            fr4,
+            postfix,
+        })
+    }
+
+    // The residues of `sequence` this result numbered
+    fn numbered<'a>(&self, sequence: &'a str) -> Result<&'a str> {
+        sequence
             .get(self.query_start..=self.query_end)
             .ok_or_else(|| {
                 Error::InvalidSequence(format!(
@@ -351,21 +418,7 @@ impl NumberingResult {
                     self.query_end,
                     sequence.len()
                 ))
-            })?;
-
-        let mut map = segment_positions(&self.positions, aligned_seq, self.scheme, self.chain);
-
-        Ok(SegmentResult {
-            prefix: map.remove("prefix").unwrap_or_default(),
-            fr1: map.remove("fr1").unwrap_or_default(),
-            cdr1: map.remove("cdr1").unwrap_or_default(),
-            fr2: map.remove("fr2").unwrap_or_default(),
-            cdr2: map.remove("cdr2").unwrap_or_default(),
-            fr3: map.remove("fr3").unwrap_or_default(),
-            cdr3: map.remove("cdr3").unwrap_or_default(),
-            fr4: map.remove("fr4").unwrap_or_default(),
-            postfix: map.remove("postfix").unwrap_or_default(),
-        })
+            })
     }
 }
 
@@ -384,6 +437,20 @@ mod tests {
     fn test_create_annotator_with_chains() {
         let annotator = Annotator::new(&[Chain::IGH, Chain::IGK], Scheme::IMGT, None).unwrap();
         assert_eq!(annotator.matrices.len(), 2);
+    }
+
+    // The range was only checked by the Python wrapper; JavaScript, Polars and the CLI accepted any value.
+    #[test]
+    fn min_confidence_must_lie_in_zero_to_one() {
+        for accepted in [None, Some(0.0), Some(1.0)] {
+            assert!(Annotator::new(&[Chain::IGH], Scheme::IMGT, accepted).is_ok());
+        }
+        for rejected in [-0.01, 1.01, f32::NAN] {
+            assert!(matches!(
+                Annotator::new(&[Chain::IGH], Scheme::IMGT, Some(rejected)),
+                Err(Error::InvalidMinConfidence(_))
+            ));
+        }
     }
 
     #[test]
@@ -563,21 +630,6 @@ mod tests {
     #[test]
     fn an_x_run_holds_no_domain() {
         assert!(spans(&"X".repeat(300)).is_empty());
-    }
-
-    #[test]
-    fn segment_of_a_numbering_matches_segment() {
-        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::Kabat, None).unwrap();
-        let from_numbering = annotator
-            .number(FULL_IGH)
-            .unwrap()
-            .segment(FULL_IGH)
-            .unwrap();
-        let segmented = annotator.segment(FULL_IGH).unwrap();
-        assert_eq!(
-            (from_numbering.fr1, from_numbering.cdr3, from_numbering.fr4),
-            (segmented.fr1, segmented.cdr3, segmented.fr4)
-        );
     }
 
     #[test]
@@ -860,6 +912,42 @@ mod tests {
         assert_eq!(result.query_start, prefix.len());
         assert_eq!(result.query_end, prefix.len() + FULL_IGH.len() - 1);
         assert_eq!(result.positions.len(), FULL_IGH.len());
+    }
+
+    #[test]
+    fn residues_skip_the_flanking_residues() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let sequence = format!("MGWSCIILFLVATATGVHSX{FULL_IGH}AAAAAAA");
+        let flanked = annotator.number(&sequence).unwrap();
+        let bare = annotator.number(FULL_IGH).unwrap();
+        let got: Vec<_> = flanked.residues(&sequence).unwrap().collect();
+        let expected: Vec<_> = bare.residues(FULL_IGH).unwrap().collect();
+        assert_eq!(got, expected);
+    }
+
+    // Issue #58: residues the aligner leaves out were dropped instead of landing in prefix/postfix.
+    #[test]
+    fn segment_puts_flanking_residues_in_prefix_and_postfix() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let sequence = "AAAAAQVQLQESGGGLVQPGGSLRLSCAASGFTFSNYKMNWVRQAPGKGLEWVSDISQSGASISYTGSVKGRFTISRDNAKNTLYLQMNSLKPEDTAVYYCARCPAPFTRDCFDVTSTTYAYRGQGTQVTVSSHHHHHHEPEA";
+        let s = annotator.segment(sequence).unwrap();
+        assert_eq!(s.prefix, "AAAAA");
+        assert_eq!(s.postfix, "HHHHHHEPEA");
+        assert_eq!(s.fr4, "RGQGTQVTVSS");
+        let rebuilt = [
+            &s.prefix, &s.fr1, &s.cdr1, &s.fr2, &s.cdr2, &s.fr3, &s.cdr3, &s.fr4, &s.postfix,
+        ]
+        .map(String::as_str)
+        .concat();
+        assert_eq!(rebuilt, sequence);
+    }
+
+    #[test]
+    fn a_numbering_needs_the_sequence_it_numbered() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        let result = annotator.number(&format!("AAAAAA{FULL_IGH}")).unwrap();
+        assert!(result.residues(FULL_IGH).is_err());
+        assert!(result.segment(FULL_IGH).is_err());
     }
 
     /// Truncated but productive camel VHH reads from the Observed Antibody Space (Li et al. 2017,

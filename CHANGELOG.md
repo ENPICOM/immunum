@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Polars: `number`, `segment`, `numbering_method` and `segmentation_method` paired the numbering with the
+  sequence from its first residue instead of from `query_start`, so every residue after a leader or other
+  leading flank was shifted by the length of that flank (#53).
+- `segment` dropped the residues the aligner leaves out before and after the domain instead of putting
+  them in `prefix` and `postfix`, in Rust, Python, Polars and JavaScript. The regions now always join
+  back into the input sequence, as documented (#58).
+- Python: an `Annotator` used from a thread other than the one that created it raised a `PanicException`
+  ("unsendable, but sent to another thread"). It can now be shared across threads.
+- The documentation's web tool upper-cased the sequence before numbering it, so it showed residues the
+  user hadn't entered; it now numbers the sequence as given, like every other interface. It still drops
+  whitespace from the text box, so a wrapped or spaced sequence can be pasted.
+
 ### Added
 - Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
   It keeps the best alignment's domain, then searches the residues before and after it the same way, each
@@ -18,15 +31,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without aligning again. The first domain of a single-domain sequence numbers exactly like
   `Annotator::number`, including AHo's light-chain position 149. A `Domain`'s span, chain and confidence
   are read through methods (`query_start()`, `chain()`, ...), so they can't drift from its alignment.
-- Rust: `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions without numbering again.
-  `sequence` is the whole sequence that was numbered or searched; one too short for the numbering is an
-  error.
+- Rust: `NumberingResult::residues(sequence)` pairs each numbered position with its residue, and
+  `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions, flanks included, without
+  numbering again. `sequence` is the whole sequence that was numbered or searched; one too short for the
+  numbering is an error. Python, JavaScript, Polars and the CLI now all use these.
+- Rust: `numbering::SEGMENT_NAMES` lists the segments in sequence order by the names every interface
+  uses, and `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
+  documentation's web tool take their region names and order from these instead of their own lists.
+- CLI: JSON and JSONL records carry `query_start` and `query_end`, as Python and JavaScript results do.
+- JavaScript: `schemeSupportsChain(scheme, chain)` tells whether a scheme numbers a chain, by the rule
+  the `Annotator` constructor applies; Rust: `Scheme::supports(chain)`. The documentation's web tool
+  uses it to enable its chain checkboxes instead of keeping its own copy of the rule.
 
 ### Changed
+- **Breaking:** Polars `number` and `numbering_method` return the same struct, with the fields Python's
+  and JavaScript's `Annotator.number` return: `chain`, `scheme`, `confidence`, `numbering`,
+  `query_start`, `query_end` and `error`. `numbering` is a list of `{position, residue}` structs; explode
+  and unnest it for one row per residue. `number` returned `positions` and `residues` lists instead of
+  `numbering`, and had no `confidence` (#38); neither had `query_start` or `query_end`.
+- Chain and scheme names are parsed once, in Rust, for every interface. Python drops its own alias
+  tables, so Python, JavaScript, Polars and the CLI accept the same names and report the same error
+  message for an unknown one. The chain groups `ig`, `tcr` and `all`, which only the CLI accepted, now
+  work everywhere; a chain named twice (e.g. `["ig", "H"]`) is used once.
+- `min_confidence` outside `[0, 1]` is rejected by every interface. Only Python checked it; JavaScript,
+  Polars and the CLI accepted any value.
+- Polars `number` and `segment` report an unknown chain or scheme when the expression runs, as a
+  `ComputeError`, instead of raising `ValueError` when the expression is built.
+- Rust: `Chain` and `Scheme` parse errors are `immunum::Error` (`InvalidChain`/`InvalidScheme`) naming
+  the accepted values, instead of `strum::ParseError`. New: `Chain::parse_names` and
+  `Annotator::from_names`, and `Error::InvalidMinConfidence`.
 - Rust: `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
   threads. A thread keeps at most about 650 KB of alignment buffer between calls, what a 1,000-residue
   sequence needs; a longer sequence's buffer is freed when its call returns. `Annotator::number` and
-  `Annotator::segment` are built on the pieces above; their results are unchanged.
+  `Annotator::segment` are built on the pieces above; apart from the flanks fixed above, their results
+  are unchanged.
+
+### Removed
+- Rust: `Chain::parse_chain_spec`. Use `Chain::parse_names(spec.split(','))`.
 
 ## [1.3.3] - 2026-10-01
 
