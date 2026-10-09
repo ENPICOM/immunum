@@ -45,36 +45,6 @@ Chain type is automatically detected by aligning against all loaded chains and s
 Every scheme is derived from the internal IMGT numbering. Region (FR/CDR) boundaries follow each
 scheme's own definition and differ between heavy and light chains.
 
-### Errors
-
-immunum fails in two ways, and every interface reports each the same way:
-
-- **A setup mistake is raised** before any sequence is numbered: Python raises `immunum.Error` (a `ValueError`) and JavaScript throws an `Error`, both with a `kind`; Polars raises when the expression is built; the CLI prints `error: …` and exits with status 1.
-- **A sequence that can't be numbered is returned**, so a batch never stops for it: its result has `error` (the message) and `error_kind` (`errorKind` in JavaScript) set, and every other field empty.
-
-| Kind                     | Raised or returned | When                                                         |
-| ------------------------ | ------------------ | ------------------------------------------------------------ |
-| `invalid_chain`          | raised             | an unknown chain name, or no chains                          |
-| `invalid_scheme`         | raised             | an unknown scheme name                                       |
-| `unsupported_chain`      | raised             | a scheme other than IMGT asked to number a TCR chain         |
-| `invalid_min_confidence` | raised             | `min_confidence` outside `[0, 1]`                            |
-| `invalid_sequence`       | returned           | a sequence too short, too long, or holding a non-letter      |
-| `low_confidence`         | returned           | no alignment reaches `min_confidence`                        |
-| `domain_too_short`       | returned           | from `*_domains` only: the best alignment is confident but shorter than a domain (30 residues), and no other domain is found |
-
-```python
-import immunum
-
-try:
-    immunum.Annotator(chains=["IGX"], scheme="imgt")
-except immunum.Error as e:
-    print(e.kind)  # invalid_chain
-
-result = immunum.Annotator(chains=["ig"], scheme="imgt").number("AAAA")
-print(result.error_kind)  # invalid_sequence
-print(result.error)       # sequence length 4 is below minimum 30
-```
-
 ## Table of Contents
 
 - [Python](#python)
@@ -94,6 +64,7 @@ print(result.error)       # sequence length 4 is below minimum 30
   - [Input](#input)
   - [Output](#output)
   - [Examples](#examples)
+- [Errors](#errors)
 - [Development](#development)
 - [Project structure](#project-structure)
 
@@ -372,6 +343,36 @@ immunum number -c all sequences.fasta | awk -F'\t' 'NR==1 || $2=="H"'
 
 # Extract CDR3 sequences with jq
 immunum number -f json sequences.fasta | jq '[.[] | {id: .sequence_id, numbering}]'
+```
+
+## Errors
+
+immunum fails in two ways, and every interface reports each the same way:
+
+- **A setup mistake is raised** before any sequence is numbered: Python raises `immunum.Error` (a `ValueError`) and JavaScript throws an `Error`, both with a `kind`; Polars raises when the expression is built; the CLI prints `error: …` and exits with status 1.
+- **A sequence that can't be numbered is returned**, so a batch never stops for it: its result has `error` (the message) and `error_kind` (`errorKind` in JavaScript) set, and every other field empty.
+
+| Kind                     | Raised or returned | When                                                         |
+| ------------------------ | ------------------ | ------------------------------------------------------------ |
+| `invalid_chain`          | raised             | an unknown chain name, or no chains                          |
+| `invalid_scheme`         | raised             | an unknown scheme name                                       |
+| `unsupported_chain`      | raised             | a scheme other than IMGT asked to number a TCR chain         |
+| `invalid_min_confidence` | raised             | `min_confidence` outside `[0, 1]`                            |
+| `invalid_sequence`       | returned           | a sequence too short, too long, or holding a non-letter      |
+| `low_confidence`         | returned           | no alignment reaches `min_confidence`                        |
+| `domain_too_short`       | returned           | from `*_domains` only: the best alignment is confident but shorter than a domain (30 residues), and no other domain is found |
+
+```python
+import immunum
+
+try:
+    immunum.Annotator(chains=["IGX"], scheme="imgt")
+except immunum.Error as e:
+    print(e.kind)  # invalid_chain
+
+result = immunum.Annotator(chains=["ig"], scheme="imgt").number("AAAA")
+print(result.error_kind)  # invalid_sequence
+print(result.error)       # sequence length 4 is below minimum 30
 ```
 
 ## Development
