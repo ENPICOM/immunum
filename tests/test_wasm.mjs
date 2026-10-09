@@ -10,7 +10,7 @@
 
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { Annotator } from "../pkg/immunum.js";
+import { Annotator, schemeSupportsChain } from "../pkg/immunum.js";
 
 const ALL_CHAINS = ["H", "K", "L", "A", "B", "G", "D"];
 const AB_CHAINS = ["H", "K", "L"];
@@ -78,6 +78,38 @@ describe("Annotator init", () => {
     for (const minConfidence of [-0.1, 1.5]) {
       assert.throws(() => new Annotator(["H"], "imgt", minConfidence));
     }
+  });
+});
+
+describe("schemeSupportsChain()", () => {
+  it("allows every chain under IMGT and only antibody chains otherwise", () => {
+    for (const chain of ALL_CHAINS) {
+      assert.equal(schemeSupportsChain("imgt", chain), true);
+    }
+    for (const scheme of ["kabat", "chothia", "martin", "aho"]) {
+      for (const chain of ALL_CHAINS) {
+        assert.equal(schemeSupportsChain(scheme, chain), AB_CHAINS.includes(chain));
+      }
+    }
+  });
+
+  it("agrees with what the Annotator constructor accepts", () => {
+    for (const scheme of ["imgt", "kabat", "chothia", "martin", "aho"]) {
+      for (const chain of ALL_CHAINS) {
+        let constructs = true;
+        try {
+          new Annotator([chain], scheme).free();
+        } catch {
+          constructs = false;
+        }
+        assert.equal(schemeSupportsChain(scheme, chain), constructs);
+      }
+    }
+  });
+
+  it("throws on an unknown scheme or chain", () => {
+    assert.throws(() => schemeSupportsChain("INVALID", "H"));
+    assert.throws(() => schemeSupportsChain("imgt", "INVALID"));
   });
 });
 

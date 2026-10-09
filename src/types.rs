@@ -147,14 +147,16 @@ fn unknown_scheme(name: &str) -> Error {
 }
 
 impl Scheme {
-    /// Kabat, Chothia, Martin and AHo rules are derived for antibody chains only. AHo is defined
-    /// for TCR chains too, but immunum does not ship TCR AHo rules yet.
+    /// Whether this scheme numbers `chain`. IMGT numbers every chain; Kabat, Chothia, Martin and
+    /// AHo rules are derived for antibody chains only. AHo is defined for TCR chains too, but
+    /// immunum does not ship TCR AHo rules yet.
+    pub fn supports(self, chain: Chain) -> bool {
+        self == Scheme::IMGT || !TCR_CHAINS.contains(&chain)
+    }
+
+    /// An error unless this scheme [`supports`](Self::supports) `chain`.
     pub fn validate_chain(self, chain: Chain) -> Result<()> {
-        if matches!(
-            self,
-            Scheme::Kabat | Scheme::Chothia | Scheme::Martin | Scheme::Aho
-        ) && TCR_CHAINS.contains(&chain)
-        {
+        if !self.supports(chain) {
             return Err(Error::InvalidScheme(format!(
                 "{self} scheme only supported for antibody chains (IGH, IGK, IGL)"
             )));

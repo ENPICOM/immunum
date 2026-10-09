@@ -2,6 +2,7 @@ use js_sys::{Object, Reflect};
 use wasm_bindgen::prelude::*;
 
 use crate::annotator::Annotator;
+use crate::types::{Chain, Scheme};
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_TYPES: &str = r#"
@@ -72,7 +73,7 @@ export interface SegmentationResult {
  *   - `"Aho"` / `"a"` — AHo numbering (derived from IMGT)
  *
  *   Only IMGT supports TCR chains; the other schemes are restricted to antibody
- *   chains (IGH, IGK, IGL).
+ *   chains (IGH, IGK, IGL). {@link schemeSupportsChain} checks a pair up front.
  *
  * @param min_confidence - Optional minimum alignment confidence threshold in the
  *   range `[0, 1]`. Sequences scoring below this value are rejected with an error.
@@ -167,6 +168,17 @@ impl Annotator {
         }
         dict.into()
     }
+}
+
+/// Whether `scheme` numbers `chain`: IMGT numbers every chain, the other schemes antibody chains
+/// (IGH, IGK, IGL) only. Takes a scheme and a single chain by the names `Annotator` accepts, and
+/// throws on an unknown one.
+#[wasm_bindgen(js_name = "schemeSupportsChain")]
+pub fn scheme_supports_chain(scheme: &str, chain: &str) -> Result<bool, JsValue> {
+    let to_js = |e: crate::Error| JsValue::from_str(&e.to_string());
+    let scheme: Scheme = scheme.parse().map_err(to_js)?;
+    let chain: Chain = chain.parse().map_err(to_js)?;
+    Ok(scheme.supports(chain))
 }
 
 #[cfg(test)]

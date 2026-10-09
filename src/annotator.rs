@@ -124,7 +124,7 @@ const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",
-    pyclass(name = "_Annotator", module = "immunum._internal", unsendable)
+    pyclass(name = "_Annotator", module = "immunum._internal")
 )]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip_typescript))]
 #[derive(Clone, Serialize, Deserialize)]

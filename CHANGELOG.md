@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `segment` dropped the residues the aligner leaves out before and after the domain instead of putting
   them in `prefix` and `postfix`, in Rust, Python, Polars and JavaScript. The regions now always join
   back into the input sequence, as documented (#58).
+- Python: an `Annotator` used from a thread other than the one that created it raised a `PanicException`
+  ("unsendable, but sent to another thread"). It can now be shared across threads.
+- The documentation's web tool upper-cased the sequence before numbering it, so it showed residues the
+  user hadn't entered; it now numbers the sequence as given, like every other interface. It still drops
+  whitespace from the text box, so a wrapped or spaced sequence can be pasted.
 
 ### Added
 - Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
@@ -34,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uses, and `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
   documentation's web tool take their region names and order from these instead of their own lists.
 - CLI: JSON and JSONL records carry `query_start` and `query_end`, as Python and JavaScript results do.
+- JavaScript: `schemeSupportsChain(scheme, chain)` tells whether a scheme numbers a chain, by the rule
+  the `Annotator` constructor applies; Rust: `Scheme::supports(chain)`. The documentation's web tool
+  uses it to enable its chain checkboxes instead of keeping its own copy of the rule.
 
 ### Changed
 - **Breaking:** Polars `number` and `numbering_method` return the same struct, with the fields Python's

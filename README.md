@@ -165,6 +165,15 @@ console.log(segments.cdr3); // "AREGTTGKPIGAFAH"
 annotator.free(); // or use `using annotator = new Annotator(...)` with explicit resource management
 ```
 
+`schemeSupportsChain(scheme, chain)` tells whether a scheme numbers a chain before you build an annotator, e.g. to offer only valid choices in a UI:
+
+```js
+const { schemeSupportsChain } = require("immunum");
+
+schemeSupportsChain("kabat", "H"); // true
+schemeSupportsChain("kabat", "B"); // false: only IMGT numbers TCR chains
+```
+
 ## Rust
 
 ### Installation

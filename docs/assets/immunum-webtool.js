@@ -1,5 +1,5 @@
 // Interactive WASM numbering tool for the immunum docs homepage.
-import init, { Annotator } from "./wasm/immunum.js";
+import init, { Annotator, schemeSupportsChain } from "./wasm/immunum.js";
 
 const EXAMPLES = {
   IGH: "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
@@ -16,14 +16,6 @@ const ALL_CHAINS = [
   { value: "G", label: "Gamma (TRG)" },
   { value: "D", label: "Delta (TRD)" },
 ];
-
-// Only IMGT is defined for TCR chains; every derived scheme is antibody-only.
-const ANTIBODY_CHAINS = new Set(["H", "K", "L"]);
-const ANTIBODY_ONLY_SCHEMES = new Set(["kabat", "chothia", "martin", "aho"]);
-
-function isChainAllowed(chain, scheme) {
-  return ANTIBODY_ONLY_SCHEMES.has(scheme) ? ANTIBODY_CHAINS.has(chain) : true;
-}
 
 const $ = (id) => document.getElementById(id);
 
@@ -53,11 +45,12 @@ function getScheme() {
   return el ? el.value : "imgt";
 }
 
+// Needs the WASM module: which chains a scheme numbers comes from immunum itself.
 function refreshChainAvailability() {
   const scheme = getScheme();
   const boxes = $("chain").querySelectorAll('input[type="checkbox"]');
   for (const cb of boxes) {
-    const allowed = isChainAllowed(cb.value, scheme);
+    const allowed = schemeSupportsChain(scheme, cb.value);
     cb.disabled = !allowed;
     cb.closest("label").classList.toggle("is-disabled", !allowed);
     if (!allowed) cb.checked = false;
@@ -168,14 +161,9 @@ async function main() {
   // Material's instant navigation loads a different page). Bail out early.
   if (!document.getElementById("immunum-form")) return;
 
-  // Wire UI immediately so example buttons + scheme switching work even
-  // before the WASM module finishes loading.
+  // Wire UI immediately so example buttons work even before the WASM
+  // module finishes loading.
   buildChainCheckboxes();
-  refreshChainAvailability();
-
-  for (const r of document.querySelectorAll('input[name="scheme"]')) {
-    r.addEventListener("change", refreshChainAvailability);
-  }
 
   const confSlider = $("min-confidence");
   const confValue = $("confidence-value");
@@ -199,6 +187,11 @@ async function main() {
     return;
   }
 
+  refreshChainAvailability();
+  for (const r of document.querySelectorAll('input[name="scheme"]')) {
+    r.addEventListener("change", refreshChainAvailability);
+  }
+
   const runBtn = $("run-btn");
   runBtn.disabled = false;
   runBtn.textContent = "Number sequence";
@@ -206,7 +199,10 @@ async function main() {
   $("immunum-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
     clearError();
-    const sequence = $("seq-input").value.trim().toUpperCase().replace(/\s+/g, "");
+    // A pasted sequence often wraps over lines or comes in spaced blocks; drop the whitespace, as
+    // the CLI joins FASTA lines. Case is left alone: immunum numbers either case and returns
+    // residues as given, like every interface.
+    const sequence = $("seq-input").value.replace(/\s+/g, "");
     if (!sequence) {
       showError("Please enter a sequence.");
       return;

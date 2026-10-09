@@ -1,6 +1,7 @@
 import immunum
 import pytest
 import pickle
+from concurrent.futures import ThreadPoolExecutor
 
 
 ALL_CHAINS = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
@@ -115,6 +116,14 @@ class TestAnnotatorInit:
         annotator, seq = annotator_and_seq
         re_annotator = pickle.loads(pickle.dumps(annotator))
         re_annotator.number(seq)
+
+    def test_shared_across_threads(self):
+        # One annotator, used from threads other than the one that made it
+        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
+        expected = annotator.number(IGH_SEQ)
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(annotator.number, [IGH_SEQ] * 8))
+        assert results == [expected] * 8
 
 
 class TestNumbering:
