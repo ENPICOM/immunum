@@ -100,8 +100,8 @@ function renderResult(sequence, numberResult, segResult) {
   schemeEl.textContent = `Scheme: ${numberResult.scheme}`;
 
   // Aligned query range (1-indexed, inclusive — user-facing convention).
-  const qStart = numberResult.query_start;
-  const qEnd = numberResult.query_end;
+  const qStart = numberResult.queryStart;
+  const qEnd = numberResult.queryEnd;
   $("result-range").textContent = `Query ${qStart + 1}–${qEnd + 1} (${qEnd - qStart + 1} aa)`;
 
   // Render the aligned region with the flanks segment() left out of it dimmed.

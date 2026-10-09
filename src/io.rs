@@ -1,6 +1,7 @@
 //! Input parsing and output formatting for sequence records
 
-use crate::annotator::NumberingResult;
+use crate::annotator::{NumberingResult, SegmentResult};
+use crate::numbering::SEGMENT_NAMES;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
@@ -16,6 +17,8 @@ pub struct Record {
 pub struct NumberedRecord {
     pub id: String,
     pub sequence: String,
+    /// Which of the sequence's domains `result` numbers, 0-based, when every domain was numbered
+    pub domain: Option<usize>,
     pub result: Option<NumberingResult>,
     pub error: Option<String>,
 }
@@ -25,6 +28,7 @@ impl NumberedRecord {
         Self {
             id,
             sequence,
+            domain: None,
             result: Some(result),
             error: None,
         }
@@ -33,8 +37,51 @@ impl NumberedRecord {
         Self {
             id,
             sequence,
+            domain: None,
             result: None,
             error: Some(error),
+        }
+    }
+    /// This record as the `domain`th domain of its sequence
+    pub fn in_domain(self, domain: usize) -> Self {
+        Self {
+            domain: Some(domain),
+            ..self
+        }
+    }
+}
+
+/// A segmented record: input record id paired with its FR/CDR split (or an error)
+pub struct SegmentedRecord {
+    pub id: String,
+    /// Which of the sequence's domains `result` splits, 0-based, when every domain was segmented
+    pub domain: Option<usize>,
+    pub result: Option<SegmentResult>,
+    pub error: Option<String>,
+}
+
+impl SegmentedRecord {
+    pub fn success(id: String, result: SegmentResult) -> Self {
+        Self {
+            id,
+            domain: None,
+            result: Some(result),
+            error: None,
+        }
+    }
+    pub fn failure(id: String, error: String) -> Self {
+        Self {
+            id,
+            domain: None,
+            result: None,
+            error: Some(error),
+        }
+    }
+    /// This record as the `domain`th domain of its sequence
+    pub fn in_domain(self, domain: usize) -> Self {
+        Self {
+            domain: Some(domain),
+            ..self
         }
     }
 }
@@ -64,7 +111,7 @@ impl FromStr for OutputFormat {
 }
 
 impl OutputFormat {
-    /// Write numbered records in this format
+    /// Write numbered records in this format, one per sequence
     pub fn write(&self, writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
         match self {
             Self::Tsv => write_tsv(writer, records),
@@ -73,39 +120,97 @@ impl OutputFormat {
         }
     }
 
-    /// Write format header (e.g. TSV column names, JSON array opening)
-    pub fn write_header(&self, writer: &mut impl Write) -> io::Result<()> {
+    /// Write format header (e.g. TSV column names, JSON array opening) for numbered records. With
+    /// `all_domains`, records carry the index of the domain they number.
+    pub fn write_header(&self, writer: &mut impl Write, all_domains: bool) -> io::Result<()> {
         match self {
-            Self::Tsv => writeln!(
-                writer,
-                "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
-            ),
+            Self::Tsv => write_tsv_header(writer, all_domains),
             Self::Json => writeln!(writer, "["),
             Self::Jsonl => Ok(()),
         }
     }
 
-    /// Write a single numbered record
+    /// Write format header (e.g. TSV column names, JSON array opening) for segmented records. With
+    /// `all_domains`, records carry the index of the domain they split.
+    pub fn write_segment_header(
+        &self,
+        writer: &mut impl Write,
+        all_domains: bool,
+    ) -> io::Result<()> {
+        match self {
+            Self::Tsv => {
+                write_tsv_id_header(writer, all_domains)?;
+                for name in SEGMENT_NAMES {
+                    write!(writer, "\t{name}")?;
+                }
+                writeln!(writer, "\terror")
+            }
+            Self::Json => writeln!(writer, "["),
+            Self::Jsonl => Ok(()),
+        }
+    }
+
+    /// Write a single numbered record. With `all_domains`, it carries the index of the domain it
+    /// numbers.
     pub fn write_record(
         &self,
         writer: &mut impl Write,
         record: &NumberedRecord,
         index: usize,
+        all_domains: bool,
     ) -> io::Result<()> {
         match self {
-            Self::Tsv => write_tsv_record(writer, record),
-            Self::Json => {
-                if index > 0 {
-                    writeln!(writer, ",")?;
+            Self::Tsv => write_tsv_record(writer, record, all_domains),
+            _ => self.write_json_record(writer, &record_to_json(record, all_domains)?, index),
+        }
+    }
+
+    /// Write a single segmented record, one TSV row per record. With `all_domains`, it carries the
+    /// index of the domain it splits.
+    pub fn write_segment_record(
+        &self,
+        writer: &mut impl Write,
+        record: &SegmentedRecord,
+        index: usize,
+        all_domains: bool,
+    ) -> io::Result<()> {
+        match self {
+            Self::Tsv => {
+                write_tsv_id(writer, &record.id, record.domain, all_domains)?;
+                match &record.result {
+                    Some(segments) => {
+                        for (_, residues) in segments.regions() {
+                            write!(writer, "\t{residues}")?;
+                        }
+                        writeln!(writer, "\t")
+                    }
+                    None => {
+                        for _ in SEGMENT_NAMES {
+                            write!(writer, "\t")?;
+                        }
+                        writeln!(writer, "\t{}", record.error.as_deref().unwrap_or(""))
+                    }
                 }
-                let json = record_to_json(record)?;
-                serde_json::to_writer_pretty(&mut *writer, &json).map_err(io::Error::other)
             }
-            Self::Jsonl => {
-                let json = record_to_json(record)?;
-                serde_json::to_writer(&mut *writer, &json).map_err(io::Error::other)?;
-                writeln!(writer)
+            _ => self.write_json_record(writer, &segments_to_json(record, all_domains), index),
+        }
+    }
+
+    // One JSON record: an element of the JSON array, or a JSONL line
+    fn write_json_record(
+        &self,
+        writer: &mut impl Write,
+        json: &serde_json::Value,
+        index: usize,
+    ) -> io::Result<()> {
+        if matches!(self, Self::Json) {
+            if index > 0 {
+                writeln!(writer, ",")?;
             }
+            serde_json::to_writer_pretty(&mut *writer, json).map_err(io::Error::other)
+        } else {
+            serde_json::to_writer(&mut *writer, json).map_err(io::Error::other)?;
+            writeln!(writer)
         }
     }
 
@@ -204,35 +309,64 @@ pub fn read_fasta(reader: impl BufRead) -> Result<Vec<Record>, String> {
 
 /// Write records in TSV long format (one row per position)
 pub fn write_tsv(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
-    writeln!(
-        writer,
-        "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
-    )?;
+    write_tsv_header(writer, false)?;
     for rec in records {
-        write_tsv_record(writer, rec)?;
+        write_tsv_record(writer, rec, false)?;
     }
     Ok(())
 }
 
+fn write_tsv_header(writer: &mut impl Write, all_domains: bool) -> io::Result<()> {
+    write_tsv_id_header(writer, all_domains)?;
+    writeln!(
+        writer,
+        "\tchain\tscheme\tconfidence\tposition\tresidue\terror"
+    )
+}
+
+// The columns naming a record: its sequence, and its domain when every domain was processed
+fn write_tsv_id_header(writer: &mut impl Write, all_domains: bool) -> io::Result<()> {
+    write!(writer, "sequence_id")?;
+    if all_domains {
+        write!(writer, "\tdomain")?;
+    }
+    Ok(())
+}
+
+fn write_tsv_id(
+    writer: &mut impl Write,
+    id: &str,
+    domain: Option<usize>,
+    all_domains: bool,
+) -> io::Result<()> {
+    write!(writer, "{id}")?;
+    match (all_domains, domain) {
+        (true, Some(domain)) => write!(writer, "\t{domain}"),
+        (true, None) => write!(writer, "\t"),
+        (false, _) => Ok(()),
+    }
+}
+
 /// Write a single record in TSV format (without header)
-fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result<()> {
+fn write_tsv_record(
+    writer: &mut impl Write,
+    rec: &NumberedRecord,
+    all_domains: bool,
+) -> io::Result<()> {
     match &rec.result {
         Some(result) => {
             for (pos, ch) in result.residues(&rec.sequence).map_err(io::Error::other)? {
+                write_tsv_id(writer, &rec.id, rec.domain, all_domains)?;
                 writeln!(
                     writer,
-                    "{}\t{}\t{}\t{:.4}\t{}\t{}\t",
-                    rec.id, result.chain, result.scheme, result.confidence, pos, ch
+                    "\t{}\t{}\t{:.4}\t{}\t{}\t",
+                    result.chain, result.scheme, result.confidence, pos, ch
                 )?;
             }
         }
         None => {
-            writeln!(
-                writer,
-                "{}\t\t\t\t\t\t{}",
-                rec.id,
-                rec.error.as_deref().unwrap_or("")
-            )?;
+            write_tsv_id(writer, &rec.id, rec.domain, all_domains)?;
+            writeln!(writer, "\t\t\t\t\t\t{}", rec.error.as_deref().unwrap_or(""))?;
         }
     }
     Ok(())
@@ -242,7 +376,7 @@ fn write_tsv_record(writer: &mut impl Write, rec: &NumberedRecord) -> io::Result
 pub fn write_json(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     let json_records = records
         .iter()
-        .map(record_to_json)
+        .map(|rec| record_to_json(rec, false))
         .collect::<io::Result<Vec<_>>>()?;
     serde_json::to_writer_pretty(&mut *writer, &json_records).map_err(io::Error::other)?;
     writeln!(writer)?;
@@ -252,15 +386,48 @@ pub fn write_json(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Re
 /// Write records as JSON lines (one object per line)
 pub fn write_jsonl(writer: &mut impl Write, records: &[NumberedRecord]) -> io::Result<()> {
     for rec in records {
-        let json = record_to_json(rec)?;
+        let json = record_to_json(rec, false)?;
         serde_json::to_writer(&mut *writer, &json).map_err(io::Error::other)?;
         writeln!(writer)?;
     }
     Ok(())
 }
 
-fn record_to_json(rec: &NumberedRecord) -> io::Result<serde_json::Value> {
-    Ok(match &rec.result {
+// The keys naming a record: its sequence, and its domain when every domain was processed
+fn json_id(
+    id: &str,
+    domain: Option<usize>,
+    all_domains: bool,
+) -> serde_json::Map<String, serde_json::Value> {
+    let mut record = serde_json::Map::new();
+    record.insert("sequence_id".into(), id.into());
+    if all_domains {
+        record.insert("domain".into(), domain.into());
+    }
+    record
+}
+
+fn segments_to_json(rec: &SegmentedRecord, all_domains: bool) -> serde_json::Value {
+    let mut record = json_id(&rec.id, rec.domain, all_domains);
+    match &rec.result {
+        Some(segments) => {
+            for (name, residues) in segments.regions() {
+                record.insert(name.into(), residues.into());
+            }
+        }
+        None => {
+            for name in SEGMENT_NAMES {
+                record.insert(name.into(), serde_json::Value::Null);
+            }
+        }
+    }
+    record.insert("error".into(), rec.error.as_deref().into());
+    record.into()
+}
+
+fn record_to_json(rec: &NumberedRecord, all_domains: bool) -> io::Result<serde_json::Value> {
+    let mut record = json_id(&rec.id, rec.domain, all_domains);
+    let fields = match &rec.result {
         Some(result) => {
             let numbering: serde_json::Map<String, serde_json::Value> = result
                 .residues(&rec.sequence)
@@ -268,7 +435,6 @@ fn record_to_json(rec: &NumberedRecord) -> io::Result<serde_json::Value> {
                 .map(|(pos, ch)| (pos.to_string(), serde_json::Value::String(ch.to_string())))
                 .collect();
             serde_json::json!({
-                "sequence_id": rec.id,
                 "chain": result.chain.to_string(),
                 "scheme": result.scheme.to_string(),
                 "confidence": result.confidence,
@@ -279,7 +445,6 @@ fn record_to_json(rec: &NumberedRecord) -> io::Result<serde_json::Value> {
             })
         }
         None => serde_json::json!({
-            "sequence_id": rec.id,
             "chain": null,
             "scheme": null,
             "confidence": null,
@@ -288,7 +453,11 @@ fn record_to_json(rec: &NumberedRecord) -> io::Result<serde_json::Value> {
             "query_end": null,
             "error": rec.error.as_deref().unwrap_or("unknown error"),
         }),
-    })
+    };
+    if let serde_json::Value::Object(fields) = fields {
+        record.extend(fields);
+    }
+    Ok(record.into())
 }
 
 #[cfg(test)]

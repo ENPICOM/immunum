@@ -256,6 +256,135 @@ fn jsonl_record_carries_the_numbered_span() {
     assert_eq!(parsed["query_end"], leader.len() + igh.len() - 1);
 }
 
+const SCFV: &str = concat!(
+    "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
+    "GGGGSGGGGSGGGGS",
+    "DIVMTQSPDSLAVSLGERATINCKSSQSVLYSSNSKNYLAWYQDKPGQPPKLLIYWASTRESGVPDRFSGSGSGTDFTLTISSLQAEDVAVYYCQQYYSTPYSFGQGTKLEIK",
+);
+
+#[test]
+fn all_domains_emits_one_record_per_domain() {
+    // An scFv, an invalid sequence, and one too unlike any domain to hold one
+    let input = format!("{SCFV}\nAAAA\n{}\n", "A".repeat(40));
+    let output = immunum()
+        .args(["number", "--all-domains", "-f", "jsonl"])
+        .write_stdin(input)
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let records: Vec<serde_json::Value> = String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("valid jsonl"))
+        .collect();
+    let summary: Vec<_> = records
+        .iter()
+        .map(|r| {
+            (
+                r["sequence_id"].clone(),
+                r["domain"].clone(),
+                r["chain"].clone(),
+                r["error"].is_string(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        summary,
+        vec![
+            ("seq_1".into(), 0.into(), "H".into(), false),
+            ("seq_1".into(), 1.into(), "K".into(), false),
+            (
+                "seq_2".into(),
+                serde_json::Value::Null,
+                serde_json::Value::Null,
+                true
+            ),
+        ]
+    );
+}
+
+#[test]
+fn all_domains_tsv_has_a_domain_column() {
+    let output = immunum()
+        .args(["number", "--all-domains", SCFV])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let mut lines = stdout.lines();
+    assert_eq!(
+        lines.next(),
+        Some("sequence_id\tdomain\tchain\tscheme\tconfidence\tposition\tresidue\terror")
+    );
+    let domains: std::collections::BTreeSet<(&str, &str)> = lines
+        .map(|line| {
+            let cols: Vec<&str> = line.split('\t').collect();
+            (cols[1], cols[2])
+        })
+        .collect();
+    assert_eq!(domains, [("0", "H"), ("1", "K")].into_iter().collect());
+}
+
+const SEGMENT_COLUMNS: [&str; 10] = [
+    "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix", "error",
+];
+
+#[test]
+fn segment_writes_a_column_per_region() {
+    let igh = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
+    let output = immunum().args(["segment", igh]).output().unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let rows: Vec<Vec<&str>> = stdout.lines().map(|l| l.split('\t').collect()).collect();
+    assert_eq!(rows[0][0], "sequence_id");
+    assert_eq!(rows[0][1..], SEGMENT_COLUMNS);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[1][1..10].concat(), igh);
+    assert_eq!(rows[1][7], "AREGTTGKPIGAFAH");
+}
+
+#[test]
+fn segment_all_domains_puts_every_residue_in_one_record() {
+    let output = immunum()
+        .args(["segment", "--all-domains", "-f", "jsonl"])
+        .write_stdin(format!("{SCFV}\nAAAA\n"))
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let records: Vec<serde_json::Value> = String::from_utf8(output.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("valid jsonl"))
+        .collect();
+    let ids: Vec<_> = records
+        .iter()
+        .map(|r| (r["sequence_id"].clone(), r["domain"].clone()))
+        .collect();
+    assert_eq!(
+        ids,
+        vec![
+            ("seq_1".into(), 0.into()),
+            ("seq_1".into(), 1.into()),
+            ("seq_2".into(), serde_json::Value::Null),
+        ]
+    );
+    let rebuilt: String = records[..2]
+        .iter()
+        .flat_map(|r| {
+            SEGMENT_COLUMNS[..9]
+                .iter()
+                .map(|&c| r[c].as_str().unwrap().to_string())
+        })
+        .collect();
+    assert_eq!(rebuilt, SCFV);
+    assert!(records[2]["error"].is_string());
+    assert!(records[2]["fr1"].is_null());
+}
+
 #[test]
 fn mixed_batch_always_emits_one_record_per_input() {
     // Two sequences: one valid IGH, one garbage

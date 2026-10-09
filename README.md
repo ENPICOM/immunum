@@ -51,6 +51,7 @@ scheme's own definition and differ between heavy and light chains.
   - [Installation](#installation)
   - [Numbering](#numbering)
   - [Segmentation](#segmentation)
+  - [Multiple domains](#multiple-domains)
   - [Polars plugin](#polars-plugin)
 - [JavaScript / npm](#javascript--npm)
   - [Installation](#installation-1)
@@ -110,6 +111,32 @@ assert result.cdr3 == 'AREGTTGKPIGAFAH'
 assert result.fr4 == 'WGQGTLVTVSS'
 ```
 
+### Multiple domains
+
+`number` and `segment` work on the best-scoring domain. `number_domains` and `segment_domains` do the same for every variable domain in a sequence, such as both domains of an scFv, in sequence order. Each result is what `number` or `segment` returns for that domain:
+
+```python
+from immunum import Annotator
+
+heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+kappa = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+linker = "GGGGSGGGGSGGGGS"
+
+annotator = Annotator(chains=["ig"], scheme="imgt")
+domains = annotator.number_domains(heavy + linker + kappa)
+assert [d.chain for d in domains] == ["H", "K"]
+
+heavy_regions, kappa_regions = annotator.segment_domains(heavy + linker + kappa)
+assert kappa_regions.prefix == linker
+assert kappa_regions.cdr3 == "QQHYTTPPT"
+```
+
+In `segment_domains`, every residue lands in exactly one domain's regions: a domain's `prefix` holds the residues since the previous domain (or the start of the sequence), and only the last domain has the residues after it as its `postfix`, so all domains' regions in order rebuild the sequence.
+
+The lists are empty when no domain aligns with enough confidence. An invalid sequence gives a single result with `error` set, as `number` and `segment` would.
+
+A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and directly follows other residues, such as a linker, can have the residue just before it numbered as its first position. IMGT position 1 is so variable that the sequence alone can't tell a linker residue from the domain's own first residue.
+
 ### Polars plugin
 
 For batch processing, `immunum.polars` registers elementwise Polars expressions:
@@ -134,7 +161,9 @@ result = df.with_columns(
 )
 ```
 
-The `number` expression returns a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and `error`. `numbering_method` returns the same. Explode `numbering` and unnest it for one row per residue. The `segment` expression returns a struct with fields `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`.
+The `number` expression returns a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and `error`. Explode `numbering` and unnest it for one row per residue. The `segment` expression returns a struct with fields `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`. `number_domains` and `segment_domains` return a list of those structs per sequence, one per domain.
+
+Every expression takes either `chains`, `scheme` and `min_confidence`, or a prebuilt `Annotator` as `annotator=`.
 
 ## JavaScript / npm
 
@@ -161,6 +190,10 @@ console.log(result.numbering);  // { "1": "Q", "2": "V", ... }
 
 const segments = annotator.segment(sequence);
 console.log(segments.cdr3); // "AREGTTGKPIGAFAH"
+
+// Every domain, e.g. both domains of an scFv; each is what number() / segment() returns for it
+const domains = annotator.numberDomains(sequence);
+const domainSegments = annotator.segmentDomains(sequence);
 
 annotator.free(); // or use `using annotator = new Annotator(...)` with explicit resource management
 ```
@@ -207,21 +240,36 @@ for (aa, pos) in sequence.chars().zip(result.positions.iter()) {
 
 let segments = annotator.segment(sequence).unwrap();
 println!("CDR3: {}", segments.cdr3);
+
+// Every domain, e.g. both domains of an scFv, numbered under the annotator's scheme
+for domain in annotator.number_domains(sequence).unwrap() {
+    println!("{} at {}..={}", domain.chain, domain.query_start, domain.query_end);
+}
+for segments in annotator.segment_domains(sequence).unwrap() {
+    println!("CDR3: {}", segments.cdr3);
+}
 ```
 
 ## CLI
 
 ```bash
 immunum number [OPTIONS] [INPUT] [OUTPUT]
+immunum segment [OPTIONS] [INPUT] [OUTPUT]
 ```
 
+`number` writes one record per numbered residue (TSV) or per sequence (JSON). `segment` writes one record per sequence, with a column or field per region: `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`.
+
 ### Options
+
+Both commands take the same options.
 
 | Flag           | Description                                                                                                                        | Default |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`), `chothia` (`c`), `martin` (`m`), `aho` (`a`)                                          | `imgt`  |
 | `-c, --chain`  | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig`    |
 | `-f, --format` | Output format: `tsv`, `json`, `jsonl`                                                                                              | `tsv`   |
+| `--min-confidence` | Minimum alignment confidence, in [0, 1]                                                                                        | `0.5`   |
+| `--all-domains` | Every domain in each sequence (e.g. both domains of an scFv): one record per domain, with a 0-based `domain` column/field. With `segment`, every residue lands in exactly one domain's regions | off     |
 
 ### Input
 
@@ -254,6 +302,15 @@ immunum number -c all -f jsonl sequences.fasta
 
 # TCR sequences only, save to file
 immunum number -c tcr tcr_sequences.fasta output.tsv
+
+# Both domains of each scFv, one JSONL record per domain
+immunum number --all-domains -f jsonl scfvs.fasta
+
+# FR/CDR regions of each sequence, one TSV row per sequence
+immunum segment sequences.fasta
+
+# CDR3 of every domain of each scFv
+immunum segment --all-domains scfvs.fasta | cut -f1,2,9
 
 # Extract sequences from a TSV column and pipe in (see fixtures/ig.tsv)
 tail -n +2 fixtures/ig.tsv | cut -f2 | immunum number

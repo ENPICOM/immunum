@@ -1,8 +1,91 @@
 use js_sys::{Object, Reflect};
 use wasm_bindgen::prelude::*;
 
-use crate::annotator::Annotator;
+use crate::annotator::{Annotator, NumberingResult, SegmentResult};
 use crate::types::{Chain, Scheme};
+
+// What `Annotator.number` returns for `sequence`: the numbering, or the error with every other field
+// null
+fn numbering_object(sequence: &str, result: crate::Result<NumberingResult>) -> JsValue {
+    let dict = Object::new();
+    match result {
+        Ok(result) => {
+            let numbering = js_sys::Map::new();
+            for (pos, ch) in result
+                .residues(sequence)
+                .expect("`result` numbered `sequence`")
+            {
+                numbering.set(
+                    &JsValue::from_str(&pos.to_string()),
+                    &JsValue::from_str(&ch.to_string()),
+                );
+            }
+            Reflect::set(&dict, &"chain".into(), &result.chain.to_string().into()).unwrap();
+            Reflect::set(&dict, &"scheme".into(), &result.scheme.to_string().into()).unwrap();
+            Reflect::set(&dict, &"confidence".into(), &result.confidence.into()).unwrap();
+            Reflect::set(&dict, &"numbering".into(), &numbering.into()).unwrap();
+            Reflect::set(
+                &dict,
+                &"queryStart".into(),
+                &(result.query_start as u32).into(),
+            )
+            .unwrap();
+            Reflect::set(&dict, &"queryEnd".into(), &(result.query_end as u32).into()).unwrap();
+            Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
+        }
+        Err(e) => {
+            Reflect::set(&dict, &"chain".into(), &JsValue::NULL).unwrap();
+            Reflect::set(&dict, &"scheme".into(), &JsValue::NULL).unwrap();
+            Reflect::set(&dict, &"confidence".into(), &JsValue::NULL).unwrap();
+            Reflect::set(&dict, &"numbering".into(), &JsValue::NULL).unwrap();
+            Reflect::set(&dict, &"queryStart".into(), &JsValue::NULL).unwrap();
+            Reflect::set(&dict, &"queryEnd".into(), &JsValue::NULL).unwrap();
+            Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
+        }
+    }
+    dict.into()
+}
+
+// What `Annotator.segment` returns: the segments, or the error with no segments
+fn segment_object(result: crate::Result<SegmentResult>) -> JsValue {
+    let dict = Object::new();
+    match result {
+        Ok(s) => {
+            for (name, residues) in s.regions() {
+                Reflect::set(
+                    &dict,
+                    &JsValue::from_str(name),
+                    &JsValue::from_str(residues),
+                )
+                .unwrap();
+            }
+            Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
+        }
+        Err(e) => {
+            Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
+        }
+    }
+    dict.into()
+}
+
+// One object per domain, or a single error object when the sequence couldn't be searched
+fn per_domain<T>(
+    results: crate::Result<Vec<T>>,
+    object: impl Fn(crate::Result<T>) -> JsValue,
+) -> JsValue {
+    let objects = js_sys::Array::new();
+    match results {
+        Ok(results) => {
+            for result in results {
+                objects.push(&object(Ok(result)));
+            }
+        }
+        Err(e) => {
+            objects.push(&object(Err(e)));
+        }
+    }
+    objects.into()
+}
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_TYPES: &str = r#"
@@ -12,7 +95,7 @@ const TS_TYPES: &str = r#"
  */
 export type Numbering = Map<string, string>;
 
-/** Result returned by {@link Annotator.number}. On failure, chain/scheme/confidence/numbering/query_start/query_end are null and error contains the reason. */
+/** Result returned by {@link Annotator.number}. On failure, chain/scheme/confidence/numbering/queryStart/queryEnd are null and error contains the reason. */
 export interface NumberingResult {
     /** Detected chain type: `"H"`, `"K"`, `"L"`, `"A"`, `"B"`, `"G"`, or `"D"`. Null on failure. */
     chain: string | null;
@@ -23,9 +106,9 @@ export interface NumberingResult {
     /** Position-to-residue mapping for the aligned region. Null on failure. */
     numbering: Numbering | null;
     /** 0-indexed start of the aligned region in the input sequence (inclusive). Null on failure. */
-    query_start: number | null;
+    queryStart: number | null;
     /** 0-indexed end of the aligned region in the input sequence (inclusive). Null on failure. */
-    query_end: number | null;
+    queryEnd: number | null;
     /** Error message if numbering failed, null on success. */
     error: string | null;
 }
@@ -75,16 +158,38 @@ export interface SegmentationResult {
  *   Only IMGT supports TCR chains; the other schemes are restricted to antibody
  *   chains (IGH, IGK, IGL). {@link schemeSupportsChain} checks a pair up front.
  *
- * @param min_confidence - Optional minimum alignment confidence threshold in the
+ * @param minConfidence - Optional minimum alignment confidence threshold in the
  *   range `[0, 1]`. Sequences scoring below this value are rejected with an error.
  *   Defaults to `0.5` when `null` or omitted.
  */
 export class Annotator {
     free(): void;
     [Symbol.dispose](): void;
-    constructor(chains: string[], scheme: string, min_confidence?: number | null);
+    constructor(chains: string[], scheme: string, minConfidence?: number | null);
     number(sequence: string): NumberingResult;
+    /**
+     * Number every variable domain in a sequence, such as both domains of an scFv. One
+     * {@link NumberingResult} per domain, ordered by position, each what `number` returns for that
+     * domain; empty when no domain aligns with enough confidence. When the sequence itself is
+     * invalid, a single result with `error` set.
+     *
+     * A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and
+     * directly follows other residues, such as a linker, can have the residue just before it
+     * numbered as its first position: IMGT position 1 is so variable that the sequence alone can't
+     * tell a linker residue from the domain's own first residue.
+     */
+    numberDomains(sequence: string): NumberingResult[];
     segment(sequence: string): SegmentationResult;
+    /**
+     * Split every variable domain in a sequence into FR/CDR regions. One
+     * {@link SegmentationResult} per domain, ordered by position; empty when no domain aligns with
+     * enough confidence. When the sequence itself is invalid, a single result with `error` set.
+     *
+     * Every residue lands in exactly one domain's regions: a domain's `prefix` holds the residues
+     * since the previous domain (or the start of the sequence), and only the last domain has the
+     * residues after it as its `postfix`. All domains' regions in order rebuild the sequence.
+     */
+    segmentDomains(sequence: string): SegmentationResult[];
 
 }
 "#;
@@ -103,70 +208,24 @@ impl Annotator {
 
     #[wasm_bindgen(js_name = "number", skip_typescript)]
     pub fn wasm_number(&self, sequence: &str) -> JsValue {
-        let dict = Object::new();
-        match self.number(sequence) {
-            Ok(result) => {
-                let numbering = js_sys::Map::new();
-                for (pos, ch) in result
-                    .residues(sequence)
-                    .expect("`result` numbered `sequence`")
-                {
-                    numbering.set(
-                        &JsValue::from_str(&pos.to_string()),
-                        &JsValue::from_str(&ch.to_string()),
-                    );
-                }
-                Reflect::set(&dict, &"chain".into(), &result.chain.to_string().into()).unwrap();
-                Reflect::set(&dict, &"scheme".into(), &result.scheme.to_string().into()).unwrap();
-                Reflect::set(&dict, &"confidence".into(), &result.confidence.into()).unwrap();
-                Reflect::set(&dict, &"numbering".into(), &numbering.into()).unwrap();
-                Reflect::set(
-                    &dict,
-                    &"query_start".into(),
-                    &(result.query_start as u32).into(),
-                )
-                .unwrap();
-                Reflect::set(
-                    &dict,
-                    &"query_end".into(),
-                    &(result.query_end as u32).into(),
-                )
-                .unwrap();
-                Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
-            }
-            Err(e) => {
-                Reflect::set(&dict, &"chain".into(), &JsValue::NULL).unwrap();
-                Reflect::set(&dict, &"scheme".into(), &JsValue::NULL).unwrap();
-                Reflect::set(&dict, &"confidence".into(), &JsValue::NULL).unwrap();
-                Reflect::set(&dict, &"numbering".into(), &JsValue::NULL).unwrap();
-                Reflect::set(&dict, &"query_start".into(), &JsValue::NULL).unwrap();
-                Reflect::set(&dict, &"query_end".into(), &JsValue::NULL).unwrap();
-                Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
-            }
-        }
-        dict.into()
+        numbering_object(sequence, self.number(sequence))
+    }
+
+    #[wasm_bindgen(js_name = "numberDomains", skip_typescript)]
+    pub fn wasm_number_domains(&self, sequence: &str) -> JsValue {
+        per_domain(self.number_domains(sequence), |result| {
+            numbering_object(sequence, result)
+        })
     }
 
     #[wasm_bindgen(js_name = "segment", skip_typescript)]
     pub fn wasm_segment(&self, sequence: &str) -> JsValue {
-        let dict = Object::new();
-        match self.segment(sequence) {
-            Ok(s) => {
-                for (name, residues) in s.regions() {
-                    Reflect::set(
-                        &dict,
-                        &JsValue::from_str(name),
-                        &JsValue::from_str(residues),
-                    )
-                    .unwrap();
-                }
-                Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
-            }
-            Err(e) => {
-                Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
-            }
-        }
-        dict.into()
+        segment_object(self.segment(sequence))
+    }
+
+    #[wasm_bindgen(js_name = "segmentDomains", skip_typescript)]
+    pub fn wasm_segment_domains(&self, sequence: &str) -> JsValue {
+        per_domain(self.segment_domains(sequence), segment_object)
     }
 }
 

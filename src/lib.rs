@@ -81,7 +81,7 @@ pub use scoring::ScoringMatrix;
 pub use types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use io::{read_fasta, read_input, NumberedRecord, OutputFormat, Record};
+pub use io::{read_fasta, read_input, NumberedRecord, OutputFormat, Record, SegmentedRecord};
 #[cfg(not(target_arch = "wasm32"))]
 pub use validation::{load_validation_csv, validate_entry, ValidationEntry, ValidationResult};
 

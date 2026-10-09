@@ -31,6 +31,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without aligning again. The first domain of a single-domain sequence numbers exactly like
   `Annotator::number`, including AHo's light-chain position 149. A `Domain`'s span, chain and confidence
   are read through methods (`query_start()`, `chain()`, ...), so they can't drift from its alignment.
+- Every interface numbers and segments every variable domain in a sequence, such as both domains of an
+  scFv: `number_domains` and `segment_domains` in Rust (`Annotator`), Python (`Annotator`) and Polars,
+  `numberDomains` and `segmentDomains` in JavaScript, and `--all-domains` on the CLI's `number` and
+  `segment`. Each domain's result is what `number` or `segment` returns for that domain, in sequence
+  order. No domain gives an empty list (no CLI record); an invalid sequence gives a single result with
+  `error` set, as `number` and `segment` do.
+- `segment_domains` puts every residue in exactly one domain's regions: a domain's `prefix` holds the
+  residues since the previous domain (or the start of the sequence), and only the last domain has the
+  residues after it as its `postfix`, so all domains' regions in order rebuild the sequence.
+- CLI: `immunum segment` splits sequences into FR/CDR regions, one record per sequence (or per domain
+  with `--all-domains`) with a column or field per region. It takes the same options as `number`. With
+  `--all-domains`, both commands add a 0-based `domain` column (TSV) or field (JSON).
+- Polars: every expression (`number`, `number_domains`, `segment`, `segment_domains`) takes either
+  `chains`, `scheme` and `min_confidence`, or a prebuilt `Annotator` as `annotator=`.
+- Rust: `NumberedRecord` and the new `SegmentedRecord` have a `domain` field and `in_domain`, and
+  `OutputFormat::write_header` and `write_record` take an `all_domains` switch, with
+  `write_segment_header` and `write_segment_record` for segments.
 - Rust: `NumberingResult::residues(sequence)` pairs each numbered position with its residue, and
   `NumberingResult::segment(sequence)` splits a numbering into FR/CDR regions, flanks included, without
   numbering again. `sequence` is the whole sequence that was numbered or searched; one too short for the
@@ -38,14 +55,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust: `numbering::SEGMENT_NAMES` lists the segments in sequence order by the names every interface
   uses, and `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
   documentation's web tool take their region names and order from these instead of their own lists.
-- CLI: JSON and JSONL records carry `query_start` and `query_end`, as Python and JavaScript results do.
+- CLI: JSON and JSONL records carry `query_start` and `query_end`, as Python results do (`queryStart` and
+  `queryEnd` in JavaScript).
 - JavaScript: `schemeSupportsChain(scheme, chain)` tells whether a scheme numbers a chain, by the rule
   the `Annotator` constructor applies; Rust: `Scheme::supports(chain)`. The documentation's web tool
   uses it to enable its chain checkboxes instead of keeping its own copy of the rule.
 
 ### Changed
+- **Breaking:** JavaScript uses camelCase throughout, as JavaScript and TypeScript code expects: `number`
+  results have `queryStart` and `queryEnd` instead of `query_start` and `query_end`, and the
+  constructor's third parameter is declared as `minConfidence`.
 - **Breaking:** Polars `number` and `numbering_method` return the same struct, with the fields Python's
-  and JavaScript's `Annotator.number` return: `chain`, `scheme`, `confidence`, `numbering`,
+  `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering`,
   `query_start`, `query_end` and `error`. `numbering` is a list of `{position, residue}` structs; explode
   and unnest it for one row per residue. `number` returned `positions` and `residues` lists instead of
   `numbering`, and had no `confidence` (#38); neither had `query_start` or `query_end`.
@@ -65,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequence needs; a longer sequence's buffer is freed when its call returns. `Annotator::number` and
   `Annotator::segment` are built on the pieces above; apart from the flanks fixed above, their results
   are unchanged.
+
+### Deprecated
+- Polars `numbering_method` and `segmentation_method`. Use `number(expr, annotator=annotator)` and
+  `segment(expr, annotator=annotator)`, which return the same.
 
 ### Removed
 - Rust: `Chain::parse_chain_spec`. Use `Chain::parse_names(spec.split(','))`.
