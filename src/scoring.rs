@@ -3,7 +3,6 @@
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-use crate::error::{Error, Result};
 use crate::types::Chain;
 use serde::{Deserialize, Serialize};
 
@@ -51,8 +50,8 @@ impl PositionScores {
 }
 
 impl ScoringMatrix {
-    /// Load a scoring matrix for a specific chain type
-    pub fn load(chain: Chain) -> Result<Self> {
+    /// The built-in scoring matrix for a chain type
+    pub fn load(chain: Chain) -> Self {
         let json = match chain {
             Chain::IGH => include_str!(concat!(env!("OUT_DIR"), "/matrices/IGH.json")),
             Chain::IGK => include_str!(concat!(env!("OUT_DIR"), "/matrices/IGK.json")),
@@ -62,10 +61,9 @@ impl ScoringMatrix {
             Chain::TRG => include_str!(concat!(env!("OUT_DIR"), "/matrices/TRG.json")),
             Chain::TRD => include_str!(concat!(env!("OUT_DIR"), "/matrices/TRD.json")),
         };
-
-        serde_json::from_str(json).map_err(|e| {
-            Error::ConsensusParseError(format!("Failed to parse scoring matrix: {}", e))
-        })
+        // The matrices are generated at build time; one that doesn't parse is a build bug, which
+        // `test_load_all_matrices` catches
+        serde_json::from_str(json).expect("built-in scoring matrix parses")
     }
 }
 
@@ -75,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_load_igh_matrix() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         assert!(!matrix.positions.is_empty());
         assert!(matrix.positions.len() > 100);
     }
@@ -92,14 +90,14 @@ mod tests {
             Chain::TRG,
             Chain::TRD,
         ] {
-            let matrix = ScoringMatrix::load(chain).unwrap();
+            let matrix = ScoringMatrix::load(chain);
             assert!(!matrix.positions.is_empty());
         }
     }
 
     #[test]
     fn test_gap_penalties() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
 
         // All positions should have gap penalties
         for pos in &matrix.positions {
@@ -116,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_scores_reasonable() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
 
         // Check that scores are in reasonable range (BLOSUM62 range is roughly -4 to 11)
         for pos in &matrix.positions {

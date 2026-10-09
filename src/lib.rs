@@ -10,9 +10,9 @@
 //!
 //! | Chain | Type | Schemes |
 //! |-------|------|---------|
-//! | IGH | Antibody heavy | IMGT, Kabat |
-//! | IGK | Antibody kappa | IMGT, Kabat |
-//! | IGL | Antibody lambda | IMGT, Kabat |
+//! | IGH | Antibody heavy | IMGT, Kabat, Chothia, Martin, AHo |
+//! | IGK | Antibody kappa | IMGT, Kabat, Chothia, Martin, AHo |
+//! | IGL | Antibody lambda | IMGT, Kabat, Chothia, Martin, AHo |
 //! | TRA | TCR alpha | IMGT |
 //! | TRB | TCR beta | IMGT |
 //! | TRG | TCR gamma | IMGT |
@@ -29,12 +29,12 @@
 //! let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 //! let result = annotator.number(sequence).unwrap();
 //!
-//! println!("Chain:      {}", result.chain);       // IGH
+//! println!("Chain:      {}", result.chain);       // H
 //! println!("Confidence: {:.2}", result.confidence);
 //!
-//! // Iterate over (amino acid, IMGT position) pairs
-//! for (aa, pos) in sequence.chars().zip(result.positions.iter()) {
-//!     println!("{aa} -> {pos}");
+//! // Iterate over (IMGT position, amino acid) pairs
+//! for (pos, aa) in result.residues(sequence).unwrap() {
+//!     println!("{pos} -> {aa}");
 //! }
 //! ```
 //!
@@ -42,15 +42,17 @@
 //!
 //! - [`Annotator`] — main entry point; holds loaded scoring matrices and numbers sequences
 //! - [`NumberingResult`] — the output of [`Annotator::number`]: positions, chain, confidence
-//! - [`Position`] — an IMGT/Kabat position such as `111` or `111A`
+//! - [`Position`] — a position such as `111` or `111A`
 //! - [`Chain`] — chain type (`IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`)
-//! - [`Scheme`] — numbering scheme (`IMGT` or `Kabat`)
+//! - [`Scheme`] — numbering scheme (`IMGT`, `Kabat`, `Chothia`, `Martin` or `Aho`)
+//! - [`Error`] — a setup mistake, such as an unknown chain name; [`SequenceError`] — a sequence
+//!   that couldn't be numbered
 //!
 //! # Modules
 //!
 //! - [`annotator`] — high-level annotation API
 //! - [`alignment`] — Needleman-Wunsch semi-global alignment
-//! - [`numbering`] — IMGT and Kabat numbering rules
+//! - [`numbering`] — IMGT, Kabat, Chothia, Martin and AHo numbering rules
 //! - [`scoring`] — position-specific scoring matrices
 //! - [`io`] — FASTA parsing and TSV/JSON/JSONL output
 //! - [`types`] — core domain types
@@ -78,7 +80,7 @@ pub use alignment::{align, Alignment};
 pub use annotator::{
     per_domain, Annotator, Domain, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE,
 };
-pub use error::{Error, Result};
+pub use error::{Error, Result, SequenceError};
 pub use scoring::ScoringMatrix;
 pub use types::{scheme_supports_chain, Chain, Insertion, NumberingRule, Position, Region, Scheme};
 

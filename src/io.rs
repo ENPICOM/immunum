@@ -1,6 +1,7 @@
 //! Input parsing and output formatting for sequence records
 
 use crate::annotator::{NumberingResult, SegmentResult};
+use crate::error::SequenceError;
 use crate::numbering::SEGMENT_NAMES;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
@@ -13,33 +14,26 @@ pub struct Record {
     pub sequence: String,
 }
 
-/// A numbered record: input record paired with its numbering result (or an error)
+/// A numbered record: input record paired with its numbering result
 pub struct NumberedRecord {
     pub id: String,
     pub sequence: String,
     /// Which of the sequence's domains `result` numbers, 0-based, when every domain was numbered
     pub domain: Option<usize>,
-    pub result: Option<NumberingResult>,
-    pub error: Option<String>,
+    pub result: Result<NumberingResult, SequenceError>,
 }
 
 impl NumberedRecord {
-    pub fn success(id: String, sequence: String, result: NumberingResult) -> Self {
+    pub fn new(
+        id: String,
+        sequence: String,
+        result: Result<NumberingResult, SequenceError>,
+    ) -> Self {
         Self {
             id,
             sequence,
             domain: None,
-            result: Some(result),
-            error: None,
-        }
-    }
-    pub fn failure(id: String, sequence: String, error: String) -> Self {
-        Self {
-            id,
-            sequence,
-            domain: None,
-            result: None,
-            error: Some(error),
+            result,
         }
     }
     /// This record as the `domain`th domain of its sequence
@@ -51,30 +45,20 @@ impl NumberedRecord {
     }
 }
 
-/// A segmented record: input record id paired with its FR/CDR split (or an error)
+/// A segmented record: input record id paired with its FR/CDR split
 pub struct SegmentedRecord {
     pub id: String,
     /// Which of the sequence's domains `result` splits, 0-based, when every domain was segmented
     pub domain: Option<usize>,
-    pub result: Option<SegmentResult>,
-    pub error: Option<String>,
+    pub result: Result<SegmentResult, SequenceError>,
 }
 
 impl SegmentedRecord {
-    pub fn success(id: String, result: SegmentResult) -> Self {
+    pub fn new(id: String, result: Result<SegmentResult, SequenceError>) -> Self {
         Self {
             id,
             domain: None,
-            result: Some(result),
-            error: None,
-        }
-    }
-    pub fn failure(id: String, error: String) -> Self {
-        Self {
-            id,
-            domain: None,
-            result: None,
-            error: Some(error),
+            result,
         }
     }
     /// This record as the `domain`th domain of its sequence
@@ -143,7 +127,7 @@ impl OutputFormat {
                 for name in SEGMENT_NAMES {
                     write!(writer, "\t{name}")?;
                 }
-                writeln!(writer, "\terror")
+                writeln!(writer, "\terror\terror_kind")
             }
             Self::Json => writeln!(writer, "["),
             Self::Jsonl => Ok(()),
@@ -178,17 +162,17 @@ impl OutputFormat {
             Self::Tsv => {
                 write_tsv_id(writer, &record.id, record.domain, all_domains)?;
                 match &record.result {
-                    Some(segments) => {
+                    Ok(segments) => {
                         for (_, residues) in segments.regions() {
                             write!(writer, "\t{residues}")?;
                         }
-                        writeln!(writer, "\t")
+                        writeln!(writer, "\t\t")
                     }
-                    None => {
+                    Err(e) => {
                         for _ in SEGMENT_NAMES {
                             write!(writer, "\t")?;
                         }
-                        writeln!(writer, "\t{}", record.error.as_deref().unwrap_or(""))
+                        writeln!(writer, "\t{e}\t{}", e.kind())
                     }
                 }
             }
@@ -223,7 +207,8 @@ impl OutputFormat {
     }
 }
 
-/// Read input records: auto-detects FASTA file, stdin, or raw sequence string
+/// Read input records: auto-detects FASTA file, stdin, or raw sequence string. An argument is a
+/// raw sequence only when it isn't an existing path and consists solely of ASCII letters.
 pub fn read_input(input: Option<&str>) -> Result<Vec<Record>, String> {
     match input {
         None | Some("-") => {
@@ -235,11 +220,15 @@ pub fn read_input(input: Option<&str>) -> Result<Vec<Record>, String> {
             if path.exists() {
                 let file = File::open(path).map_err(|e| format!("cannot open '{}': {}", s, e))?;
                 read_auto(BufReader::new(file))
-            } else {
+            } else if !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphabetic()) {
                 Ok(vec![Record {
                     id: "seq_1".to_string(),
                     sequence: s.to_string(),
                 }])
+            } else {
+                Err(format!(
+                    "cannot open '{s}': no such file (a raw sequence may only contain letters)"
+                ))
             }
         }
     }
@@ -320,7 +309,7 @@ fn write_tsv_header(writer: &mut impl Write, all_domains: bool) -> io::Result<()
     write_tsv_id_header(writer, all_domains)?;
     writeln!(
         writer,
-        "\tchain\tscheme\tconfidence\tposition\tresidue\terror"
+        "\tchain\tscheme\tconfidence\tposition\tresidue\terror\terror_kind"
     )
 }
 
@@ -354,19 +343,19 @@ fn write_tsv_record(
     all_domains: bool,
 ) -> io::Result<()> {
     match &rec.result {
-        Some(result) => {
+        Ok(result) => {
             for (pos, ch) in result.residues(&rec.sequence).map_err(io::Error::other)? {
                 write_tsv_id(writer, &rec.id, rec.domain, all_domains)?;
                 writeln!(
                     writer,
-                    "\t{}\t{}\t{:.4}\t{}\t{}\t",
+                    "\t{}\t{}\t{:.4}\t{}\t{}\t\t",
                     result.chain, result.scheme, result.confidence, pos, ch
                 )?;
             }
         }
-        None => {
+        Err(e) => {
             write_tsv_id(writer, &rec.id, rec.domain, all_domains)?;
-            writeln!(writer, "\t\t\t\t\t\t{}", rec.error.as_deref().unwrap_or(""))?;
+            writeln!(writer, "\t\t\t\t\t\t{e}\t{}", e.kind())?;
         }
     }
     Ok(())
@@ -410,25 +399,28 @@ fn json_id(
 fn segments_to_json(rec: &SegmentedRecord, all_domains: bool) -> serde_json::Value {
     let mut record = json_id(&rec.id, rec.domain, all_domains);
     match &rec.result {
-        Some(segments) => {
+        Ok(segments) => {
             for (name, residues) in segments.regions() {
                 record.insert(name.into(), residues.into());
             }
+            record.insert("error".into(), serde_json::Value::Null);
+            record.insert("error_kind".into(), serde_json::Value::Null);
         }
-        None => {
+        Err(e) => {
             for name in SEGMENT_NAMES {
                 record.insert(name.into(), serde_json::Value::Null);
             }
+            record.insert("error".into(), e.to_string().into());
+            record.insert("error_kind".into(), e.kind().into());
         }
     }
-    record.insert("error".into(), rec.error.as_deref().into());
     record.into()
 }
 
 fn record_to_json(rec: &NumberedRecord, all_domains: bool) -> io::Result<serde_json::Value> {
     let mut record = json_id(&rec.id, rec.domain, all_domains);
     let fields = match &rec.result {
-        Some(result) => {
+        Ok(result) => {
             let numbering: serde_json::Map<String, serde_json::Value> = result
                 .residues(&rec.sequence)
                 .map_err(io::Error::other)?
@@ -442,16 +434,18 @@ fn record_to_json(rec: &NumberedRecord, all_domains: bool) -> io::Result<serde_j
                 "query_start": result.query_start,
                 "query_end": result.query_end,
                 "error": null,
+                "error_kind": null,
             })
         }
-        None => serde_json::json!({
+        Err(e) => serde_json::json!({
             "chain": null,
             "scheme": null,
             "confidence": null,
             "numbering": null,
             "query_start": null,
             "query_end": null,
-            "error": rec.error.as_deref().unwrap_or("unknown error"),
+            "error": e.to_string(),
+            "error_kind": e.kind(),
         }),
     };
     if let serde_json::Value::Object(fields) = fields {
@@ -465,6 +459,11 @@ mod tests {
     use super::*;
     use crate::types::{Chain, Position, Scheme};
     use std::io::Cursor;
+
+    const LOW_CONFIDENCE: SequenceError = SequenceError::LowConfidence {
+        confidence: 0.1,
+        threshold: 0.5,
+    };
 
     fn simple_test_result(positions: Vec<Position>) -> NumberingResult {
         let query_end = positions.len().saturating_sub(1);
@@ -519,10 +518,10 @@ mod tests {
                 insertion: None,
             },
         ]);
-        let records = vec![NumberedRecord::success(
+        let records = vec![NumberedRecord::new(
             "s1".to_string(),
             "EV".to_string(),
-            result,
+            Ok(result),
         )];
         let mut buf = Vec::new();
         write_tsv(&mut buf, &records).unwrap();
@@ -530,18 +529,18 @@ mod tests {
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(
             lines[0],
-            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror\terror_kind"
         );
-        assert_eq!(lines[1], "s1\tH\tIMGT\t1.0000\t1\tE\t");
-        assert_eq!(lines[2], "s1\tH\tIMGT\t1.0000\t2\tV\t");
+        assert_eq!(lines[1], "s1\tH\tIMGT\t1.0000\t1\tE\t\t");
+        assert_eq!(lines[2], "s1\tH\tIMGT\t1.0000\t2\tV\t\t");
     }
 
     #[test]
     fn test_write_tsv_error() {
-        let records = vec![NumberedRecord::failure(
+        let records = vec![NumberedRecord::new(
             "bad".to_string(),
             "AAAAA".to_string(),
-            "low confidence".to_string(),
+            Err(LOW_CONFIDENCE),
         )];
         let mut buf = Vec::new();
         write_tsv(&mut buf, &records).unwrap();
@@ -549,9 +548,12 @@ mod tests {
         let lines: Vec<&str> = output.lines().collect();
         assert_eq!(
             lines[0],
-            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror\terror_kind"
         );
-        assert_eq!(lines[1], "bad\t\t\t\t\t\tlow confidence");
+        assert_eq!(
+            lines[1],
+            "bad\t\t\t\t\t\talignment confidence 0.1000 is below min_confidence 0.5000\tlow_confidence"
+        );
     }
 
     #[test]
@@ -560,10 +562,10 @@ mod tests {
             number: 1,
             insertion: None,
         }]);
-        let records = vec![NumberedRecord::success(
+        let records = vec![NumberedRecord::new(
             "s1".to_string(),
             "E".to_string(),
-            result,
+            Ok(result),
         )];
         let mut buf = Vec::new();
         write_jsonl(&mut buf, &records).unwrap();
@@ -572,14 +574,15 @@ mod tests {
         assert_eq!(parsed["sequence_id"], "s1");
         assert_eq!(parsed["numbering"]["1"], "E");
         assert!(parsed["error"].is_null());
+        assert!(parsed["error_kind"].is_null());
     }
 
     #[test]
     fn test_write_jsonl_error() {
-        let records = vec![NumberedRecord::failure(
+        let records = vec![NumberedRecord::new(
             "bad".to_string(),
             "AAAAA".to_string(),
-            "low confidence".to_string(),
+            Err(LOW_CONFIDENCE),
         )];
         let mut buf = Vec::new();
         write_jsonl(&mut buf, &records).unwrap();
@@ -587,7 +590,11 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(output.trim()).unwrap();
         assert_eq!(parsed["sequence_id"], "bad");
         assert!(parsed["chain"].is_null());
-        assert_eq!(parsed["error"], "low confidence");
+        assert_eq!(
+            parsed["error"],
+            "alignment confidence 0.1000 is below min_confidence 0.5000"
+        );
+        assert_eq!(parsed["error_kind"], "low_confidence");
     }
 
     #[test]
@@ -596,10 +603,10 @@ mod tests {
             number: 1,
             insertion: None,
         }]);
-        let records = vec![NumberedRecord::success(
+        let records = vec![NumberedRecord::new(
             "s1".to_string(),
             "E".to_string(),
-            result,
+            Ok(result),
         )];
         let mut buf = Vec::new();
         write_json(&mut buf, &records).unwrap();

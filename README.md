@@ -64,6 +64,7 @@ scheme's own definition and differ between heavy and light chains.
   - [Input](#input)
   - [Output](#output)
   - [Examples](#examples)
+- [Errors](#errors)
 - [Development](#development)
 - [Project structure](#project-structure)
 
@@ -133,7 +134,7 @@ assert kappa_regions.cdr3 == "QQHYTTPPT"
 
 In `segment_domains`, every residue lands in exactly one domain's regions: a domain's `prefix` holds the residues since the previous domain (or the start of the sequence), and only the last domain has the residues after it as its `postfix`, so all domains' regions in order rebuild the sequence.
 
-The lists are empty when no domain aligns with enough confidence. An invalid sequence gives a single result with `error` set, as `number` and `segment` would.
+The lists are never empty. A sequence without a domain gives a single result with `error` and `error_kind` set: `low_confidence` when no alignment reaches `min_confidence`, as `number` reports it, or `domain_too_short` when the best alignment is confident but shorter than a domain must be. An invalid sequence gives a single `invalid_sequence` result, as `number` and `segment` would.
 
 A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and directly follows other residues, such as a linker, can have the residue just before it numbered as its first position. IMGT position 1 is so variable that the sequence alone can't tell a linker residue from the domain's own first residue.
 
@@ -161,9 +162,9 @@ result = df.with_columns(
 )
 ```
 
-The `number` expression returns a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and `error`. Explode `numbering` and unnest it for one row per residue. The `segment` expression returns a struct with fields `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`. `number_domains` and `segment_domains` return a list of those structs per sequence, one per domain.
+The `number` expression returns a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end`, `error` and `error_kind`. Explode `numbering` and unnest it for one row per residue. The `segment` expression returns a struct with fields `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix`, `error` and `error_kind`. `number_domains` and `segment_domains` return a list of those structs per sequence, one per domain.
 
-Every expression takes either `chains`, `scheme` and `min_confidence`, or a prebuilt `Annotator` as `annotator=`.
+Every expression takes either `chains`, `scheme` and `min_confidence`, or a prebuilt `Annotator` as `annotator=`. Either way the annotator is built when the expression is, so an unknown name raises `immunum.Error` right there.
 
 ## JavaScript / npm
 
@@ -185,8 +186,8 @@ const sequence =
 
 const result = annotator.number(sequence);
 console.log(result.chain);      // "H"
-console.log(result.confidence); // 0.97
-console.log(result.numbering);  // { "1": "Q", "2": "V", ... }
+console.log(result.confidence); // 0.78
+console.log(result.numbering);  // Map { "1" => "Q", "2" => "V", ... }
 
 const segments = annotator.segment(sequence);
 console.log(segments.cdr3); // "AREGTTGKPIGAFAH"
@@ -208,6 +209,21 @@ schemeSupportsChain("kabat", "B"); // false: only IMGT numbers TCR chains
 regionsFor("kabat", "H").cdr1;    // [31, 35]
 ```
 
+A setup mistake throws an `Error` with a `kind`; a sequence that can't be numbered comes back with `error` and `errorKind` set (see [Errors](#errors)):
+
+```js
+try {
+  new Annotator(["IGX"], "imgt");
+} catch (err) {
+  console.log(err.kind);    // "invalid_chain"
+  console.log(err.message); // "unknown chain 'IGX' (options: ...)"
+}
+
+const failed = new Annotator(["ig"], "imgt").number("AAAA");
+console.log(failed.errorKind); // "invalid_sequence"
+console.log(failed.error);     // "sequence length 4 is below minimum 30"
+```
+
 ## Rust
 
 ### Installation
@@ -216,7 +232,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-immunum = "0.9"
+immunum = "1.3"
 ```
 
 ### Usage
@@ -233,10 +249,10 @@ let annotator = Annotator::new(
 let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
 let result = annotator.number(sequence).unwrap();
-println!("Chain: {}", result.chain);        // IGH
+println!("Chain: {}", result.chain);        // H
 println!("Confidence: {:.2}", result.confidence);
-for (aa, pos) in sequence.chars().zip(result.positions.iter()) {
-    println!("{} -> {}", aa, pos);
+for (pos, aa) in result.residues(sequence).unwrap() {
+    println!("{} -> {}", pos, aa);
 }
 
 let segments = annotator.segment(sequence).unwrap();
@@ -251,6 +267,8 @@ for segments in annotator.segment_domains(sequence).unwrap() {
 }
 ```
 
+Setting up returns `immunum::Error`; numbering one sequence returns `immunum::SequenceError`, so a sequence's result can only fail with `InvalidSequence` or `LowConfidence`, plus `DomainTooShort` from the domain search. Both have `kind()`, the code every other interface reports.
+
 ## CLI
 
 ```bash
@@ -258,7 +276,7 @@ immunum number [OPTIONS] [INPUT] [OUTPUT]
 immunum segment [OPTIONS] [INPUT] [OUTPUT]
 ```
 
-`number` writes one record per numbered residue (TSV) or per sequence (JSON). `segment` writes one record per sequence, with a column or field per region: `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`.
+`number` writes one record per numbered residue (TSV) or per sequence (JSON). `segment` writes one record per sequence, with a column or field per region: `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix`, `error` and `error_kind`. A sequence that can't be numbered gets a record with `error` and `error_kind` set, and the run carries on; a summary of how many failed goes to stderr.
 
 ### Options
 
@@ -269,12 +287,12 @@ Both commands take the same options.
 | `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`), `chothia` (`c`), `martin` (`m`), `aho` (`a`)                                          | `imgt`  |
 | `-c, --chain`  | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig`    |
 | `-f, --format` | Output format: `tsv`, `json`, `jsonl`                                                                                              | `tsv`   |
-| `--min-confidence` | Minimum alignment confidence, in [0, 1]                                                                                        | `0.5`   |
-| `--all-domains` | Every domain in each sequence (e.g. both domains of an scFv): one record per domain, with a 0-based `domain` column/field. With `segment`, every residue lands in exactly one domain's regions | off     |
+| `--min-confidence` | Minimum alignment confidence, in [0, 1]; a sequence below it gets a record with `error_kind` `low_confidence` | `0.5`   |
+| `--all-domains` | Every domain in each sequence (e.g. both domains of an scFv): one record per domain, with a 0-based `domain` column/field. With `segment`, every residue lands in exactly one domain's regions. A sequence without a domain gets one error record | off     |
 
 ### Input
 
-Accepts a raw sequence, a FASTA file, or stdin (auto-detected):
+Accepts a raw sequence, a FASTA file, or stdin (auto-detected). An argument is read as a sequence only when it is all letters, so a mistyped file name is an error rather than a sequence:
 
 ```bash
 immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS
@@ -317,14 +335,44 @@ immunum segment --all-domains scfvs.fasta | cut -f1,2,9
 tail -n +2 fixtures/ig.tsv | cut -f2 | immunum number
 awk -F'\t' 'NR==1{for(i=1;i<=NF;i++) if($i=="sequence") c=i} NR>1{print $c}' fixtures/ig.tsv | immunum number
 
-# Filter TSV output to CDR3 positions (111-128 in IMGT)
-immunum number sequences.fasta | awk -F'\t' '$4 >= 111 && $4 <= 128'
+# Filter TSV output to CDR3 positions (105-117 in IMGT); `+0` reads insertions like 111A as 111
+immunum number sequences.fasta | awk -F'\t' 'NR==1 || ($5+0 >= 105 && $5+0 <= 117)'
 
 # Filter to heavy chain results only
 immunum number -c all sequences.fasta | awk -F'\t' 'NR==1 || $2=="H"'
 
 # Extract CDR3 sequences with jq
 immunum number -f json sequences.fasta | jq '[.[] | {id: .sequence_id, numbering}]'
+```
+
+## Errors
+
+immunum fails in two ways, and every interface reports each the same way:
+
+- **A setup mistake is raised** before any sequence is numbered: Python raises `immunum.Error` (a `ValueError`) and JavaScript throws an `Error`, both with a `kind`; Polars raises when the expression is built; the CLI prints `error: …` and exits with status 1.
+- **A sequence that can't be numbered is returned**, so a batch never stops for it: its result has `error` (the message) and `error_kind` (`errorKind` in JavaScript) set, and every other field empty.
+
+| Kind                     | Raised or returned | When                                                         |
+| ------------------------ | ------------------ | ------------------------------------------------------------ |
+| `invalid_chain`          | raised             | an unknown chain name, or no chains                          |
+| `invalid_scheme`         | raised             | an unknown scheme name                                       |
+| `unsupported_chain`      | raised             | a scheme other than IMGT asked to number a TCR chain         |
+| `invalid_min_confidence` | raised             | `min_confidence` outside `[0, 1]`                            |
+| `invalid_sequence`       | returned           | a sequence too short, too long, or holding a non-letter      |
+| `low_confidence`         | returned           | no alignment reaches `min_confidence`                        |
+| `domain_too_short`       | returned           | from `*_domains` only: the best alignment is confident but shorter than a domain (30 residues), and no other domain is found |
+
+```python
+import immunum
+
+try:
+    immunum.Annotator(chains=["IGX"], scheme="imgt")
+except immunum.Error as e:
+    print(e.kind)  # invalid_chain
+
+result = immunum.Annotator(chains=["ig"], scheme="imgt").number("AAAA")
+print(result.error_kind)  # invalid_sequence
+print(result.error)       # sequence length 4 is below minimum 30
 ```
 
 ## Development
@@ -358,6 +406,7 @@ task build-local PROFILE=release
 ```bash
 task test-rust    # test only rust code
 task test-python  # test only python code
+task test-wasm    # test only the JavaScript bindings
 task test         # test all code
 ```
 
@@ -374,11 +423,11 @@ There are multiple benchmarks in the repository. For full list, see `task | grep
 
 ```bash
 $ task | grep benchmark
+* benchmark:                    Run all benchmarks and produce plots for them
 * benchmark-accuracy:           Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)
-* benchmark-cli:                Benchmark correctness of the CLI tool
+* benchmark-cli:                Speed benchmark using Criterion (benches/speed_benchmark.rs)
 * benchmark-comparison:         Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)
-* benchmark-scaling:            Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
-* benchmark-speed:              Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)
+* benchmark-speed:              Speed benchmark: sizes 100..1M, 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
 * benchmark-speed-polars:       Speed benchmark for immunum polars across all chain/scheme fixtures
 ```
 
@@ -386,10 +435,11 @@ $ task | grep benchmark
 
 ```
 src/
-├── main.rs          # CLI binary (immunum number ...)
+├── main.rs          # CLI binary (immunum number / immunum segment)
 ├── lib.rs           # Public API
-├── annotator.rs     # Sequence annotation and chain detection
+├── annotator.rs     # Sequence annotation, chain detection and domain search
 ├── alignment.rs     # Needleman-Wunsch semi-global alignment
+├── error.rs         # Error (raised) and SequenceError (returned)
 ├── io.rs            # Input parsing (FASTA, raw) and output formatting (TSV, JSON, JSONL)
 ├── numbering.rs     # Numbering module entry point
 ├── numbering/
@@ -399,13 +449,15 @@ src/
 │   ├── martin.rs    # Martin (extended Chothia) numbering rules
 │   └── aho.rs       # AHo numbering rules
 ├── scoring.rs       # PSSM and scoring matrices
-├── types.rs         # Core domain types (Chain, Scheme, Position)
+├── types.rs         # Core domain types (Chain, Scheme, Position, Region)
+├── python.rs        # Python bindings (pyo3)
+├── polars.rs        # Polars plugin expressions
+├── wasm.rs          # JavaScript bindings (wasm-bindgen) and TypeScript types
 ├── validation.rs    # Validation utilities
-├── error.rs         # Error types
 └── bin/
     ├── benchmark.rs       # Validation metrics report
-    ├── debug_validation.rs # Alignment mismatch visualization
-    └── speed_benchmark.rs  # Performance benchmarks
+    └── debug_validation.rs # Alignment mismatch visualization
+benches/             # Criterion and Python speed/correctness benchmarks
 resources/
 └── consensus/       # Consensus sequence CSVs (compiled into scoring matrices)
 fixtures/
@@ -413,10 +465,11 @@ fixtures/
 ├── ig.fasta         # Example antibody sequences
 └── ig.tsv           # Example TSV input
 scripts/             # Python tooling for generating consensus data
+tests/               # CLI, Python, Polars and JS tests, and the shared error_cases.json
 immunum/
-├── _internal.pyi    # python stub file for pyo3
-├── polars.py        # polars extension module
-└── python.py        # python module
+├── __init__.py      # Python module
+├── _internal.pyi    # Python stub file for pyo3
+└── polars.py        # Polars extension module
 ```
 
 ### Design decisions

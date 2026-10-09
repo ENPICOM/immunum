@@ -220,7 +220,7 @@ async function main() {
     try {
       annotator = new Annotator(chains, scheme, minConfidence);
     } catch (err) {
-      showError(`Could not initialise annotator: ${err}`);
+      showError(`Could not initialise annotator: ${err.message}`);
       return;
     }
     try {
@@ -233,7 +233,7 @@ async function main() {
       const segResult = annotator.segment(sequence);
       renderResult(sequence, numResult, segResult);
     } catch (err) {
-      showError(`Numbering failed: ${err}`);
+      showError(`Numbering failed: ${err.message}`);
     } finally {
       annotator.free?.();
     }

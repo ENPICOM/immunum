@@ -2,7 +2,7 @@
 
 Polars module uses [`polars`](https://pola.rs) dataframe library, relying on its built-in multiprocessing and query optimization engine to allow you to run your queries blazingly fast. If you have a big of data (hundreds of thousands and more), it's strongly preferred you use this interface.
 
-Every expression takes either chain and scheme names (`chains`, `scheme` and optionally `min_confidence`), like the examples below, or an `Annotator` you have already built, as `annotator=`. Both return the same fields and run equally fast. An `Annotator` is convenient when your code holds one anyway: its arguments are checked when you build it, so a mistake raises `ValueError` straight away instead of a `ComputeError` when the query runs. `number_domains()` and `segment_domains()` return a list per sequence, one entry per domain, such as both domains of an scFv. `numbering_method()` and `segmentation_method()` are deprecated; use `number(..., annotator=...)` and `segment(..., annotator=...)`.
+Every expression takes either chain and scheme names (`chains`, `scheme` and optionally `min_confidence`), like the examples below, or an `Annotator` you have already built, as `annotator=`. Both return the same fields and run equally fast; an `Annotator` is convenient when your code holds one anyway. `number_domains()` and `segment_domains()` return a list per sequence, one entry per domain, such as both domains of an scFv. `numbering_method()` and `segmentation_method()` are deprecated; use `number(..., annotator=...)` and `segment(..., annotator=...)`.
 
 Also, note that if you don't need a column, don't materialize it afterwards -- on big dataframes, queries will get **significantly** faster. For instance, example below runs in under a second for dataset with 8M entries (200,000 of them are actual paired sequences), while full numbering would take around 10 times more.
 
@@ -134,6 +134,37 @@ print(top_framework_groups("source.parquet", "target.parquet"))
 # │ QVQLVQSGAEVKKPGSSVKVSCKAS ┆ ISWVRQAPGQGLEWMGG ┆ NYAQKFQGRVTITADESTSTAYMELSSLRS… ┆ EIVLTQSPGTLSLSPGERATLSCRAS ┆ LAWYQQKPGQAPRLLIY ┆ SRATGIPDRFSGSGSGTDFTLTISRLEPED… ┆ 899   │
 # │ EVQLVESGGGLVQPGGSLRLSCAAS ┆ MSWVRQAPGKGLEWVAN ┆ YYVDSVKGRFTISRDNAKNSLYLQMNSLRA… ┆ DIQMTQSPSSLSASVGDRVTITCRAS ┆ LNWYQQKPGKAPKLLIY ┆ SLQSGVPSRFSGSGSGTDFTLTISSLQPED… ┆ 868   │
 # └───────────────────────────┴───────────────────┴─────────────────────────────────┴────────────────────────────┴───────────────────┴─────────────────────────────────┴───────┘
+```
+
+### Errors
+
+Setup mistakes raise `immunum.Error` (a `ValueError`) as soon as you build the expression, before any query runs: an unknown chain or scheme, a scheme that doesn't number a chain, or a `min_confidence` outside `[0, 1]`. Its `kind` attribute names what went wrong as a stable code (`invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`).
+
+A sequence that can't be numbered never fails the query. Its struct has every field null except `error`, the message, and `error_kind`: `invalid_sequence` (too short, too long or not amino acids) or `low_confidence` (no alignment reached `min_confidence`). Both are null on success, so you can filter or count failures like any other column. The `number_domains` and `segment_domains` lists are never empty: a sequence without a domain gets that one struct, with `low_confidence`, or with `domain_too_short` when the best alignment is confident but shorter than a domain must be.
+
+```python
+import polars as pl
+import immunum
+import immunum.polars as imp
+
+try:
+    imp.number("sequence", chains=["IGX"], scheme="imgt")
+except immunum.Error as e:
+    print(e.kind)  # "invalid_chain"
+
+df = pl.DataFrame({"sequence": ["AAAA", "A" * 40]}).select(
+    imp.number("sequence", chains=["ig"], scheme="imgt").struct.field("error", "error_kind")
+)
+print(df)
+# shape: (2, 2)
+# ┌─────────────────────────────────┬──────────────────┐
+# │ error                           ┆ error_kind       │
+# │ ---                             ┆ ---              │
+# │ str                             ┆ str              │
+# ╞═════════════════════════════════╪══════════════════╡
+# │ sequence length 4 is below min… ┆ invalid_sequence │
+# │ alignment confidence 0.0416 is… ┆ low_confidence   │
+# └─────────────────────────────────┴──────────────────┘
 ```
 
 ## Polars integrations
