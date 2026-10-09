@@ -1,4 +1,4 @@
-from immunum._internal import _Annotator, _regions_for  # noqa: F401
+from immunum._internal import _Annotator, _regions_for, _scheme_supports_chain  # noqa: F401
 from dataclasses import dataclass, fields
 from typing import Optional
 
@@ -322,3 +322,27 @@ def regions_for(scheme: str, chain: str) -> dict[str, tuple[int, int]]:
             Kabat, Chothia, Martin or AHo table to return for one.
     """
     return _regions_for(scheme=scheme, chain=chain)
+
+
+def scheme_supports_chain(scheme: str, chain: str) -> bool:
+    """Tell whether a scheme numbers a chain, before building an `Annotator` for them.
+
+    ```python
+    from immunum import scheme_supports_chain
+
+    assert scheme_supports_chain("kabat", "H")
+    assert not scheme_supports_chain("kabat", "B")  # only IMGT numbers TCR chains
+    ```
+
+    Args:
+        scheme: Numbering scheme, as for `Annotator`.
+        chain: A single chain, as for `Annotator`.
+
+    Returns:
+        bool: ``True`` when `Annotator` accepts the pair. IMGT numbers every chain;
+            Kabat, Chothia, Martin and AHo number antibody chains (IGH, IGK, IGL) only.
+
+    Raises:
+        ValueError: If the scheme or chain is unrecognised.
+    """
+    return _scheme_supports_chain(scheme=scheme, chain=chain)

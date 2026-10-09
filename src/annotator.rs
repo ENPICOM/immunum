@@ -121,6 +121,16 @@ thread_local! {
 /// freed when its call returns.
 const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
 
+/// Per-domain results as every interface returns them: one per domain from
+/// [`Annotator::number_domains`] or [`Annotator::segment_domains`], or, when the sequence couldn't
+/// be searched, its error as the single result.
+pub fn per_domain<T>(results: Result<Vec<T>>) -> Vec<Result<T>> {
+    match results {
+        Ok(results) => results.into_iter().map(Ok).collect(),
+        Err(e) => vec![Err(e)],
+    }
+}
+
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",

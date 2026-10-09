@@ -4,14 +4,17 @@ use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
-use strum_macros::{Display, EnumString};
+use strum::{EnumMessage, IntoEnumIterator};
+use strum_macros::{Display, EnumIter, EnumMessage, EnumString};
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
 /// A chain type. Parses case-insensitively from its locus (`IGH`), letter (`H`) or name (`heavy`).
 #[cfg_attr(feature = "python", pyclass(get_all))]
-#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
+#[derive(
+    Debug, EnumString, EnumMessage, Display, PartialEq, Serialize, Deserialize, Clone, Copy,
+)]
 #[strum(parse_err_ty = Error, parse_err_fn = unknown_chain)]
 pub enum Chain {
     #[strum(
@@ -82,10 +85,25 @@ pub const IG_CHAINS: &[Chain] = &[Chain::IGH, Chain::IGK, Chain::IGL];
 /// All T-cell receptor chains
 pub const TCR_CHAINS: &[Chain] = &[Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD];
 
+/// Groups of chains that [`Chain::parse_names`] accepts besides single chains
+const CHAIN_GROUPS: [(&str, &[Chain]); 3] =
+    [("all", ALL_CHAINS), ("ig", IG_CHAINS), ("tcr", TCR_CHAINS)];
+
 fn unknown_chain(name: &str) -> Error {
+    unknown_chain_among(name, &[])
+}
+
+// An unknown chain name, with every name that would have been accepted: each chain's names as
+// `Chain` parses them, and `groups` where groups are accepted too
+fn unknown_chain_among(name: &str, groups: &[(&str, &[Chain])]) -> Error {
+    let mut options: Vec<String> = ALL_CHAINS.iter().map(accepted_names).collect();
+    if !groups.is_empty() {
+        let groups: Vec<&str> = groups.iter().map(|(group, _)| *group).collect();
+        options.push(format!("or the groups {}", groups.join(", ")));
+    }
     Error::InvalidChain(format!(
-        "unknown chain '{name}' (options: IGH/H/heavy, IGK/K/kappa, IGL/L/lambda, TRA/A/alpha, \
-         TRB/B/beta, TRG/G/gamma, TRD/D/delta)"
+        "unknown chain '{name}' (options: {})",
+        options.join(", ")
     ))
 }
 
@@ -96,17 +114,14 @@ impl Chain {
         let mut chains = Vec::new();
         for name in names {
             let name = name.trim();
-            let group = [("all", ALL_CHAINS), ("ig", IG_CHAINS), ("tcr", TCR_CHAINS)]
+            let group = CHAIN_GROUPS
                 .into_iter()
                 .find(|(group, _)| name.eq_ignore_ascii_case(group));
             let named = match group {
                 Some((_, group)) => group,
-                None => &[name.parse::<Chain>().map_err(|_| {
-                    Error::InvalidChain(format!(
-                        "unknown chain '{name}' (options: h, k, l, a, b, g, d, their loci or \
-                         names such as IGH or heavy, or the groups ig, tcr, all)"
-                    ))
-                })?][..],
+                None => &[name
+                    .parse::<Chain>()
+                    .map_err(|_| unknown_chain_among(name, &CHAIN_GROUPS))?][..],
             };
             for &chain in named {
                 if !chains.contains(&chain) {
@@ -120,7 +135,18 @@ impl Chain {
 
 /// Numbering schemes for output. Parses case-insensitively from its name (`kabat`) or initial (`k`).
 #[cfg_attr(feature = "python", pyclass(get_all))]
-#[derive(Debug, EnumString, Display, PartialEq, Serialize, Deserialize, Clone, Copy)]
+#[derive(
+    Debug,
+    EnumString,
+    EnumMessage,
+    EnumIter,
+    Display,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Clone,
+    Copy,
+)]
 #[strum(parse_err_ty = Error, parse_err_fn = unknown_scheme)]
 pub enum Scheme {
     /// IMGT numbering (canonical internal representation)
@@ -141,9 +167,27 @@ pub enum Scheme {
 }
 
 fn unknown_scheme(name: &str) -> Error {
+    let options: Vec<String> = Scheme::iter()
+        .map(|scheme| accepted_names(&scheme))
+        .collect();
     Error::InvalidScheme(format!(
-        "unknown scheme '{name}' (options: IMGT/i, Kabat/k, Chothia/c, Martin/m, Aho/a)"
+        "unknown scheme '{name}' (options: {})",
+        options.join(", ")
     ))
+}
+
+// Every name a variant parses from, as strum matches them, joined by `/` for an error message: its
+// display name first, as results report it, then the rest
+fn accepted_names<T: EnumMessage + fmt::Display>(variant: &T) -> String {
+    let display = variant.to_string();
+    let others = variant
+        .get_serializations()
+        .iter()
+        .filter(|&&name| name != display);
+    std::iter::once(display.as_str())
+        .chain(others.copied())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 impl Scheme {
@@ -163,6 +207,12 @@ impl Scheme {
         }
         Ok(())
     }
+}
+
+/// Whether `scheme` numbers `chain` (see [`Scheme::supports`]), both by the names users write:
+/// see [`Scheme`] and [`Chain`]. An error for an unknown name.
+pub fn scheme_supports_chain(scheme: &str, chain: &str) -> Result<bool> {
+    Ok(scheme.parse::<Scheme>()?.supports(chain.parse()?))
 }
 
 /// Position in a numbered sequence
@@ -255,6 +305,22 @@ pub enum Region {
     FR3,
     CDR3,
     FR4,
+}
+
+impl Region {
+    /// The region's name as every interface writes it: `fr1`, `cdr1`, ... `fr4`.
+    /// [`SEGMENT_NAMES`](crate::numbering::SEGMENT_NAMES) takes its region names from here.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Region::FR1 => "fr1",
+            Region::CDR1 => "cdr1",
+            Region::FR2 => "fr2",
+            Region::CDR2 => "cdr2",
+            Region::FR3 => "fr3",
+            Region::CDR3 => "cdr3",
+            Region::FR4 => "fr4",
+        }
+    }
 }
 
 /// Region definition for a numbering scheme.
@@ -453,6 +519,39 @@ mod tests {
             ]
         );
         assert!(Chain::parse_names(["ig", "IGX"]).is_err());
+    }
+
+    #[test]
+    fn an_unknown_chain_lists_the_names_that_would_parse() {
+        let single = "IGX".parse::<Chain>().unwrap_err().to_string();
+        let listed = Chain::parse_names(["IGX"]).unwrap_err().to_string();
+        for chain in ALL_CHAINS {
+            for name in chain.get_serializations() {
+                assert_eq!(name.parse::<Chain>().unwrap(), *chain);
+                assert!(
+                    single.contains(name) && listed.contains(name),
+                    "{name} not listed"
+                );
+            }
+        }
+        // Groups are offered only where they're accepted
+        assert!(listed.ends_with("or the groups all, ig, tcr)"), "{listed}");
+        assert!(!single.contains("groups"), "{single}");
+    }
+
+    #[test]
+    fn an_unknown_scheme_lists_the_names_that_would_parse() {
+        let message = "Z".parse::<Scheme>().unwrap_err().to_string();
+        for scheme in Scheme::iter() {
+            for name in scheme.get_serializations() {
+                assert_eq!(name.parse::<Scheme>().unwrap(), scheme);
+                assert!(
+                    message.contains(&format!("{scheme}/")),
+                    "{scheme} not listed first"
+                );
+                assert!(message.contains(name), "{name} not listed");
+            }
+        }
     }
 
     /// A definition stores only the region ends, so the starts are arithmetic: every start is the

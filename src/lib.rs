@@ -75,10 +75,12 @@ pub use numbering::kabat;
 pub use numbering::martin;
 
 pub use alignment::{align, Alignment};
-pub use annotator::{Annotator, Domain, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE};
+pub use annotator::{
+    per_domain, Annotator, Domain, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE,
+};
 pub use error::{Error, Result};
 pub use scoring::ScoringMatrix;
-pub use types::{Chain, Insertion, NumberingRule, Position, Region, Scheme};
+pub use types::{scheme_supports_chain, Chain, Insertion, NumberingRule, Position, Region, Scheme};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use io::{read_fasta, read_input, NumberedRecord, OutputFormat, Record, SegmentedRecord};

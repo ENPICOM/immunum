@@ -198,13 +198,14 @@ const domainSegments = annotator.segmentDomains(sequence);
 annotator.free(); // or use `using annotator = new Annotator(...)` with explicit resource management
 ```
 
-`schemeSupportsChain(scheme, chain)` tells whether a scheme numbers a chain before you build an annotator, e.g. to offer only valid choices in a UI:
+`schemeSupportsChain(scheme, chain)` tells whether a scheme numbers a chain before you build an annotator, e.g. to offer only valid choices in a UI. `regionsFor(scheme, chain)` returns the scheme's FR/CDR boundaries for the chain, both ends inclusive, without numbering a sequence:
 
 ```js
-const { schemeSupportsChain } = require("immunum");
+const { regionsFor, schemeSupportsChain } = require("immunum");
 
 schemeSupportsChain("kabat", "H"); // true
 schemeSupportsChain("kabat", "B"); // false: only IMGT numbers TCR chains
+regionsFor("kabat", "H").cdr1;    // [31, 35]
 ```
 
 ## Rust

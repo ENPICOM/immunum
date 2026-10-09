@@ -11,6 +11,7 @@ use crate::alignment::AlignedPosition;
 use crate::chothia::{
     CHOTHIA_HEAVY_REGIONS, CHOTHIA_HEAVY_RULES, CHOTHIA_LIGHT_REGIONS, CHOTHIA_LIGHT_RULES,
 };
+use crate::error::Result;
 use crate::imgt::{IMGT_REGIONS, IMGT_RULES};
 use crate::kabat::{
     KABAT_HEAVY_REGIONS, KABAT_HEAVY_RULES, KABAT_LIGHT_REGIONS, KABAT_LIGHT_RULES,
@@ -46,9 +47,35 @@ pub fn region_for_position(pos: u8, scheme: Scheme, chain: Chain) -> Option<Regi
     regions_for(scheme, chain).region(pos)
 }
 
-/// The segments of a numbered sequence in sequence order, by the name every interface uses for them
+/// The FR/CDR boundaries `scheme` uses for `chain`, both by the names users write (see [`Scheme`]
+/// and [`Chain`]): each region by [`Region::name`] with its inclusive `(start, end)` positions,
+/// N- to C-terminal. An error for an unknown name, or for a chain the scheme doesn't number.
+pub fn region_spans(scheme: &str, chain: &str) -> Result<[(&'static str, (u8, u8)); 7]> {
+    let scheme: Scheme = scheme.parse()?;
+    let chain: Chain = chain.parse()?;
+    scheme.validate_chain(chain)?;
+    Ok(regions_for(scheme, chain)
+        .spans()
+        .map(|(region, span)| (region.name(), span)))
+}
+
+/// The segment holding the residues before the numbered ones
+pub const PREFIX: &str = "prefix";
+/// The segment holding the residues after the numbered ones
+pub const POSTFIX: &str = "postfix";
+
+/// The segments of a numbered sequence in sequence order, by the name every interface uses for them:
+/// the regions by [`Region::name`], between [`PREFIX`] and [`POSTFIX`]
 pub const SEGMENT_NAMES: [&str; 9] = [
-    "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix",
+    PREFIX,
+    Region::FR1.name(),
+    Region::CDR1.name(),
+    Region::FR2.name(),
+    Region::CDR2.name(),
+    Region::FR3.name(),
+    Region::CDR3.name(),
+    Region::FR4.name(),
+    POSTFIX,
 ];
 
 /// Segment a numbered sequence into its constituent regions
@@ -68,11 +95,11 @@ pub fn segment(
 
     for (position, ch) in positions.iter().zip(sequence.chars()) {
         let key = match region_for_position(position.number, scheme, chain) {
-            Some(region) => region.to_string(),
-            None if position.number == 0 => "Prefix".to_string(),
-            None => "Postfix".to_string(),
+            Some(region) => region.name(),
+            None if position.number == 0 => PREFIX,
+            None => POSTFIX,
         };
-        segments.get_mut(&key.to_lowercase()).unwrap().push(ch);
+        segments.get_mut(key).unwrap().push(ch);
     }
 
     segments

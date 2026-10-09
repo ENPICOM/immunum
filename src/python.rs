@@ -3,9 +3,9 @@ use postcard::{from_bytes, to_allocvec};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-use crate::annotator::{Annotator, NumberingResult, SegmentResult};
-use crate::numbering::{regions_for, SEGMENT_NAMES};
-use crate::types::{Chain, Scheme};
+use crate::annotator::{per_domain, Annotator, NumberingResult, SegmentResult};
+use crate::numbering::{region_spans, SEGMENT_NAMES};
+use crate::types::scheme_supports_chain;
 
 // What `Annotator.number` returns for `sequence`: the numbering, or the error with every other field
 // None
@@ -68,22 +68,6 @@ fn segment_dict(
     Ok(dict)
 }
 
-// One dict per domain, or a single error dict when the sequence couldn't be searched
-fn per_domain<'py, T>(
-    py: Python<'py>,
-    results: crate::Result<Vec<T>>,
-    dict: impl Fn(crate::Result<T>) -> PyResult<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyList>> {
-    let dicts = match results {
-        Ok(results) => results
-            .into_iter()
-            .map(|result| dict(Ok(result)))
-            .collect::<PyResult<Vec<_>>>()?,
-        Err(e) => vec![dict(Err(e))?],
-    };
-    PyList::new(py, dicts)
-}
-
 #[pymethods]
 impl Annotator {
     // python methods
@@ -110,9 +94,11 @@ impl Annotator {
         py: Python<'py>,
         sequence: &str,
     ) -> PyResult<Bound<'py, PyList>> {
-        per_domain(py, self.number_domains(sequence), |result| {
-            numbering_dict(py, sequence, result)
-        })
+        let dicts = per_domain(self.number_domains(sequence))
+            .into_iter()
+            .map(|result| numbering_dict(py, sequence, result))
+            .collect::<PyResult<Vec<_>>>()?;
+        PyList::new(py, dicts)
     }
 
     #[pyo3(signature = (sequence), name = "segment")]
@@ -127,9 +113,11 @@ impl Annotator {
         py: Python<'py>,
         sequence: &str,
     ) -> PyResult<Bound<'py, PyList>> {
-        per_domain(py, self.segment_domains(sequence), |result| {
-            segment_dict(py, result)
-        })
+        let dicts = per_domain(self.segment_domains(sequence))
+            .into_iter()
+            .map(|result| segment_dict(py, result))
+            .collect::<PyResult<Vec<_>>>()?;
+        PyList::new(py, dicts)
     }
 
     pub fn __setstate__(
@@ -163,22 +151,25 @@ impl Annotator {
     }
 }
 
-/// Region boundaries as `{region: (start, end)}`, both ends inclusive, keyed by the lowercase
-/// region name that `segment` uses.
+fn invalid(e: crate::Error) -> PyErr {
+    PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())
+}
+
+/// Region boundaries as `{region: (start, end)}`, both ends inclusive, keyed by the region names
+/// `segment` uses.
 #[pyfunction]
 fn _regions_for<'py>(py: Python<'py>, scheme: &str, chain: &str) -> PyResult<Bound<'py, PyDict>> {
-    let invalid = |e: crate::Error| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string());
-    let parsed_chain = chain.parse::<Chain>().map_err(invalid)?;
-    let parsed_scheme = scheme.parse::<Scheme>().map_err(invalid)?;
-    parsed_scheme
-        .validate_chain(parsed_chain)
-        .map_err(invalid)?;
-
     let dict = PyDict::new(py);
-    for (region, span) in regions_for(parsed_scheme, parsed_chain).spans() {
-        dict.set_item(region.to_string().to_lowercase(), span)?;
+    for (region, span) in region_spans(scheme, chain).map_err(invalid)? {
+        dict.set_item(region, span)?;
     }
     Ok(dict)
+}
+
+/// Whether `scheme` numbers `chain`
+#[pyfunction]
+fn _scheme_supports_chain(scheme: &str, chain: &str) -> PyResult<bool> {
+    scheme_supports_chain(scheme, chain).map_err(invalid)
 }
 
 #[pymodule]
@@ -186,5 +177,6 @@ fn _internal(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_class::<Annotator>()?;
     m.add_function(wrap_pyfunction!(_regions_for, m)?)?;
+    m.add_function(wrap_pyfunction!(_scheme_supports_chain, m)?)?;
     Ok(())
 }

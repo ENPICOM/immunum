@@ -53,18 +53,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbering again. `sequence` is the whole sequence that was numbered or searched; one too short for the
   numbering is an error. Python, JavaScript, Polars and the CLI now all use these.
 - Rust: `numbering::SEGMENT_NAMES` lists the segments in sequence order by the names every interface
-  uses, and `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
+  uses, built from `Region::name()` and the new `numbering::PREFIX` and `numbering::POSTFIX`, and
+  `SegmentResult::regions()` pairs each with its residues. Python, JavaScript, Polars and the
   documentation's web tool take their region names and order from these instead of their own lists.
 - CLI: JSON and JSONL records carry `query_start` and `query_end`, as Python results do (`queryStart` and
   `queryEnd` in JavaScript).
-- JavaScript: `schemeSupportsChain(scheme, chain)` tells whether a scheme numbers a chain, by the rule
-  the `Annotator` constructor applies; Rust: `Scheme::supports(chain)`. The documentation's web tool
-  uses it to enable its chain checkboxes instead of keeping its own copy of the rule.
+- Python and JavaScript expose the same scheme lookups: `scheme_supports_chain(scheme, chain)`
+  (`schemeSupportsChain` in JavaScript) tells whether a scheme numbers a chain, by the rule the
+  `Annotator` constructor applies, and JavaScript gains `regionsFor(scheme, chain)`, which Python has as
+  `regions_for`. Both take names and report unknown ones as every interface does; they are
+  `immunum::scheme_supports_chain` and `numbering::region_spans` in Rust, with `Scheme::supports(chain)`
+  and `Region::name()`. The documentation's web tool uses `schemeSupportsChain` to enable its chain
+  checkboxes instead of keeping its own copy of the rule.
+- Rust: `per_domain` turns what `number_domains` and `segment_domains` return into one result per
+  domain, or the error as the single result. Python, JavaScript, Polars and the CLI all use it, so they
+  report an invalid sequence the same way.
 
 ### Changed
 - **Breaking:** JavaScript uses camelCase throughout, as JavaScript and TypeScript code expects: `number`
   results have `queryStart` and `queryEnd` instead of `query_start` and `query_end`, and the
-  constructor's third parameter is declared as `minConfidence`.
+  constructor's third parameter is declared as `minConfidence`. Every other field name is the same as in
+  Python, Polars and the CLI.
+- **Breaking:** JavaScript `segment` and `segmentDomains` results that failed set every region to `null`,
+  as Python, Polars and the CLI do, instead of leaving the region fields out.
 - **Breaking:** Polars `number` and `numbering_method` return the same struct, with the fields Python's
   `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering`,
   `query_start`, `query_end` and `error`. `numbering` is a list of `{position, residue}` structs; explode
@@ -73,7 +84,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Chain and scheme names are parsed once, in Rust, for every interface. Python drops its own alias
   tables, so Python, JavaScript, Polars and the CLI accept the same names and report the same error
   message for an unknown one. The chain groups `ig`, `tcr` and `all`, which only the CLI accepted, now
-  work everywhere; a chain named twice (e.g. `["ig", "H"]`) is used once.
+  work everywhere; a chain named twice (e.g. `["ig", "H"]`) is used once. An unknown chain or scheme
+  name gets one message everywhere, listing every name the parser accepts (taken from the parser
+  itself, the name results report first), plus the chain groups where groups are accepted.
 - `min_confidence` outside `[0, 1]` is rejected by every interface. Only Python checked it; JavaScript,
   Polars and the CLI accepted any value.
 - Polars `number` and `segment` report an unknown chain or scheme when the expression runs, as a

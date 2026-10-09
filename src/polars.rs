@@ -1,4 +1,4 @@
-use crate::annotator::{Annotator, NumberingResult, SegmentResult};
+use crate::annotator::{per_domain, Annotator, NumberingResult, SegmentResult};
 use crate::numbering::SEGMENT_NAMES;
 use polars::prelude::*;
 use polars_arrow::bitmap::MutableBitmap;
@@ -73,7 +73,8 @@ fn residue_dtype() -> DataType {
     ])
 }
 
-// The fields `Annotator.number` returns in Python and JavaScript, as Polars types
+// The fields `Annotator.number` returns in Python (JavaScript names `query_start` and `query_end`
+// in camelCase), as Polars types
 fn numbering_dtype() -> DataType {
     DataType::Struct(vec![
         Field::new("chain".into(), DataType::String),
@@ -199,10 +200,12 @@ fn domains_series<D: Send>(
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                Some(match domains(ann, value) {
-                    Ok(domains) => domains.into_iter().map(Ok).collect(),
-                    Err(e) => vec![Err(e.to_string())],
-                })
+                Some(
+                    per_domain(domains(ann, value))
+                        .into_iter()
+                        .map(|result| result.map_err(|e| e.to_string()))
+                        .collect(),
+                )
             })
             .collect()
     });

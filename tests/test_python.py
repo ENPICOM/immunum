@@ -408,6 +408,27 @@ AB_SCHEMES = ["IMGT", "Kabat", "Chothia", "Martin", "Aho"]
 NON_IMGT_SCHEMES = ["Kabat", "Chothia", "Martin", "Aho"]
 
 
+class TestSchemeSupportsChain:
+    @pytest.mark.parametrize("scheme", AB_SCHEMES)
+    @pytest.mark.parametrize("chain", ALL_CHAINS)
+    def test_agrees_with_annotator_and_regions_for(self, scheme, chain):
+        supported = immunum.scheme_supports_chain(scheme, chain)
+        assert supported == (scheme == "IMGT" or chain in AB_CHAINS)
+        if supported:
+            immunum.Annotator([chain], scheme)
+            immunum.regions_for(scheme, chain)
+        else:
+            with pytest.raises(ValueError):
+                immunum.Annotator([chain], scheme)
+            with pytest.raises(ValueError):
+                immunum.regions_for(scheme, chain)
+
+    @pytest.mark.parametrize("scheme,chain", [("INVALID", "IGH"), ("IMGT", "INVALID")])
+    def test_unknown_scheme_or_chain_raises(self, scheme, chain):
+        with pytest.raises(ValueError):
+            immunum.scheme_supports_chain(scheme, chain)
+
+
 class TestRegionsFor:
     @pytest.mark.parametrize(
         "scheme,chain,expected",

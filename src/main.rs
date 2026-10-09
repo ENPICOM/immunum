@@ -4,7 +4,8 @@ use std::str::FromStr;
 
 use clap::{Args, Parser, Subcommand};
 use immunum::{
-    Annotator, NumberedRecord, OutputFormat, Record, SegmentedRecord, DEFAULT_MIN_CONFIDENCE,
+    per_domain, Annotator, NumberedRecord, OutputFormat, Record, SegmentedRecord,
+    DEFAULT_MIN_CONFIDENCE,
 };
 
 #[derive(Parser)]
@@ -105,17 +106,19 @@ fn run_number(args: &AnnotateArgs) -> Result<(), String> {
     let mut written = 0;
     for rec in records {
         let numbered = if args.all_domains {
-            match annotator.number_domains(&rec.sequence) {
-                Ok(results) => results
-                    .into_iter()
-                    .enumerate()
-                    .map(|(domain, result)| {
+            per_domain(annotator.number_domains(&rec.sequence))
+                .into_iter()
+                .enumerate()
+                .map(|(domain, result)| match result {
+                    Ok(result) => {
                         NumberedRecord::success(rec.id.clone(), rec.sequence.clone(), result)
                             .in_domain(domain)
-                    })
-                    .collect(),
-                Err(e) => vec![NumberedRecord::failure(rec.id, rec.sequence, e.to_string())],
-            }
+                    }
+                    Err(e) => {
+                        NumberedRecord::failure(rec.id.clone(), rec.sequence.clone(), e.to_string())
+                    }
+                })
+                .collect()
         } else {
             vec![match annotator.number(&rec.sequence) {
                 Ok(result) => NumberedRecord::success(rec.id, rec.sequence, result),
@@ -147,16 +150,16 @@ fn run_segment(args: &AnnotateArgs) -> Result<(), String> {
     let mut written = 0;
     for rec in records {
         let segmented = if args.all_domains {
-            match annotator.segment_domains(&rec.sequence) {
-                Ok(results) => results
-                    .into_iter()
-                    .enumerate()
-                    .map(|(domain, result)| {
+            per_domain(annotator.segment_domains(&rec.sequence))
+                .into_iter()
+                .enumerate()
+                .map(|(domain, result)| match result {
+                    Ok(result) => {
                         SegmentedRecord::success(rec.id.clone(), result).in_domain(domain)
-                    })
-                    .collect(),
-                Err(e) => vec![SegmentedRecord::failure(rec.id, e.to_string())],
-            }
+                    }
+                    Err(e) => SegmentedRecord::failure(rec.id.clone(), e.to_string()),
+                })
+                .collect()
         } else {
             vec![match annotator.segment(&rec.sequence) {
                 Ok(result) => SegmentedRecord::success(rec.id, result),

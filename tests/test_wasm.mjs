@@ -10,7 +10,7 @@
 
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { Annotator, schemeSupportsChain } from "../pkg/immunum.js";
+import { Annotator, regionsFor, schemeSupportsChain } from "../pkg/immunum.js";
 
 const ALL_CHAINS = ["H", "K", "L", "A", "B", "G", "D"];
 const AB_CHAINS = ["H", "K", "L"];
@@ -110,6 +110,33 @@ describe("schemeSupportsChain()", () => {
   it("throws on an unknown scheme or chain", () => {
     assert.throws(() => schemeSupportsChain("INVALID", "H"));
     assert.throws(() => schemeSupportsChain("imgt", "INVALID"));
+  });
+});
+
+describe("regionsFor()", () => {
+  it("returns inclusive bounds in N- to C-terminal order", () => {
+    const kabatHeavy = regionsFor("kabat", "H");
+    assert.deepEqual(Object.keys(kabatHeavy), ["fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4"]);
+    assert.deepEqual(kabatHeavy.cdr1, [31, 35]);
+    assert.deepEqual(kabatHeavy.fr4, [103, 113]);
+    assert.notDeepEqual(regionsFor("kabat", "K"), kabatHeavy);
+  });
+
+  it("throws exactly for the pairs schemeSupportsChain rejects", () => {
+    for (const scheme of ["imgt", "kabat", "chothia", "martin", "aho"]) {
+      for (const chain of ALL_CHAINS) {
+        if (schemeSupportsChain(scheme, chain)) {
+          assert.doesNotThrow(() => regionsFor(scheme, chain));
+        } else {
+          assert.throws(() => regionsFor(scheme, chain), /only supported for antibody chains/);
+        }
+      }
+    }
+  });
+
+  it("throws on an unknown scheme or chain", () => {
+    assert.throws(() => regionsFor("INVALID", "H"));
+    assert.throws(() => regionsFor("imgt", "INVALID"));
   });
 });
 
@@ -299,11 +326,13 @@ describe("segment()", () => {
     assert.equal(result.error, null);
   });
 
-  it("returns error field on invalid sequence (does not throw)", () => {
+  it("returns error and every region null on invalid sequence (does not throw)", () => {
     const annotator = new Annotator(ALL_CHAINS, "IMGT");
     const result = annotator.segment("AAAAAAAAAAAAAAAA");
     assert.equal(typeof result.error, "string");
-    assert.equal(result.fr1, undefined);
+    for (const key of ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"]) {
+      assert.equal(result[key], null, `${key} should be null`);
+    }
   });
 
   it("keeps flanking residues in prefix and postfix (#58)", () => {
