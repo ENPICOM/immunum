@@ -60,6 +60,7 @@ immunum fails in two ways, and every interface reports each the same way:
 | `invalid_min_confidence` | raised             | `min_confidence` outside `[0, 1]`                            |
 | `invalid_sequence`       | returned           | a sequence too short, too long, or holding a non-letter      |
 | `low_confidence`         | returned           | no alignment reaches `min_confidence`                        |
+| `domain_too_short`       | returned           | from `*_domains` only: the best alignment is confident but shorter than a domain (30 residues), and no other domain is found |
 
 ```python
 import immunum
@@ -162,7 +163,7 @@ assert kappa_regions.cdr3 == "QQHYTTPPT"
 
 In `segment_domains`, every residue lands in exactly one domain's regions: a domain's `prefix` holds the residues since the previous domain (or the start of the sequence), and only the last domain has the residues after it as its `postfix`, so all domains' regions in order rebuild the sequence.
 
-The lists are empty when no domain aligns with enough confidence. An invalid sequence gives a single result with `error` set, as `number` and `segment` would.
+The lists are never empty. A sequence without a domain gives a single result with `error` and `error_kind` set: `low_confidence` when no alignment reaches `min_confidence`, as `number` reports it, or `domain_too_short` when the best alignment is confident but shorter than a domain must be. An invalid sequence gives a single `invalid_sequence` result, as `number` and `segment` would.
 
 A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and directly follows other residues, such as a linker, can have the residue just before it numbered as its first position. IMGT position 1 is so variable that the sequence alone can't tell a linker residue from the domain's own first residue.
 
@@ -295,7 +296,7 @@ for segments in annotator.segment_domains(sequence).unwrap() {
 }
 ```
 
-Setting up returns `immunum::Error`; numbering one sequence returns `immunum::SequenceError`, so a sequence's result can only fail with `InvalidSequence` or `LowConfidence`. Both have `kind()`, the code every other interface reports.
+Setting up returns `immunum::Error`; numbering one sequence returns `immunum::SequenceError`, so a sequence's result can only fail with `InvalidSequence` or `LowConfidence`, plus `DomainTooShort` from the domain search. Both have `kind()`, the code every other interface reports.
 
 ## CLI
 
@@ -316,7 +317,7 @@ Both commands take the same options.
 | `-c, --chain`  | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig`    |
 | `-f, --format` | Output format: `tsv`, `json`, `jsonl`                                                                                              | `tsv`   |
 | `--min-confidence` | Minimum alignment confidence, in [0, 1]; a sequence below it gets a record with `error_kind` `low_confidence` | `0.5`   |
-| `--all-domains` | Every domain in each sequence (e.g. both domains of an scFv): one record per domain, with a 0-based `domain` column/field. With `segment`, every residue lands in exactly one domain's regions | off     |
+| `--all-domains` | Every domain in each sequence (e.g. both domains of an scFv): one record per domain, with a 0-based `domain` column/field. With `segment`, every residue lands in exactly one domain's regions. A sequence without a domain gets one error record | off     |
 
 ### Input
 

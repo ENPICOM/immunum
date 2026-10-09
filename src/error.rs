@@ -75,6 +75,11 @@ pub enum SequenceError {
     /// The best alignment's confidence is below the annotator's minimum
     #[error("alignment confidence {confidence:.4} is below min_confidence {threshold:.4}")]
     LowConfidence { confidence: f32, threshold: f32 },
+
+    /// A search for every domain found none: the best alignment is confident but covers fewer
+    /// residues than a domain must
+    #[error("domain length {length} is below minimum {minimum}")]
+    DomainTooShort { length: usize, minimum: usize },
 }
 
 impl SequenceError {
@@ -83,6 +88,7 @@ impl SequenceError {
         match self {
             SequenceError::InvalidSequence(_) => "invalid_sequence",
             SequenceError::LowConfidence { .. } => "low_confidence",
+            SequenceError::DomainTooShort { .. } => "domain_too_short",
         }
     }
 }

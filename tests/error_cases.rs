@@ -59,6 +59,28 @@ fn lookup_errors() {
     }
 }
 
+// Both `*_domains` methods give `case`'s error as their single result
+fn assert_domain_lists_fail(annotator: &Annotator, case: &Value) {
+    let sequence = case["sequence"].as_str().unwrap();
+    let errors = [
+        per_domain(annotator.number_domains(sequence))
+            .into_iter()
+            .map(|r| r.err())
+            .collect(),
+        per_domain(annotator.segment_domains(sequence))
+            .into_iter()
+            .map(|r| r.err())
+            .collect::<Vec<_>>(),
+    ];
+    for errors in errors {
+        let [Some(error)] = &errors[..] else {
+            panic!("expected one error for {case}")
+        };
+        assert_eq!(error.kind(), case["kind"], "{case}");
+        assert_eq!(error.to_string(), case["message"], "{case}");
+    }
+}
+
 #[test]
 fn sequence_errors() {
     for case in cases("sequences") {
@@ -71,28 +93,18 @@ fn sequence_errors() {
             assert_eq!(error.kind(), case["kind"], "{case}");
             assert_eq!(error.to_string(), case["message"], "{case}");
         }
+        assert_domain_lists_fail(&annotator, &case);
+    }
+}
 
-        for domains in [
-            per_domain(annotator.number_domains(sequence))
-                .into_iter()
-                .map(|r| r.map(|_| ()))
-                .collect::<Vec<_>>(),
-            per_domain(annotator.segment_domains(sequence))
-                .into_iter()
-                .map(|r| r.map(|_| ()))
-                .collect(),
-        ] {
-            match case["domains"].as_str().unwrap() {
-                "empty" => assert!(domains.is_empty(), "{case}"),
-                "error" => {
-                    let [Err(error)] = &domains[..] else {
-                        panic!("expected one error for {case}")
-                    };
-                    assert_eq!(error.kind(), case["kind"], "{case}");
-                    assert_eq!(error.to_string(), case["message"], "{case}");
-                }
-                other => panic!("unknown domains expectation {other}"),
-            }
-        }
+#[test]
+fn domain_errors() {
+    for case in cases("domain_errors") {
+        let annotator = annotator(&case).unwrap();
+        let sequence = case["sequence"].as_str().unwrap();
+
+        assert!(annotator.number(sequence).is_ok(), "{case}");
+        assert!(annotator.segment(sequence).is_ok(), "{case}");
+        assert_domain_lists_fail(&annotator, &case);
     }
 }

@@ -70,8 +70,9 @@ class SegmenationResult:
     """Why the sequence couldn't be segmented, or ``None`` on success."""
     error_kind: Optional[str]
     """What went wrong, as a stable code, or ``None`` on success: ``"invalid_sequence"``
-    (too short, too long or not amino acids) or ``"low_confidence"`` (no alignment reached
-    ``min_confidence``)."""
+    (too short, too long or not amino acids), ``"low_confidence"`` (no alignment reached
+    ``min_confidence``) or, from ``segment_domains`` only, ``"domain_too_short"`` (the best
+    alignment is confident but too short to be a domain)."""
 
     def as_dict(self) -> dict[str, Optional[str]]:
         """Return dict mapping segment names to sequences (excludes the error fields)
@@ -132,8 +133,9 @@ class NumberingResult:
     """Why the sequence couldn't be numbered, or ``None`` on success."""
     error_kind: Optional[str]
     """What went wrong, as a stable code, or ``None`` on success: ``"invalid_sequence"``
-    (too short, too long or not amino acids) or ``"low_confidence"`` (no alignment reached
-    ``min_confidence``)."""
+    (too short, too long or not amino acids), ``"low_confidence"`` (no alignment reached
+    ``min_confidence``) or, from ``number_domains`` only, ``"domain_too_short"`` (the best
+    alignment is confident but too short to be a domain)."""
 
 
 class Annotator:
@@ -248,9 +250,12 @@ class Annotator:
 
         Returns:
             One `NumberingResult` per domain, ordered by position, each what `number`
-            returns for that domain; empty when no domain aligns with enough
-            confidence. When the sequence itself is invalid (too short, too long or
-            not amino acids), a single result with ``error`` and ``error_kind`` set.
+            returns for that domain; never empty. A sequence without a domain gives a
+            single result with ``error`` and ``error_kind`` set: ``"low_confidence"``
+            when no alignment reaches ``min_confidence``, as `number` reports it, or
+            ``"domain_too_short"`` when the best alignment is confident but shorter
+            than a domain must be. So does an invalid sequence (too short, too long or
+            not amino acids), with ``"invalid_sequence"``.
 
         A domain that lacks its first IMGT positions (a light chain starting at position 2,
         say) and directly follows other residues, such as a linker, can have the residue just
@@ -308,10 +313,9 @@ class Annotator:
             sequence: Amino-acid sequence string (single-letter codes).
 
         Returns:
-            One `SegmenationResult` per domain, ordered by position; empty when no
-            domain aligns with enough confidence. When the sequence itself is invalid
-            (too short, too long or not amino acids), a single result with ``error``
-            and ``error_kind`` set.
+            One `SegmenationResult` per domain, ordered by position; never empty. A
+            sequence without a domain or an invalid one gives a single result with
+            ``error`` and ``error_kind`` set, as `number_domains` describes.
         """
         return [
             SegmenationResult(**d) for d in self._annotator.segment_domains(sequence)

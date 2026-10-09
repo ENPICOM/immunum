@@ -67,7 +67,10 @@ attribute names what went wrong as a stable code (`invalid_chain`, `invalid_sche
 A sequence that can't be numbered doesn't raise, so a loop over many sequences never stops for
 one bad one. Its result has every field `None` except `error`, the message, and `error_kind`:
 `invalid_sequence` (too short, too long or not amino acids) or `low_confidence` (no alignment
-reached `min_confidence`). Both are `None` on success.
+reached `min_confidence`). Both are `None` on success. `number_domains` and `segment_domains`
+never return an empty list: a sequence without a domain gives that one result, with
+`low_confidence`, or with `domain_too_short` when the best alignment is confident but shorter
+than a domain must be.
 
 ```python
 import immunum

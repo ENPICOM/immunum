@@ -199,7 +199,7 @@ impl Annotator {
     }
 
     /// Every domain in `sequence` numbered under this annotator's scheme, ordered by position; see
-    /// [`Annotator::domains`] for how they're found. Empty when no domain aligns well enough.
+    /// [`Annotator::domains`] for how they're found, and for the error when there is none.
     pub fn number_domains(&self, sequence: &str) -> Result<Vec<NumberingResult>, SequenceError> {
         Ok(self
             .domains(sequence)?
@@ -212,7 +212,8 @@ impl Annotator {
     /// [`Annotator::domains`] for how they're found. Every residue lands in exactly one domain's
     /// segments: a domain's prefix holds the residues since the previous domain (or the start of the
     /// sequence), and only the last domain has the residues after it as its postfix. The domains'
-    /// segments in order therefore rebuild `sequence`. Empty when no domain aligns well enough.
+    /// segments in order therefore rebuild `sequence`. See [`Annotator::domains`] for the error when
+    /// there is no domain.
     pub fn segment_domains(&self, sequence: &str) -> Result<Vec<SegmentResult>, SequenceError> {
         let domains = self.number_domains(sequence)?;
         let mut start = 0;
@@ -232,32 +233,49 @@ impl Annotator {
             .collect())
     }
 
-    /// Every variable domain in `sequence`, ordered by position.
+    /// Every variable domain in `sequence`, ordered by position; never empty.
     ///
     /// Aligns the sequence and keeps the best alignment's domain, then searches the residues before and
     /// after it the same way, each on its own, so every domain is the best alignment of the residues
     /// around it that no other domain holds. A part stops being searched once it is shorter than
     /// [`MIN_SEQUENCE_LENGTH`] or its best alignment falls below the minimum confidence. A domain
     /// shorter than [`MIN_SEQUENCE_LENGTH`] is not reported, but the residues around it are searched.
+    ///
+    /// When there is no domain, the error says why, from the best alignment of the whole sequence:
+    /// [`SequenceError::LowConfidence`] when it falls below the minimum confidence, as
+    /// [`Annotator::number`] reports it, or [`SequenceError::DomainTooShort`] when it is confident but
+    /// too short and the residues around it hold no domain either.
     pub fn domains(&self, sequence: &str) -> Result<Vec<Domain>, SequenceError> {
         validate_sequence(sequence)?;
+        let best = self.best_domain(sequence)?;
+        let best_length = best.query_end + 1 - best.query_start;
+
+        // Every confident alignment found, with the part of the sequence it was the best of
+        let mut found = vec![(best, 0..sequence.len())];
         let mut domains = Vec::new();
-        let mut parts = Vec::new();
-        parts.push(0..sequence.len());
-        while let Some(part) = parts.pop() {
-            if part.len() < MIN_SEQUENCE_LENGTH {
-                continue;
+        while let Some((domain, part)) = found.pop() {
+            for side in [
+                part.start..domain.query_start,
+                domain.query_end + 1..part.end,
+            ] {
+                if side.len() >= MIN_SEQUENCE_LENGTH {
+                    let next = self.aligned_domain(sequence, side.clone());
+                    if next.confidence >= self.min_confidence {
+                        found.push((next, side));
+                    }
+                }
             }
-            let domain = self.aligned_domain(sequence, part.clone());
-            if domain.confidence < self.min_confidence {
-                continue;
-            }
-            parts.push(part.start..domain.query_start);
-            parts.push(domain.query_end + 1..part.end);
             if domain.query_end + 1 - domain.query_start >= MIN_SEQUENCE_LENGTH {
                 domains.push(domain);
             }
         }
+        if domains.is_empty() {
+            return Err(SequenceError::DomainTooShort {
+                length: best_length,
+                minimum: MIN_SEQUENCE_LENGTH,
+            });
+        }
+
         domains.sort_by_key(|domain| domain.query_start);
         for i in 1..domains.len() {
             domains[i - 1].tail_limit = domains[i].query_start;
@@ -668,14 +686,23 @@ mod tests {
         assert_eq!(spans(&sequence), vec![(0, 118, Chain::IGH)]);
     }
 
+    // Why `sequence` holds no domain
+    fn no_domain(sequence: &str) -> &'static str {
+        Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None)
+            .unwrap()
+            .domains(sequence)
+            .unwrap_err()
+            .kind()
+    }
+
     #[test]
     fn a_constant_region_holds_no_domain() {
-        assert!(spans(KAPPA_CONSTANT).is_empty());
+        assert_eq!(no_domain(KAPPA_CONSTANT), "low_confidence");
     }
 
     #[test]
     fn an_x_run_holds_no_domain() {
-        assert!(spans(&"X".repeat(300)).is_empty());
+        assert_eq!(no_domain(&"X".repeat(300)), "low_confidence");
     }
 
     #[test]

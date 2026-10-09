@@ -299,18 +299,22 @@ describe("numberDomains() and segmentDomains()", () => {
   });
 
   for (const method of ["numberDomains", "segmentDomains"]) {
-    for (const c of ERROR_CASES.sequences) {
-      it(`${method} returns ${c.domains === "error" ? `one ${c.kind} result` : "no result"} for ${c.sequence}`, () => {
+    for (const c of [...ERROR_CASES.sequences, ...ERROR_CASES.domain_errors]) {
+      it(`${method} returns one ${c.kind} result for ${c.sequence}`, () => {
         const domains = new Annotator(c.chains, c.scheme)[method](c.sequence);
-        if (c.domains === "error") {
-          assert.equal(domains.length, 1);
-          assert.equal(domains[0].error, c.message);
-          assert.equal(domains[0].errorKind, c.kind);
-        } else {
-          assert.deepEqual(domains, []);
-        }
+        assert.equal(domains.length, 1);
+        assert.equal(domains[0].error, c.message);
+        assert.equal(domains[0].errorKind, c.kind);
       });
     }
+  }
+
+  for (const c of ERROR_CASES.domain_errors) {
+    it(`number() and segment() succeed for ${c.sequence}, which holds no domain`, () => {
+      const annotator = new Annotator(c.chains, c.scheme);
+      assert.equal(annotator.number(c.sequence).error, null);
+      assert.equal(annotator.segment(c.sequence).error, null);
+    });
   }
 });
 

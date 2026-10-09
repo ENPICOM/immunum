@@ -1,5 +1,5 @@
 {
-  "_comment": "Every interface reports these errors with this kind and message. Read by tests/error_cases.rs, tests/cli.rs, tests/test_python.py, tests/test_polars.py and tests/test_wasm.mjs.",
+  "_comment": "Every interface reports these errors with this kind and message. `setup` and `lookups` are raised. `sequences` fail `number`, `segment` and both `*_domains`, which return the error as their single result. `domain_errors` number and segment fine but hold no domain, so only the `*_domains` methods return the error as their single result. Read by tests/error_cases.rs, tests/cli.rs, tests/test_python.py, tests/test_polars.py and tests/test_wasm.mjs.",
   "setup": [
     {
       "chains": ["IGX"],
@@ -78,24 +78,30 @@
       "scheme": "imgt",
       "sequence": "AAAA",
       "kind": "invalid_sequence",
-      "message": "sequence length 4 is below minimum 30",
-      "domains": "error"
+      "message": "sequence length 4 is below minimum 30"
     },
     {
       "chains": ["ig"],
       "scheme": "imgt",
       "sequence": "QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1",
       "kind": "invalid_sequence",
-      "message": "invalid character '1' at position 4",
-      "domains": "error"
+      "message": "invalid character '1' at position 4"
     },
     {
       "chains": ["ig"],
       "scheme": "imgt",
       "sequence": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       "kind": "low_confidence",
-      "message": "alignment confidence 0.0416 is below min_confidence 0.5000",
-      "domains": "empty"
+      "message": "alignment confidence 0.0416 is below min_confidence 0.5000"
+    }
+  ],
+  "domain_errors": [
+    {
+      "chains": ["ig"],
+      "scheme": "imgt",
+      "sequence": "GGGGGGGGGGGGGGGGGGGGGGGQVQLVQSGAEVK",
+      "kind": "domain_too_short",
+      "message": "domain length 12 is below minimum 30"
     }
   ]
 }

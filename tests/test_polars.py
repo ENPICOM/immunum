@@ -294,7 +294,7 @@ class TestPolarsMatchesAnnotator:
             for s in sequences
         ]
         assert got == expected
-        assert [len(row) for row in expected[:3]] == [2, 1, 0]
+        assert [len(row) for row in expected[:3]] == [2, 1, 1]
 
 
 class TestPolarsAnnotatorArguments:
@@ -367,21 +367,34 @@ class TestPolarsErrorCases:
         assert list(row.values()) == [None] * len(row)
 
     @pytest.mark.parametrize("function", ["number_domains", "segment_domains"])
-    @pytest.mark.parametrize("case", ERROR_CASES["sequences"])
-    def test_domains(self, case, function):
+    @pytest.mark.parametrize(
+        "case", ERROR_CASES["sequences"] + ERROR_CASES["domain_errors"]
+    )
+    def test_domains_return_the_error_as_their_only_result(self, case, function):
         expr = getattr(imp, function)(
             "sequence", chains=case["chains"], scheme=case["scheme"]
         )
-        [domains] = (
+        [[domain]] = (
             polars.DataFrame({"sequence": [case["sequence"]]})
             .select(expr.alias("d"))["d"]
             .to_list()
         )
-        if case["domains"] == "empty":
-            assert domains == []
-        else:
-            [domain] = domains
-            assert (domain["error"], domain["error_kind"]) == (
-                case["message"],
-                case["kind"],
-            )
+        assert (domain.pop("error"), domain.pop("error_kind")) == (
+            case["message"],
+            case["kind"],
+        )
+        assert list(domain.values()) == [None] * len(domain)
+
+    @pytest.mark.parametrize("function", ["number", "segment"])
+    @pytest.mark.parametrize("case", ERROR_CASES["domain_errors"])
+    def test_a_domain_error_numbers_fine_on_its_own(self, case, function):
+        expr = getattr(imp, function)(
+            "sequence", chains=case["chains"], scheme=case["scheme"]
+        )
+        [row] = (
+            polars.DataFrame({"sequence": [case["sequence"]]})
+            .select(expr.alias("r"))
+            .unnest("r")
+            .to_dicts()
+        )
+        assert row["error"] is None

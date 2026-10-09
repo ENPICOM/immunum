@@ -43,7 +43,7 @@ struct AnnotateArgs {
     #[arg(long, default_value_t = DEFAULT_MIN_CONFIDENCE)]
     min_confidence: f32,
     /// Process every variable domain in each sequence (e.g. both domains of an scFv), one record
-    /// per domain with its 0-based `domain` index. A sequence without a domain gets no record.
+    /// per domain with its 0-based `domain` index. A sequence without a domain gets one error record.
     #[arg(long)]
     all_domains: bool,
 }

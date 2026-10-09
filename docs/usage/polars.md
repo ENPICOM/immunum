@@ -140,7 +140,7 @@ print(top_framework_groups("source.parquet", "target.parquet"))
 
 Setup mistakes raise `immunum.Error` (a `ValueError`) as soon as you build the expression, before any query runs: an unknown chain or scheme, a scheme that doesn't number a chain, or a `min_confidence` outside `[0, 1]`. Its `kind` attribute names what went wrong as a stable code (`invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`).
 
-A sequence that can't be numbered never fails the query. Its struct has every field null except `error`, the message, and `error_kind`: `invalid_sequence` (too short, too long or not amino acids) or `low_confidence` (no alignment reached `min_confidence`). Both are null on success, so you can filter or count failures like any other column.
+A sequence that can't be numbered never fails the query. Its struct has every field null except `error`, the message, and `error_kind`: `invalid_sequence` (too short, too long or not amino acids) or `low_confidence` (no alignment reached `min_confidence`). Both are null on success, so you can filter or count failures like any other column. The `number_domains` and `segment_domains` lists are never empty: a sequence without a domain gets that one struct, with `low_confidence`, or with `domain_too_short` when the best alignment is confident but shorter than a domain must be.
 
 ```python
 import polars as pl

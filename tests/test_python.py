@@ -514,16 +514,21 @@ class TestErrorCases:
         ]
         assert others == [None] * len(others)
 
-    @pytest.mark.parametrize("case", ERROR_CASES["sequences"])
+    @pytest.mark.parametrize(
+        "case", ERROR_CASES["sequences"] + ERROR_CASES["domain_errors"]
+    )
     @pytest.mark.parametrize("method", ["number", "segment"])
-    def test_domains(self, case, method):
+    def test_domains_return_the_error_as_their_only_result(self, case, method):
         annotator = immunum.Annotator(case["chains"], case["scheme"])
-        domains = getattr(annotator, f"{method}_domains")(case["sequence"])
-        if case["domains"] == "empty":
-            assert domains == []
-        else:
-            assert domains == [getattr(annotator, method)(case["sequence"])]
-            assert (domains[0].error, domains[0].error_kind) == (
-                case["message"],
-                case["kind"],
-            )
+        [domain] = getattr(annotator, f"{method}_domains")(case["sequence"])
+        assert (domain.error, domain.error_kind) == (case["message"], case["kind"])
+        others = [
+            v for k, v in vars(domain).items() if k not in ("error", "error_kind")
+        ]
+        assert others == [None] * len(others)
+
+    @pytest.mark.parametrize("case", ERROR_CASES["domain_errors"])
+    @pytest.mark.parametrize("method", ["number", "segment"])
+    def test_a_domain_error_numbers_fine_on_its_own(self, case, method):
+        annotator = immunum.Annotator(case["chains"], case["scheme"])
+        assert getattr(annotator, method)(case["sequence"]).error is None

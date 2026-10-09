@@ -146,7 +146,7 @@ export interface NumberingResult {
     queryEnd: number | null;
     /** Error message if numbering failed, null on success. */
     error: string | null;
-    /** What went wrong if numbering failed: `"invalid_sequence"` or `"low_confidence"`. Null on success. */
+    /** What went wrong if numbering failed: `"invalid_sequence"`, `"low_confidence"` or, from {@link Annotator.numberDomains} only, `"domain_too_short"`. Null on success. */
     errorKind: string | null;
 }
 
@@ -165,7 +165,7 @@ export interface SegmentationResult {
     postfix: string | null;
     /** Error message if segmentation failed, null on success. */
     error: string | null;
-    /** What went wrong if segmentation failed: `"invalid_sequence"` or `"low_confidence"`. Null on success. */
+    /** What went wrong if segmentation failed: `"invalid_sequence"`, `"low_confidence"` or, from {@link Annotator.segmentDomains} only, `"domain_too_short"`. Null on success. */
     errorKind: string | null;
 }
 
@@ -234,8 +234,10 @@ export class Annotator {
     /**
      * Number every variable domain in a sequence, such as both domains of an scFv. One
      * {@link NumberingResult} per domain, ordered by position, each what `number` returns for that
-     * domain; empty when no domain aligns with enough confidence. When the sequence itself is
-     * invalid, a single result with `error` set.
+     * domain; never empty. A sequence without a domain gives a single result with `error` and
+     * `errorKind` set: `"low_confidence"` when no alignment reaches the minimum confidence, as
+     * `number` reports it, or `"domain_too_short"` when the best alignment is confident but shorter
+     * than a domain must be. So does an invalid sequence, with `"invalid_sequence"`.
      *
      * A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and
      * directly follows other residues, such as a linker, can have the residue just before it
@@ -246,8 +248,9 @@ export class Annotator {
     segment(sequence: string): SegmentationResult;
     /**
      * Split every variable domain in a sequence into FR/CDR regions. One
-     * {@link SegmentationResult} per domain, ordered by position; empty when no domain aligns with
-     * enough confidence. When the sequence itself is invalid, a single result with `error` set.
+     * {@link SegmentationResult} per domain, ordered by position; never empty. A sequence without
+     * a domain, or an invalid one, gives a single result with `error` and `errorKind` set, as for
+     * `numberDomains`.
      *
      * Every residue lands in exactly one domain's regions: a domain's `prefix` holds the residues
      * since the previous domain (or the start of the sequence), and only the last domain has the

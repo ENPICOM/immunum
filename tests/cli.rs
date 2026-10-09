@@ -265,8 +265,8 @@ const SCFV: &str = concat!(
 
 #[test]
 fn all_domains_emits_one_record_per_domain() {
-    // An scFv, an invalid sequence, and one too unlike any domain to hold one
-    let input = format!("{SCFV}\nAAAA\n{}\n", "A".repeat(40));
+    // An scFv, and an invalid sequence, whose error record belongs to no domain
+    let input = format!("{SCFV}\nAAAA\n");
     let output = immunum()
         .args(["number", "--all-domains", "-f", "jsonl"])
         .write_stdin(input)
@@ -552,48 +552,50 @@ fn setup_errors_exit_with_the_shared_message() {
 #[test]
 fn sequence_errors_are_returned_as_records() {
     for case in error_cases()["sequences"].as_array().unwrap() {
-        let chains = chain_list(case);
-        let scheme = case["scheme"].as_str().unwrap();
-        let input = format!("{}\n", case["sequence"].as_str().unwrap());
         for command in ["number", "segment"] {
-            let output = immunum()
-                .args([command, "-f", "jsonl", "-c", &chains, "-s", scheme])
-                .write_stdin(input.clone())
-                .output()
-                .unwrap();
-            assert!(output.status.success());
-            let records = jsonl_records(output.stdout);
+            let records = jsonl_records(run_case(command, case, false));
             assert_eq!(records.len(), 1, "{command} {case}");
             assert_eq!(records[0]["error"], case["message"], "{command} {case}");
             assert_eq!(records[0]["error_kind"], case["kind"], "{command} {case}");
-
-            let output = immunum()
-                .args([
-                    command,
-                    "--all-domains",
-                    "-f",
-                    "jsonl",
-                    "-c",
-                    &chains,
-                    "-s",
-                    scheme,
-                ])
-                .write_stdin(input.clone())
-                .output()
-                .unwrap();
-            assert!(output.status.success());
-            let records = jsonl_records(output.stdout);
-            match case["domains"].as_str().unwrap() {
-                "error" => {
-                    assert_eq!(records.len(), 1, "{command} {case}");
-                    assert_eq!(records[0]["error"], case["message"], "{command} {case}");
-                    assert_eq!(records[0]["error_kind"], case["kind"], "{command} {case}");
-                }
-                "empty" => assert!(records.is_empty(), "{command} {case}"),
-                other => panic!("unknown domains outcome {other}"),
-            }
+            assert_all_domains_error(command, case);
         }
     }
+}
+
+#[test]
+fn a_sequence_without_a_domain_gets_an_error_record_with_all_domains() {
+    for case in error_cases()["domain_errors"].as_array().unwrap() {
+        for command in ["number", "segment"] {
+            let records = jsonl_records(run_case(command, case, false));
+            assert!(records[0]["error"].is_null(), "{command} {case}");
+            assert_all_domains_error(command, case);
+        }
+    }
+}
+
+// `command -f jsonl` on `case`'s sequence, through stdin because one fixture sequence holds a digit
+fn run_case(command: &str, case: &serde_json::Value, all_domains: bool) -> Vec<u8> {
+    let chains = chain_list(case);
+    let mut args = vec![command, "-f", "jsonl", "-c", &chains];
+    args.extend(["-s", case["scheme"].as_str().unwrap()]);
+    if all_domains {
+        args.push("--all-domains");
+    }
+    let output = immunum()
+        .args(args)
+        .write_stdin(format!("{}\n", case["sequence"].as_str().unwrap()))
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{command} {case}");
+    output.stdout
+}
+
+// With `--all-domains`, `case`'s sequence gets one record, carrying its error
+fn assert_all_domains_error(command: &str, case: &serde_json::Value) {
+    let records = jsonl_records(run_case(command, case, true));
+    assert_eq!(records.len(), 1, "{command} {case}");
+    assert_eq!(records[0]["error"], case["message"], "{command} {case}");
+    assert_eq!(records[0]["error_kind"], case["kind"], "{command} {case}");
 }
 
 // --- JSON output is valid ---

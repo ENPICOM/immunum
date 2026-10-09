@@ -189,9 +189,11 @@ def number_domains(
     """Number every variable domain in each sequence, such as both domains of an scFv.
 
     Each row gets a list with one struct per domain, ordered by position, each with the fields
-    `number` returns for that domain. The list is empty when no domain aligns with enough
-    confidence. When the sequence itself is invalid (too short, too long or not amino acids), it
-    holds a single struct with `error` and `error_kind` set and every other field null.
+    `number` returns for that domain; the list is never empty. A sequence without a domain gets
+    a single struct with `error` and `error_kind` set and every other field null: `low_confidence`
+    when no alignment reaches `min_confidence`, as `number` reports it, or `domain_too_short` when
+    the best alignment is confident but shorter than a domain must be. So does an invalid sequence
+    (too short, too long or not amino acids), with `invalid_sequence`.
 
     A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and
     directly follows other residues, such as a linker, can have the residue just before it
@@ -360,9 +362,9 @@ def segment_domains(
     `segment` returns. Every residue lands in exactly one domain's regions: a domain's `prefix`
     holds the residues since the previous domain (or the start of the sequence), and only the
     last domain has the residues after it as its `postfix`, so all domains' regions in order
-    rebuild the sequence. The list is empty when no domain aligns with enough confidence; for an
-    invalid sequence it holds a single struct with `error` and `error_kind` set and every segment
-    null.
+    rebuild the sequence. The list is never empty: a sequence without a domain, or an invalid one,
+    gets a single struct with `error` and `error_kind` set and every segment null, as for
+    `number_domains`.
 
     Pass either `chains` and `scheme`, or a prebuilt `annotator`, as for `number`.
 

@@ -40,8 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scFv: `number_domains` and `segment_domains` in Rust (`Annotator`), Python (`Annotator`) and Polars,
   `numberDomains` and `segmentDomains` in JavaScript, and `--all-domains` on the CLI's `number` and
   `segment`. Each domain's result is what `number` or `segment` returns for that domain, in sequence
-  order. No domain gives an empty list (no CLI record); an invalid sequence gives a single result with
-  `error` set, as `number` and `segment` do.
+  order. The list is never empty: a sequence without a domain or an invalid one gives a single result
+  with `error` set, as `number` and `segment` do, and the CLI writes one error record for it.
 - `segment_domains` puts every residue in exactly one domain's regions: a domain's `prefix` holds the
   residues since the previous domain (or the start of the sequence), and only the last domain has the
   residues after it as its `postfix`, so all domains' regions in order rebuild the sequence.
@@ -73,10 +73,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust: `per_domain` turns what `number_domains` and `segment_domains` return into one result per
   domain, or the error as the single result. Python, JavaScript, Polars and the CLI all use it, so they
   report an invalid sequence the same way.
-- Every result that failed carries `error_kind` next to `error` (`errorKind` in JavaScript):
-  `invalid_sequence` or `low_confidence`, so failed rows can be filtered without matching messages. It is
-  a field of Python's `NumberingResult` and `SegmenationResult`, of the Polars structs and of CLI JSON
-  records, and a column of CLI TSV output.
+- Every result that failed carries `error_kind` next to `error` (`errorKind` in JavaScript), so failed
+  rows can be filtered without matching messages: `invalid_sequence`, `low_confidence` or, from the
+  `*_domains` methods only, `domain_too_short` (the best alignment is confident but shorter than a
+  domain must be, so there is no domain to report). It is a field of Python's `NumberingResult` and
+  `SegmenationResult`, of the Polars structs and of CLI JSON records, and a column of CLI TSV output.
 - Python: `immunum.Error`, a `ValueError` subclass raised for every setup mistake, with a `kind`:
   `invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`. JavaScript throws
   `Error` objects with the same `kind` (`ImmunumError` in the TypeScript types).
@@ -96,8 +97,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for a chain it has no rules for, which was `InvalidScheme`), `InvalidMinConfidence`, `InvalidPosition`
   and the new `WrongSequence` (a numbering paired with another sequence, which was `InvalidSequence`).
   `immunum::SequenceError` is one sequence that couldn't be numbered, returned by every interface:
-  `InvalidSequence` and `LowConfidence`. `Annotator::number`, `segment`, `domains`, `number_domains` and
-  `segment_domains` return `Result<_, SequenceError>`. Both enums are `#[non_exhaustive]` and have
+  `InvalidSequence`, `LowConfidence` and the new `DomainTooShort`. `Annotator::number`, `segment`,
+  `domains`, `number_domains` and `segment_domains` return `Result<_, SequenceError>`, and `domains` is
+  an error instead of an empty list when there is no domain. Both enums are `#[non_exhaustive]` and have
   `kind()`. `immunum::Result` takes the error type as a defaulted second parameter. `AlignmentError`,
   `ConsensusParseError`, `PositionMappingError` and `Io` are gone: none could happen through the
   library. `ScoringMatrix::load` returns the matrix itself, and the validation functions return a boxed
