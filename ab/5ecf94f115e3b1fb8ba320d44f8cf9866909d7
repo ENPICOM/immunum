@@ -1,0 +1,52 @@
+src/annotator.rs
+  h_acea35c6bbea0b 190-222,423-428,433-434,674-697
+  h_acea35c6bbea0b 698-699
+immunum/__init__.py
+  h_acea35c6bbea0b 196-236,245-246,251-293
+  h_acea35c6bbea0b 247,294
+CHANGELOG.md
+  h_acea35c6bbea0b 34-50,58-59,65-67,69,90-93
+README.md
+  h_acea35c6bbea0b 54,114-139,164-166,194-197,243-250,257,260-261,264-265,271-272,306-314
+docs/api/polars.md
+  h_acea35c6bbea0b 5-6,9-10
+docs/assets/immunum-webtool.js
+  h_acea35c6bbea0b 103-104
+docs/usage/polars.md
+  h_acea35c6bbea0b 5
+immunum/_internal.pyi
+  h_acea35c6bbea0b 25,27
+immunum/polars.py
+  h_acea35c6bbea0b 3,25-56,60-61,63,71-74,163-170,175-237,239-255,261-262,264,272,322-329,334,337-345,347-354,362-363,368-370,374-390,396-403,406,408,411-416,418,421-426,428
+src/io.rs
+  h_acea35c6bbea0b 3-4,20-21,31,40,45-86,114,123-139,141-147,153-154,160-175,178-192,195-208,210-213,312-320,323-331,336-349,351-355,359,362-363,368-369,379,389,396-430,456-460
+src/lib.rs
+  h_acea35c6bbea0b 84
+src/main.rs
+  h_acea35c6bbea0b 6-8,20-22,26,43-46,49-55,57-63,65-88,90-92,94-100,102-103,105-123,125-130,133-142,144-172,174,181
+src/polars.rs
+  h_acea35c6bbea0b 77-78,89-100,113-126,133-152,155,162,168-245,279,308,313,318-328,330-337,350-366,369,378-388,390-396,399,421
+src/python.rs
+  h_acea35c6bbea0b 4,6,10-86,103-115,120-132
+src/wasm.rs
+  h_acea35c6bbea0b 4,7-89,98,109,111,161,168,170-181,183-192,211-218,223-228
+tests/cli.rs
+  h_acea35c6bbea0b 259-387
+tests/test_polars.py
+  h_acea35c6bbea0b 245-257,270-271,275,283-285,287-296,299-315,317-318,321-326,329-331,333-337,341-345
+tests/test_python.py
+  h_acea35c6bbea0b 205-270
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 77,167,170-176,179,189-190,221-272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ab5ecf94f115e3b1fb8ba320d44f8cf9866909d7",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
