@@ -363,8 +363,8 @@ immunum segment --all-domains scfvs.fasta | cut -f1,2,9
 tail -n +2 fixtures/ig.tsv | cut -f2 | immunum number
 awk -F'\t' 'NR==1{for(i=1;i<=NF;i++) if($i=="sequence") c=i} NR>1{print $c}' fixtures/ig.tsv | immunum number
 
-# Filter TSV output to CDR3 positions (111-128 in IMGT)
-immunum number sequences.fasta | awk -F'\t' '$4 >= 111 && $4 <= 128'
+# Filter TSV output to CDR3 positions (105-117 in IMGT); `+0` reads insertions like 111A as 111
+immunum number sequences.fasta | awk -F'\t' 'NR==1 || ($5+0 >= 105 && $5+0 <= 117)'
 
 # Filter to heavy chain results only
 immunum number -c all sequences.fasta | awk -F'\t' 'NR==1 || $2=="H"'
