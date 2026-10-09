@@ -38,7 +38,8 @@ struct AnnotateArgs {
     /// Output format: tsv, json, jsonl
     #[arg(short, long, default_value = "tsv")]
     format: String,
-    /// Minimum confidence threshold (0.0-1.0). Sequences below this are skipped.
+    /// Minimum confidence threshold (0.0-1.0). A sequence below it gets an error record with
+    /// `error_kind` `low_confidence`.
     #[arg(long, default_value_t = DEFAULT_MIN_CONFIDENCE)]
     min_confidence: f32,
     /// Process every variable domain in each sequence (e.g. both domains of an scFv), one record
@@ -103,28 +104,30 @@ fn run_number(args: &AnnotateArgs) -> Result<(), String> {
         .write_header(&mut writer, args.all_domains)
         .map_err(write_error)?;
 
+    let total = records.len();
     let mut written = 0;
+    let mut failed = 0;
     for rec in records {
-        let numbered = if args.all_domains {
+        let numbered: Vec<_> = if args.all_domains {
             per_domain(annotator.number_domains(&rec.sequence))
                 .into_iter()
                 .enumerate()
-                .map(|(domain, result)| match result {
-                    Ok(result) => {
-                        NumberedRecord::success(rec.id.clone(), rec.sequence.clone(), result)
-                            .in_domain(domain)
-                    }
-                    Err(e) => {
-                        NumberedRecord::failure(rec.id.clone(), rec.sequence.clone(), e.to_string())
+                .map(|(domain, result)| {
+                    let numbered =
+                        NumberedRecord::new(rec.id.clone(), rec.sequence.clone(), result);
+                    match numbered.result {
+                        Ok(_) => numbered.in_domain(domain),
+                        Err(_) => numbered,
                     }
                 })
                 .collect()
         } else {
-            vec![match annotator.number(&rec.sequence) {
-                Ok(result) => NumberedRecord::success(rec.id, rec.sequence, result),
-                Err(e) => NumberedRecord::failure(rec.id, rec.sequence, e.to_string()),
-            }]
+            let result = annotator.number(&rec.sequence);
+            vec![NumberedRecord::new(rec.id, rec.sequence, result)]
         };
+        if numbered.iter().any(|r| r.result.is_err()) {
+            failed += 1;
+        }
         for numbered in &numbered {
             format
                 .write_record(&mut writer, numbered, written, args.all_domains)
@@ -133,7 +136,10 @@ fn run_number(args: &AnnotateArgs) -> Result<(), String> {
         }
     }
 
-    format.write_footer(&mut writer).map_err(write_error)
+    format.write_footer(&mut writer).map_err(write_error)?;
+    writer.flush().map_err(write_error)?;
+    report_failures(failed, total);
+    Ok(())
 }
 
 fn run_segment(args: &AnnotateArgs) -> Result<(), String> {
@@ -147,25 +153,31 @@ fn run_segment(args: &AnnotateArgs) -> Result<(), String> {
         .write_segment_header(&mut writer, args.all_domains)
         .map_err(write_error)?;
 
+    let total = records.len();
     let mut written = 0;
+    let mut failed = 0;
     for rec in records {
-        let segmented = if args.all_domains {
+        let segmented: Vec<_> = if args.all_domains {
             per_domain(annotator.segment_domains(&rec.sequence))
                 .into_iter()
                 .enumerate()
-                .map(|(domain, result)| match result {
-                    Ok(result) => {
-                        SegmentedRecord::success(rec.id.clone(), result).in_domain(domain)
+                .map(|(domain, result)| {
+                    let segmented = SegmentedRecord::new(rec.id.clone(), result);
+                    match segmented.result {
+                        Ok(_) => segmented.in_domain(domain),
+                        Err(_) => segmented,
                     }
-                    Err(e) => SegmentedRecord::failure(rec.id.clone(), e.to_string()),
                 })
                 .collect()
         } else {
-            vec![match annotator.segment(&rec.sequence) {
-                Ok(result) => SegmentedRecord::success(rec.id, result),
-                Err(e) => SegmentedRecord::failure(rec.id, e.to_string()),
-            }]
+            vec![SegmentedRecord::new(
+                rec.id,
+                annotator.segment(&rec.sequence),
+            )]
         };
+        if segmented.iter().any(|r| r.result.is_err()) {
+            failed += 1;
+        }
         for segmented in &segmented {
             format
                 .write_segment_record(&mut writer, segmented, written, args.all_domains)
@@ -174,7 +186,19 @@ fn run_segment(args: &AnnotateArgs) -> Result<(), String> {
         }
     }
 
-    format.write_footer(&mut writer).map_err(write_error)
+    format.write_footer(&mut writer).map_err(write_error)?;
+    writer.flush().map_err(write_error)?;
+    report_failures(failed, total);
+    Ok(())
+}
+
+// Per-sequence errors don't stop the batch or change the exit code, but shouldn't go unnoticed
+fn report_failures(failed: usize, total: usize) {
+    if failed > 0 {
+        eprintln!(
+            "warning: {failed} of {total} sequences had errors; see the error and error_kind columns"
+        );
+    }
 }
 
 fn main() {

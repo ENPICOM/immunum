@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::ops::Range;
 
 use crate::alignment::{align, AlignBuffer, AlignedPosition, Alignment};
-use crate::error::{Error, Result};
+use crate::error::{Error, Result, SequenceError};
 use crate::numbering::{apply_numbering, segment as segment_positions, SEGMENT_NAMES};
 use crate::scoring::ScoringMatrix;
 use crate::types::{Chain, Position, Scheme};
@@ -86,23 +86,23 @@ pub const MAX_SEQUENCE_LENGTH: usize = 10000;
 
 /// Validate that `sequence` contains only standard amino acid characters
 /// (case-insensitive) and that its length is within the allowed bounds.
-fn validate_sequence(sequence: &str) -> Result<()> {
+fn validate_sequence(sequence: &str) -> Result<(), SequenceError> {
     let len = sequence.len();
     if len < MIN_SEQUENCE_LENGTH {
-        return Err(Error::InvalidSequence(format!(
+        return Err(SequenceError::InvalidSequence(format!(
             "sequence length {} is below minimum {}",
             len, MIN_SEQUENCE_LENGTH
         )));
     }
     if len > MAX_SEQUENCE_LENGTH {
-        return Err(Error::InvalidSequence(format!(
+        return Err(SequenceError::InvalidSequence(format!(
             "sequence length {} exceeds maximum {}",
             len, MAX_SEQUENCE_LENGTH
         )));
     }
     for (i, b) in sequence.bytes().enumerate() {
         if !b.is_ascii_alphabetic() {
-            return Err(Error::InvalidSequence(format!(
+            return Err(SequenceError::InvalidSequence(format!(
                 "invalid character {:?} at position {i}",
                 b as char
             )));
@@ -124,7 +124,7 @@ const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
 /// Per-domain results as every interface returns them: one per domain from
 /// [`Annotator::number_domains`] or [`Annotator::segment_domains`], or, when the sequence couldn't
 /// be searched, its error as the single result.
-pub fn per_domain<T>(results: Result<Vec<T>>) -> Vec<Result<T>> {
+pub fn per_domain<T>(results: Result<Vec<T>, SequenceError>) -> Vec<Result<T, SequenceError>> {
     match results {
         Ok(results) => results.into_iter().map(Ok).collect(),
         Err(e) => vec![Err(e)],
@@ -148,7 +148,7 @@ pub struct Annotator {
 impl Annotator {
     pub fn new(chains: &[Chain], scheme: Scheme, min_confidence: Option<f32>) -> Result<Self> {
         if chains.is_empty() {
-            return Err(Error::InvalidChain("chains cannot be empty".to_string()));
+            return Err(Error::InvalidChain("no chains given".to_string()));
         }
         if let Some(confidence) = min_confidence.filter(|c| !(0.0..=1.0).contains(c)) {
             return Err(Error::InvalidMinConfidence(confidence));
@@ -158,11 +158,10 @@ impl Annotator {
             scheme.validate_chain(chain)?;
         }
 
-        let mut matrices = Vec::new();
-        for &chain in chains {
-            let matrix = ScoringMatrix::load(chain)?;
-            matrices.push((chain, matrix));
-        }
+        let matrices = chains
+            .iter()
+            .map(|&chain| (chain, ScoringMatrix::load(chain)))
+            .collect();
 
         Ok(Self {
             matrices,
@@ -187,23 +186,26 @@ impl Annotator {
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
-    pub fn number(&self, sequence: &str) -> Result<NumberingResult> {
+    pub fn number(&self, sequence: &str) -> Result<NumberingResult, SequenceError> {
         validate_sequence(sequence)?;
-        self.best_domain(sequence)?.number(self.scheme)
+        Ok(self.best_domain(sequence)?.numbered_as(self.scheme))
     }
 
     /// Segment a sequence into FR/CDR regions
-    pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
-        self.number(sequence)?.segment(sequence)
+    pub fn segment(&self, sequence: &str) -> Result<SegmentResult, SequenceError> {
+        Ok(self
+            .number(sequence)?
+            .segment_within(sequence, 0..sequence.len()))
     }
 
     /// Every domain in `sequence` numbered under this annotator's scheme, ordered by position; see
     /// [`Annotator::domains`] for how they're found. Empty when no domain aligns well enough.
-    pub fn number_domains(&self, sequence: &str) -> Result<Vec<NumberingResult>> {
-        self.domains(sequence)?
+    pub fn number_domains(&self, sequence: &str) -> Result<Vec<NumberingResult>, SequenceError> {
+        Ok(self
+            .domains(sequence)?
             .iter()
-            .map(|domain| domain.number(self.scheme))
-            .collect()
+            .map(|domain| domain.numbered_as(self.scheme))
+            .collect())
     }
 
     /// The FR/CDR split of every domain in `sequence`, ordered by position; see
@@ -211,10 +213,10 @@ impl Annotator {
     /// segments: a domain's prefix holds the residues since the previous domain (or the start of the
     /// sequence), and only the last domain has the residues after it as its postfix. The domains'
     /// segments in order therefore rebuild `sequence`. Empty when no domain aligns well enough.
-    pub fn segment_domains(&self, sequence: &str) -> Result<Vec<SegmentResult>> {
+    pub fn segment_domains(&self, sequence: &str) -> Result<Vec<SegmentResult>, SequenceError> {
         let domains = self.number_domains(sequence)?;
         let mut start = 0;
-        domains
+        Ok(domains
             .iter()
             .enumerate()
             .map(|(i, domain)| {
@@ -227,7 +229,7 @@ impl Annotator {
                 start = end;
                 segments
             })
-            .collect()
+            .collect())
     }
 
     /// Every variable domain in `sequence`, ordered by position.
@@ -237,7 +239,7 @@ impl Annotator {
     /// around it that no other domain holds. A part stops being searched once it is shorter than
     /// [`MIN_SEQUENCE_LENGTH`] or its best alignment falls below the minimum confidence. A domain
     /// shorter than [`MIN_SEQUENCE_LENGTH`] is not reported, but the residues around it are searched.
-    pub fn domains(&self, sequence: &str) -> Result<Vec<Domain>> {
+    pub fn domains(&self, sequence: &str) -> Result<Vec<Domain>, SequenceError> {
         validate_sequence(sequence)?;
         let mut domains = Vec::new();
         let mut parts = Vec::new();
@@ -246,7 +248,7 @@ impl Annotator {
             if part.len() < MIN_SEQUENCE_LENGTH {
                 continue;
             }
-            let domain = self.aligned_domain(sequence, part.clone())?;
+            let domain = self.aligned_domain(sequence, part.clone());
             if domain.confidence < self.min_confidence {
                 continue;
             }
@@ -263,10 +265,10 @@ impl Annotator {
         Ok(domains)
     }
 
-    fn best_domain(&self, sequence: &str) -> Result<Domain> {
-        let domain = self.aligned_domain(sequence, 0..sequence.len())?;
+    fn best_domain(&self, sequence: &str) -> Result<Domain, SequenceError> {
+        let domain = self.aligned_domain(sequence, 0..sequence.len());
         if domain.confidence < self.min_confidence {
-            return Err(Error::LowConfidence {
+            return Err(SequenceError::LowConfidence {
                 confidence: domain.confidence,
                 threshold: self.min_confidence,
             });
@@ -275,27 +277,21 @@ impl Annotator {
     }
 
     // The domain of the best alignment of `sequence[part]`, whatever its confidence, placed in `sequence`
-    fn aligned_domain(&self, sequence: &str, part: Range<usize>) -> Result<Domain> {
-        let (chain, alignment) = self.get_best_alignment(&sequence[part.clone()])?;
+    fn aligned_domain(&self, sequence: &str, part: Range<usize>) -> Domain {
+        let (chain, alignment) = self.get_best_alignment(&sequence[part.clone()]);
         let confidence = if alignment.max_confidence_score > 0.0 {
             (alignment.confidence_score / alignment.max_confidence_score).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        Ok(Domain::new(
-            chain,
-            alignment,
-            confidence,
-            part.start,
-            sequence.len(),
-        ))
+        Domain::new(chain, alignment, confidence, part.start, sequence.len())
     }
 
     /// Align the sequence to all loaded chain types and return the best match
     /// If multiple chains were provided during initialization, this will align to all
     /// of them and return the best match. If only one chain was provided, it will
     /// align to that chain directly.
-    fn get_best_alignment(&self, sequence: &str) -> Result<(Chain, Alignment)> {
+    fn get_best_alignment(&self, sequence: &str) -> (Chain, Alignment) {
         ALIGN_BUFFER.with_borrow_mut(|buf| {
             // Align to all loaded chain types and find best match by raw alignment score
             let mut best: Option<(Chain, Alignment)> = None;
@@ -310,9 +306,7 @@ impl Annotator {
                 }
             }
             buf.release_above(KEPT_ALIGN_CELLS);
-            best.ok_or_else(|| {
-                Error::AlignmentError("failed to align to any chain type".to_string())
-            })
+            best.expect("`Annotator::new` rejects an empty chain list")
         })
     }
 }
@@ -383,10 +377,15 @@ impl Domain {
         self.cons_end
     }
 
-    /// This domain numbered under `scheme`, from the alignment that found it.
+    /// This domain numbered under `scheme`, from the alignment that found it. An error when `scheme`
+    /// doesn't number this domain's chain.
     pub fn number(&self, scheme: Scheme) -> Result<NumberingResult> {
         scheme.validate_chain(self.chain)?;
+        Ok(self.numbered_as(scheme))
+    }
 
+    // This domain numbered under `scheme`, which numbers its chain
+    fn numbered_as(&self, scheme: Scheme) -> NumberingResult {
         let mut positions = apply_numbering(&self.states, scheme, self.chain);
         let mut query_end = self.query_end;
 
@@ -403,7 +402,7 @@ impl Domain {
             query_end += 1;
         }
 
-        Ok(NumberingResult {
+        NumberingResult {
             chain: self.chain,
             scheme,
             positions,
@@ -412,7 +411,7 @@ impl Domain {
             confidence: self.confidence,
             query_start: self.query_start,
             query_end,
-        })
+        }
     }
 }
 
@@ -430,20 +429,21 @@ impl NumberingResult {
     /// numbered ones open the prefix and the residues after them close the postfix, so the regions in
     /// order rebuild `sequence`.
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
-        self.segment_within(sequence, 0..sequence.len())
+        self.numbered(sequence)?;
+        Ok(self.segment_within(sequence, 0..sequence.len()))
     }
 
-    // The FR/CDR split of `sequence[span]`, which holds the numbered residues: the residues of `span`
-    // before them open the prefix and those after them close the postfix
-    fn segment_within(&self, sequence: &str, span: Range<usize>) -> Result<SegmentResult> {
-        let numbered = self.numbered(sequence)?;
+    // The FR/CDR split of `sequence[span]`, which holds the residues this result numbered: the
+    // residues of `span` before them open the prefix and those after them close the postfix
+    fn segment_within(&self, sequence: &str, span: Range<usize>) -> SegmentResult {
+        let numbered = &sequence[self.query_start..=self.query_end];
         let mut map = segment_positions(&self.positions, numbered, self.scheme, self.chain);
         let [mut prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, mut postfix] =
             SEGMENT_NAMES.map(|name| map.remove(name).unwrap_or_default());
         prefix.insert_str(0, &sequence[span.start..self.query_start]);
         postfix.push_str(&sequence[self.query_end + 1..span.end]);
 
-        Ok(SegmentResult {
+        SegmentResult {
             prefix,
             fr1,
             cdr1,
@@ -453,20 +453,17 @@ impl NumberingResult {
             cdr3,
             fr4,
             postfix,
-        })
+        }
     }
 
     // The residues of `sequence` this result numbered
     fn numbered<'a>(&self, sequence: &'a str) -> Result<&'a str> {
         sequence
             .get(self.query_start..=self.query_end)
-            .ok_or_else(|| {
-                Error::InvalidSequence(format!(
-                    "numbered residues {}..={} lie outside a sequence of length {}",
-                    self.query_start,
-                    self.query_end,
-                    sequence.len()
-                ))
+            .ok_or(Error::WrongSequence {
+                start: self.query_start,
+                end: self.query_end,
+                length: sequence.len(),
             })
     }
 }

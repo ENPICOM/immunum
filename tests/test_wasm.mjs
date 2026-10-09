@@ -9,8 +9,22 @@
  */
 
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { Annotator, regionsFor, schemeSupportsChain } from "../pkg/immunum.js";
+
+// The errors every interface reports, with their kind and message
+const ERROR_CASES = JSON.parse(readFileSync(new URL("./error_cases.json", import.meta.url)));
+
+// Asserts that `fn` throws an `Error` with the `kind` and `message` of `expected`
+function assertThrowsCase(fn, expected) {
+  assert.throws(fn, (err) => {
+    assert.ok(err instanceof Error, `expected an Error, got ${err}`);
+    assert.equal(err.kind, expected.kind);
+    assert.equal(err.message, expected.message);
+    return true;
+  });
+}
 
 const ALL_CHAINS = ["H", "K", "L", "A", "B", "G", "D"];
 const AB_CHAINS = ["H", "K", "L"];
@@ -38,17 +52,15 @@ describe("Annotator init", () => {
     assert.ok(annotator);
   });
 
-  it("throws on invalid chain", () => {
-    assert.throws(() => new Annotator(["INVALID"], "imgt"));
-  });
+  for (const c of ERROR_CASES.setup) {
+    it(`throws ${c.kind} for chains ${JSON.stringify(c.chains)}, scheme ${c.scheme}, minConfidence ${c.min_confidence}`, () => {
+      assertThrowsCase(() => new Annotator(c.chains, c.scheme, c.min_confidence ?? undefined), c);
+    });
+  }
 
-  it("throws on invalid scheme", () => {
-    assert.throws(() => new Annotator(["H"], "INVALID"));
-  });
-
-  it("throws on antibody-only scheme + TCR", () => {
+  it("throws unsupported_chain on antibody-only scheme + TCR", () => {
     for (const scheme of ["kabat", "chothia", "martin", "aho"]) {
-      assert.throws(() => new Annotator(["A"], scheme));
+      assert.throws(() => new Annotator(["A"], scheme), { kind: "unsupported_chain" });
     }
   });
 
@@ -74,10 +86,8 @@ describe("Annotator init", () => {
     assert.deepEqual([...byGroup.numbering], [...byChains.numbering]);
   });
 
-  it("throws on minConfidence outside [0, 1]", () => {
-    for (const minConfidence of [-0.1, 1.5]) {
-      assert.throws(() => new Annotator(["H"], "imgt", minConfidence));
-    }
+  it("throws invalid_min_confidence below 0", () => {
+    assert.throws(() => new Annotator(["H"], "imgt", -0.1), { kind: "invalid_min_confidence" });
   });
 });
 
@@ -107,10 +117,16 @@ describe("schemeSupportsChain()", () => {
     }
   });
 
-  it("throws on an unknown scheme or chain", () => {
-    assert.throws(() => schemeSupportsChain("INVALID", "H"));
-    assert.throws(() => schemeSupportsChain("imgt", "INVALID"));
-  });
+  for (const c of ERROR_CASES.lookups) {
+    const expected = c.scheme_supports_chain;
+    it(`${typeof expected === "boolean" ? `returns ${expected}` : `throws ${expected.kind}`} for ${c.scheme}, ${c.chain}`, () => {
+      if (typeof expected === "boolean") {
+        assert.equal(schemeSupportsChain(c.scheme, c.chain), expected);
+      } else {
+        assertThrowsCase(() => schemeSupportsChain(c.scheme, c.chain), expected);
+      }
+    });
+  }
 });
 
 describe("regionsFor()", () => {
@@ -128,16 +144,17 @@ describe("regionsFor()", () => {
         if (schemeSupportsChain(scheme, chain)) {
           assert.doesNotThrow(() => regionsFor(scheme, chain));
         } else {
-          assert.throws(() => regionsFor(scheme, chain), /only supported for antibody chains/);
+          assert.throws(() => regionsFor(scheme, chain), { kind: "unsupported_chain" });
         }
       }
     }
   });
 
-  it("throws on an unknown scheme or chain", () => {
-    assert.throws(() => regionsFor("INVALID", "H"));
-    assert.throws(() => regionsFor("imgt", "INVALID"));
-  });
+  for (const c of ERROR_CASES.lookups) {
+    it(`throws ${c.regions_for.kind} for ${c.scheme}, ${c.chain}`, () => {
+      assertThrowsCase(() => regionsFor(c.scheme, c.chain), c.regions_for);
+    });
+  }
 });
 
 describe("number()", () => {
@@ -208,28 +225,27 @@ describe("number()", () => {
     );
   });
 
-  it("returns error field on empty sequence (does not throw)", () => {
-    const annotator = new Annotator(ALL_CHAINS, "imgt");
-    const result = annotator.number("");
-    assert.equal(result.chain, null);
-    assert.equal(result.numbering, null);
-    assert.equal(result.queryStart, null);
-    assert.equal(result.queryEnd, null);
-    assert.equal(typeof result.error, "string");
-  });
+  for (const c of ERROR_CASES.sequences) {
+    it(`returns ${c.kind} with every other field null for ${c.sequence} (does not throw)`, () => {
+      const result = new Annotator(c.chains, c.scheme).number(c.sequence);
+      assert.deepEqual(result, {
+        chain: null,
+        scheme: null,
+        confidence: null,
+        numbering: null,
+        queryStart: null,
+        queryEnd: null,
+        error: c.message,
+        errorKind: c.kind,
+      });
+    });
+  }
 
-  it("returns error field on invalid sequence (does not throw)", () => {
-    const annotator = new Annotator(ALL_CHAINS, "imgt");
-    const result = annotator.number("AAAAAAAAAAAAAAAA");
-    assert.equal(result.chain, null);
-    assert.equal(result.numbering, null);
-    assert.equal(typeof result.error, "string");
-  });
-
-  it("returns null error on success", () => {
+  it("returns null error and errorKind on success", () => {
     const annotator = new Annotator(["H"], "imgt");
     const result = annotator.number(IGH_SEQ);
     assert.equal(result.error, null);
+    assert.equal(result.errorKind, null);
   });
 
   it("detects kappa or lambda for IGL sequence", () => {
@@ -282,18 +298,19 @@ describe("numberDomains() and segmentDomains()", () => {
     assert.equal(domains[1].cdr3, annotator.segment(KAPPA_SEQ).cdr3);
   });
 
-  for (const method of ["number", "segment"]) {
-    it(`${method}Domains returns one error result for an invalid sequence`, () => {
-      const annotator = new Annotator(["ig"], "imgt");
-      const domains = annotator[`${method}Domains`]("AAAA");
-      assert.equal(domains.length, 1);
-      assert.equal(domains[0].error, annotator[method]("AAAA").error);
-    });
-
-    it(`${method}Domains returns no result for a sequence without a domain`, () => {
-      const annotator = new Annotator(["ig"], "imgt");
-      assert.deepEqual(annotator[`${method}Domains`]("A".repeat(40)), []);
-    });
+  for (const method of ["numberDomains", "segmentDomains"]) {
+    for (const c of ERROR_CASES.sequences) {
+      it(`${method} returns ${c.domains === "error" ? `one ${c.kind} result` : "no result"} for ${c.sequence}`, () => {
+        const domains = new Annotator(c.chains, c.scheme)[method](c.sequence);
+        if (c.domains === "error") {
+          assert.equal(domains.length, 1);
+          assert.equal(domains[0].error, c.message);
+          assert.equal(domains[0].errorKind, c.kind);
+        } else {
+          assert.deepEqual(domains, []);
+        }
+      });
+    }
   }
 });
 
@@ -320,20 +337,23 @@ describe("segment()", () => {
     assert.ok(result.cdr3.length > 0);
   });
 
-  it("returns null error on success", () => {
+  it("returns null error and errorKind on success", () => {
     const annotator = new Annotator(["H"], "IMGT");
     const result = annotator.segment(IGH_SEQ);
     assert.equal(result.error, null);
+    assert.equal(result.errorKind, null);
   });
 
-  it("returns error and every region null on invalid sequence (does not throw)", () => {
-    const annotator = new Annotator(ALL_CHAINS, "IMGT");
-    const result = annotator.segment("AAAAAAAAAAAAAAAA");
-    assert.equal(typeof result.error, "string");
-    for (const key of ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"]) {
-      assert.equal(result[key], null, `${key} should be null`);
-    }
-  });
+  for (const c of ERROR_CASES.sequences) {
+    it(`returns ${c.kind} with every region null for ${c.sequence} (does not throw)`, () => {
+      const result = new Annotator(c.chains, c.scheme).segment(c.sequence);
+      assert.equal(result.error, c.message);
+      assert.equal(result.errorKind, c.kind);
+      for (const key of ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"]) {
+        assert.equal(result[key], null, `${key} should be null`);
+      }
+    });
+  }
 
   it("keeps flanking residues in prefix and postfix (#58)", () => {
     const annotator = new Annotator(["H"], "IMGT");

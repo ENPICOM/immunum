@@ -78,7 +78,7 @@ pub use alignment::{align, Alignment};
 pub use annotator::{
     per_domain, Annotator, Domain, NumberingResult, SegmentResult, DEFAULT_MIN_CONFIDENCE,
 };
-pub use error::{Error, Result};
+pub use error::{Error, Result, SequenceError};
 pub use scoring::ScoringMatrix;
 pub use types::{scheme_supports_chain, Chain, Insertion, NumberingRule, Position, Region, Scheme};
 

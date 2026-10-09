@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The documentation's web tool upper-cased the sequence before numbering it, so it showed residues the
   user hadn't entered; it now numbers the sequence as given, like every other interface. It still drops
   whitespace from the text box, so a wrapped or spaced sequence can be pasted.
+- CLI: an argument that wasn't an existing file was read as a sequence, so a mistyped file name gave one
+  invalid-sequence record and exit status 0. An argument is now read as a sequence only when it is all
+  letters; otherwise a missing file is an error (exit status 1).
+- CLI: the `--min-confidence` help said sequences below it are skipped; they get an error record.
+- Python: unpickling a corrupt `Annotator` raised `PanicException`; it raises `ValueError`.
 
 ### Added
 - Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
@@ -68,8 +73,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust: `per_domain` turns what `number_domains` and `segment_domains` return into one result per
   domain, or the error as the single result. Python, JavaScript, Polars and the CLI all use it, so they
   report an invalid sequence the same way.
+- Every result that failed carries `error_kind` next to `error` (`errorKind` in JavaScript):
+  `invalid_sequence` or `low_confidence`, so failed rows can be filtered without matching messages. It is
+  a field of Python's `NumberingResult` and `SegmenationResult`, of the Polars structs and of CLI JSON
+  records, and a column of CLI TSV output.
+- Python: `immunum.Error`, a `ValueError` subclass raised for every setup mistake, with a `kind`:
+  `invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`. JavaScript throws
+  `Error` objects with the same `kind` (`ImmunumError` in the TypeScript types).
+- CLI: when any record has an error, a one-line summary goes to stderr.
 
 ### Changed
+- **Breaking:** error messages drop their category prefix, which `error_kind` and `kind` now carry, and
+  read the same in every interface: `Invalid sequence: sequence length 4 is below minimum 30` is now
+  `sequence length 4 is below minimum 30`, `Low confidence: 0.0416 < threshold 0.5000` is now
+  `alignment confidence 0.0416 is below min_confidence 0.5000`, and `Invalid chain type: unknown chain
+  'IGX' …` is now `unknown chain 'IGX' …`. A scheme asked for a chain it doesn't number names the chain.
+- **Breaking:** JavaScript throws `Error` objects with `message` and `kind` instead of plain strings.
+- **Breaking:** CLI TSV output has an `error_kind` column after `error`, and JSON records an
+  `error_kind` field.
+- **Breaking:** Rust errors are split by how they're reported. `immunum::Error` is a setup mistake,
+  raised by every interface: `InvalidChain`, `InvalidScheme`, the new `UnsupportedChain` (a scheme asked
+  for a chain it has no rules for, which was `InvalidScheme`), `InvalidMinConfidence`, `InvalidPosition`
+  and the new `WrongSequence` (a numbering paired with another sequence, which was `InvalidSequence`).
+  `immunum::SequenceError` is one sequence that couldn't be numbered, returned by every interface:
+  `InvalidSequence` and `LowConfidence`. `Annotator::number`, `segment`, `domains`, `number_domains` and
+  `segment_domains` return `Result<_, SequenceError>`. Both enums are `#[non_exhaustive]` and have
+  `kind()`. `immunum::Result` takes the error type as a defaulted second parameter. `AlignmentError`,
+  `ConsensusParseError`, `PositionMappingError` and `Io` are gone: none could happen through the
+  library. `ScoringMatrix::load` returns the matrix itself, and the validation functions return a boxed
+  `ValidationError`.
+- **Breaking:** Rust `NumberedRecord` and `SegmentedRecord` hold `result: Result<_, SequenceError>` and
+  are built with `new`, instead of `success`/`failure` and separate `result`/`error` options.
 - **Breaking:** JavaScript uses camelCase throughout, as JavaScript and TypeScript code expects: `number`
   results have `queryStart` and `queryEnd` instead of `query_start` and `query_end`, and the
   constructor's third parameter is declared as `minConfidence`. Every other field name is the same as in
@@ -89,11 +123,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   itself, the name results report first), plus the chain groups where groups are accepted.
 - `min_confidence` outside `[0, 1]` is rejected by every interface. Only Python checked it; JavaScript,
   Polars and the CLI accepted any value.
-- Polars `number` and `segment` report an unknown chain or scheme when the expression runs, as a
-  `ComputeError`, instead of raising `ValueError` when the expression is built.
-- Rust: `Chain` and `Scheme` parse errors are `immunum::Error` (`InvalidChain`/`InvalidScheme`) naming
-  the accepted values, instead of `strum::ParseError`. New: `Chain::parse_names` and
-  `Annotator::from_names`, and `Error::InvalidMinConfidence`.
+- Polars builds the annotator when the expression is built, from `chains`, `scheme` and
+  `min_confidence` or from `annotator=`, so an unknown name raises `immunum.Error` (a `ValueError`) right
+  there. Both forms run through the same plugin function.
+- Rust: `Chain` and `Scheme` parse errors are `immunum::Error` naming the accepted values, instead of
+  `strum::ParseError`. New: `Chain::parse_names` and `Annotator::from_names`.
 - Rust: `Annotator` is `Send + Sync`: its alignment buffer is per thread, so one annotator can serve many
   threads. A thread keeps at most about 650 KB of alignment buffer between calls, what a 1,000-residue
   sequence needs; a longer sequence's buffer is freed when its call returns. `Annotator::number` and

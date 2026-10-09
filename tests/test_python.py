@@ -1,7 +1,12 @@
 import immunum
+import json
 import pytest
 import pickle
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+# The errors every interface reports, with their kinds and messages
+ERROR_CASES = json.loads((Path(__file__).parent / "error_cases.json").read_text())
 
 
 ALL_CHAINS = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
@@ -87,26 +92,15 @@ class TestAnnotatorInit:
     )
     def test_non_imgt_tcr_raises(self, chains, scheme):
         with pytest.raises(
-            ValueError, match=f"{scheme} scheme only supported for antibody chains"
-        ):
+            immunum.Error, match=f"{scheme} scheme only supported for antibody chains"
+        ) as raised:
             immunum.Annotator(chains, scheme)
+        assert raised.value.kind == "unsupported_chain"
 
-    @pytest.mark.parametrize(
-        "chains,scheme",
-        [
-            (["INVALID"], "IMGT"),
-            (["IGH"], "INVALID"),
-            ([], "IMGT"),
-        ],
-    )
-    def test_invalid_args_raise(self, chains, scheme):
-        with pytest.raises(ValueError):
-            immunum.Annotator(chains, scheme)
-
-    @pytest.mark.parametrize("min_confidence", [-0.1, 1.5])
-    def test_min_confidence_out_of_range_raises(self, min_confidence):
-        with pytest.raises(ValueError):
-            immunum.Annotator(["IGH"], "IMGT", min_confidence)
+    def test_min_confidence_below_zero_raises(self):
+        with pytest.raises(immunum.Error) as raised:
+            immunum.Annotator(["IGH"], "IMGT", -0.1)
+        assert raised.value.kind == "invalid_min_confidence"
 
     def test_number_smoke(self, annotator_and_seq):
         annotator, seq = annotator_and_seq
@@ -116,6 +110,11 @@ class TestAnnotatorInit:
         annotator, seq = annotator_and_seq
         re_annotator = pickle.loads(pickle.dumps(annotator))
         re_annotator.number(seq)
+
+    def test_corrupt_pickle_state_raises_value_error(self):
+        annotator = immunum.Annotator(["IGH"], "IMGT")
+        with pytest.raises(ValueError, match="invalid Annotator state"):
+            annotator._annotator.__setstate__(b"\xff")
 
     def test_shared_across_threads(self):
         # One annotator, used from threads other than the one that made it
@@ -147,20 +146,6 @@ class TestNumbering:
         assert 0 <= result.query_start <= result.query_end < len(IGH_SEQ)
         assert result.query_end - result.query_start + 1 == len(result.numbering)
 
-    def test_empty_sequence_returns_error(self):
-        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
-        result = annotator.number("")
-        assert result.error is not None
-        assert result.chain is None
-        assert result.query_start is None
-        assert result.query_end is None
-
-    def test_invalid_sequence_returns_error(self):
-        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
-        result = annotator.number("AAAAAAAAAAAAAAAA")
-        assert result.error is not None
-        assert result.chain is None
-
     def test_confidence_is_float(self, annotator_and_seq):
         annotator, seq = annotator_and_seq
         result = annotator.number(seq)
@@ -173,12 +158,6 @@ class TestNumbering:
             f"fr{i}" for i in (1, 2, 3, 4)
         } | {"prefix", "postfix"}
         assert result.error is None
-
-    def test_segmentation_invalid_sequence_returns_error(self):
-        annotator = immunum.Annotator(ALL_CHAINS, "IMGT")
-        result = annotator.segment("AAAAAAAAAAAAAAAA")
-        assert result.error is not None
-        assert result.fr1 is None
 
     def test_segmentation_keeps_flanking_residues(self):
         """Issue #58: residues before and after the domain land in prefix and postfix."""
@@ -254,19 +233,6 @@ class TestDomains:
         domains = getattr(annotator, f"{method}_domains")
         assert domains(IGH_SEQ) == [single(IGH_SEQ)]
 
-    @pytest.mark.parametrize("method", ["number", "segment"])
-    def test_an_invalid_sequence_is_one_error_result(self, method):
-        annotator = immunum.Annotator(["ig"], "IMGT")
-        single = getattr(annotator, method)
-        domains = getattr(annotator, f"{method}_domains")
-        assert domains("AAAA") == [single("AAAA")]
-        assert domains("AAAA")[0].error is not None
-
-    @pytest.mark.parametrize("method", ["number_domains", "segment_domains"])
-    def test_a_sequence_without_a_domain_has_none(self, method):
-        annotator = immunum.Annotator(["ig"], "IMGT")
-        assert getattr(annotator, method)("A" * 40) == []
-
 
 class TestNormalization:
     @pytest.mark.parametrize(
@@ -311,19 +277,6 @@ class TestNormalization:
         assert alias_result.scheme == canonical_scheme
         assert alias_result.scheme == canonical_result.scheme
         assert alias_result.numbering == canonical_result.numbering
-
-    @pytest.mark.parametrize(
-        "chains,scheme",
-        [
-            (["INVALID"], "IMGT"),
-            (["IGH"], "INVALID"),
-            (["Z"], "IMGT"),
-            (["IGX"], "IMGT"),
-        ],
-    )
-    def test_unknown_alias_raises(self, chains, scheme):
-        with pytest.raises(ValueError):
-            immunum.Annotator(chains, scheme)
 
 
 # Region boundaries per scheme and chain, inclusive on both ends. Pinned literals on purpose:
@@ -418,15 +371,10 @@ class TestSchemeSupportsChain:
             immunum.Annotator([chain], scheme)
             immunum.regions_for(scheme, chain)
         else:
-            with pytest.raises(ValueError):
+            with pytest.raises(immunum.Error):
                 immunum.Annotator([chain], scheme)
-            with pytest.raises(ValueError):
+            with pytest.raises(immunum.Error):
                 immunum.regions_for(scheme, chain)
-
-    @pytest.mark.parametrize("scheme,chain", [("INVALID", "IGH"), ("IMGT", "INVALID")])
-    def test_unknown_scheme_or_chain_raises(self, scheme, chain):
-        with pytest.raises(ValueError):
-            immunum.scheme_supports_chain(scheme, chain)
 
 
 class TestRegionsFor:
@@ -477,9 +425,10 @@ class TestRegionsFor:
     @pytest.mark.parametrize("chain", TCR_CHAINS)
     def test_non_imgt_tcr_raises(self, scheme, chain):
         with pytest.raises(
-            ValueError, match=f"{scheme} scheme only supported for antibody chains"
-        ):
+            immunum.Error, match=f"{scheme} scheme only supported for antibody chains"
+        ) as raised:
             immunum.regions_for(scheme, chain)
+        assert raised.value.kind == "unsupported_chain"
 
     @pytest.mark.parametrize("chain", TCR_CHAINS)
     def test_imgt_covers_tcr_chains(self, chain):
@@ -497,8 +446,10 @@ class TestRegionsFor:
         ],
     )
     def test_unknown_scheme_or_chain_raises(self, scheme, chain):
-        with pytest.raises(ValueError):
+        with pytest.raises(immunum.Error) as raised:
             immunum.regions_for(scheme, chain)
+        expected = "invalid_scheme" if scheme != "IMGT" else "invalid_chain"
+        assert raised.value.kind == expected
 
     @pytest.mark.parametrize(
         "alias_scheme,alias_chain,scheme,chain",
@@ -517,3 +468,62 @@ class TestRegionsFor:
         assert immunum.regions_for(alias_scheme, alias_chain) == immunum.regions_for(
             scheme, chain
         )
+
+
+class TestErrorCases:
+    """Every case in tests/error_cases.json, reported with its kind and message."""
+
+    def test_error_is_a_value_error_from_immunum(self):
+        assert issubclass(immunum.Error, ValueError)
+        assert immunum.Error.__module__ == "immunum"
+
+    @pytest.mark.parametrize("case", ERROR_CASES["setup"])
+    def test_setup_raises(self, case):
+        with pytest.raises(immunum.Error) as raised:
+            immunum.Annotator(case["chains"], case["scheme"], case["min_confidence"])
+        assert isinstance(raised.value, ValueError)
+        assert raised.value.kind == case["kind"]
+        assert str(raised.value) == case["message"]
+
+    @pytest.mark.parametrize("case", ERROR_CASES["lookups"])
+    def test_regions_for_raises(self, case):
+        with pytest.raises(immunum.Error) as raised:
+            immunum.regions_for(case["scheme"], case["chain"])
+        assert raised.value.kind == case["regions_for"]["kind"]
+        assert str(raised.value) == case["regions_for"]["message"]
+
+    @pytest.mark.parametrize("case", ERROR_CASES["lookups"])
+    def test_scheme_supports_chain(self, case):
+        expected = case["scheme_supports_chain"]
+        if isinstance(expected, bool):
+            assert immunum.scheme_supports_chain(case["scheme"], case["chain"]) is expected
+            return
+        with pytest.raises(immunum.Error) as raised:
+            immunum.scheme_supports_chain(case["scheme"], case["chain"])
+        assert raised.value.kind == expected["kind"]
+        assert str(raised.value) == expected["message"]
+
+    @pytest.mark.parametrize("case", ERROR_CASES["sequences"])
+    @pytest.mark.parametrize("method", ["number", "segment"])
+    def test_sequence_error_is_returned(self, case, method):
+        annotator = immunum.Annotator(case["chains"], case["scheme"])
+        result = getattr(annotator, method)(case["sequence"])
+        assert (result.error, result.error_kind) == (case["message"], case["kind"])
+        others = [
+            v for k, v in vars(result).items() if k not in ("error", "error_kind")
+        ]
+        assert others == [None] * len(others)
+
+    @pytest.mark.parametrize("case", ERROR_CASES["sequences"])
+    @pytest.mark.parametrize("method", ["number", "segment"])
+    def test_domains(self, case, method):
+        annotator = immunum.Annotator(case["chains"], case["scheme"])
+        domains = getattr(annotator, f"{method}_domains")(case["sequence"])
+        if case["domains"] == "empty":
+            assert domains == []
+        else:
+            assert domains == [getattr(annotator, method)(case["sequence"])]
+            assert (domains[0].error, domains[0].error_kind) == (
+                case["message"],
+                case["kind"],
+            )

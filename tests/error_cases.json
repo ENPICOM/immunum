@@ -1,0 +1,101 @@
+{
+  "_comment": "Every interface reports these errors with this kind and message. Read by tests/error_cases.rs, tests/cli.rs, tests/test_python.py, tests/test_polars.py and tests/test_wasm.mjs.",
+  "setup": [
+    {
+      "chains": ["IGX"],
+      "scheme": "imgt",
+      "min_confidence": null,
+      "kind": "invalid_chain",
+      "message": "unknown chain 'IGX' (options: H/IGH/heavy, K/IGK/kappa, L/IGL/lambda, A/TRA/alpha, B/TRB/beta, G/TRG/gamma, D/TRD/delta, or the groups all, ig, tcr)"
+    },
+    {
+      "chains": [],
+      "scheme": "imgt",
+      "min_confidence": null,
+      "kind": "invalid_chain",
+      "message": "no chains given"
+    },
+    {
+      "chains": ["H"],
+      "scheme": "Z",
+      "min_confidence": null,
+      "kind": "invalid_scheme",
+      "message": "unknown scheme 'Z' (options: IMGT/i, Kabat/k, Chothia/c, Martin/m, Aho/a)"
+    },
+    {
+      "chains": ["TRB"],
+      "scheme": "kabat",
+      "min_confidence": null,
+      "kind": "unsupported_chain",
+      "message": "Kabat scheme only supported for antibody chains (IGH, IGK, IGL), not TRB"
+    },
+    {
+      "chains": ["H"],
+      "scheme": "imgt",
+      "min_confidence": 1.5,
+      "kind": "invalid_min_confidence",
+      "message": "min_confidence must be in [0, 1], got 1.5"
+    }
+  ],
+  "lookups": [
+    {
+      "scheme": "kabat",
+      "chain": "TRB",
+      "regions_for": {
+        "kind": "unsupported_chain",
+        "message": "Kabat scheme only supported for antibody chains (IGH, IGK, IGL), not TRB"
+      },
+      "scheme_supports_chain": false
+    },
+    {
+      "scheme": "imgt",
+      "chain": "ig",
+      "regions_for": {
+        "kind": "invalid_chain",
+        "message": "unknown chain 'ig' (options: H/IGH/heavy, K/IGK/kappa, L/IGL/lambda, A/TRA/alpha, B/TRB/beta, G/TRG/gamma, D/TRD/delta)"
+      },
+      "scheme_supports_chain": {
+        "kind": "invalid_chain",
+        "message": "unknown chain 'ig' (options: H/IGH/heavy, K/IGK/kappa, L/IGL/lambda, A/TRA/alpha, B/TRB/beta, G/TRG/gamma, D/TRD/delta)"
+      }
+    },
+    {
+      "scheme": "Z",
+      "chain": "H",
+      "regions_for": {
+        "kind": "invalid_scheme",
+        "message": "unknown scheme 'Z' (options: IMGT/i, Kabat/k, Chothia/c, Martin/m, Aho/a)"
+      },
+      "scheme_supports_chain": {
+        "kind": "invalid_scheme",
+        "message": "unknown scheme 'Z' (options: IMGT/i, Kabat/k, Chothia/c, Martin/m, Aho/a)"
+      }
+    }
+  ],
+  "sequences": [
+    {
+      "chains": ["ig"],
+      "scheme": "imgt",
+      "sequence": "AAAA",
+      "kind": "invalid_sequence",
+      "message": "sequence length 4 is below minimum 30",
+      "domains": "error"
+    },
+    {
+      "chains": ["ig"],
+      "scheme": "imgt",
+      "sequence": "QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1QVQL1",
+      "kind": "invalid_sequence",
+      "message": "invalid character '1' at position 4",
+      "domains": "error"
+    },
+    {
+      "chains": ["ig"],
+      "scheme": "imgt",
+      "sequence": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "kind": "low_confidence",
+      "message": "alignment confidence 0.0416 is below min_confidence 0.5000",
+      "domains": "empty"
+    }
+  ]
+}

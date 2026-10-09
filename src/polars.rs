@@ -1,4 +1,5 @@
 use crate::annotator::{per_domain, Annotator, NumberingResult, SegmentResult};
+use crate::error::SequenceError;
 use crate::numbering::SEGMENT_NAMES;
 use polars::prelude::*;
 use polars_arrow::bitmap::MutableBitmap;
@@ -45,24 +46,6 @@ struct NumberKwargs {
     annotator: Annotator,
 }
 
-#[derive(Serialize, Deserialize)]
-struct NumberFuncKwargs {
-    chains: Vec<String>,
-    scheme: String,
-    min_confidence: Option<f32>,
-}
-
-impl NumberFuncKwargs {
-    fn annotator(&self) -> PolarsResult<Annotator> {
-        Annotator::from_names(
-            self.chains.iter().map(String::as_str),
-            &self.scheme,
-            self.min_confidence,
-        )
-        .map_err(|e| polars_err!(InvalidOperation: "{}", e))
-    }
-}
-
 // ── Numbering ────────────────────────────────────────────────────────────────
 
 // One numbered residue: its position and its amino acid
@@ -87,6 +70,7 @@ fn numbering_dtype() -> DataType {
         Field::new("query_start".into(), DataType::UInt32),
         Field::new("query_end".into(), DataType::UInt32),
         Field::new("error".into(), DataType::String),
+        Field::new("error_kind".into(), DataType::String),
     ])
 }
 
@@ -106,22 +90,12 @@ fn numbering_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Polar
     numbering_series(inputs[0].str()?, kwargs.annotator)
 }
 
-#[polars_expr(output_type_func=numbering_struct_output)]
-fn numbering_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsResult<Series> {
-    numbering_series(inputs[0].str()?, kwargs.annotator()?)
-}
-
 #[polars_expr(output_type_func=number_domains_struct_output)]
 fn number_domains_class_struct_expr(
     inputs: &[Series],
     kwargs: NumberKwargs,
 ) -> PolarsResult<Series> {
     number_domains_series(inputs[0].str()?, kwargs.annotator)
-}
-
-#[polars_expr(output_type_func=number_domains_struct_output)]
-fn number_domains_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsResult<Series> {
-    number_domains_series(inputs[0].str()?, kwargs.annotator()?)
 }
 
 // A numbering, with its positions and residues formatted for the output columns
@@ -148,7 +122,7 @@ impl NumberedRow {
 }
 
 // One numbering struct: the numbering, or the error that took its place
-type Numbering = Result<NumberedRow, String>;
+type Numbering = Result<NumberedRow, SequenceError>;
 
 // One numbering struct per sequence
 fn numbering_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Series> {
@@ -160,8 +134,7 @@ fn numbering_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Se
                 let value = (*opt_v)?;
                 Some(
                     ann.number(value)
-                        .map(|result| NumberedRow::new(result, value))
-                        .map_err(|e| e.to_string()),
+                        .map(|result| NumberedRow::new(result, value)),
                 )
             })
             .collect()
@@ -190,22 +163,17 @@ fn number_domains_series(ca: &StringChunked, annotator: Annotator) -> PolarsResu
 fn domains_series<D: Send>(
     ca: &StringChunked,
     annotator: Annotator,
-    domains: impl Fn(&Annotator, &str) -> crate::Result<Vec<D>> + Send + Sync,
-    structs: impl Fn(PlSmallStr, &[Option<Result<D, String>>]) -> PolarsResult<Series>,
+    domains: impl Fn(&Annotator, &str) -> crate::Result<Vec<D>, SequenceError> + Send + Sync,
+    structs: impl Fn(PlSmallStr, &[Option<Result<D, SequenceError>>]) -> PolarsResult<Series>,
 ) -> PolarsResult<Series> {
     let len = ca.len();
     let values: Vec<Option<&str>> = ca.into_iter().collect();
-    let rows: Vec<Option<Vec<Result<D, String>>>> = POOL.install(|| {
+    let rows: Vec<Option<Vec<Result<D, SequenceError>>>> = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                Some(
-                    per_domain(domains(ann, value))
-                        .into_iter()
-                        .map(|result| result.map_err(|e| e.to_string()))
-                        .collect(),
-                )
+                Some(per_domain(domains(ann, value)))
             })
             .collect()
     });
@@ -216,7 +184,7 @@ fn domains_series<D: Send>(
         offsets.try_push(row.as_ref().map_or(0, Vec::len))?;
         searched.push(row.is_some());
     }
-    let domains: Vec<Option<Result<D, String>>> =
+    let domains: Vec<Option<Result<D, SequenceError>>> =
         rows.into_iter().flatten().flatten().map(Some).collect();
     list_series(
         ca.name().clone(),
@@ -279,6 +247,7 @@ fn numbering_struct(name: PlSmallStr, rows: &[Option<Numbering>]) -> PolarsResul
     let mut query_start = PrimitiveChunkedBuilder::<UInt32Type>::new("query_start".into(), len);
     let mut query_end = PrimitiveChunkedBuilder::<UInt32Type>::new("query_end".into(), len);
     let mut error = StringChunkedBuilder::new("error".into(), len);
+    let mut error_kind = StringChunkedBuilder::new("error_kind".into(), len);
     for row in rows {
         match row {
             Some(Ok(row)) => {
@@ -290,6 +259,7 @@ fn numbering_struct(name: PlSmallStr, rows: &[Option<Numbering>]) -> PolarsResul
                 query_start.append_value(row.result.query_start as u32);
                 query_end.append_value(row.result.query_end as u32);
                 error.append_null();
+                error_kind.append_null();
             }
             _ => {
                 chain.append_null();
@@ -299,7 +269,9 @@ fn numbering_struct(name: PlSmallStr, rows: &[Option<Numbering>]) -> PolarsResul
                 numbered.push(false);
                 query_start.append_null();
                 query_end.append_null();
-                error.append_option(row.as_ref().and_then(|r| r.as_ref().err()));
+                let e = row.as_ref().and_then(|r| r.as_ref().err());
+                error.append_option(e.map(ToString::to_string));
+                error_kind.append_option(e.map(SequenceError::kind));
             }
         }
     }
@@ -312,6 +284,7 @@ fn numbering_struct(name: PlSmallStr, rows: &[Option<Numbering>]) -> PolarsResul
         query_start.finish().into_series(),
         query_end.finish().into_series(),
         error.finish().into_series(),
+        error_kind.finish().into_series(),
     ];
     StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())
 }
@@ -323,7 +296,7 @@ fn segmentation_dtype() -> DataType {
     DataType::Struct(
         SEGMENT_NAMES
             .into_iter()
-            .chain(["error"])
+            .chain(["error", "error_kind"])
             .map(|name| Field::new(name.into(), DataType::String))
             .collect(),
     )
@@ -345,11 +318,6 @@ fn segmentation_class_struct_expr(inputs: &[Series], kwargs: NumberKwargs) -> Po
     segmentation_series(inputs[0].str()?, kwargs.annotator)
 }
 
-#[polars_expr(output_type_func=segmentation_struct_output)]
-fn segmentation_struct_expr(inputs: &[Series], kwargs: NumberFuncKwargs) -> PolarsResult<Series> {
-    segmentation_series(inputs[0].str()?, kwargs.annotator()?)
-}
-
 #[polars_expr(output_type_func=segment_domains_struct_output)]
 fn segment_domains_class_struct_expr(
     inputs: &[Series],
@@ -358,23 +326,15 @@ fn segment_domains_class_struct_expr(
     segment_domains_series(inputs[0].str()?, kwargs.annotator)
 }
 
-#[polars_expr(output_type_func=segment_domains_struct_output)]
-fn segment_domains_struct_expr(
-    inputs: &[Series],
-    kwargs: NumberFuncKwargs,
-) -> PolarsResult<Series> {
-    segment_domains_series(inputs[0].str()?, kwargs.annotator()?)
-}
-
 // One segmentation struct per sequence
 fn segmentation_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Series> {
     let values: Vec<Option<&str>> = ca.into_iter().collect();
-    let rows: Vec<Option<Result<SegmentResult, String>>> = POOL.install(|| {
+    let rows: Vec<Option<Result<SegmentResult, SequenceError>>> = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
                 let value = (*opt_v)?;
-                Some(ann.segment(value).map_err(|e| e.to_string()))
+                Some(ann.segment(value))
             })
             .collect()
     });
@@ -390,15 +350,16 @@ fn segment_domains_series(ca: &StringChunked, annotator: Annotator) -> PolarsRes
     )
 }
 
-// One struct per row: a field per segment, and the error when the row couldn't be segmented; a row
-// is null where there was no sequence
+// One struct per row: a field per segment, and the error and its kind when the row couldn't be
+// segmented; a row is null where there was no sequence
 fn segmentation_struct(
     name: PlSmallStr,
-    rows: &[Option<Result<SegmentResult, String>>],
+    rows: &[Option<Result<SegmentResult, SequenceError>>],
 ) -> PolarsResult<Series> {
     let len = rows.len();
     let mut segments = SEGMENT_NAMES.map(|name| StringChunkedBuilder::new(name.into(), len));
     let mut errors = StringChunkedBuilder::new("error".into(), len);
+    let mut error_kinds = StringChunkedBuilder::new("error_kind".into(), len);
     for row in rows {
         match row {
             Some(Ok(s)) => {
@@ -406,19 +367,22 @@ fn segmentation_struct(
                     builder.append_value(residues);
                 }
                 errors.append_null();
+                error_kinds.append_null();
             }
             _ => {
                 segments
                     .iter_mut()
                     .for_each(|builder| builder.append_null());
-                errors.append_option(row.as_ref().and_then(|r| r.as_ref().err()));
+                let e = row.as_ref().and_then(|r| r.as_ref().err());
+                errors.append_option(e.map(ToString::to_string));
+                error_kinds.append_option(e.map(SequenceError::kind));
             }
         }
     }
 
     let fields: Vec<Series> = segments
         .into_iter()
-        .chain([errors])
+        .chain([errors, error_kinds])
         .map(|builder| builder.finish().into_series())
         .collect();
     StructChunked::from_series(name, len, fields.iter()).map(|ca| ca.into_series())

@@ -45,6 +45,35 @@ Chain type is automatically detected by aligning against all loaded chains and s
 Every scheme is derived from the internal IMGT numbering. Region (FR/CDR) boundaries follow each
 scheme's own definition and differ between heavy and light chains.
 
+### Errors
+
+immunum fails in two ways, and every interface reports each the same way:
+
+- **A setup mistake is raised** before any sequence is numbered: Python raises `immunum.Error` (a `ValueError`) and JavaScript throws an `Error`, both with a `kind`; Polars raises when the expression is built; the CLI prints `error: …` and exits with status 1.
+- **A sequence that can't be numbered is returned**, so a batch never stops for it: its result has `error` (the message) and `error_kind` (`errorKind` in JavaScript) set, and every other field empty.
+
+| Kind                     | Raised or returned | When                                                         |
+| ------------------------ | ------------------ | ------------------------------------------------------------ |
+| `invalid_chain`          | raised             | an unknown chain name, or no chains                          |
+| `invalid_scheme`         | raised             | an unknown scheme name                                       |
+| `unsupported_chain`      | raised             | a scheme other than IMGT asked to number a TCR chain         |
+| `invalid_min_confidence` | raised             | `min_confidence` outside `[0, 1]`                            |
+| `invalid_sequence`       | returned           | a sequence too short, too long, or holding a non-letter      |
+| `low_confidence`         | returned           | no alignment reaches `min_confidence`                        |
+
+```python
+import immunum
+
+try:
+    immunum.Annotator(chains=["IGX"], scheme="imgt")
+except immunum.Error as e:
+    print(e.kind)  # invalid_chain
+
+result = immunum.Annotator(chains=["ig"], scheme="imgt").number("AAAA")
+print(result.error_kind)  # invalid_sequence
+print(result.error)       # sequence length 4 is below minimum 30
+```
+
 ## Table of Contents
 
 - [Python](#python)
@@ -161,9 +190,9 @@ result = df.with_columns(
 )
 ```
 
-The `number` expression returns a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and `error`. Explode `numbering` and unnest it for one row per residue. The `segment` expression returns a struct with fields `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`. `number_domains` and `segment_domains` return a list of those structs per sequence, one per domain.
+The `number` expression returns a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end`, `error` and `error_kind`. Explode `numbering` and unnest it for one row per residue. The `segment` expression returns a struct with fields `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix`, `error` and `error_kind`. `number_domains` and `segment_domains` return a list of those structs per sequence, one per domain.
 
-Every expression takes either `chains`, `scheme` and `min_confidence`, or a prebuilt `Annotator` as `annotator=`.
+Every expression takes either `chains`, `scheme` and `min_confidence`, or a prebuilt `Annotator` as `annotator=`. Either way the annotator is built when the expression is, so an unknown name raises `immunum.Error` right there.
 
 ## JavaScript / npm
 
@@ -206,6 +235,21 @@ const { regionsFor, schemeSupportsChain } = require("immunum");
 schemeSupportsChain("kabat", "H"); // true
 schemeSupportsChain("kabat", "B"); // false: only IMGT numbers TCR chains
 regionsFor("kabat", "H").cdr1;    // [31, 35]
+```
+
+A setup mistake throws an `Error` with a `kind`; a sequence that can't be numbered comes back with `error` and `errorKind` set (see [Errors](#errors)):
+
+```js
+try {
+  new Annotator(["IGX"], "imgt");
+} catch (err) {
+  console.log(err.kind);    // "invalid_chain"
+  console.log(err.message); // "unknown chain 'IGX' (options: ...)"
+}
+
+const failed = new Annotator(["ig"], "imgt").number("AAAA");
+console.log(failed.errorKind); // "invalid_sequence"
+console.log(failed.error);     // "sequence length 4 is below minimum 30"
 ```
 
 ## Rust
@@ -251,6 +295,8 @@ for segments in annotator.segment_domains(sequence).unwrap() {
 }
 ```
 
+Setting up returns `immunum::Error`; numbering one sequence returns `immunum::SequenceError`, so a sequence's result can only fail with `InvalidSequence` or `LowConfidence`. Both have `kind()`, the code every other interface reports.
+
 ## CLI
 
 ```bash
@@ -258,7 +304,7 @@ immunum number [OPTIONS] [INPUT] [OUTPUT]
 immunum segment [OPTIONS] [INPUT] [OUTPUT]
 ```
 
-`number` writes one record per numbered residue (TSV) or per sequence (JSON). `segment` writes one record per sequence, with a column or field per region: `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and `error`.
+`number` writes one record per numbered residue (TSV) or per sequence (JSON). `segment` writes one record per sequence, with a column or field per region: `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix`, `error` and `error_kind`. A sequence that can't be numbered gets a record with `error` and `error_kind` set, and the run carries on; a summary of how many failed goes to stderr.
 
 ### Options
 
@@ -269,12 +315,12 @@ Both commands take the same options.
 | `-s, --scheme` | Numbering scheme: `imgt` (`i`), `kabat` (`k`), `chothia` (`c`), `martin` (`m`), `aho` (`a`)                                          | `imgt`  |
 | `-c, --chain`  | Chain filter: `h`,`k`,`l`,`a`,`b`,`g`,`d` or groups: `ig`, `tcr`, `all`. Accepts any form (`h`, `heavy`, `igh`), case-insensitive. | `ig`    |
 | `-f, --format` | Output format: `tsv`, `json`, `jsonl`                                                                                              | `tsv`   |
-| `--min-confidence` | Minimum alignment confidence, in [0, 1]                                                                                        | `0.5`   |
+| `--min-confidence` | Minimum alignment confidence, in [0, 1]; a sequence below it gets a record with `error_kind` `low_confidence` | `0.5`   |
 | `--all-domains` | Every domain in each sequence (e.g. both domains of an scFv): one record per domain, with a 0-based `domain` column/field. With `segment`, every residue lands in exactly one domain's regions | off     |
 
 ### Input
 
-Accepts a raw sequence, a FASTA file, or stdin (auto-detected):
+Accepts a raw sequence, a FASTA file, or stdin (auto-detected). An argument is read as a sequence only when it is all letters, so a mistyped file name is an error rather than a sequence:
 
 ```bash
 immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS

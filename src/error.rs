@@ -1,40 +1,88 @@
 //! Error types for immunum
+//!
+//! immunum fails in two ways, and every interface reports them differently on purpose:
+//!
+//! - [`Error`]: immunum was set up or called wrongly, such as an unknown chain name. Nothing can be
+//!   done until the caller fixes it, so every interface raises it: Python raises `immunum.Error`,
+//!   JavaScript throws an `Error`, Polars fails when the expression is built and the CLI exits with
+//!   status 1.
+//! - [`SequenceError`]: one sequence couldn't be numbered. A batch shouldn't stop for it, so every
+//!   interface returns it in that sequence's result, as `error` with its [`SequenceError::kind`] as
+//!   `error_kind`.
 
 use thiserror::Error;
 
-/// Result type alias for immunum operations
-pub type Result<T> = std::result::Result<T, Error>;
+use crate::types::{Chain, Scheme};
 
-/// Errors that can occur during sequence numbering and alignment
-#[derive(Debug, Error)]
+/// Result of an immunum call: [`Error`] unless given, `Result<T, SequenceError>` for one sequence
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// immunum was set up or called wrongly. Every interface raises it.
+#[derive(Debug, Error, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
-    #[error("Invalid chain type: {0}")]
+    /// An unknown chain name, or no chains at all
+    #[error("{0}")]
     InvalidChain(String),
 
-    #[error("Invalid numbering scheme: {0}")]
+    /// An unknown scheme name
+    #[error("{0}")]
     InvalidScheme(String),
 
-    #[error("Consensus file parsing error: {0}")]
-    ConsensusParseError(String),
+    /// A scheme asked to number a chain it has no rules for
+    #[error("{scheme} scheme only supported for antibody chains (IGH, IGK, IGL), not {chain:?}")]
+    UnsupportedChain { scheme: Scheme, chain: Chain },
 
-    #[error("Alignment failed: {0}")]
-    AlignmentError(String),
-
-    #[error("Position mapping error: {0}")]
-    PositionMappingError(String),
-
-    #[error("Invalid position format: {0}")]
-    InvalidPosition(String),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Invalid sequence: {0}")]
-    InvalidSequence(String),
-
-    #[error("Low confidence: {confidence:.4} < threshold {threshold:.4}")]
-    LowConfidence { confidence: f32, threshold: f32 },
-
+    /// A minimum confidence outside `[0, 1]`
     #[error("min_confidence must be in [0, 1], got {0}")]
     InvalidMinConfidence(f32),
+
+    /// A position that doesn't read as a number with an optional insertion letter
+    #[error("invalid position: {0}")]
+    InvalidPosition(String),
+
+    /// A numbering paired with a sequence other than the one it numbered
+    #[error("numbered residues {start}..={end} lie outside a sequence of length {length}")]
+    WrongSequence {
+        start: usize,
+        end: usize,
+        length: usize,
+    },
+}
+
+impl Error {
+    /// What went wrong, as a stable code every interface reports alongside the message
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Error::InvalidChain(_) => "invalid_chain",
+            Error::InvalidScheme(_) => "invalid_scheme",
+            Error::UnsupportedChain { .. } => "unsupported_chain",
+            Error::InvalidMinConfidence(_) => "invalid_min_confidence",
+            Error::InvalidPosition(_) => "invalid_position",
+            Error::WrongSequence { .. } => "wrong_sequence",
+        }
+    }
+}
+
+/// One sequence couldn't be numbered. Every interface returns it in that sequence's result.
+#[derive(Debug, Error, PartialEq)]
+#[non_exhaustive]
+pub enum SequenceError {
+    /// Too short, too long, or holding a character that isn't a letter
+    #[error("{0}")]
+    InvalidSequence(String),
+
+    /// The best alignment's confidence is below the annotator's minimum
+    #[error("alignment confidence {confidence:.4} is below min_confidence {threshold:.4}")]
+    LowConfidence { confidence: f32, threshold: f32 },
+}
+
+impl SequenceError {
+    /// What went wrong, as a stable code every interface reports as `error_kind`
+    pub fn kind(&self) -> &'static str {
+        match self {
+            SequenceError::InvalidSequence(_) => "invalid_sequence",
+            SequenceError::LowConfidence { .. } => "low_confidence",
+        }
+    }
 }
