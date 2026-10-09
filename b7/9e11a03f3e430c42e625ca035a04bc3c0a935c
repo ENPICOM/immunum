@@ -1,0 +1,44 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 43-44,76-80,100-102
+README.md
+  h_acea35c6bbea0b 63,166,299,320
+docs/usage/polars.md
+  h_acea35c6bbea0b 143
+docs/usage/python.md
+  h_acea35c6bbea0b 70-73
+immunum/__init__.py
+  h_acea35c6bbea0b 73-75,136-138,253-258,316-318
+immunum/polars.py
+  h_acea35c6bbea0b 192-196,365-367
+src/annotator.rs
+  h_acea35c6bbea0b 202,215-216,236,243-247,250-254,256-266,272-278,689-697,700,705
+src/error.rs
+  h_acea35c6bbea0b 78-82,91
+src/main.rs
+  h_acea35c6bbea0b 46
+src/wasm.rs
+  h_acea35c6bbea0b 149,168,237-240,251-253
+tests/cli.rs
+  h_acea35c6bbea0b 268-269,556,560-563,565-571,576-600
+tests/error_cases.json
+  h_acea35c6bbea0b 2,81,88,95-104
+tests/error_cases.rs
+  h_acea35c6bbea0b 62-83,96-98,100-108
+tests/test_polars.py
+  h_acea35c6bbea0b 297,370-373,377,382-400
+tests/test_python.py
+  h_acea35c6bbea0b 517-519,521,523-534
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 302-303,305-307,311-318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b79e11a03f3e430c42e625ca035a04bc3c0a935c",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
