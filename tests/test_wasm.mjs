@@ -10,7 +10,7 @@
 
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { Annotator, schemeSupportsChain } from "../pkg/immunum.js";
+import { Annotator, regionsFor, schemeSupportsChain } from "../pkg/immunum.js";
 
 const ALL_CHAINS = ["H", "K", "L", "A", "B", "G", "D"];
 const AB_CHAINS = ["H", "K", "L"];
@@ -74,7 +74,7 @@ describe("Annotator init", () => {
     assert.deepEqual([...byGroup.numbering], [...byChains.numbering]);
   });
 
-  it("throws on min_confidence outside [0, 1]", () => {
+  it("throws on minConfidence outside [0, 1]", () => {
     for (const minConfidence of [-0.1, 1.5]) {
       assert.throws(() => new Annotator(["H"], "imgt", minConfidence));
     }
@@ -110,6 +110,33 @@ describe("schemeSupportsChain()", () => {
   it("throws on an unknown scheme or chain", () => {
     assert.throws(() => schemeSupportsChain("INVALID", "H"));
     assert.throws(() => schemeSupportsChain("imgt", "INVALID"));
+  });
+});
+
+describe("regionsFor()", () => {
+  it("returns inclusive bounds in N- to C-terminal order", () => {
+    const kabatHeavy = regionsFor("kabat", "H");
+    assert.deepEqual(Object.keys(kabatHeavy), ["fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4"]);
+    assert.deepEqual(kabatHeavy.cdr1, [31, 35]);
+    assert.deepEqual(kabatHeavy.fr4, [103, 113]);
+    assert.notDeepEqual(regionsFor("kabat", "K"), kabatHeavy);
+  });
+
+  it("throws exactly for the pairs schemeSupportsChain rejects", () => {
+    for (const scheme of ["imgt", "kabat", "chothia", "martin", "aho"]) {
+      for (const chain of ALL_CHAINS) {
+        if (schemeSupportsChain(scheme, chain)) {
+          assert.doesNotThrow(() => regionsFor(scheme, chain));
+        } else {
+          assert.throws(() => regionsFor(scheme, chain), /only supported for antibody chains/);
+        }
+      }
+    }
+  });
+
+  it("throws on an unknown scheme or chain", () => {
+    assert.throws(() => regionsFor("INVALID", "H"));
+    assert.throws(() => regionsFor("imgt", "INVALID"));
   });
 });
 
@@ -164,19 +191,19 @@ describe("number()", () => {
     }
   });
 
-  it("returns query_start/query_end as inclusive 0-indexed ints on success", () => {
+  it("returns queryStart/queryEnd as inclusive 0-indexed ints on success", () => {
     const annotator = new Annotator(["H"], "imgt");
     const result = annotator.number(IGH_SEQ);
-    assert.equal(typeof result.query_start, "number");
-    assert.equal(typeof result.query_end, "number");
-    assert.ok(Number.isInteger(result.query_start));
-    assert.ok(Number.isInteger(result.query_end));
-    assert.ok(result.query_start >= 0);
-    assert.ok(result.query_end >= result.query_start);
-    assert.ok(result.query_end < IGH_SEQ.length);
+    assert.equal(typeof result.queryStart, "number");
+    assert.equal(typeof result.queryEnd, "number");
+    assert.ok(Number.isInteger(result.queryStart));
+    assert.ok(Number.isInteger(result.queryEnd));
+    assert.ok(result.queryStart >= 0);
+    assert.ok(result.queryEnd >= result.queryStart);
+    assert.ok(result.queryEnd < IGH_SEQ.length);
     // Aligned length should match the number of numbered residues.
     assert.equal(
-      result.query_end - result.query_start + 1,
+      result.queryEnd - result.queryStart + 1,
       result.numbering.size,
     );
   });
@@ -186,8 +213,8 @@ describe("number()", () => {
     const result = annotator.number("");
     assert.equal(result.chain, null);
     assert.equal(result.numbering, null);
-    assert.equal(result.query_start, null);
-    assert.equal(result.query_end, null);
+    assert.equal(result.queryStart, null);
+    assert.equal(result.queryEnd, null);
     assert.equal(typeof result.error, "string");
   });
 
@@ -216,6 +243,58 @@ describe("number()", () => {
     const result = annotator.number(IGH_SEQ);
     assert.equal(result.scheme, "Kabat");
   });
+});
+
+describe("numberDomains() and segmentDomains()", () => {
+  const LINKER = "GGGGSGGGGSGGGGS";
+  // Starts at IMGT position 1. A light chain missing its first positions takes linker residues for
+  // them when it follows a linker, so it wouldn't number as it does on its own.
+  const KAPPA_SEQ =
+    "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK";
+  const REGIONS = ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"];
+
+  it("numbers each domain like number() on its own", () => {
+    const annotator = new Annotator(["ig"], "imgt");
+    const domains = annotator.numberDomains(IGH_SEQ + LINKER + KAPPA_SEQ);
+    const heavy = annotator.number(IGH_SEQ);
+    const light = annotator.number(KAPPA_SEQ);
+    assert.deepEqual(
+      domains.map((d) => d.chain),
+      [heavy.chain, light.chain],
+    );
+    assert.deepEqual([...domains[0].numbering], [...heavy.numbering]);
+    assert.deepEqual([...domains[1].numbering], [...light.numbering]);
+    assert.equal(domains[1].queryStart, IGH_SEQ.length + LINKER.length + light.queryStart);
+  });
+
+  it("segments with every residue in exactly one domain", () => {
+    const annotator = new Annotator(["ig"], "imgt");
+    const sequence = "MKYLL" + IGH_SEQ + LINKER + KAPPA_SEQ + "HHHHHH";
+    const domains = annotator.segmentDomains(sequence);
+    assert.equal(domains.map((d) => REGIONS.map((r) => d[r]).join("")).join(""), sequence);
+    assert.deepEqual(
+      domains.map((d) => [d.prefix, d.postfix]),
+      [
+        ["MKYLL", ""],
+        [LINKER, "HHHHHH"],
+      ],
+    );
+    assert.equal(domains[1].cdr3, annotator.segment(KAPPA_SEQ).cdr3);
+  });
+
+  for (const method of ["number", "segment"]) {
+    it(`${method}Domains returns one error result for an invalid sequence`, () => {
+      const annotator = new Annotator(["ig"], "imgt");
+      const domains = annotator[`${method}Domains`]("AAAA");
+      assert.equal(domains.length, 1);
+      assert.equal(domains[0].error, annotator[method]("AAAA").error);
+    });
+
+    it(`${method}Domains returns no result for a sequence without a domain`, () => {
+      const annotator = new Annotator(["ig"], "imgt");
+      assert.deepEqual(annotator[`${method}Domains`]("A".repeat(40)), []);
+    });
+  }
 });
 
 describe("segment()", () => {
@@ -247,11 +326,13 @@ describe("segment()", () => {
     assert.equal(result.error, null);
   });
 
-  it("returns error field on invalid sequence (does not throw)", () => {
+  it("returns error and every region null on invalid sequence (does not throw)", () => {
     const annotator = new Annotator(ALL_CHAINS, "IMGT");
     const result = annotator.segment("AAAAAAAAAAAAAAAA");
     assert.equal(typeof result.error, "string");
-    assert.equal(result.fr1, undefined);
+    for (const key of ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"]) {
+      assert.equal(result[key], null, `${key} should be null`);
+    }
   });
 
   it("keeps flanking residues in prefix and postfix (#58)", () => {

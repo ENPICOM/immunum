@@ -121,6 +121,16 @@ thread_local! {
 /// freed when its call returns.
 const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
 
+/// Per-domain results as every interface returns them: one per domain from
+/// [`Annotator::number_domains`] or [`Annotator::segment_domains`], or, when the sequence couldn't
+/// be searched, its error as the single result.
+pub fn per_domain<T>(results: Result<Vec<T>>) -> Vec<Result<T>> {
+    match results {
+        Ok(results) => results.into_iter().map(Ok).collect(),
+        Err(e) => vec![Err(e)],
+    }
+}
+
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",
@@ -185,6 +195,39 @@ impl Annotator {
     /// Segment a sequence into FR/CDR regions
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
         self.number(sequence)?.segment(sequence)
+    }
+
+    /// Every domain in `sequence` numbered under this annotator's scheme, ordered by position; see
+    /// [`Annotator::domains`] for how they're found. Empty when no domain aligns well enough.
+    pub fn number_domains(&self, sequence: &str) -> Result<Vec<NumberingResult>> {
+        self.domains(sequence)?
+            .iter()
+            .map(|domain| domain.number(self.scheme))
+            .collect()
+    }
+
+    /// The FR/CDR split of every domain in `sequence`, ordered by position; see
+    /// [`Annotator::domains`] for how they're found. Every residue lands in exactly one domain's
+    /// segments: a domain's prefix holds the residues since the previous domain (or the start of the
+    /// sequence), and only the last domain has the residues after it as its postfix. The domains'
+    /// segments in order therefore rebuild `sequence`. Empty when no domain aligns well enough.
+    pub fn segment_domains(&self, sequence: &str) -> Result<Vec<SegmentResult>> {
+        let domains = self.number_domains(sequence)?;
+        let mut start = 0;
+        domains
+            .iter()
+            .enumerate()
+            .map(|(i, domain)| {
+                let end = if i + 1 == domains.len() {
+                    sequence.len()
+                } else {
+                    domain.query_end + 1
+                };
+                let segments = domain.segment_within(sequence, start..end);
+                start = end;
+                segments
+            })
+            .collect()
     }
 
     /// Every variable domain in `sequence`, ordered by position.
@@ -387,12 +430,18 @@ impl NumberingResult {
     /// numbered ones open the prefix and the residues after them close the postfix, so the regions in
     /// order rebuild `sequence`.
     pub fn segment(&self, sequence: &str) -> Result<SegmentResult> {
+        self.segment_within(sequence, 0..sequence.len())
+    }
+
+    // The FR/CDR split of `sequence[span]`, which holds the numbered residues: the residues of `span`
+    // before them open the prefix and those after them close the postfix
+    fn segment_within(&self, sequence: &str, span: Range<usize>) -> Result<SegmentResult> {
         let numbered = self.numbered(sequence)?;
         let mut map = segment_positions(&self.positions, numbered, self.scheme, self.chain);
         let [mut prefix, fr1, cdr1, fr2, cdr2, fr3, cdr3, fr4, mut postfix] =
             SEGMENT_NAMES.map(|name| map.remove(name).unwrap_or_default());
-        prefix.insert_str(0, &sequence[..self.query_start]);
-        postfix.push_str(&sequence[self.query_end + 1..]);
+        prefix.insert_str(0, &sequence[span.start..self.query_start]);
+        postfix.push_str(&sequence[self.query_end + 1..span.end]);
 
         Ok(SegmentResult {
             prefix,
@@ -630,6 +679,32 @@ mod tests {
     #[test]
     fn an_x_run_holds_no_domain() {
         assert!(spans(&"X".repeat(300)).is_empty());
+    }
+
+    #[test]
+    fn segment_domains_puts_every_residue_in_exactly_one_domain() {
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let (leader, tag) = ("MKYLL", "HHHHHH");
+        let scfv = format!("{leader}{FULL_IGH}{LINKER}{KAPPA}{tag}");
+        let segments = annotator.segment_domains(&scfv).unwrap();
+
+        let rebuilt: String = segments
+            .iter()
+            .flat_map(|s| s.regions())
+            .map(|(_, residues)| residues)
+            .collect();
+        assert_eq!(rebuilt, scfv);
+        let flanks: Vec<_> = segments
+            .iter()
+            .map(|s| (s.prefix.as_str(), s.postfix.as_str()))
+            .collect();
+        assert_eq!(flanks, [(leader, ""), (LINKER, tag)]);
+
+        // Between the flanks, each domain splits as it does on its own
+        for (segments, domain) in segments.iter().zip([FULL_IGH, KAPPA]) {
+            let alone = annotator.segment(domain).unwrap();
+            assert_eq!(segments.regions()[1..8], alone.regions()[1..8]);
+        }
     }
 
     #[test]
