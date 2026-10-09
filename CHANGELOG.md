@@ -245,4 +245,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - Prior release
 
-See the [GitHub releases page](https://github.com/ENPICOM/immunum-rs/releases) for history prior to 1.1.0.
+See the [GitHub releases page](https://github.com/ENPICOM/immunum/releases) for history prior to 1.1.0.

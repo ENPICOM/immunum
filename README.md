@@ -215,8 +215,8 @@ const sequence =
 
 const result = annotator.number(sequence);
 console.log(result.chain);      // "H"
-console.log(result.confidence); // 0.97
-console.log(result.numbering);  // { "1": "Q", "2": "V", ... }
+console.log(result.confidence); // 0.78
+console.log(result.numbering);  // Map { "1" => "Q", "2" => "V", ... }
 
 const segments = annotator.segment(sequence);
 console.log(segments.cdr3); // "AREGTTGKPIGAFAH"
@@ -261,7 +261,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-immunum = "0.9"
+immunum = "1.3"
 ```
 
 ### Usage
@@ -278,10 +278,10 @@ let annotator = Annotator::new(
 let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
 let result = annotator.number(sequence).unwrap();
-println!("Chain: {}", result.chain);        // IGH
+println!("Chain: {}", result.chain);        // H
 println!("Confidence: {:.2}", result.confidence);
-for (aa, pos) in sequence.chars().zip(result.positions.iter()) {
-    println!("{} -> {}", aa, pos);
+for (pos, aa) in result.residues(sequence).unwrap() {
+    println!("{} -> {}", pos, aa);
 }
 
 let segments = annotator.segment(sequence).unwrap();
@@ -405,6 +405,7 @@ task build-local PROFILE=release
 ```bash
 task test-rust    # test only rust code
 task test-python  # test only python code
+task test-wasm    # test only the JavaScript bindings
 task test         # test all code
 ```
 
@@ -421,11 +422,11 @@ There are multiple benchmarks in the repository. For full list, see `task | grep
 
 ```bash
 $ task | grep benchmark
+* benchmark:                    Run all benchmarks and produce plots for them
 * benchmark-accuracy:           Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)
-* benchmark-cli:                Benchmark correctness of the CLI tool
+* benchmark-cli:                Speed benchmark using Criterion (benches/speed_benchmark.rs)
 * benchmark-comparison:         Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)
-* benchmark-scaling:            Scaling benchmark: sizes 100..10M (10x steps), 1 round, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
-* benchmark-speed:              Speed benchmark across dataset sizes (100 to 1M sequences, 7 rounds, H/imgt)
+* benchmark-speed:              Speed benchmark: sizes 100..1M, 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
 * benchmark-speed-polars:       Speed benchmark for immunum polars across all chain/scheme fixtures
 ```
 
@@ -433,10 +434,11 @@ $ task | grep benchmark
 
 ```
 src/
-├── main.rs          # CLI binary (immunum number ...)
+├── main.rs          # CLI binary (immunum number / immunum segment)
 ├── lib.rs           # Public API
-├── annotator.rs     # Sequence annotation and chain detection
+├── annotator.rs     # Sequence annotation, chain detection and domain search
 ├── alignment.rs     # Needleman-Wunsch semi-global alignment
+├── error.rs         # Error (raised) and SequenceError (returned)
 ├── io.rs            # Input parsing (FASTA, raw) and output formatting (TSV, JSON, JSONL)
 ├── numbering.rs     # Numbering module entry point
 ├── numbering/
@@ -446,13 +448,15 @@ src/
 │   ├── martin.rs    # Martin (extended Chothia) numbering rules
 │   └── aho.rs       # AHo numbering rules
 ├── scoring.rs       # PSSM and scoring matrices
-├── types.rs         # Core domain types (Chain, Scheme, Position)
+├── types.rs         # Core domain types (Chain, Scheme, Position, Region)
+├── python.rs        # Python bindings (pyo3)
+├── polars.rs        # Polars plugin expressions
+├── wasm.rs          # JavaScript bindings (wasm-bindgen) and TypeScript types
 ├── validation.rs    # Validation utilities
-├── error.rs         # Error types
 └── bin/
     ├── benchmark.rs       # Validation metrics report
-    ├── debug_validation.rs # Alignment mismatch visualization
-    └── speed_benchmark.rs  # Performance benchmarks
+    └── debug_validation.rs # Alignment mismatch visualization
+benches/             # Criterion and Python speed/correctness benchmarks
 resources/
 └── consensus/       # Consensus sequence CSVs (compiled into scoring matrices)
 fixtures/
@@ -460,10 +464,11 @@ fixtures/
 ├── ig.fasta         # Example antibody sequences
 └── ig.tsv           # Example TSV input
 scripts/             # Python tooling for generating consensus data
+tests/               # CLI, Python, Polars and JS tests, and the shared error_cases.json
 immunum/
-├── _internal.pyi    # python stub file for pyo3
-├── polars.py        # polars extension module
-└── python.py        # python module
+├── __init__.py      # Python module
+├── _internal.pyi    # Python stub file for pyo3
+└── polars.py        # Polars extension module
 ```
 
 ### Design decisions
