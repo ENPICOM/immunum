@@ -1,0 +1,19 @@
+fixtures/validation/tcr_D_imgt.csv
+  s_394dc2250bcee0::t_298e4927130dd5 2-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f022e315199b972c0badb4d63a81bea95652a5d2",
+  "prompts": {},
+  "sessions": {
+    "s_394dc2250bcee0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e145bd4-c41c-4e5b-8e48-e8ca6cbdee04",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
