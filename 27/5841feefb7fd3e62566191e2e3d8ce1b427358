@@ -1,0 +1,20 @@
+.github/workflows/ci.yml
+  h_acea35c6bbea0b 14-15,21-23,50-53,55-60,62-65,72-73,79,82-83,89
+CHANGELOG.md
+  h_acea35c6bbea0b 112-114
+pyproject.toml
+  h_acea35c6bbea0b 48-56,58
+uv.lock
+  h_acea35c6bbea0b 487,724,745-752,773,781,792-799,2060-2140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "275841feefb7fd3e62566191e2e3d8ce1b427358",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
