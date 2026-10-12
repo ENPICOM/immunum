@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rows can be filtered without matching messages: `invalid_sequence`, `low_confidence` or, from the
   `*_domains` methods only, `domain_too_short` (the best alignment is confident but shorter than a
   domain must be, so there is no domain to report). It is a field of Python's `NumberingResult` and
-  `SegmenationResult`, of the Polars structs and of CLI JSON records, and a column of CLI TSV output.
+  `SegmentationResult`, of the Polars structs and of CLI JSON records, and a column of CLI TSV output.
 - Python: `immunum.Error`, a `ValueError` subclass raised for every setup mistake, with a `kind`:
   `invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`. JavaScript throws
   `Error` objects with the same `kind` (`ImmunumError` in the TypeScript types).

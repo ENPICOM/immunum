@@ -16,7 +16,7 @@
       members: true
       filters: ["!^_"]
 
-::: immunum.SegmenationResult
+::: immunum.SegmentationResult
     options:
       members: true
       filters: ["!^_"]

@@ -9,7 +9,7 @@ from typing import Optional
 
 
 @dataclass(frozen=True)
-class SegmenationResult:
+class SegmentationResult:
     """
     Python dataclass containing numbering results. Allows for direct atribute access
     via `results.fr1`, and also for iterating through segmentation results via `as_dict()`:
@@ -264,21 +264,21 @@ class Annotator:
         """
         return [NumberingResult(**d) for d in self._annotator.number_domains(sequence)]
 
-    def segment(self, sequence: str) -> SegmenationResult:
+    def segment(self, sequence: str) -> SegmentationResult:
         """Split a sequence into FR/CDR regions.
 
         Args:
             sequence: Amino-acid sequence string (single-letter codes).
 
         Returns:
-            A `SegmenationResult` with ``fr1``–``fr4``, ``cdr1``–``cdr3``,
+            A `SegmentationResult` with ``fr1``–``fr4``, ``cdr1``–``cdr3``,
             and the residues before and after the domain as ``prefix``/``postfix``,
             so the regions in order rebuild the sequence. On failure, ``error`` and
             ``error_kind`` are set and all region fields are ``None``.
         """
-        return SegmenationResult(**self._annotator.segment(sequence))
+        return SegmentationResult(**self._annotator.segment(sequence))
 
-    def segment_domains(self, sequence: str) -> list[SegmenationResult]:
+    def segment_domains(self, sequence: str) -> list[SegmentationResult]:
         """Split every variable domain in a sequence into FR/CDR regions.
 
         Every residue lands in exactly one domain's regions: a domain's ``prefix`` holds
@@ -313,12 +313,12 @@ class Annotator:
             sequence: Amino-acid sequence string (single-letter codes).
 
         Returns:
-            One `SegmenationResult` per domain, ordered by position; never empty. A
+            One `SegmentationResult` per domain, ordered by position; never empty. A
             sequence without a domain or an invalid one gives a single result with
             ``error`` and ``error_kind`` set, as `number_domains` describes.
         """
         return [
-            SegmenationResult(**d) for d in self._annotator.segment_domains(sequence)
+            SegmentationResult(**d) for d in self._annotator.segment_domains(sequence)
         ]
 
 
@@ -358,10 +358,16 @@ def scheme_supports_chain(scheme: str, chain: str) -> bool:
     """Tell whether a scheme numbers a chain, before building an `Annotator` for them.
 
     ```python
-    from immunum import scheme_supports_chain
+    from immunum import (
+        scheme_supports_chain,
+    )
 
-    assert scheme_supports_chain("kabat", "H")
-    assert not scheme_supports_chain("kabat", "B")  # only IMGT numbers TCR chains
+    assert scheme_supports_chain(
+        "kabat", "H"
+    )
+    assert not scheme_supports_chain(
+        "kabat", "B"
+    )  # only IMGT numbers TCR chains
     ```
 
     Args:
