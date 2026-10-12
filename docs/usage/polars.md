@@ -165,7 +165,7 @@ print(df)
 # │ str                             ┆ str              │
 # ╞═════════════════════════════════╪══════════════════╡
 # │ sequence length 4 is below min… ┆ invalid_sequence │
-# │ alignment confidence 0.0416 is… ┆ low_confidence   │
+# │ alignment confidence 0.0435 is… ┆ low_confidence   │
 # └─────────────────────────────────┴──────────────────┘
 ```
 

@@ -92,7 +92,7 @@
       "scheme": "imgt",
       "sequence": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       "kind": "low_confidence",
-      "message": "alignment confidence 0.0416 is below min_confidence 0.5000"
+      "message": "alignment confidence 0.0435 is below min_confidence 0.5000"
     }
   ],
   "domain_errors": [

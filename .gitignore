@@ -16,3 +16,6 @@ results.json
 
 # ANARCI source for local benchmarking
 ANARCI/
+
+# IMGT/GENE-DB download cache of scripts/generate_consensus.py
+.cache/
