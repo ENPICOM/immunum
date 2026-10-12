@@ -3,18 +3,18 @@
 immunum is compared against three established antibody numbering tools:
 [antpack~=0.2.7](https://github.com/jlparkI/AntPack),
 [ANARCI](https://github.com/oxpig/ANARCI), and
-[anarcii2](https://github.com/oxpig/ANARCII).
+[ANARCII](https://github.com/oxpig/ANARCII).
 
 ## How benchmarks are run
 
 Two separate benchmark runs are combined to produce the plots on this page:
 
-- **Accuracy** (`task benchmark-accuracy`): each table from `fixtures/validation/*.csv` is
+- **Accuracy** (`task benchmark-accuracy`): each table from `fixtures/validation/*_imgt.csv` is
 sampled to 1,000 sequences and annotated 7 rounds with every tool. Accuracy is measured
 as residue-level correctness per IMGT region (FR1–FR4, CDR1–CDR3).
 
 - **Speed** (`task benchmark-speed`): batch sizes from 100 to 1,000,000 sequences (10× steps)
-are timed 3 rounds each using IGH/IMGT. Only the annotation step is timed -— annotator
+are timed 3 rounds each using IGH/IMGT. Only the annotation step is timed — annotator
 construction and result extraction are excluded.
 
 Plots are generated from the saved CSV files with `task plots`.
@@ -25,16 +25,16 @@ The validation fixtures are derived from unique PDB structures where the
 IMGT numbering assigned by antpack and ANARCI agrees between the two tools. As a
 consequence, **antpack and ANARCI will by definition always achieve 100% correctness
 on these fixtures** — they are the source of the ground truth. This is a known
-limitation; we intend to fix that in the next release.
+limitation, tracked in [#33](https://github.com/ENPICOM/immunum/issues/33).
 
 ### Known issues
 
 The runs for ANARCI, ANARCII, and Antpack may not reflect best-case performance due
 to how they are invoked in the benchmark harness (for instance, `antpack_parallel` scaling is very weird). Fixes are tracked in:
 
-- ANARCI: [#0](https://github.com/ENPICOM/immunum-rs/issues)
-- ANARCII: [#0](https://github.com/ENPICOM/immunum-rs/issues)
-- Antpack: [#0](https://github.com/ENPICOM/immunum-rs/issues)
+- ANARCI: [#30](https://github.com/ENPICOM/immunum/issues/30)
+- ANARCII: [#31](https://github.com/ENPICOM/immunum/issues/31)
+- Antpack: [#32](https://github.com/ENPICOM/immunum/issues/32)
 
 If you want to add another tool to the comparison, please open an issue on our
 [issue tracker](https://github.com/ENPICOM/immunum/issues).

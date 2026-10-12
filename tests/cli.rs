@@ -17,7 +17,7 @@ fn raw_sequence_argument() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror",
+            "sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror\terror_kind",
         ));
 }
 
@@ -178,7 +178,8 @@ fn output_to_file() {
         .stdout(predicate::str::is_empty());
 
     let contents = fs::read_to_string(&out_path).unwrap();
-    assert!(contents.contains("sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror"));
+    assert!(contents
+        .contains("sequence_id\tchain\tscheme\tconfidence\tposition\tresidue\terror\terror_kind"));
 }
 
 // --- TSV piping via stdin ---
@@ -264,8 +265,8 @@ const SCFV: &str = concat!(
 
 #[test]
 fn all_domains_emits_one_record_per_domain() {
-    // An scFv, an invalid sequence, and one too unlike any domain to hold one
-    let input = format!("{SCFV}\nAAAA\n{}\n", "A".repeat(40));
+    // An scFv, and an invalid sequence, whose error record belongs to no domain
+    let input = format!("{SCFV}\nAAAA\n");
     let output = immunum()
         .args(["number", "--all-domains", "-f", "jsonl"])
         .write_stdin(input)
@@ -316,7 +317,9 @@ fn all_domains_tsv_has_a_domain_column() {
     let mut lines = stdout.lines();
     assert_eq!(
         lines.next(),
-        Some("sequence_id\tdomain\tchain\tscheme\tconfidence\tposition\tresidue\terror")
+        Some(
+            "sequence_id\tdomain\tchain\tscheme\tconfidence\tposition\tresidue\terror\terror_kind"
+        )
     );
     let domains: std::collections::BTreeSet<(&str, &str)> = lines
         .map(|line| {
@@ -327,8 +330,18 @@ fn all_domains_tsv_has_a_domain_column() {
     assert_eq!(domains, [("0", "H"), ("1", "K")].into_iter().collect());
 }
 
-const SEGMENT_COLUMNS: [&str; 10] = [
-    "prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix", "error",
+const SEGMENT_COLUMNS: [&str; 11] = [
+    "prefix",
+    "fr1",
+    "cdr1",
+    "fr2",
+    "cdr2",
+    "fr3",
+    "cdr3",
+    "fr4",
+    "postfix",
+    "error",
+    "error_kind",
 ];
 
 #[test]
@@ -422,12 +435,32 @@ fn error_record_appears_in_tsv() {
         lines[1].contains("seq_1"),
         "error row should have sequence id"
     );
-    // last column (error) should be non-empty
     let cols: Vec<&str> = lines[1].split('\t').collect();
-    assert!(
-        !cols.last().unwrap().is_empty(),
-        "error column should be non-empty"
+    assert_eq!(
+        cols[cols.len() - 2..],
+        ["sequence length 10 is below minimum 30", "invalid_sequence"]
     );
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        "warning: 1 of 1 sequences had errors; see the error and error_kind columns\n"
+    );
+}
+
+#[test]
+fn success_rows_leave_error_columns_empty_in_tsv() {
+    let output = immunum()
+        .args(["number", "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty(), "no summary without errors");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for line in stdout.lines().skip(1) {
+        let cols: Vec<&str> = line.split('\t').collect();
+        assert_eq!(cols.len(), 8);
+        assert_eq!(cols[6..], ["", ""]);
+    }
 }
 
 // --- Error cases ---
@@ -453,29 +486,116 @@ fn invalid_format_shows_error() {
 }
 
 #[test]
-fn invalid_scheme_shows_error() {
+fn missing_input_file_is_a_setup_error() {
     immunum()
-        .args([
-            "number",
-            "-s",
-            "nonsense",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
-        ])
+        .args(["number", "seqs_typo.fasta"])
         .assert()
-        .failure();
+        .code(1)
+        .stdout(predicate::str::is_empty())
+        .stderr(
+            "error: cannot open 'seqs_typo.fasta': no such file (a raw sequence may only contain letters)\n",
+        );
+}
+
+// --- Shared error table (tests/error_cases.json) ---
+
+fn error_cases() -> serde_json::Value {
+    serde_json::from_str(&fs::read_to_string("tests/error_cases.json").unwrap()).unwrap()
+}
+
+fn chain_list(case: &serde_json::Value) -> String {
+    let chains: Vec<&str> = case["chains"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap())
+        .collect();
+    chains.join(",")
+}
+
+fn jsonl_records(stdout: Vec<u8>) -> Vec<serde_json::Value> {
+    String::from_utf8(stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("valid jsonl"))
+        .collect()
 }
 
 #[test]
-fn out_of_range_min_confidence_shows_error() {
-    immunum()
-        .args([
-            "number",
-            "--min-confidence",
-            "1.5",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
-        ])
-        .assert()
-        .failure();
+fn setup_errors_exit_with_the_shared_message() {
+    for case in error_cases()["setup"].as_array().unwrap() {
+        let chains = chain_list(case);
+        if chains.is_empty() {
+            // The command line can't express an empty chain list
+            continue;
+        }
+        let mut args = vec![
+            "number".to_string(),
+            "-c".to_string(),
+            chains,
+            "-s".to_string(),
+            case["scheme"].as_str().unwrap().to_string(),
+        ];
+        if let Some(min_confidence) = case["min_confidence"].as_f64() {
+            args.extend(["--min-confidence".to_string(), min_confidence.to_string()]);
+        }
+        args.push("EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS".to_string());
+        immunum()
+            .args(&args)
+            .assert()
+            .code(1)
+            .stdout(predicate::str::is_empty())
+            .stderr(format!("error: {}\n", case["message"].as_str().unwrap()));
+    }
+}
+
+#[test]
+fn sequence_errors_are_returned_as_records() {
+    for case in error_cases()["sequences"].as_array().unwrap() {
+        for command in ["number", "segment"] {
+            let records = jsonl_records(run_case(command, case, false));
+            assert_eq!(records.len(), 1, "{command} {case}");
+            assert_eq!(records[0]["error"], case["message"], "{command} {case}");
+            assert_eq!(records[0]["error_kind"], case["kind"], "{command} {case}");
+            assert_all_domains_error(command, case);
+        }
+    }
+}
+
+#[test]
+fn a_sequence_without_a_domain_gets_an_error_record_with_all_domains() {
+    for case in error_cases()["domain_errors"].as_array().unwrap() {
+        for command in ["number", "segment"] {
+            let records = jsonl_records(run_case(command, case, false));
+            assert!(records[0]["error"].is_null(), "{command} {case}");
+            assert_all_domains_error(command, case);
+        }
+    }
+}
+
+// `command -f jsonl` on `case`'s sequence, through stdin because one fixture sequence holds a digit
+fn run_case(command: &str, case: &serde_json::Value, all_domains: bool) -> Vec<u8> {
+    let chains = chain_list(case);
+    let mut args = vec![command, "-f", "jsonl", "-c", &chains];
+    args.extend(["-s", case["scheme"].as_str().unwrap()]);
+    if all_domains {
+        args.push("--all-domains");
+    }
+    let output = immunum()
+        .args(args)
+        .write_stdin(format!("{}\n", case["sequence"].as_str().unwrap()))
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{command} {case}");
+    output.stdout
+}
+
+// With `--all-domains`, `case`'s sequence gets one record, carrying its error
+fn assert_all_domains_error(command: &str, case: &serde_json::Value) {
+    let records = jsonl_records(run_case(command, case, true));
+    assert_eq!(records.len(), 1, "{command} {case}");
+    assert_eq!(records[0]["error"], case["message"], "{command} {case}");
+    assert_eq!(records[0]["error_kind"], case["kind"], "{command} {case}");
 }
 
 // --- JSON output is valid ---

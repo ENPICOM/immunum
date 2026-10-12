@@ -4,15 +4,33 @@ use wasm_bindgen::prelude::*;
 use crate::annotator::{per_domain, Annotator, NumberingResult, SegmentResult};
 use crate::numbering::{region_spans, SEGMENT_NAMES};
 use crate::types::scheme_supports_chain;
+use crate::SequenceError;
 
+// What every function throws: an `Error` with the message and the error's `kind`
 fn to_js(e: crate::Error) -> JsValue {
-    JsValue::from_str(&e.to_string())
+    let error = js_sys::Error::new(&e.to_string());
+    Reflect::set(&error, &"kind".into(), &e.kind().into()).unwrap();
+    error.into()
+}
+
+// Sets `error` and `errorKind` on a returned object, both null on success
+fn set_error(dict: &Object, error: Option<&SequenceError>) {
+    let (message, kind) = match error {
+        Some(e) => (
+            JsValue::from_str(&e.to_string()),
+            JsValue::from_str(e.kind()),
+        ),
+        None => (JsValue::NULL, JsValue::NULL),
+    };
+    Reflect::set(dict, &"error".into(), &message).unwrap();
+    Reflect::set(dict, &"errorKind".into(), &kind).unwrap();
 }
 
 // What `Annotator.number` returns for `sequence`: the numbering, or the error with every other field
 // null. The fields are camelCase on purpose, as JavaScript and TypeScript code expects:
-// `queryStart` and `queryEnd` here are `query_start` and `query_end` in every other interface.
-fn numbering_object(sequence: &str, result: crate::Result<NumberingResult>) -> JsValue {
+// `queryStart`, `queryEnd` and `errorKind` here are `query_start`, `query_end` and `error_kind` in
+// every other interface.
+fn numbering_object(sequence: &str, result: Result<NumberingResult, SequenceError>) -> JsValue {
     let dict = Object::new();
     match result {
         Ok(result) => {
@@ -37,7 +55,7 @@ fn numbering_object(sequence: &str, result: crate::Result<NumberingResult>) -> J
             )
             .unwrap();
             Reflect::set(&dict, &"queryEnd".into(), &(result.query_end as u32).into()).unwrap();
-            Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
+            set_error(&dict, None);
         }
         Err(e) => {
             Reflect::set(&dict, &"chain".into(), &JsValue::NULL).unwrap();
@@ -46,14 +64,14 @@ fn numbering_object(sequence: &str, result: crate::Result<NumberingResult>) -> J
             Reflect::set(&dict, &"numbering".into(), &JsValue::NULL).unwrap();
             Reflect::set(&dict, &"queryStart".into(), &JsValue::NULL).unwrap();
             Reflect::set(&dict, &"queryEnd".into(), &JsValue::NULL).unwrap();
-            Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
+            set_error(&dict, Some(&e));
         }
     }
     dict.into()
 }
 
 // What `Annotator.segment` returns: the segments, or the error with every segment null
-fn segment_object(result: crate::Result<SegmentResult>) -> JsValue {
+fn segment_object(result: Result<SegmentResult, SequenceError>) -> JsValue {
     let dict = Object::new();
     match result {
         Ok(s) => {
@@ -65,13 +83,13 @@ fn segment_object(result: crate::Result<SegmentResult>) -> JsValue {
                 )
                 .unwrap();
             }
-            Reflect::set(&dict, &"error".into(), &JsValue::NULL).unwrap();
+            set_error(&dict, None);
         }
         Err(e) => {
             for name in SEGMENT_NAMES {
                 Reflect::set(&dict, &JsValue::from_str(name), &JsValue::NULL).unwrap();
             }
-            Reflect::set(&dict, &"error".into(), &JsValue::from_str(&e.to_string())).unwrap();
+            set_error(&dict, Some(&e));
         }
     }
     dict.into()
@@ -79,8 +97,8 @@ fn segment_object(result: crate::Result<SegmentResult>) -> JsValue {
 
 // One object per domain, as `per_domain` returns them
 fn domain_objects<T>(
-    results: crate::Result<Vec<T>>,
-    object: impl Fn(crate::Result<T>) -> JsValue,
+    results: Result<Vec<T>, SequenceError>,
+    object: impl Fn(Result<T, SequenceError>) -> JsValue,
 ) -> JsValue {
     per_domain(results)
         .into_iter()
@@ -98,10 +116,20 @@ const TS_TYPES: &str = r#"
 export type Numbering = Map<string, string>;
 
 /**
- * Result returned by {@link Annotator.number}. On failure, chain/scheme/confidence/numbering/queryStart/queryEnd are null and error contains the reason.
+ * Error thrown when immunum is set up or called wrongly, such as with an unknown chain name.
+ * `message` says what went wrong; `kind` is a stable code for it: `"invalid_chain"`,
+ * `"invalid_scheme"`, `"unsupported_chain"` or `"invalid_min_confidence"`.
+ */
+export interface ImmunumError extends Error {
+    kind: string;
+}
+
+/**
+ * Result returned by {@link Annotator.number}. On failure, chain/scheme/confidence/numbering/queryStart/queryEnd are null and error and errorKind contain the reason.
  *
- * The fields are camelCase on purpose, as JavaScript and TypeScript code expects: `queryStart` and
- * `queryEnd` are `query_start` and `query_end` in Python, Polars and the CLI.
+ * The fields are camelCase on purpose, as JavaScript and TypeScript code expects: `queryStart`,
+ * `queryEnd` and `errorKind` are `query_start`, `query_end` and `error_kind` in Python, Polars and
+ * the CLI.
  */
 export interface NumberingResult {
     /** Detected chain type: `"H"`, `"K"`, `"L"`, `"A"`, `"B"`, `"G"`, or `"D"`. Null on failure. */
@@ -118,9 +146,11 @@ export interface NumberingResult {
     queryEnd: number | null;
     /** Error message if numbering failed, null on success. */
     error: string | null;
+    /** What went wrong if numbering failed: `"invalid_sequence"`, `"low_confidence"` or, from {@link Annotator.numberDomains} only, `"domain_too_short"`. Null on success. */
+    errorKind: string | null;
 }
 
-/** FR/CDR segments returned by {@link Annotator.segment}. On failure, every region field is null and error contains the reason. */
+/** FR/CDR segments returned by {@link Annotator.segment}. On failure, every region field is null and error and errorKind contain the reason. */
 export interface SegmentationResult {
     fr1: string | null;
     cdr1: string | null;
@@ -135,6 +165,8 @@ export interface SegmentationResult {
     postfix: string | null;
     /** Error message if segmentation failed, null on success. */
     error: string | null;
+    /** What went wrong if segmentation failed: `"invalid_sequence"`, `"low_confidence"` or, from {@link Annotator.segmentDomains} only, `"domain_too_short"`. Null on success. */
+    errorKind: string | null;
 }
 
 /** Inclusive `[start, end]` position bounds of each FR/CDR region, N- to C-terminal. */
@@ -151,8 +183,10 @@ export interface RegionSpans {
 /**
  * The FR/CDR region boundaries a scheme uses for a chain, both named as for {@link Annotator}.
  * IMGT and AHo number every chain alike; Kabat, Chothia and Martin place their CDRs differently
- * on heavy and light chains. Throws for an unknown scheme or chain, and for a chain the scheme
- * doesn't number (only IMGT numbers TCR chains).
+ * on heavy and light chains.
+ *
+ * @throws {ImmunumError} `invalid_scheme` or `invalid_chain` for an unknown scheme or chain, and
+ *   `unsupported_chain` for a chain the scheme doesn't number (only IMGT numbers TCR chains).
  */
 export function regionsFor(scheme: string, chain: string): RegionSpans;
 
@@ -187,6 +221,10 @@ export function regionsFor(scheme: string, chain: string): RegionSpans;
  * @param minConfidence - Optional minimum alignment confidence threshold in the
  *   range `[0, 1]`. Sequences scoring below this value are rejected with an error.
  *   Defaults to `0.5` when `null` or omitted.
+ *
+ * @throws {ImmunumError} `invalid_chain` for an unknown chain name or no chains,
+ *   `invalid_scheme` for an unknown scheme, `unsupported_chain` for a chain the scheme
+ *   doesn't number and `invalid_min_confidence` for a `minConfidence` outside `[0, 1]`.
  */
 export class Annotator {
     free(): void;
@@ -196,8 +234,10 @@ export class Annotator {
     /**
      * Number every variable domain in a sequence, such as both domains of an scFv. One
      * {@link NumberingResult} per domain, ordered by position, each what `number` returns for that
-     * domain; empty when no domain aligns with enough confidence. When the sequence itself is
-     * invalid, a single result with `error` set.
+     * domain; never empty. A sequence without a domain gives a single result with `error` and
+     * `errorKind` set: `"low_confidence"` when no alignment reaches the minimum confidence, as
+     * `number` reports it, or `"domain_too_short"` when the best alignment is confident but shorter
+     * than a domain must be. So does an invalid sequence, with `"invalid_sequence"`.
      *
      * A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and
      * directly follows other residues, such as a linker, can have the residue just before it
@@ -208,8 +248,9 @@ export class Annotator {
     segment(sequence: string): SegmentationResult;
     /**
      * Split every variable domain in a sequence into FR/CDR regions. One
-     * {@link SegmentationResult} per domain, ordered by position; empty when no domain aligns with
-     * enough confidence. When the sequence itself is invalid, a single result with `error` set.
+     * {@link SegmentationResult} per domain, ordered by position; never empty. A sequence without
+     * a domain, or an invalid one, gives a single result with `error` and `errorKind` set, as for
+     * `numberDomains`.
      *
      * Every residue lands in exactly one domain's regions: a domain's `prefix` holds the residues
      * since the previous domain (or the start of the sequence), and only the last domain has the
@@ -256,8 +297,9 @@ impl Annotator {
 }
 
 /// Whether `scheme` numbers `chain`: IMGT numbers every chain, the other schemes antibody chains
-/// (IGH, IGK, IGL) only. Takes a scheme and a single chain by the names `Annotator` accepts, and
-/// throws on an unknown one.
+/// (IGH, IGK, IGL) only. Takes a scheme and a single chain by the names `Annotator` accepts.
+///
+/// @throws {ImmunumError} `invalid_scheme` or `invalid_chain` for an unknown scheme or chain.
 #[wasm_bindgen(js_name = "schemeSupportsChain")]
 pub fn wasm_scheme_supports_chain(scheme: &str, chain: &str) -> Result<bool, JsValue> {
     scheme_supports_chain(scheme, chain).map_err(to_js)

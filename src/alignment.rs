@@ -368,7 +368,7 @@ mod tests {
     }
     #[test]
     fn test_align_simple() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
 
         // A simple sequence that should align
         let sequence =
@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_empty_sequence() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         let result = test_align("", &matrix.positions);
         // Empty sequence should align with negative infinity score and no positions
         assert_eq!(result.score, f32::NEG_INFINITY);
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_partial_sequence_start() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
 
         // A sequence starting from middle of framework should align without heavy penalty
         let partial_seq = "GLEWVSAISGSGGSTYYADSVKGRFTISRDNAKN";
@@ -414,7 +414,7 @@ mod tests {
 
     #[test]
     fn test_partial_sequence_end() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
 
         // A sequence ending in middle should align without heavy penalty
         let partial_seq = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVS";
@@ -429,7 +429,7 @@ mod tests {
 
     #[test]
     fn test_fragment_alignment() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
 
         // A small fragment from the middle should align
         let fragment = "GLEWVSAISKSGGSTYY";
@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn test_normal_antibody_no_flanking() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         let result = test_align(FULL_IGH, &matrix.positions);
 
         assert_eq!(result.query_start, 0, "No prefix: query_start should be 0");
@@ -469,7 +469,7 @@ mod tests {
 
     #[test]
     fn test_trailing_suffix() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         let suffix = "AAAAAAA";
         let sequence = format!("{FULL_IGH}{suffix}");
         let result = test_align(&sequence, &matrix.positions);
@@ -492,7 +492,7 @@ mod tests {
 
     #[test]
     fn test_one_trailing_residue_is_not_inserted_after_the_last_position() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         for residue in ["A", "G", "R", "W"] {
             let sequence = format!("{FULL_IGH}{residue}");
             let result = test_align(&sequence, &matrix.positions);
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_one_trailing_residue_is_not_placed_at_an_unoccupied_position() {
-        let matrix = ScoringMatrix::load(Chain::IGK).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGK);
         for residue in ["A", "G", "R", "W"] {
             let sequence = format!("{KAPPA}{residue}");
             let result = test_align(&sequence, &matrix.positions);
@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn test_one_trailing_residue_aligns_the_domain_like_none() {
         for (chain, domain) in [(Chain::IGH, FULL_IGH), (Chain::IGK, KAPPA)] {
-            let matrix = ScoringMatrix::load(chain).unwrap();
+            let matrix = ScoringMatrix::load(chain);
             let bare = test_align(domain, &matrix.positions);
             let with_tail = test_align(&format!("{domain}A"), &matrix.positions);
 
@@ -541,7 +541,7 @@ mod tests {
 
     #[test]
     fn test_leading_prefix() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         let prefix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}");
         let result = test_align(&sequence, &matrix.positions);
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_both_flanking() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         let prefix = "AAAAAAA";
         let suffix = "AAAAAAA";
         let sequence = format!("{prefix}{FULL_IGH}{suffix}");
@@ -575,7 +575,7 @@ mod tests {
 
     #[test]
     fn test_ultralong_cdr3_is_not_clipped() {
-        let matrix = ScoringMatrix::load(Chain::IGH).unwrap();
+        let matrix = ScoringMatrix::load(Chain::IGH);
         let result = test_align(ULTRALONG_IGH, &matrix.positions);
 
         assert_eq!(result.query_start, 0);

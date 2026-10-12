@@ -1,6 +1,6 @@
 # Scripts
 
-Python helper scripts for generating consensus data used by the immunum-rs alignment engine. All commands should be run with `uv run` from the project root.
+Python helper scripts for generating consensus data used by the immunum alignment engine. All commands should be run with `uv run` from the project root.
 
 ## generate_consensus.py
 

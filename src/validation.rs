@@ -1,7 +1,7 @@
 //! Validation against numbered test data
 
 use crate::annotator::Annotator;
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::types::{Chain, Position, Scheme};
 use std::collections::HashMap;
 use std::fs;
@@ -16,18 +16,20 @@ pub struct ValidationEntry {
     pub expected_positions: Vec<(Position, char)>,
 }
 
+/// Why validation couldn't run: an unreadable or empty CSV, an annotator that couldn't be built, or
+/// a sequence that couldn't be numbered
+pub type ValidationError = Box<dyn std::error::Error + Send + Sync>;
+
 /// Load validation data from CSV file
-pub fn load_validation_csv(path: &Path) -> Result<Vec<ValidationEntry>> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| Error::ConsensusParseError(format!("Failed to read file: {}", e)))?;
+pub fn load_validation_csv(path: &Path) -> Result<Vec<ValidationEntry>, ValidationError> {
+    let content =
+        fs::read_to_string(path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
 
     let mut entries = Vec::new();
     let mut lines = content.lines();
 
     // Parse header to get position labels
-    let header_line = lines
-        .next()
-        .ok_or_else(|| Error::ConsensusParseError("Empty CSV file".to_string()))?;
+    let header_line = lines.next().ok_or("empty CSV file")?;
     let headers: Vec<&str> = header_line.split(',').collect();
 
     // Skip first three columns (header, sequence, species)
@@ -147,7 +149,7 @@ impl ChainMetrics {
 }
 
 /// Validate all sequences for a given chain with IMGT scheme (default)
-pub fn validate_chain(chain: Chain, csv_path: &str) -> Result<ChainMetrics> {
+pub fn validate_chain(chain: Chain, csv_path: &str) -> Result<ChainMetrics, ValidationError> {
     validate_chain_with_scheme(chain, csv_path, Scheme::IMGT, None)
 }
 
@@ -158,7 +160,7 @@ pub fn validate_chain_with_scheme(
     csv_path: &str,
     scheme: Scheme,
     species_filter: Option<&str>,
-) -> Result<ChainMetrics> {
+) -> Result<ChainMetrics, ValidationError> {
     let path = std::path::PathBuf::from(csv_path);
     let entries = load_validation_csv(&path)?;
     // Use min_confidence=0 for validation: we want to test all sequences regardless of confidence
@@ -182,7 +184,10 @@ pub fn validate_chain_with_scheme(
 }
 
 /// Validate a single entry against the annotator
-pub fn validate_entry(entry: &ValidationEntry, annotator: &Annotator) -> Result<ValidationResult> {
+pub fn validate_entry(
+    entry: &ValidationEntry,
+    annotator: &Annotator,
+) -> Result<ValidationResult, ValidationError> {
     // Number the sequence
     let result = annotator.number(&entry.sequence)?;
 
@@ -192,11 +197,12 @@ pub fn validate_entry(entry: &ValidationEntry, annotator: &Annotator) -> Result<
 
     let aligned_len = result.query_end - result.query_start + 1;
     if result.positions.len() != aligned_len {
-        return Err(Error::AlignmentError(format!(
-            "Numbering length {} doesn't match antibody region length {}",
+        return Err(format!(
+            "numbering length {} doesn't match antibody region length {}",
             result.positions.len(),
             aligned_len,
-        )));
+        )
+        .into());
     }
 
     let total_positions = entry.expected_positions.len();

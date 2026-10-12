@@ -201,9 +201,10 @@ impl Scheme {
     /// An error unless this scheme [`supports`](Self::supports) `chain`.
     pub fn validate_chain(self, chain: Chain) -> Result<()> {
         if !self.supports(chain) {
-            return Err(Error::InvalidScheme(format!(
-                "{self} scheme only supported for antibody chains (IGH, IGK, IGL)"
-            )));
+            return Err(Error::UnsupportedChain {
+                scheme: self,
+                chain,
+            });
         }
         Ok(())
     }

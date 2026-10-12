@@ -234,7 +234,7 @@ tasks:
                 done
 
     benchmark-speed:
-        desc: "Speed benchmark: sizes 100..10M (10x steps), 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
+        desc: "Speed benchmark: sizes 100..1M, 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
         cmd: |
             uv run --group benchmark python benches/bench_comparison.py \
               --sizes 1_000_000 --sizes 500 --sizes 1000 --sizes 5000 --sizes 10_000 --sizes 50_000 --sizes 100_000 --sizes 500_000 --sizes 100 \

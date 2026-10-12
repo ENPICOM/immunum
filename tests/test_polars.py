@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import rtoml
 from pathlib import Path
 
@@ -7,7 +8,11 @@ import pytest
 
 polars = pytest.importorskip("polars")
 
+import immunum  # noqa: E402
 import immunum.polars as imp  # noqa: E402
+
+# The errors every interface reports, with their kinds and messages
+ERROR_CASES = json.loads((Path(__file__).parent / "error_cases.json").read_text())
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "validation"
 BENCHMARKS = Path(__file__).parent.parent / "BENCHMARKS.toml"
@@ -104,16 +109,7 @@ class TestPolarsNumber:
             )
         ).unnest("numbered")
         assert result["error"][0] is None
-
-    def test_number_error_field_set_on_failure(self):
-        df = polars.DataFrame({"sequence": ["AAAAAAAAAAAAAAAA"]})
-        result = df.select(
-            imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
-                "numbered"
-            )
-        ).unnest("numbered")
-        assert result["error"][0] is not None
-        assert result["chain"][0] is None
+        assert result["error_kind"][0] is None
 
     def test_number_multiple_sequences(self):
         df = polars.DataFrame({"sequence": [IGH_SEQ, SEQ]})
@@ -138,11 +134,6 @@ class TestPolarsNumber:
         canonical = numbering(["IGH", "IGK", "IGL"], "IMGT")
         assert numbering(["ig"], "i") == canonical
         assert numbering(["heavy", "k", "lambda"], "imgt") == canonical
-
-    def test_number_unknown_chain_raises(self):
-        df = polars.DataFrame({"sequence": [IGH_SEQ]})
-        with pytest.raises(polars.exceptions.ComputeError):
-            df.select(imp.number(polars.col("sequence"), chains=["IGX"], scheme="IMGT"))
 
 
 @pytest.mark.slow
@@ -197,6 +188,7 @@ class TestPolarsSegment:
             "prefix",
             "postfix",
             "error",
+            "error_kind",
         }
         assert expected_fields.issubset(set(result.columns))
 
@@ -208,16 +200,7 @@ class TestPolarsSegment:
             )
         ).unnest("segmented")
         assert result["error"][0] is None
-
-    def test_segment_error_field_set_on_failure(self):
-        df = polars.DataFrame({"sequence": ["AAAAAAAAAAAAAAAA"]})
-        result = df.select(
-            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
-                "segmented"
-            )
-        ).unnest("segmented")
-        assert result["error"][0] is not None
-        assert result["fr1"][0] is None
+        assert result["error_kind"][0] is None
 
     def test_segment_multiple_sequences(self):
         df = polars.DataFrame({"sequence": [IGH_SEQ, SEQ]})
@@ -311,7 +294,7 @@ class TestPolarsMatchesAnnotator:
             for s in sequences
         ]
         assert got == expected
-        assert [len(row) for row in expected[:3]] == [2, 1, 0]
+        assert [len(row) for row in expected[:3]] == [2, 1, 1]
 
 
 class TestPolarsAnnotatorArguments:
@@ -343,3 +326,75 @@ class TestPolarsAnnotatorArguments:
             old = getattr(imp, deprecated)(polars.col("sequence"), annotator=annotator)
         new = getattr(imp, replacement)(polars.col("sequence"), annotator=annotator)
         assert df.select(old.alias("x")).equals(df.select(new.alias("x")))
+
+
+FUNCTIONS = ["number", "number_domains", "segment", "segment_domains"]
+
+
+class TestPolarsErrorCases:
+    """Every case in tests/error_cases.json, reported with its kind and message."""
+
+    @pytest.mark.parametrize("function", FUNCTIONS)
+    @pytest.mark.parametrize("case", ERROR_CASES["setup"])
+    def test_setup_raises_when_the_expression_is_built(self, case, function):
+        with pytest.raises(immunum.Error) as raised:
+            getattr(imp, function)(
+                "sequence",
+                chains=case["chains"],
+                scheme=case["scheme"],
+                min_confidence=case["min_confidence"],
+            )
+        assert isinstance(raised.value, ValueError)
+        assert raised.value.kind == case["kind"]
+        assert str(raised.value) == case["message"]
+
+    @pytest.mark.parametrize("function", ["number", "segment"])
+    @pytest.mark.parametrize("case", ERROR_CASES["sequences"])
+    def test_sequence_error_is_returned(self, case, function):
+        expr = getattr(imp, function)(
+            "sequence", chains=case["chains"], scheme=case["scheme"]
+        )
+        [row] = (
+            polars.DataFrame({"sequence": [case["sequence"]]})
+            .select(expr.alias("r"))
+            .unnest("r")
+            .to_dicts()
+        )
+        assert (row.pop("error"), row.pop("error_kind")) == (
+            case["message"],
+            case["kind"],
+        )
+        assert list(row.values()) == [None] * len(row)
+
+    @pytest.mark.parametrize("function", ["number_domains", "segment_domains"])
+    @pytest.mark.parametrize(
+        "case", ERROR_CASES["sequences"] + ERROR_CASES["domain_errors"]
+    )
+    def test_domains_return_the_error_as_their_only_result(self, case, function):
+        expr = getattr(imp, function)(
+            "sequence", chains=case["chains"], scheme=case["scheme"]
+        )
+        [[domain]] = (
+            polars.DataFrame({"sequence": [case["sequence"]]})
+            .select(expr.alias("d"))["d"]
+            .to_list()
+        )
+        assert (domain.pop("error"), domain.pop("error_kind")) == (
+            case["message"],
+            case["kind"],
+        )
+        assert list(domain.values()) == [None] * len(domain)
+
+    @pytest.mark.parametrize("function", ["number", "segment"])
+    @pytest.mark.parametrize("case", ERROR_CASES["domain_errors"])
+    def test_a_domain_error_numbers_fine_on_its_own(self, case, function):
+        expr = getattr(imp, function)(
+            "sequence", chains=case["chains"], scheme=case["scheme"]
+        )
+        [row] = (
+            polars.DataFrame({"sequence": [case["sequence"]]})
+            .select(expr.alias("r"))
+            .unnest("r")
+            .to_dicts()
+        )
+        assert row["error"] is None

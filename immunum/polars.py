@@ -30,27 +30,26 @@ def _plugin(
     min_confidence: float | None,
     annotator: Annotator | None,
 ) -> pl.Expr:
-    """The plugin `function`, with its annotator prebuilt or built from names when the query runs."""
+    """The plugin `function` with `annotator`, or with one built from the names now.
+
+    Building it here raises `immunum.Error` for a bad name when the expression is built, not
+    when the query runs.
+    """
     if annotator is not None:
         if chains is not None or scheme is not None or min_confidence is not None:
             raise TypeError(
                 "pass either `annotator` or `chains`, `scheme` and `min_confidence`, not both"
             )
-        return register_plugin_function(
-            args=[expr],
-            plugin_path=LIB,
-            function_name=f"{function}_class_struct_expr",
-            is_elementwise=True,
-            kwargs={"annotator": annotator._annotator},
-        )
-    if chains is None or scheme is None:
+    elif chains is None or scheme is None:
         raise TypeError("pass `chains` and `scheme`, or a prebuilt `annotator`")
+    else:
+        annotator = Annotator(chains, scheme, min_confidence)
     return register_plugin_function(
         args=[expr],
         plugin_path=LIB,
-        function_name=f"{function}_struct_expr",
+        function_name=f"{function}_class_struct_expr",
         is_elementwise=True,
-        kwargs={"chains": chains, "scheme": scheme, "min_confidence": min_confidence},
+        kwargs={"annotator": annotator._annotator},
     )
 
 
@@ -65,13 +64,12 @@ def number(
     """Number sequences as a Polars expression.
 
     Each row gets the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`,
-    `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and
-    `error`. On failure, `error` is set and every other field is null.
+    `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end`, `error`
+    and `error_kind`. On failure, `error` and `error_kind` are set and every other field is null.
 
     Pass either `chains` and `scheme` (and optionally `min_confidence`), or a prebuilt
-    `annotator`; both give the same result and run as fast. Names are checked when the query
-    runs, so an unknown one raises a `ComputeError` then; an `Annotator` checks them when you
-    build it, raising `ValueError`.
+    `annotator`; both give the same result and run as fast. Either way the names are checked
+    when the expression is built, so a bad one raises `immunum.Error` straight away.
 
     Example:
 
@@ -110,6 +108,7 @@ def number(
                 "query_start": pl.UInt32,
                 "query_end": pl.UInt32,
                 "error": pl.String,
+                "error_kind": pl.String,
             }
         )
     ]
@@ -121,15 +120,15 @@ def number(
         )
     )
 
-    # shape: (2, 7)
-    # ┌───────┬────────┬────────────┬─────────────────────────────────┬─────────────┬───────────┬───────┐
-    # │ chain ┆ scheme ┆ confidence ┆ numbering                       ┆ query_start ┆ query_end ┆ error │
-    # │ ---   ┆ ---    ┆ ---        ┆ ---                             ┆ ---         ┆ ---       ┆ ---   │
-    # │ str   ┆ str    ┆ f32        ┆ list[struct[2]]                 ┆ u32         ┆ u32       ┆ str   │
-    # ╞═══════╪════════╪════════════╪═════════════════════════════════╪═════════════╪═══════════╪═══════╡
-    # │ H     ┆ IMGT   ┆ 0.784515   ┆ [{"1","Q"}, {"2","V"}, … {"128… ┆ 0           ┆ 121       ┆ null  │
-    # │ K     ┆ IMGT   ┆ 0.878814   ┆ [{"1","D"}, {"2","I"}, … {"127… ┆ 0           ┆ 106       ┆ null  │
-    # └───────┴────────┴────────────┴─────────────────────────────────┴─────────────┴───────────┴───────┘
+    # shape: (2, 8)
+    # ┌───────┬────────┬────────────┬─────────────────────────────────┬─────────────┬───────────┬───────┬────────────┐
+    # │ chain ┆ scheme ┆ confidence ┆ numbering                       ┆ query_start ┆ query_end ┆ error ┆ error_kind │
+    # │ ---   ┆ ---    ┆ ---        ┆ ---                             ┆ ---         ┆ ---       ┆ ---   ┆ ---        │
+    # │ str   ┆ str    ┆ f32        ┆ list[struct[2]]                 ┆ u32         ┆ u32       ┆ str   ┆ str        │
+    # ╞═══════╪════════╪════════════╪═════════════════════════════════╪═════════════╪═══════════╪═══════╪════════════╡
+    # │ H     ┆ IMGT   ┆ 0.784515   ┆ [{"1","Q"}, {"2","V"}, … {"128… ┆ 0           ┆ 121       ┆ null  ┆ null       │
+    # │ K     ┆ IMGT   ┆ 0.878814   ┆ [{"1","D"}, {"2","I"}, … {"127… ┆ 0           ┆ 106       ┆ null  ┆ null       │
+    # └───────┴────────┴────────────┴─────────────────────────────────┴─────────────┴───────────┴───────┴────────────┘
 
     # One row per numbered residue
     print(
@@ -171,6 +170,10 @@ def number(
 
     Returns:
         pl.Expr: numbering expression
+
+    Raises:
+        immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.
+        TypeError: If both or neither of `annotator` and the names are given.
     """
     return _plugin(expr, "numbering", chains, scheme, min_confidence, annotator)
 
@@ -186,9 +189,11 @@ def number_domains(
     """Number every variable domain in each sequence, such as both domains of an scFv.
 
     Each row gets a list with one struct per domain, ordered by position, each with the fields
-    `number` returns for that domain. The list is empty when no domain aligns with enough
-    confidence. When the sequence itself is invalid (too short, too long or not amino acids), it
-    holds a single struct with `error` set and every other field null.
+    `number` returns for that domain; the list is never empty. A sequence without a domain gets
+    a single struct with `error` and `error_kind` set and every other field null: `low_confidence`
+    when no alignment reaches `min_confidence`, as `number` reports it, or `domain_too_short` when
+    the best alignment is confident but shorter than a domain must be. So does an invalid sequence
+    (too short, too long or not amino acids), with `invalid_sequence`.
 
     A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and
     directly follows other residues, such as a linker, can have the residue just before it
@@ -251,6 +256,10 @@ def number_domains(
 
     Returns:
         pl.Expr: domains expression
+
+    Raises:
+        immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.
+        TypeError: If both or neither of `annotator` and the names are given.
     """
     return _plugin(expr, "number_domains", chains, scheme, min_confidence, annotator)
 
@@ -265,9 +274,9 @@ def segment(
 ) -> pl.Expr:
     """Split sequences into FR/CDR regions as a Polars expression.
 
-    Each row gets `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix` and
-    `error`. The segments join back into the sequence. On failure, `error` is set and every
-    segment is null.
+    Each row gets `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix`,
+    `error` and `error_kind`. The segments join back into the sequence. On failure, `error` and
+    `error_kind` are set and every segment is null.
 
     Pass either `chains` and `scheme`, or a prebuilt `annotator`, as for `number`.
 
@@ -306,6 +315,7 @@ def segment(
             "fr4": pl.String,
             "postfix": pl.String,
             "error": pl.String,
+            "error_kind": pl.String,
         }
     )
     print(
@@ -330,6 +340,10 @@ def segment(
 
     Returns:
         pl.Expr: segmentation expression
+
+    Raises:
+        immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.
+        TypeError: If both or neither of `annotator` and the names are given.
     """
     return _plugin(expr, "segmentation", chains, scheme, min_confidence, annotator)
 
@@ -348,8 +362,9 @@ def segment_domains(
     `segment` returns. Every residue lands in exactly one domain's regions: a domain's `prefix`
     holds the residues since the previous domain (or the start of the sequence), and only the
     last domain has the residues after it as its `postfix`, so all domains' regions in order
-    rebuild the sequence. The list is empty when no domain aligns with enough confidence; for an
-    invalid sequence it holds a single struct with `error` set and every segment null.
+    rebuild the sequence. The list is never empty: a sequence without a domain, or an invalid one,
+    gets a single struct with `error` and `error_kind` set and every segment null, as for
+    `number_domains`.
 
     Pass either `chains` and `scheme`, or a prebuilt `annotator`, as for `number`.
 
@@ -404,6 +419,10 @@ def segment_domains(
 
     Returns:
         pl.Expr: domains expression
+
+    Raises:
+        immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.
+        TypeError: If both or neither of `annotator` and the names are given.
     """
     return _plugin(expr, "segment_domains", chains, scheme, min_confidence, annotator)
 

@@ -1,4 +1,9 @@
-from immunum._internal import _Annotator, _regions_for, _scheme_supports_chain  # noqa: F401
+from immunum._internal import (  # noqa: F401
+    Error,
+    _Annotator,
+    _regions_for,
+    _scheme_supports_chain,
+)
 from dataclasses import dataclass, fields
 from typing import Optional
 
@@ -62,15 +67,23 @@ class SegmenationResult:
     prefix: Optional[str]
     postfix: Optional[str]
     error: Optional[str]
+    """Why the sequence couldn't be segmented, or ``None`` on success."""
+    error_kind: Optional[str]
+    """What went wrong, as a stable code, or ``None`` on success: ``"invalid_sequence"``
+    (too short, too long or not amino acids), ``"low_confidence"`` (no alignment reached
+    ``min_confidence``) or, from ``segment_domains`` only, ``"domain_too_short"`` (the best
+    alignment is confident but too short to be a domain)."""
 
     def as_dict(self) -> dict[str, Optional[str]]:
-        """Return dict mapping segment names to sequences (excludes error field)
+        """Return dict mapping segment names to sequences (excludes the error fields)
 
         Returns:
             dict[str, str | None]: dict mapping ['fr1', 'fr2', ...] to their aminoacid sequences
         """
         return {
-            f.name: getattr(self, f.name) for f in fields(self) if f.name != "error"
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name not in ("error", "error_kind")
         }
 
 
@@ -117,6 +130,12 @@ class NumberingResult:
     query_start: Optional[int]
     query_end: Optional[int]
     error: Optional[str]
+    """Why the sequence couldn't be numbered, or ``None`` on success."""
+    error_kind: Optional[str]
+    """What went wrong, as a stable code, or ``None`` on success: ``"invalid_sequence"``
+    (too short, too long or not amino acids), ``"low_confidence"`` (no alignment reached
+    ``min_confidence``) or, from ``number_domains`` only, ``"domain_too_short"`` (the best
+    alignment is confident but too short to be a domain)."""
 
 
 class Annotator:
@@ -151,9 +170,16 @@ class Annotator:
             restricted to antibody chains (IGH, IGK, IGL).
 
         min_confidence: Minimum alignment confidence threshold in the range ``[0, 1]``.
-            Sequences scoring below this value raise a ``ValueError``. Defaults to
-            ``0.5``, which filters non-immunoglobulin sequences while retaining all
-            validated antibody sequences. Pass ``0.0`` to disable filtering.
+            Sequences scoring below this value get a result with ``error`` set and
+            ``error_kind`` ``"low_confidence"``. Defaults to ``0.5``, which filters
+            non-immunoglobulin sequences while retaining all validated antibody
+            sequences. Pass ``0.0`` to disable filtering.
+
+    Raises:
+        immunum.Error: A ``ValueError`` raised when the arguments are wrong. Its
+            ``kind`` attribute names what went wrong: ``"invalid_chain"`` (an unknown
+            chain, or no chains), ``"invalid_scheme"``, ``"unsupported_chain"`` (a
+            non-IMGT scheme for TCR chains) or ``"invalid_min_confidence"``.
     """
 
     def __init__(
@@ -172,9 +198,10 @@ class Annotator:
                 threshold. Defaults to ``0.5``; pass ``0.0`` to disable.
 
         Raises:
-            ValueError: If any chain or scheme value is unrecognised, if a
+            immunum.Error: If any chain or scheme value is unrecognised, if a
                 non-IMGT scheme is requested for TCR chains, or if
-                ``min_confidence`` is outside ``[0, 1]``.
+                ``min_confidence`` is outside ``[0, 1]``. See the class docstring
+                for its ``kind`` values.
         """
         self._annotator = _Annotator(
             chains=chains, scheme=scheme, min_confidence=min_confidence
@@ -188,8 +215,8 @@ class Annotator:
 
         Returns:
             A `NumberingResult` with the detected chain, scheme, confidence score,
-            and a ``{position: residue}`` numbering dict. On failure, ``error`` is
-            set and all other fields are ``None``.
+            and a ``{position: residue}`` numbering dict. On failure, ``error`` and
+            ``error_kind`` are set and all other fields are ``None``.
         """
         return NumberingResult(**self._annotator.number(sequence))
 
@@ -223,9 +250,12 @@ class Annotator:
 
         Returns:
             One `NumberingResult` per domain, ordered by position, each what `number`
-            returns for that domain; empty when no domain aligns with enough
-            confidence. When the sequence itself is invalid (too short, too long or
-            not amino acids), a single result with ``error`` set.
+            returns for that domain; never empty. A sequence without a domain gives a
+            single result with ``error`` and ``error_kind`` set: ``"low_confidence"``
+            when no alignment reaches ``min_confidence``, as `number` reports it, or
+            ``"domain_too_short"`` when the best alignment is confident but shorter
+            than a domain must be. So does an invalid sequence (too short, too long or
+            not amino acids), with ``"invalid_sequence"``.
 
         A domain that lacks its first IMGT positions (a light chain starting at position 2,
         say) and directly follows other residues, such as a linker, can have the residue just
@@ -243,8 +273,8 @@ class Annotator:
         Returns:
             A `SegmenationResult` with ``fr1``–``fr4``, ``cdr1``–``cdr3``,
             and the residues before and after the domain as ``prefix``/``postfix``,
-            so the regions in order rebuild the sequence. On failure, ``error`` is
-            set and all region fields are ``None``.
+            so the regions in order rebuild the sequence. On failure, ``error`` and
+            ``error_kind`` are set and all region fields are ``None``.
         """
         return SegmenationResult(**self._annotator.segment(sequence))
 
@@ -283,10 +313,9 @@ class Annotator:
             sequence: Amino-acid sequence string (single-letter codes).
 
         Returns:
-            One `SegmenationResult` per domain, ordered by position; empty when no
-            domain aligns with enough confidence. When the sequence itself is invalid
-            (too short, too long or not amino acids), a single result with ``error``
-            set.
+            One `SegmenationResult` per domain, ordered by position; never empty. A
+            sequence without a domain or an invalid one gives a single result with
+            ``error`` and ``error_kind`` set, as `number_domains` describes.
         """
         return [
             SegmenationResult(**d) for d in self._annotator.segment_domains(sequence)
@@ -317,9 +346,10 @@ def regions_for(scheme: str, chain: str) -> dict[str, tuple[int, int]]:
             place their CDRs differently on heavy and light chains.
 
     Raises:
-        ValueError: If the scheme or chain is unrecognised, or if the scheme has
-            no rules for the chain — only IMGT covers TCR chains, so there is no
-            Kabat, Chothia, Martin or AHo table to return for one.
+        immunum.Error: If the scheme or chain is unrecognised (``kind``
+            ``"invalid_scheme"`` or ``"invalid_chain"``), or if the scheme has no
+            rules for the chain (``"unsupported_chain"``) — only IMGT covers TCR
+            chains, so there is no Kabat, Chothia, Martin or AHo table to return for one.
     """
     return _regions_for(scheme=scheme, chain=chain)
 
@@ -343,6 +373,7 @@ def scheme_supports_chain(scheme: str, chain: str) -> bool:
             Kabat, Chothia, Martin and AHo number antibody chains (IGH, IGK, IGL) only.
 
     Raises:
-        ValueError: If the scheme or chain is unrecognised.
+        immunum.Error: If the scheme or chain is unrecognised (``kind``
+            ``"invalid_scheme"`` or ``"invalid_chain"``).
     """
     return _scheme_supports_chain(scheme=scheme, chain=chain)

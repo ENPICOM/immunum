@@ -9,6 +9,8 @@
 
 ::: immunum.scheme_supports_chain
 
+::: immunum.Error
+
 ::: immunum.NumberingResult
     options:
       members: true
