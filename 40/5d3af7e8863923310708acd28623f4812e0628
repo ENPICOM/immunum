@@ -1,0 +1,20 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 85-87
+docs/assets/immunum-webtool.js
+  h_acea35c6bbea0b 1,8-12,27-33,97-110,112-115,120-153,159-166,168-169,171-174,176-178,181-196,271-275,278-279
+docs/demo.md
+  h_acea35c6bbea0b 23,31,83,88,99-100,102-103
+docs/stylesheets/extra.css
+  h_acea35c6bbea0b 320-362
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "405d3af7e8863923310708acd28623f4812e0628",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
