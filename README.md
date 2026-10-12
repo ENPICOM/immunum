@@ -13,7 +13,7 @@ Try it in your browser: [interactive demo](https://immunum.enpicom.com/demo/).
 
 ## Overview
 
-`immunum` is a library for numbering antibody and T-cell receptor (TCR) variable domain sequences. It uses Needleman-Wunsch semi-global alignment against position-specific scoring matrices built from consensus sequences, with BLOSUM62-based substitution scores.
+`immunum` is a library for numbering antibody and T-cell receptor (TCR) variable domain sequences. It uses Needleman-Wunsch semi-global alignment against position-specific scoring matrices built from consensus sequences of [IMGT](https://www.imgt.org) germline genes, with BLOSUM62-based substitution scores.
 
 Available as:
 
@@ -62,6 +62,7 @@ and Martin place their CDRs differently on heavy and light chains.
   - [Output](#output)
   - [Examples](#examples)
 - [Errors](#errors)
+- [Germline data](#germline-data)
 - [Development](#development)
 - [Project structure](#project-structure)
 
@@ -403,6 +404,10 @@ print(result.error_kind)  # invalid_sequence
 print(result.error)       # sequence length 4 is below minimum 30
 ```
 
+## Germline data
+
+The consensus sequences are built from the germline V and J genes of [IMGT/GENE-DB](https://www.imgt.org/genedb/) (release 202641-7), part of IMGT®, the international ImMunoGeneTics information system®, whose data are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [`resources/consensus/README.md`](https://github.com/ENPICOM/immunum/blob/main/resources/consensus/README.md) describes how they are generated and lists the IMGT publications to cite.
+
 ## Development
 
 To orchestrate a project between cargo and python, we use [`task`](http://taskfile.dev).
@@ -498,12 +503,12 @@ src/
     └── debug_validation.rs # Alignment mismatch visualization
 benches/             # Criterion and Python speed/correctness benchmarks
 resources/
-└── consensus/       # Consensus sequence CSVs (compiled into scoring matrices)
+└── consensus/       # Consensus CSVs built from IMGT/GENE-DB (compiled into scoring matrices)
 fixtures/
-├── validation/      # ANARCI-numbered reference datasets
+├── validation/      # Reference numberings (ANARCI-numbered; TRD follows IMGT's TRDV gapping)
 ├── ig.fasta         # Example antibody sequences
 └── ig.tsv           # Example TSV input
-scripts/             # Python tooling for generating consensus data
+scripts/             # Python tooling, including the consensus generator
 tests/               # CLI, Python, Polars and JS tests, and the shared error_cases.json
 immunum/
 ├── __init__.py      # Python module
@@ -516,4 +521,4 @@ immunum/
 - **Semi-global alignment** forces full query consumption, preventing long CDR3 regions from being treated as trailing gaps.
 - **Anchor positions** at highly conserved FR residues receive 3× gap penalties to stabilize alignment.
 - **FR regions** use alignment-based numbering; **CDR regions** use scheme-specific insertion rules.
-- Scoring matrices are generated at compile time from consensus data via `build.rs`.
+- Scoring matrices are generated at compile time via `build.rs` from consensus data, which `scripts/generate_consensus.py` builds from IMGT/GENE-DB germlines.

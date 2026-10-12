@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- The consensus sequences behind the scoring matrices are built from IMGT/GENE-DB germlines (release
+  202641-7, CC BY 4.0) instead of RepSeqIO germlines numbered with AntPack. V genes keep IMGT's own
+  gapping, the CDR3 of each V-J germline is placed by the IMGT rule, and the antibody germlines come from
+  human, mouse, rat, rabbit, rhesus, pig, alpaca and cow (no longer spalax and llama, which IMGT/GENE-DB
+  lacks); TCR germlines from human and mouse. `uv run --no-sync python -m scripts.generate_consensus`
+  downloads the data and regenerates the files; `resources/consensus/README.md` describes the method and
+  the IMGT publications to cite, and `resources/consensus/germlines.tsv` lists the alleles used.
+- TRD numbers the TRDV genes with IMGT's gapping: human TRDV1 has the CDR2-IMGT QGS (56, 57, 65) and
+  residues at 69-72, as in IMGT's allele alignment of TRDV1 and the IMGT region boundaries IgBLAST ships.
+  The TRD validation fixture (`fixtures/validation/tcr_D_imgt.csv`, all TRDV1) followed ANARCI, with the
+  CDR2 at 56-59 and 63-65 and nothing at 69-73; its positions 56-74 now follow IMGT. Across the other
+  chains and schemes, `BENCHMARKS.toml` moves by at most 0.27 percentage points of perfect sequences.
+- The insertion penalty at the CDR centers (IMGT 32/33, 60/61, 111/112) is -1.9 instead of -2.0, which
+  the IMGT-derived consensus needs to keep numbering bovine ultralong CDR3s (PDB 4k3e) through FR4.
+
+### Removed
+- `scripts/generate_vj_combinations.py` and `scripts/utils.py`, the RepSeqIO/AntPack consensus pipeline.
+
 ## [2.0.0] - 2026-10-12
 
 ### Fixed

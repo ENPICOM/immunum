@@ -54,7 +54,9 @@ and IGL, and the TCR chains TRA, TRB, TRG and TRD. Only single-threaded variants
 and CDR columns correspond to the seven IMGT regions (FR1–FR4 and CDR1–CDR3). Because the
 antibody ground truth is derived from antpack/ANARCI agreement, those two tools score 100% on
 IGH, IGK and IGL by construction — see the note above. On the TCR chains ANARCI isn't the ground
-truth: it scores 96.9% on TRA, 99.1% on TRB, 99.9% on TRG and 100% on TRD.
+truth: it scores 96.9% on TRA, 99.1% on TRB, 99.9% on TRG and 93.0% on TRD. The TRD fixture
+(all TRDV1) follows IMGT's gapping of TRDV1, with the CDR2 at 56, 57 and 65 and residues at 69–72;
+ANARCI puts the CDR2 at 56–59 and 63–65 and leaves 69–73 empty.
 
 <iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 
