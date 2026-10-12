@@ -47,3 +47,12 @@ print(regions_for("imgt", "H")["cdr3"])  # (105, 117)
 
 Both ends are inclusive. IMGT and AHo number every chain alike; Kabat, Chothia and Martin place
 their CDRs differently on heavy and light chains, and only IMGT covers TCR chains.
+
+`scheme_supports_chain` tells whether a scheme numbers a chain before you build an `Annotator`:
+
+```python
+from immunum import scheme_supports_chain
+
+assert scheme_supports_chain("kabat", "H")
+assert not scheme_supports_chain("kabat", "B")
+```

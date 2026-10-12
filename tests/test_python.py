@@ -202,6 +202,72 @@ class TestNumbering:
         assert "".join(getattr(result, r) for r in regions) == sequence
 
 
+LINKER = "GGGGSGGGGSGGGGS"
+# Starts at IMGT position 1. A light chain missing its first positions takes linker residues for
+# them when it follows a linker, so it wouldn't number as it does on its own.
+KAPPA_SEQ = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+
+
+class TestDomains:
+    def test_each_domain_numbers_like_number_on_its_own(self):
+        annotator = immunum.Annotator(["ig"], "IMGT")
+        domains = annotator.number_domains(IGH_SEQ + LINKER + KAPPA_SEQ)
+        heavy, light = annotator.number(IGH_SEQ), annotator.number(KAPPA_SEQ)
+        assert [d.chain for d in domains] == [heavy.chain, light.chain]
+        assert [d.numbering for d in domains] == [heavy.numbering, light.numbering]
+        offset = len(IGH_SEQ + LINKER)
+        assert (domains[1].query_start, domains[1].query_end) == (
+            offset + light.query_start,
+            offset + light.query_end,
+        )
+
+    def test_segment_domains_puts_every_residue_in_exactly_one_domain(self):
+        annotator = immunum.Annotator(["ig"], "IMGT")
+        sequence = "MKYLL" + IGH_SEQ + LINKER + KAPPA_SEQ + "HHHHHH"
+        domains = annotator.segment_domains(sequence)
+        regions = (
+            "prefix",
+            "fr1",
+            "cdr1",
+            "fr2",
+            "cdr2",
+            "fr3",
+            "cdr3",
+            "fr4",
+            "postfix",
+        )
+        assert "".join(getattr(d, r) for d in domains for r in regions) == sequence
+        assert [(d.prefix, d.postfix) for d in domains] == [
+            ("MKYLL", ""),
+            (LINKER, "HHHHHH"),
+        ]
+        for domain, alone in zip(domains, (IGH_SEQ, KAPPA_SEQ)):
+            expected = annotator.segment(alone)
+            assert [getattr(domain, r) for r in regions[1:-1]] == [
+                getattr(expected, r) for r in regions[1:-1]
+            ]
+
+    @pytest.mark.parametrize("method", ["number", "segment"])
+    def test_a_single_domain_is_what_the_single_method_returns(self, method):
+        annotator = immunum.Annotator(["ig"], "IMGT")
+        single = getattr(annotator, method)
+        domains = getattr(annotator, f"{method}_domains")
+        assert domains(IGH_SEQ) == [single(IGH_SEQ)]
+
+    @pytest.mark.parametrize("method", ["number", "segment"])
+    def test_an_invalid_sequence_is_one_error_result(self, method):
+        annotator = immunum.Annotator(["ig"], "IMGT")
+        single = getattr(annotator, method)
+        domains = getattr(annotator, f"{method}_domains")
+        assert domains("AAAA") == [single("AAAA")]
+        assert domains("AAAA")[0].error is not None
+
+    @pytest.mark.parametrize("method", ["number_domains", "segment_domains"])
+    def test_a_sequence_without_a_domain_has_none(self, method):
+        annotator = immunum.Annotator(["ig"], "IMGT")
+        assert getattr(annotator, method)("A" * 40) == []
+
+
 class TestNormalization:
     @pytest.mark.parametrize(
         "alias_chains,canonical_chains,scheme,canonical_scheme,seq",
@@ -340,6 +406,27 @@ REGION_ORDER = ["fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4"]
 
 AB_SCHEMES = ["IMGT", "Kabat", "Chothia", "Martin", "Aho"]
 NON_IMGT_SCHEMES = ["Kabat", "Chothia", "Martin", "Aho"]
+
+
+class TestSchemeSupportsChain:
+    @pytest.mark.parametrize("scheme", AB_SCHEMES)
+    @pytest.mark.parametrize("chain", ALL_CHAINS)
+    def test_agrees_with_annotator_and_regions_for(self, scheme, chain):
+        supported = immunum.scheme_supports_chain(scheme, chain)
+        assert supported == (scheme == "IMGT" or chain in AB_CHAINS)
+        if supported:
+            immunum.Annotator([chain], scheme)
+            immunum.regions_for(scheme, chain)
+        else:
+            with pytest.raises(ValueError):
+                immunum.Annotator([chain], scheme)
+            with pytest.raises(ValueError):
+                immunum.regions_for(scheme, chain)
+
+    @pytest.mark.parametrize("scheme,chain", [("INVALID", "IGH"), ("IMGT", "INVALID")])
+    def test_unknown_scheme_or_chain_raises(self, scheme, chain):
+        with pytest.raises(ValueError):
+            immunum.scheme_supports_chain(scheme, chain)
 
 
 class TestRegionsFor:

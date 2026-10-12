@@ -7,6 +7,8 @@
 
 ::: immunum.regions_for
 
+::: immunum.scheme_supports_chain
+
 ::: immunum.NumberingResult
     options:
       members: true

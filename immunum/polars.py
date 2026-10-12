@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -21,12 +22,45 @@ if TYPE_CHECKING:
 LIB = Path(__file__).parent
 
 
+def _plugin(
+    expr: IntoExprColumn,
+    function: str,
+    chains: list[str] | None,
+    scheme: str | None,
+    min_confidence: float | None,
+    annotator: Annotator | None,
+) -> pl.Expr:
+    """The plugin `function`, with its annotator prebuilt or built from names when the query runs."""
+    if annotator is not None:
+        if chains is not None or scheme is not None or min_confidence is not None:
+            raise TypeError(
+                "pass either `annotator` or `chains`, `scheme` and `min_confidence`, not both"
+            )
+        return register_plugin_function(
+            args=[expr],
+            plugin_path=LIB,
+            function_name=f"{function}_class_struct_expr",
+            is_elementwise=True,
+            kwargs={"annotator": annotator._annotator},
+        )
+    if chains is None or scheme is None:
+        raise TypeError("pass `chains` and `scheme`, or a prebuilt `annotator`")
+    return register_plugin_function(
+        args=[expr],
+        plugin_path=LIB,
+        function_name=f"{function}_struct_expr",
+        is_elementwise=True,
+        kwargs={"chains": chains, "scheme": scheme, "min_confidence": min_confidence},
+    )
+
+
 def number(
     expr: IntoExprColumn,
     *,
-    chains: list[str],
-    scheme: str,
+    chains: list[str] | None = None,
+    scheme: str | None = None,
     min_confidence: float | None = None,
+    annotator: Annotator | None = None,
 ) -> pl.Expr:
     """Number sequences as a Polars expression.
 
@@ -34,9 +68,10 @@ def number(
     `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end` and
     `error`. On failure, `error` is set and every other field is null.
 
-    The annotator is built from `chains`, `scheme` and `min_confidence` when the query runs, so
-    an unknown name or an out-of-range `min_confidence` raises a `ComputeError` then.
-    `numbering_method` takes a prebuilt `Annotator` instead and returns the same fields.
+    Pass either `chains` and `scheme` (and optionally `min_confidence`), or a prebuilt
+    `annotator`; both give the same result and run as fast. Names are checked when the query
+    runs, so an unknown one raises a `ComputeError` then; an `Annotator` checks them when you
+    build it, raising `ValueError`.
 
     Example:
 
@@ -125,32 +160,108 @@ def number(
 
     Args:
         expr (IntoExprColumn): input polars expression (e.g. `pl.col('sequence')`)
-        chains (list[str]): list of chains to use for initialized `Annotator`
-        scheme (str): scheme to use for initialized `Annotator`
-        min_confidence (float | None, optional): confidence to use for initialized `Annotator`. Defaults to None (corresponds to 0.5)
+        chains (list[str] | None): chains to consider, as for `Annotator`. Required unless
+            `annotator` is given.
+        scheme (str | None): numbering scheme, as for `Annotator`. Required unless
+            `annotator` is given.
+        min_confidence (float | None, optional): minimum alignment confidence, as for
+            `Annotator`. Defaults to None (corresponds to 0.5).
+        annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
+            `chains`, `scheme` and `min_confidence`.
 
     Returns:
         pl.Expr: numbering expression
     """
-    return register_plugin_function(
-        args=[expr],
-        plugin_path=LIB,
-        function_name="numbering_struct_expr",
-        is_elementwise=True,
-        kwargs={
-            "chains": chains,
-            "scheme": scheme,
-            "min_confidence": min_confidence,
-        },
+    return _plugin(expr, "numbering", chains, scheme, min_confidence, annotator)
+
+
+def number_domains(
+    expr: IntoExprColumn,
+    *,
+    chains: list[str] | None = None,
+    scheme: str | None = None,
+    min_confidence: float | None = None,
+    annotator: Annotator | None = None,
+) -> pl.Expr:
+    """Number every variable domain in each sequence, such as both domains of an scFv.
+
+    Each row gets a list with one struct per domain, ordered by position, each with the fields
+    `number` returns for that domain. The list is empty when no domain aligns with enough
+    confidence. When the sequence itself is invalid (too short, too long or not amino acids), it
+    holds a single struct with `error` set and every other field null.
+
+    A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and
+    directly follows other residues, such as a linker, can have the residue just before it
+    numbered as its first position: IMGT position 1 is so variable that the sequence alone can't
+    tell a linker residue from the domain's own first residue.
+
+    Pass either `chains` and `scheme`, or a prebuilt `annotator`, as for `number`.
+
+    Example:
+
+    ```python
+    import polars as pl
+    import immunum.polars as imp
+
+    heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+    kappa = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+
+    df = pl.DataFrame(
+        {
+            "sequence": [
+                heavy
+                + "GGGGSGGGGSGGGGS"
+                + kappa,
+                heavy,
+            ]
+        }
+    ).select(
+        imp.number_domains(
+            "sequence",
+            chains=["ig"],
+            scheme="imgt",
+        ).alias("domains")
     )
+
+    # One row per domain
+    print(
+        df.with_row_index("sequence")
+        .explode("domains")
+        .unnest("domains")
+        .select(
+            "sequence",
+            "chain",
+            "confidence",
+            "query_start",
+            "query_end",
+        )
+    )
+    ```
+
+    Args:
+        expr (IntoExprColumn): input polars expression (e.g. `pl.col('sequence')`)
+        chains (list[str] | None): chains to consider, as for `Annotator`. Required unless
+            `annotator` is given.
+        scheme (str | None): numbering scheme, as for `Annotator`. Required unless
+            `annotator` is given.
+        min_confidence (float | None, optional): minimum alignment confidence, as for
+            `Annotator`. Defaults to None (corresponds to 0.5).
+        annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
+            `chains`, `scheme` and `min_confidence`.
+
+    Returns:
+        pl.Expr: domains expression
+    """
+    return _plugin(expr, "number_domains", chains, scheme, min_confidence, annotator)
 
 
 def segment(
     expr: IntoExprColumn,
     *,
-    chains: list[str],
-    scheme: str,
+    chains: list[str] | None = None,
+    scheme: str | None = None,
     min_confidence: float | None = None,
+    annotator: Annotator | None = None,
 ) -> pl.Expr:
     """Split sequences into FR/CDR regions as a Polars expression.
 
@@ -158,9 +269,7 @@ def segment(
     `error`. The segments join back into the sequence. On failure, `error` is set and every
     segment is null.
 
-    The annotator is built from `chains`, `scheme` and `min_confidence` when the query runs, so
-    an unknown name or an out-of-range `min_confidence` raises a `ComputeError` then.
-    `segmentation_method` takes a prebuilt `Annotator` instead and returns the same fields.
+    Pass either `chains` and `scheme`, or a prebuilt `annotator`, as for `number`.
 
     Example:
 
@@ -206,162 +315,114 @@ def segment(
             ).struct.unnest()
         )
     )
-
-    # shape: (2, 9)
-    # ┌────────────────────────┬──────────┬───┬─────────────┬────────┬─────────┐
-    # │ fr1                    ┆ cdr1     ┆ … ┆ fr4         ┆ prefix ┆ postfix │
-    # │ ---                    ┆ ---      ┆   ┆ ---         ┆ ---    ┆ ---     │
-    # │ str                    ┆ str      ┆   ┆ str         ┆ str    ┆ str     │
-    # ╞════════════════════════╪══════════╪═══╪═════════════╪════════╪═════════╡
-    # │ QVQLVQSGAEVKRPGSSVTVS… ┆ GGSFSTYA ┆ … ┆ WGQGTLVTVSS ┆        ┆         │
-    # │ DIQMTQSPSSLSASVGDRVTI… ┆ RASQDVNT ┆ … ┆ FGQGTKVEIK  ┆        ┆         │
-    # └────────────────────────┴──────────┴───┴─────────────┴────────┴─────────┘
     ```
 
     Args:
         expr (IntoExprColumn): input polars expression (e.g. `pl.col('sequence')`)
-        chains (list[str]): list of chains to use for initialized `Annotator`
-        scheme (str): scheme to use for initialized `Annotator`
-        min_confidence (float | None, optional): confidence to use for initialized `Annotator`. Defaults to None (corresponds to 0.5)
+        chains (list[str] | None): chains to consider, as for `Annotator`. Required unless
+            `annotator` is given.
+        scheme (str | None): numbering scheme, as for `Annotator`. Required unless
+            `annotator` is given.
+        min_confidence (float | None, optional): minimum alignment confidence, as for
+            `Annotator`. Defaults to None (corresponds to 0.5).
+        annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
+            `chains`, `scheme` and `min_confidence`.
 
     Returns:
         pl.Expr: segmentation expression
     """
-    return register_plugin_function(
-        args=[expr],
-        plugin_path=LIB,
-        function_name="segmentation_struct_expr",
-        is_elementwise=True,
-        kwargs={
-            "chains": chains,
-            "scheme": scheme,
-            "min_confidence": min_confidence,
-        },
+    return _plugin(expr, "segmentation", chains, scheme, min_confidence, annotator)
+
+
+def segment_domains(
+    expr: IntoExprColumn,
+    *,
+    chains: list[str] | None = None,
+    scheme: str | None = None,
+    min_confidence: float | None = None,
+    annotator: Annotator | None = None,
+) -> pl.Expr:
+    """Split every variable domain in each sequence into FR/CDR regions.
+
+    Each row gets a list with one struct per domain, ordered by position, each with the fields
+    `segment` returns. Every residue lands in exactly one domain's regions: a domain's `prefix`
+    holds the residues since the previous domain (or the start of the sequence), and only the
+    last domain has the residues after it as its `postfix`, so all domains' regions in order
+    rebuild the sequence. The list is empty when no domain aligns with enough confidence; for an
+    invalid sequence it holds a single struct with `error` set and every segment null.
+
+    Pass either `chains` and `scheme`, or a prebuilt `annotator`, as for `number`.
+
+    Example:
+
+    ```python
+    import polars as pl
+    import immunum.polars as imp
+
+    heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+    kappa = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+
+    df = pl.DataFrame(
+        {
+            "sequence": [
+                heavy
+                + "GGGGSGGGGSGGGGS"
+                + kappa
+            ]
+        }
+    ).select(
+        imp.segment_domains(
+            "sequence",
+            chains=["ig"],
+            scheme="imgt",
+        ).alias("domains")
     )
+
+    # One row per domain
+    print(
+        df.explode("domains")
+        .unnest("domains")
+        .select(
+            "prefix",
+            "cdr1",
+            "cdr2",
+            "cdr3",
+        )
+    )
+    ```
+
+    Args:
+        expr (IntoExprColumn): input polars expression (e.g. `pl.col('sequence')`)
+        chains (list[str] | None): chains to consider, as for `Annotator`. Required unless
+            `annotator` is given.
+        scheme (str | None): numbering scheme, as for `Annotator`. Required unless
+            `annotator` is given.
+        min_confidence (float | None, optional): minimum alignment confidence, as for
+            `Annotator`. Defaults to None (corresponds to 0.5).
+        annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
+            `chains`, `scheme` and `min_confidence`.
+
+    Returns:
+        pl.Expr: domains expression
+    """
+    return _plugin(expr, "segment_domains", chains, scheme, min_confidence, annotator)
 
 
 def numbering_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
-    """Number sequences with a prebuilt `Annotator`.
-
-    Returns exactly what `number` returns, and runs as fast. Use it when your code already holds
-    an `Annotator`: its chains, scheme and `min_confidence` were checked when it was built, so a
-    mistake raises `ValueError` there instead of when the query runs. The annotator travels with
-    the query and is rebuilt from it on every call, so it saves no set-up work over `number`.
-
-    Example:
-
-    ```python
-    import polars as pl
-    import immunum
-    import immunum.polars as imp
-
-    annotator = immunum.Annotator(
-        chains=["H", "K", "L"],
-        scheme="imgt",
+    """Deprecated: use `number(expr, annotator=annotator)`, which returns the same."""
+    warnings.warn(
+        "numbering_method is deprecated; use number(expr, annotator=annotator)",
+        DeprecationWarning,
+        stacklevel=2,
     )
-
-    df = pl.DataFrame(
-        {
-            "sequence": [
-                "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
-            ]
-        }
-    ).select(
-        imp.numbering_method(
-            pl.col("sequence"),
-            annotator=annotator,
-        ).alias("numbering")
-    )
-    assert df[
-        "numbering"
-    ].struct.fields == [
-        "chain",
-        "scheme",
-        "confidence",
-        "numbering",
-        "query_start",
-        "query_end",
-        "error",
-    ]
-    ```
-
-    Args:
-        expr (IntoExprColumn): input polars expression (e.g. `pl.col('sequence')`)
-        annotator (Annotator): pre-built `Annotator` instance
-
-    Returns:
-        pl.Expr: numbering expression
-    """
-    return register_plugin_function(
-        args=[expr],
-        plugin_path=LIB,
-        function_name="numbering_class_struct_expr",
-        is_elementwise=True,
-        kwargs={"annotator": annotator._annotator},
-    )
+    return number(expr, annotator=annotator)
 
 
 def segmentation_method(expr: IntoExprColumn, *, annotator: Annotator) -> pl.Expr:
-    """Segment sequences with a prebuilt `Annotator`.
-
-    Returns exactly what `segment` returns, and runs as fast. Use it when your code already holds
-    an `Annotator`: its chains, scheme and `min_confidence` were checked when it was built, so a
-    mistake raises `ValueError` there instead of when the query runs. The annotator travels with
-    the query and is rebuilt from it on every call, so it saves no set-up work over `segment`.
-
-    Example:
-
-    ```python
-    import polars as pl
-    import immunum
-    import immunum.polars as imp
-
-    annotator = immunum.Annotator(
-        chains=["H", "K", "L"],
-        scheme="imgt",
+    """Deprecated: use `segment(expr, annotator=annotator)`, which returns the same."""
+    warnings.warn(
+        "segmentation_method is deprecated; use segment(expr, annotator=annotator)",
+        DeprecationWarning,
+        stacklevel=2,
     )
-
-    df = pl.DataFrame(
-        {
-            "sequence": [
-                "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
-                "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
-            ]
-        }
-    ).select(
-        imp.segmentation_method(
-            "sequence", annotator=annotator
-        ).alias("segmentation")
-    )
-    assert df[
-        "segmentation"
-    ].dtype == pl.Struct(
-        {
-            "prefix": pl.String,
-            "fr1": pl.String,
-            "cdr1": pl.String,
-            "fr2": pl.String,
-            "cdr2": pl.String,
-            "fr3": pl.String,
-            "cdr3": pl.String,
-            "fr4": pl.String,
-            "postfix": pl.String,
-            "error": pl.String,
-        }
-    )
-    ```
-
-    Args:
-        expr (IntoExprColumn): input polars expression (e.g. `pl.col('sequence')`)
-        annotator (Annotator): pre-built `Annotator` instance
-
-    Returns:
-        pl.Expr: segmentation expression
-    """
-    return register_plugin_function(
-        args=[expr],
-        plugin_path=LIB,
-        function_name="segmentation_class_struct_expr",
-        is_elementwise=True,
-        kwargs={"annotator": annotator._annotator},
-    )
+    return segment(expr, annotator=annotator)

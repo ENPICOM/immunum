@@ -242,6 +242,19 @@ def as_numbering_result(row: dict) -> dict:
     return {**row, "numbering": numbering}
 
 
+def expression(function: str, annotator, prebuilt: bool, chains: list[str]):
+    """`function` on the sequence column, with `annotator` itself or with its names."""
+    column = polars.col("sequence")
+    if prebuilt:
+        return getattr(imp, function)(column, annotator=annotator)
+    return getattr(imp, function)(column, chains=chains, scheme="IMGT")
+
+
+PREBUILT = pytest.mark.parametrize(
+    "prebuilt", [False, True], ids=["names", "annotator"]
+)
+
+
 class TestPolarsMatchesAnnotator:
     """Issues #53 and #58: every Polars expression returns what `Annotator` returns for the same
     sequence, flanking residues included, with the same fields."""
@@ -254,10 +267,12 @@ class TestPolarsMatchesAnnotator:
 
         return Annotator(["IGH"], "IMGT")
 
-    def assert_matches_annotator(self, expr, annotator):
+    @PREBUILT
+    def test_number(self, annotator, prebuilt):
         from dataclasses import asdict, fields
         from immunum import NumberingResult
 
+        expr = expression("number", annotator, prebuilt, ["IGH"])
         df = polars.DataFrame({"sequence": self.SEQUENCES})
         rows = df.select(expr.alias("n")).unnest("n").to_dicts()
         assert list(rows[0]) == [f.name for f in fields(NumberingResult)]
@@ -265,74 +280,66 @@ class TestPolarsMatchesAnnotator:
             asdict(annotator.number(s)) for s in self.SEQUENCES
         ]
 
-    def test_number(self, annotator):
-        expr = imp.number(polars.col("sequence"), chains=["IGH"], scheme="IMGT")
-        self.assert_matches_annotator(expr, annotator)
+    @PREBUILT
+    def test_segment(self, annotator, prebuilt):
+        from dataclasses import asdict
 
-    def test_numbering_method(self, annotator):
-        expr = imp.numbering_method(polars.col("sequence"), annotator=annotator)
-        self.assert_matches_annotator(expr, annotator)
+        expr = expression("segment", annotator, prebuilt, ["IGH"])
+        df = polars.DataFrame({"sequence": self.SEQUENCES})
+        rows = df.select(expr.alias("s")).unnest("s").to_dicts()
+        assert rows == [asdict(annotator.segment(s)) for s in self.SEQUENCES]
+        assert "".join(rows[0][r] for r in REGIONS) == FLANKED_SEQ
 
-    def test_segment(self, annotator):
+    @PREBUILT
+    @pytest.mark.parametrize("function", ["number_domains", "segment_domains"])
+    def test_domains(self, function, prebuilt):
+        from dataclasses import asdict
+        from immunum import Annotator
+
+        annotator = Annotator(["ig"], "IMGT")
+        scfv = IGH_SEQ + "GGGGSGGGGSGGGGS" + SEQ
+        sequences = [scfv, "AAAA", "A" * 40, None]
+        expr = expression(function, annotator, prebuilt, ["ig"])
+        rows = polars.DataFrame({"sequence": sequences}).select(expr.alias("d"))["d"]
+        as_result = as_numbering_result if function == "number_domains" else dict
+        got = [
+            None if row is None else [as_result(d) for d in row]
+            for row in rows.to_list()
+        ]
+        expected = [
+            None if s is None else [asdict(d) for d in getattr(annotator, function)(s)]
+            for s in sequences
+        ]
+        assert got == expected
+        assert [len(row) for row in expected[:3]] == [2, 1, 0]
+
+
+class TestPolarsAnnotatorArguments:
+    def test_names_and_an_annotator_together_raise(self):
+        from immunum import Annotator
+
+        with pytest.raises(TypeError):
+            imp.number(
+                polars.col("sequence"),
+                chains=["IGH"],
+                scheme="IMGT",
+                annotator=Annotator(["IGH"], "IMGT"),
+            )
+
+    def test_neither_names_nor_an_annotator_raise(self):
+        with pytest.raises(TypeError):
+            imp.segment(polars.col("sequence"))
+
+    @pytest.mark.parametrize(
+        "deprecated,replacement",
+        [("numbering_method", "number"), ("segmentation_method", "segment")],
+    )
+    def test_method_functions_are_deprecated_aliases(self, deprecated, replacement):
+        from immunum import Annotator
+
+        annotator = Annotator(["IGH"], "IMGT")
         df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
-        row = df.select(
-            imp.segment(polars.col("sequence"), chains=["IGH"], scheme="IMGT").alias(
-                "s"
-            )
-        ).unnest("s")
-        expected = annotator.segment(FLANKED_SEQ)
-        assert {r: row[r][0] for r in REGIONS} == expected.as_dict()
-        assert "".join(row[r][0] for r in REGIONS) == FLANKED_SEQ
-
-    def test_segmentation_method(self, annotator):
-        df = polars.DataFrame({"sequence": [FLANKED_SEQ]})
-        row = df.select(
-            imp.segmentation_method(polars.col("sequence"), annotator=annotator).alias(
-                "s"
-            )
-        ).unnest("s")
-        expected = annotator.segment(FLANKED_SEQ)
-        assert {r: row[r][0] for r in REGIONS} == expected.as_dict()
-        assert "".join(row[r][0] for r in REGIONS) == FLANKED_SEQ
-
-
-class TestPolarsNumberingMethod:
-    def test_segmentation_method_returns_expr(self):
-        from immunum import Annotator
-
-        annotator = Annotator(["IGH"], "IMGT")
-        expr = imp.segmentation_method(polars.col("sequence"), annotator=annotator)
-        assert isinstance(expr, polars.Expr)
-
-    def test_segmentation_method_on_dataframe(self):
-        from immunum import Annotator
-
-        annotator = Annotator(["IGH"], "IMGT")
-        df = polars.DataFrame({"sequence": [IGH_SEQ]})
-        result = df.select(
-            imp.segmentation_method(polars.col("sequence"), annotator=annotator).alias(
-                "numbered"
-            )
-        )
-        assert "numbered" in result.columns
-        assert result.height == 1
-
-    def test_numbering_method_returns_expr(self):
-        from immunum import Annotator
-
-        annotator = Annotator(["IGH"], "IMGT")
-        expr = imp.numbering_method(polars.col("sequence"), annotator=annotator)
-        assert isinstance(expr, polars.Expr)
-
-    def test_numbering_method_on_dataframe(self):
-        from immunum import Annotator
-
-        annotator = Annotator(["IGH"], "IMGT")
-        df = polars.DataFrame({"sequence": [IGH_SEQ]})
-        result = df.select(
-            imp.numbering_method(polars.col("sequence"), annotator=annotator).alias(
-                "numbered"
-            )
-        )
-        assert "numbered" in result.columns
-        assert result.height == 1
+        with pytest.warns(DeprecationWarning):
+            old = getattr(imp, deprecated)(polars.col("sequence"), annotator=annotator)
+        new = getattr(imp, replacement)(polars.col("sequence"), annotator=annotator)
+        assert df.select(old.alias("x")).equals(df.select(new.alias("x")))

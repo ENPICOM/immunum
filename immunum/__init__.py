@@ -1,4 +1,4 @@
-from immunum._internal import _Annotator, _regions_for  # noqa: F401
+from immunum._internal import _Annotator, _regions_for, _scheme_supports_chain  # noqa: F401
 from dataclasses import dataclass, fields
 from typing import Optional
 
@@ -193,6 +193,47 @@ class Annotator:
         """
         return NumberingResult(**self._annotator.number(sequence))
 
+    def number_domains(self, sequence: str) -> list[NumberingResult]:
+        """Number every variable domain in a sequence, such as both domains of an scFv.
+
+        ```python
+        from immunum import Annotator
+
+        heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+        kappa = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+        scfv = heavy + "GGGGSGGGGSGGGGS" + kappa
+
+        annotator = Annotator(
+            chains=["ig"], scheme="imgt"
+        )
+        domains = annotator.number_domains(scfv)
+        assert [d.chain for d in domains] == [
+            "H",
+            "K",
+        ]
+        assert (
+            domains[1].query_start
+            == len(heavy) + 15
+        )
+        assert domains[1].numbering["1"] == "D"
+        ```
+
+        Args:
+            sequence: Amino-acid sequence string (single-letter codes).
+
+        Returns:
+            One `NumberingResult` per domain, ordered by position, each what `number`
+            returns for that domain; empty when no domain aligns with enough
+            confidence. When the sequence itself is invalid (too short, too long or
+            not amino acids), a single result with ``error`` set.
+
+        A domain that lacks its first IMGT positions (a light chain starting at position 2,
+        say) and directly follows other residues, such as a linker, can have the residue just
+        before it numbered as its first position, without a known germline or source, numbering
+        can't tell a linker residue from the domain's own first residue.
+        """
+        return [NumberingResult(**d) for d in self._annotator.number_domains(sequence)]
+
     def segment(self, sequence: str) -> SegmenationResult:
         """Split a sequence into FR/CDR regions.
 
@@ -201,10 +242,55 @@ class Annotator:
 
         Returns:
             A `SegmenationResult` with ``fr1``–``fr4``, ``cdr1``–``cdr3``,
-            and any unaligned ``prefix``/``postfix`` residues. On failure,
-            ``error`` is set and all region fields are ``None``.
+            and the residues before and after the domain as ``prefix``/``postfix``,
+            so the regions in order rebuild the sequence. On failure, ``error`` is
+            set and all region fields are ``None``.
         """
         return SegmenationResult(**self._annotator.segment(sequence))
+
+    def segment_domains(self, sequence: str) -> list[SegmenationResult]:
+        """Split every variable domain in a sequence into FR/CDR regions.
+
+        Every residue lands in exactly one domain's regions: a domain's ``prefix`` holds
+        the residues since the previous domain (or the start of the sequence), and only
+        the last domain has the residues after it as its ``postfix``. All domains'
+        regions in order rebuild the sequence.
+
+        ```python
+        from immunum import Annotator
+
+        heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+        kappa = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+        linker = "GGGGSGGGGSGGGGS"
+
+        annotator = Annotator(
+            chains=["ig"], scheme="imgt"
+        )
+        heavy_regions, kappa_regions = (
+            annotator.segment_domains(
+                heavy + linker + kappa
+            )
+        )
+        assert (
+            heavy_regions.cdr3
+            == "AREGTTGKPIGAFAH"
+        )
+        assert kappa_regions.prefix == linker
+        assert kappa_regions.cdr3 == "QQHYTTPPT"
+        ```
+
+        Args:
+            sequence: Amino-acid sequence string (single-letter codes).
+
+        Returns:
+            One `SegmenationResult` per domain, ordered by position; empty when no
+            domain aligns with enough confidence. When the sequence itself is invalid
+            (too short, too long or not amino acids), a single result with ``error``
+            set.
+        """
+        return [
+            SegmenationResult(**d) for d in self._annotator.segment_domains(sequence)
+        ]
 
 
 def regions_for(scheme: str, chain: str) -> dict[str, tuple[int, int]]:
@@ -236,3 +322,27 @@ def regions_for(scheme: str, chain: str) -> dict[str, tuple[int, int]]:
             Kabat, Chothia, Martin or AHo table to return for one.
     """
     return _regions_for(scheme=scheme, chain=chain)
+
+
+def scheme_supports_chain(scheme: str, chain: str) -> bool:
+    """Tell whether a scheme numbers a chain, before building an `Annotator` for them.
+
+    ```python
+    from immunum import scheme_supports_chain
+
+    assert scheme_supports_chain("kabat", "H")
+    assert not scheme_supports_chain("kabat", "B")  # only IMGT numbers TCR chains
+    ```
+
+    Args:
+        scheme: Numbering scheme, as for `Annotator`.
+        chain: A single chain, as for `Annotator`.
+
+    Returns:
+        bool: ``True`` when `Annotator` accepts the pair. IMGT numbers every chain;
+            Kabat, Chothia, Martin and AHo number antibody chains (IGH, IGK, IGL) only.
+
+    Raises:
+        ValueError: If the scheme or chain is unrecognised.
+    """
+    return _scheme_supports_chain(scheme=scheme, chain=chain)
