@@ -1,10 +1,15 @@
-// Interactive WASM numbering tool for the immunum docs homepage.
+// Interactive WASM numbering tool for the immunum docs demo page.
 import init, { Annotator, schemeSupportsChain } from "./wasm/immunum.js";
 
 const EXAMPLES = {
   IGH: "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
   IGL: "SALTQPPAVSGTPGQRVTISCSGSDIGRRSVNWYQQFPGTAPKLLIYSNDQRPSVVPDRFSGSKSGTSASLAISGLQSEDEAEYYCAAWDDSLAVFGGGTQLTVGQPKA",
   TRB: "GVTQTPKFQVLKTGQSMTLQCAQDMNHEYMSWYRQDPGMGLRLIHYSVGAGITDQGEVPNGYNVSRSTTEDFPLRLLSAAPSQTSVYFCASRPGLAGGRPEQYFGPGTRLTVTE",
+  // The IGH example, a (G4S)3 linker and a kappa light chain.
+  scFv:
+    "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS" +
+    "GGGGSGGGGSGGGGS" +
+    "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
 };
 
 const ALL_CHAINS = [
@@ -18,6 +23,13 @@ const ALL_CHAINS = [
 ];
 
 const $ = (id) => document.getElementById(id);
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
 
 // Build the checkbox grid once. Subsequent scheme changes call
 // refreshChainAvailability() to disable/enable checkboxes in place.
@@ -82,74 +94,106 @@ function clearError() {
   $("immunum-error").hidden = true;
 }
 
-// The region of every residue in the sequence. segment() returns its regions in sequence order,
-// flanks included, so they cover the whole sequence; `error` is its only non-string field.
-function residueRegions(segResult) {
+// A segment result's regions as [name, residues] pairs, in sequence order and flanks included:
+// segmentDomains() sets them in that order, and `error`/`errorKind` are its only other fields.
+function segments(segResult) {
+  return Object.entries(segResult).filter(([, residues]) => typeof residues === "string");
+}
+
+// "fr1" → "FR1", "prefix" → "Prefix".
+function segmentLabel(name) {
+  return /^(fr|cdr)\d$/.test(name) ? name.toUpperCase() : name[0].toUpperCase() + name.slice(1);
+}
+
+// The region of every residue in the sequence. All domains' segments in order rebuild the
+// sequence, so this covers it end to end.
+function residueRegions(segResults) {
   const regions = [];
-  for (const [name, residues] of Object.entries(segResult)) {
-    if (typeof residues !== "string") continue;
-    for (let i = 0; i < residues.length; i++) regions.push(name);
+  for (const segResult of segResults) {
+    for (const [name, residues] of segments(segResult)) {
+      for (let i = 0; i < residues.length; i++) regions.push(name);
+    }
   }
   return regions;
 }
 
-function renderResult(sequence, numberResult, segResult) {
-  const chainEl = $("result-chain");
-  chainEl.textContent = `Chain: ${numberResult.chain}`;
-  const schemeEl = $("result-scheme");
-  schemeEl.textContent = `Scheme: ${numberResult.scheme}`;
+// The whole sequence, coloured by region; flanks and linkers between domains are dimmed.
+function renderSequence(segResults) {
+  const pre = $("result-sequence");
+  pre.textContent = "";
+  segResults.forEach((segResult, d) => {
+    for (const [name, residues] of segments(segResult)) {
+      if (!residues) continue;
+      const span = el("span", `region-${name}`, residues);
+      span.title = `Domain ${d + 1}: ${segmentLabel(name)} (${residues.length} aa)`;
+      pre.appendChild(span);
+    }
+  });
+}
+
+function renderSegmentTable(segResult) {
+  const table = el("table", "immunum-segments");
+  const head = el("tr");
+  for (const title of ["Region", "Residues", "Length"]) head.appendChild(el("th", "", title));
+  table.appendChild(el("thead")).appendChild(head);
+  const body = table.appendChild(el("tbody"));
+  for (const [name, residues] of segments(segResult)) {
+    // Most domains have no flanks; an empty FR or CDR row still says something.
+    if (!residues && (name === "prefix" || name === "postfix")) continue;
+    const row = el("tr");
+    const label = el("td");
+    label.appendChild(el("span", `immunum-region-tag region-${name}`, segmentLabel(name)));
+    row.append(label, el("td", "immunum-segment-residues", residues), el("td", "", residues.length));
+    body.appendChild(row);
+  }
+  return table;
+}
+
+function renderDomain(index, numberResult, segResult, regions) {
+  const section = el("section", "immunum-domain");
 
   // Aligned query range (1-indexed, inclusive — user-facing convention).
   const qStart = numberResult.queryStart;
   const qEnd = numberResult.queryEnd;
-  $("result-range").textContent = `Query ${qStart + 1}–${qEnd + 1} (${qEnd - qStart + 1} aa)`;
-
-  // Render the aligned region with the flanks segment() left out of it dimmed.
-  const alignedEl = $("result-aligned");
-  alignedEl.textContent = "";
-  const prefix = segResult.prefix;
-  const suffix = segResult.postfix;
-  const aligned = sequence.slice(prefix.length, sequence.length - suffix.length);
-  if (prefix) {
-    const s = document.createElement("span");
-    s.className = "immunum-aligned-flank";
-    s.textContent = prefix;
-    alignedEl.appendChild(s);
-  }
-  const mid = document.createElement("span");
-  mid.className = "immunum-aligned-core";
-  mid.textContent = aligned;
-  alignedEl.appendChild(mid);
-  if (suffix) {
-    const s = document.createElement("span");
-    s.className = "immunum-aligned-flank";
-    s.textContent = suffix;
-    alignedEl.appendChild(s);
-  }
-
   const conf = Math.max(0, Math.min(1, numberResult.confidence));
-  $("result-confidence-value").textContent = `Confidence: ${(conf * 100).toFixed(1)}%`;
+  const header = el("div", "immunum-result-header");
+  header.append(
+    el("span", "immunum-domain-title", `Domain ${index + 1}`),
+    el("span", "immunum-badge", `Chain: ${numberResult.chain}`),
+    el("span", "immunum-badge", `Query ${qStart + 1}–${qEnd + 1} (${qEnd - qStart + 1} aa)`),
+    el("span", "immunum-badge", `Confidence: ${(conf * 100).toFixed(1)}%`),
+  );
+  section.appendChild(header);
 
-  const regionArr = residueRegions(segResult);
-  const grid = $("result-grid");
-  grid.textContent = "";
+  section.appendChild(el("span", "immunum-aligned-label", "Segments"));
+  section.appendChild(renderSegmentTable(segResult));
 
-  let index = qStart;
+  section.appendChild(el("span", "immunum-aligned-label", "Numbering"));
+  const grid = section.appendChild(el("div", "immunum-grid"));
+  // The numbered residues run from queryStart to queryEnd, in whole-sequence coordinates.
+  let seqIndex = qStart;
   for (const [pos, aa] of numberResult.numbering) {
-    const region = regionArr[index];
-    index++;
-    const pill = document.createElement("div");
-    pill.className = "immunum-residue" + (region ? ` region-${region}` : "");
-    const posSpan = document.createElement("span");
-    posSpan.className = "pos";
-    posSpan.textContent = pos;
-    const aaSpan = document.createElement("span");
-    aaSpan.className = "aa";
-    aaSpan.textContent = aa;
-    pill.appendChild(posSpan);
-    pill.appendChild(aaSpan);
+    const region = regions[seqIndex++];
+    const pill = el("div", "immunum-residue" + (region ? ` region-${region}` : ""));
+    pill.append(el("span", "pos", pos), el("span", "aa", aa));
     grid.appendChild(pill);
   }
+  return section;
+}
+
+// numberDomains() and segmentDomains() find the same domains, so their results pair up by index.
+function renderResult(numberResults, segResults) {
+  const count = numberResults.length;
+  $("result-domain-count").textContent = `${count} domain${count === 1 ? "" : "s"}`;
+  $("result-scheme").textContent = `Scheme: ${numberResults[0].scheme}`;
+  renderSequence(segResults);
+
+  const regions = residueRegions(segResults);
+  const list = $("result-domains");
+  list.textContent = "";
+  numberResults.forEach((numberResult, d) => {
+    list.appendChild(renderDomain(d, numberResult, segResults[d], regions));
+  });
 
   $("immunum-result").hidden = false;
 }
@@ -224,14 +268,15 @@ async function main() {
       return;
     }
     try {
-      const numResult = annotator.number(sequence);
-      if (!numResult || !numResult.numbering) {
-        const reason = numResult?.error || "no variable domain found";
-        showError(`Numbering failed: ${reason}.`);
+      // Never empty: a sequence without a domain, or an invalid one, is a single result with
+      // `error` set.
+      const numResults = annotator.numberDomains(sequence);
+      if (numResults[0].error) {
+        showError(`Numbering failed: ${numResults[0].error}.`);
         return;
       }
-      const segResult = annotator.segment(sequence);
-      renderResult(sequence, numResult, segResult);
+      const segResults = annotator.segmentDomains(sequence);
+      renderResult(numResults, segResults);
     } catch (err) {
       showError(`Numbering failed: ${err.message}`);
     } finally {

@@ -82,6 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`. JavaScript throws
   `Error` objects with the same `kind` (`ImmunumError` in the TypeScript types).
 - CLI: when any record has an error, a one-line summary goes to stderr.
+- The documentation's demo page numbers and segments every domain in a sequence, with an scFv
+  example. It colours the whole sequence by region, with flanks and linkers dimmed, and shows each
+  domain's chain, query range, confidence, FR/CDR segments and numbering.
 
 ### Changed
 - **Breaking:** error messages drop their category prefix, which `error_kind` and `kind` now carry, and

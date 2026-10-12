@@ -317,8 +317,49 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
-.immunum-aligned-flank { opacity: 0.4; }
-.immunum-aligned-core  { font-weight: 700; color: var(--md-accent-fg-color); }
+
+.immunum-domain {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 10px;
+  background: var(--md-default-bg-color);
+  font-size: 0.8rem;
+}
+.immunum-domain-title { font-size: 0.95rem; font-weight: 700; }
+.immunum-domain .immunum-aligned-label { margin-top: 0.9rem; }
+
+.immunum-segments {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.8rem;
+}
+.immunum-segments th,
+.immunum-segments td {
+  text-align: left;
+  padding: 0.25rem 0.6rem 0.25rem 0;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  vertical-align: top;
+}
+.immunum-segments th { font-weight: 600; opacity: 0.7; }
+.immunum-segments td:last-child,
+.immunum-segments th:last-child { text-align: right; padding-right: 0; font-variant-numeric: tabular-nums; }
+.immunum-segment-residues {
+  font-family: var(--md-code-font-family, monospace);
+  word-break: break-all;
+}
+.immunum-region-tag {
+  display: inline-block;
+  min-width: 3.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+/* Flanks: residues before or after a domain, such as a leader or the linker between domains. */
+.region-prefix,
+.region-postfix { background: var(--md-default-fg-color--lightest); color: var(--md-default-fg-color--light); }
 
 /* Region colors — tuned to read on both light and dark palettes. */
 .region-fr1  { background: #dbeafe; color: #1e3a8a; }
