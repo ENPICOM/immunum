@@ -56,7 +56,9 @@ jobs:
         run: uv tool install go-task-bin
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
 
       - name: Build docs site
         # build-ci installs the Python package so mkdocstrings can import it;

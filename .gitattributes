@@ -1,0 +1,2 @@
+# LF in every checkout, so Windows CI reads the fixtures byte for byte as Linux and macOS do
+* text=auto eol=lf

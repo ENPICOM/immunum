@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     env:
       UV_PYTHON: ${{ matrix.python-version }}
 
@@ -36,10 +36,41 @@ jobs:
         run: uv tool install go-task-bin
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        # The same pinned version the release builds the npm package with
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
 
       - name: Run CI
         run: task ci
+
+  # The release builds Windows wheels, so main is tested on Windows too. The bindings are abi3, so
+  # one Python version covers them; lint and the WASM build are the same on every OS and run above.
+  ci-windows:
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    env:
+      UV_PYTHON: "3.13"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build
+        run: uv sync --all-extras --group dev --locked
+
+      - name: Rust tests
+        run: |
+          cargo test --no-default-features
+          cargo test --test cli
+
+      - name: Python tests
+        run: uv run --no-sync pytest README.md docs tests immunum --benchmark-disable
 
   ci-pr:
     if: github.event_name == 'pull_request'
@@ -66,7 +97,9 @@ jobs:
         run: uv tool install go-task-bin
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
 
       - name: Run CI
         run: task ci

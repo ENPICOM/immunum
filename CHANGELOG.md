@@ -108,6 +108,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stops the native binary.
 - CLI: `immunum --version` prints the version.
 - Python: the `polars` extra, `pip install "immunum[polars]"`, installs Polars for `immunum.polars`.
+- Python: wheels for Windows x64 and Intel macOS, besides Linux and Apple Silicon, so `pip install`
+  and `uvx immunum` there no longer compile from source. Python 3.14 is supported: `pip` refused it,
+  as the package declared `requires-python` below 3.14. CI tests 3.10 to 3.14, and Windows.
 - Documentation: an "Upgrading to 2.0" guide with what can break in each interface, and the
   changelog as a page. The benchmarks page says which immunum versions its plots come from.
 - Python: `immunum.__version__`, the installed version, which was only reachable as
