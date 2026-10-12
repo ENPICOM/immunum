@@ -106,6 +106,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidationError`.
 - **Breaking:** Rust `NumberedRecord` and `SegmentedRecord` hold `result: Result<_, SequenceError>` and
   are built with `new`, instead of `success`/`failure` and separate `result`/`error` options.
+- **Breaking:** Python's `SegmenationResult` is renamed `SegmentationResult`, fixing its spelling.
+  `Annotator.segment` and `segment_domains` return it as before; only code naming the class changes.
 - **Breaking:** JavaScript uses camelCase throughout, as JavaScript and TypeScript code expects: `number`
   results have `queryStart` and `queryEnd` instead of `query_start` and `query_end`, and the
   constructor's third parameter is declared as `minConfidence`. Every other field name is the same as in
