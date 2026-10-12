@@ -71,6 +71,7 @@ and Martin place their CDRs differently on heavy and light chains.
 
 ```bash
 pip install immunum
+pip install "immunum[polars]"   # with Polars, for the Polars plugin
 ```
 
 ### Numbering
@@ -137,7 +138,7 @@ A domain that lacks its first IMGT positions (a light chain starting at position
 
 ### Polars plugin
 
-For batch processing, `immunum.polars` registers elementwise Polars expressions:
+For batch processing, `immunum.polars` registers elementwise Polars expressions. It needs Polars, which `pip install "immunum[polars]"` installs:
 
 ```python
 import polars as pl

@@ -23,6 +23,10 @@ Homepage = "https://immunum.enpicom.com"
 Documentation = "https://immunum.enpicom.com"
 Repository = "https://github.com/ENPICOM/immunum"
 
+[project.optional-dependencies]
+# `pip install "immunum[polars]"` for immunum.polars
+polars = ["polars>1.30.0"]
+
 [project.scripts]
 # The Rust CLI, so `pip install immunum` and `uvx immunum` give the `immunum` command
 immunum = "immunum._internal:_run_cli"

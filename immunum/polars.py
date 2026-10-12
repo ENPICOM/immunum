@@ -9,7 +9,7 @@ try:
     from polars.plugins import register_plugin_function
 except ImportError as e:
     raise ImportError(
-        "polars is required to use immunum.polars. Install it with: pip install polars"
+        'polars is required to use immunum.polars. Install it with: pip install "immunum[polars]"'
     ) from e
 
 from immunum._internal import _Annotator  # noqa: F401

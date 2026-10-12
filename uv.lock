@@ -589,6 +589,11 @@ wheels = [
 name = "immunum"
 source = { editable = "." }
 
+[package.optional-dependencies]
+polars = [
+    { name = "polars" },
+]
+
 [package.dev-dependencies]
 benchmark = [
     { name = "anarcii" },
@@ -628,6 +633,8 @@ polars = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "polars", marker = "extra == 'polars'", specifier = ">1.30.0" }]
+provides-extras = ["polars"]
 
 [package.metadata.requires-dev]
 benchmark = [

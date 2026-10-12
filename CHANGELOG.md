@@ -107,6 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CLI as `cargo install immunum`, now in the library as `immunum::cli::run`; Ctrl-C stops it as it
   stops the native binary.
 - CLI: `immunum --version` prints the version.
+- Python: the `polars` extra, `pip install "immunum[polars]"`, installs Polars for `immunum.polars`.
+- Documentation: an "Upgrading to 2.0" guide with what can break in each interface, and the
+  changelog as a page. The benchmarks page says which immunum versions its plots come from.
 - Python: `immunum.__version__`, the installed version, which was only reachable as
   `immunum._internal.__version__`. JavaScript: `version()` returns the version of immunum the module
   was built from, as `immunum.__version__` does in Python.

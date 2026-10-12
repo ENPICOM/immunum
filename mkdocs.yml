@@ -53,11 +53,13 @@ nav:
       - usage/index.md
       - Python module: usage/python.md
       - Polars module: usage/polars.md
+      - Upgrading to 2.0: usage/upgrading.md
   - API:
       - api/index.md
       - immunum: api/immunum.md
       - immunum.polars: api/polars.md
   - Benchmarks: benchmarks/index.md
+  - Changelog: changelog.md
 
 extra_css:
   - stylesheets/extra.css
