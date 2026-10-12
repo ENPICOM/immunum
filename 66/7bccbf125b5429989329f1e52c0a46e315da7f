@@ -1,0 +1,18 @@
+Cargo.toml
+  h_acea35c6bbea0b 5-6,28-31,103,108
+CHANGELOG.md
+  h_acea35c6bbea0b 27-30,112-113
+README.md
+  h_acea35c6bbea0b 282-291,440-446
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "667bccbf125b5429989329f1e52c0a46e315da7f",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
