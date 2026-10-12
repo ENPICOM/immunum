@@ -209,6 +209,14 @@ schemeSupportsChain("kabat", "B"); // false: only IMGT numbers TCR chains
 regionsFor("kabat", "H").cdr1;    // [31, 35]
 ```
 
+`version()` returns the version of immunum the loaded module was built from, as Python's `immunum.__version__` does:
+
+```js
+const { version } = require("immunum");
+
+version(); // "2.0.0"
+```
+
 A setup mistake throws an `Error` with a `kind`; a sequence that can't be numbered comes back with `error` and `errorKind` set (see [Errors](#errors)):
 
 ```js

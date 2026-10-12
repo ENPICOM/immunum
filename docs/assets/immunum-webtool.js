@@ -1,5 +1,5 @@
 // Interactive WASM numbering tool for the immunum docs demo page.
-import init, { Annotator, schemeSupportsChain } from "./wasm/immunum.js";
+import init, { Annotator, schemeSupportsChain, version } from "./wasm/immunum.js";
 
 const EXAMPLES = {
   IGH: "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
@@ -230,6 +230,11 @@ async function main() {
     showError(`Failed to load WASM module: ${err}`);
     return;
   }
+
+  // Read from the module itself, so the page can't claim a version it isn't running.
+  const versionEl = $("immunum-version");
+  versionEl.textContent = `Running immunum v${version()} (WebAssembly)`;
+  versionEl.hidden = false;
 
   refreshChainAvailability();
   for (const r of document.querySelectorAll('input[name="scheme"]')) {

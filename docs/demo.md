@@ -16,6 +16,7 @@ hide:
 ## Try it in your browser
 
 <div class="immunum-tool" id="immunum-tool">
+  <div class="immunum-version" id="immunum-version" hidden></div>
   <form id="immunum-form" class="immunum-form">
     <label class="immunum-field immunum-field-seq">
       <span>Amino-acid sequence</span>

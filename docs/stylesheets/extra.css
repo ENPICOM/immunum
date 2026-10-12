@@ -44,6 +44,12 @@
   padding: 1.25rem;
   background: var(--md-code-bg-color);
 }
+.immunum-version {
+  margin-bottom: 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.7;
+}
 .immunum-form { display: flex; flex-direction: column; gap: 1rem; }
 .immunum-field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
 .immunum-field > span { font-weight: 600; opacity: 0.8; }
