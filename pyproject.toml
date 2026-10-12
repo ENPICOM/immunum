@@ -45,7 +45,17 @@ docs = [
     "mkdocs-material",
     "mkdocstrings[python]",
 ]
+# What the test suite needs, so CI can test a Python the lint and audit tools don't support yet
+test = [
+    { include-group = "polars" },
+    "pytest-benchmark>=5.2.3",
+    "pytest-markdown-docs>=0.9.1",
+    "pytest-xdist>=3.8.0",
+    "pytest>=8.4.2",
+    "rtoml>=0.14.0",
+]
 dev = [
+    { include-group = "test" },
     "coverage>=7.10.6",
     "go-task-bin>=3.44.1",
     "hypothesis>=6.151.9",
@@ -54,11 +64,6 @@ dev = [
     "pre-commit>=4.3.0",
     "pyrefly>=0.53.0",
     "pysentry-rs>=0.4.6",
-    "pytest-benchmark>=5.2.3",
-    "pytest-markdown-docs>=0.9.1",
-    "pytest-xdist>=3.8.0",
-    "pytest>=8.4.2",
-    "rtoml>=0.13.0",
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
