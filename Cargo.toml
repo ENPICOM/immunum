@@ -1,7 +1,9 @@
 [package]
 name = "immunum"
-version = "1.3.3"
+version = "2.0.0"
 edition = "2021"
+# The oldest Rust that builds every feature.
+rust-version = "1.89"
 default-run = "immunum"
 description = "Fast antibody and T-cell receptor numbering in Rust and Python"
 license = "MIT"
@@ -23,7 +25,10 @@ include = [
 
 [features]
 default = ["cli"]
-cli = ["dep:clap", "dep:chrono", "dep:toml"]
+cli = ["dep:clap"]
+# The validation tools in src/bin, run from a checkout (they read fixtures/); not installed with
+# the CLI. `cargo run --features dev-tools --bin benchmark`
+dev-tools = ["cli", "dep:chrono", "dep:toml"]
 python = ["dep:pyo3", "dep:postcard", "dep:pyo3-build-config"]
 polars = [
     "dep:polars",
@@ -95,12 +100,12 @@ required-features = ["cli"]
 [[bin]]
 name = "debug-validation"
 path = "src/bin/debug_validation.rs"
-required-features = ["cli"]
+required-features = ["dev-tools"]
 
 [[bin]]
 name = "benchmark"
 path = "src/bin/benchmark.rs"
-required-features = ["cli"]
+required-features = ["dev-tools"]
 
 [[bench]]
 name = "speed-benchmark"

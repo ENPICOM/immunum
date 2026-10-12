@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-10-12
 
 ### Fixed
 - Polars: `number`, `segment`, `numbering_method` and `segmentation_method` paired the numbering with the
@@ -24,6 +24,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   letters; otherwise a missing file is an error (exit status 1).
 - CLI: the `--min-confidence` help said sequences below it are skipped; they get an error record.
 - Python: unpickling a corrupt `Annotator` raised `PanicException`; it raises `ValueError`.
+- CLI: when the reader of its output stopped early, as in `immunum number seqs.fasta | head`, the
+  command printed `error: write error: Broken pipe` and exited 1. It now stops quietly with status 0.
+- Python wheels: `rand` 0.9.5 and `xxhash-rust` 0.8.19, which Polars compiles in, fix two
+  low-severity advisories. CI tests against Polars 2.0, which `immunum[polars]` installs; the lockfile
+  had the yanked Polars 1.39.2.
+- `cargo install immunum` also installed the developer tools `benchmark` and `debug-validation`,
+  which only work in a checkout of the repository. They now need the new `dev-tools` feature
+  (`cargo run --features dev-tools --bin benchmark`), so only `immunum` is installed, and the `cli`
+  feature no longer pulls in `chrono` and `toml`. The README says how to install the CLI.
+- The comparison benchmark (`task benchmark`, `task benchmark-accuracy`) read the Polars `positions`
+  and `residues` fields this release replaces, so it failed; it reads `numbering`.
+- Documentation: corrected statements that no longer held, such as the Rust install line (`"1.3"`),
+  the npm package working in browsers (it is built for Node.js), every scheme placing CDRs
+  differently on heavy and light chains (only Kabat, Chothia and Martin do), and what makes a
+  sequence `invalid_sequence`. The Python API reference renders return values as one entry, no
+  longer lists private members, and describes every result field.
+- Documentation site: a missing page showed the storage bucket's raw error instead of the site's 404
+  page; the license badge and the contents links to the JavaScript and Rust sections went nowhere;
+  and wasm-pack's copy of the README was published as a duplicate "Index" page. `task docs-build`,
+  run by `task ci`, now fails on broken links.
+- The docs are published by their own workflow, which the release runs and which can be run by hand
+  for a release tag, so a docs fix no longer needs a new version. The release publishes them after
+  the packages.
 
 ### Added
 - Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
@@ -77,13 +100,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rows can be filtered without matching messages: `invalid_sequence`, `low_confidence` or, from the
   `*_domains` methods only, `domain_too_short` (the best alignment is confident but shorter than a
   domain must be, so there is no domain to report). It is a field of Python's `NumberingResult` and
-  `SegmenationResult`, of the Polars structs and of CLI JSON records, and a column of CLI TSV output.
+  `SegmentationResult`, of the Polars structs and of CLI JSON records, and a column of CLI TSV output.
 - Python: `immunum.Error`, a `ValueError` subclass raised for every setup mistake, with a `kind`:
   `invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`. JavaScript throws
   `Error` objects with the same `kind` (`ImmunumError` in the TypeScript types).
 - CLI: when any record has an error, a one-line summary goes to stderr.
+- The Python package installs the `immunum` command, so `uvx immunum number seqs.fasta` runs the CLI
+  without Rust or a separate install, and `pip install immunum` puts it on the path. It is the same
+  CLI as `cargo install immunum`, now in the library as `immunum::cli::run`; Ctrl-C stops it as it
+  stops the native binary.
+- CLI: `immunum --version` prints the version.
+- Python: the `polars` extra, `pip install "immunum[polars]"`, installs Polars for `immunum.polars`.
+- Python: wheels for Windows x64 and Intel macOS, besides Linux and Apple Silicon, so `pip install`
+  and `uvx immunum` there no longer compile from source. Python 3.14 and 3.15 are supported: `pip`
+  refused them, as the package declared `requires-python` below 3.14. CI tests the oldest and the
+  newest supported Python, macOS and Windows.
+- Documentation: an "Upgrading to 2.0" guide with what can break in each interface, and the
+  changelog as a page. The benchmarks page says which immunum versions its plots come from.
+- Python: `immunum.__version__`, the installed version, which was only reachable as
+  `immunum._internal.__version__`. JavaScript: `version()` returns the version of immunum the module
+  was built from, as `immunum.__version__` does in Python.
+- The documentation's demo page numbers and segments every domain in a sequence, with an scFv
+  example. It colours the whole sequence by region, with flanks and linkers dimmed, and shows each
+  domain's chain, query range, confidence, FR/CDR segments and numbering. It shows the immunum
+  version it runs, read from the loaded WebAssembly module.
 
 ### Changed
+- The crate declares `rust-version = "1.89"`, the oldest Rust that builds every feature, so an older
+  toolchain is told what it needs instead of failing in a dependency.
 - **Breaking:** error messages drop their category prefix, which `error_kind` and `kind` now carry, and
   read the same in every interface: `Invalid sequence: sequence length 4 is below minimum 30` is now
   `sequence length 4 is below minimum 30`, `Low confidence: 0.0416 < threshold 0.5000` is now
@@ -106,6 +150,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidationError`.
 - **Breaking:** Rust `NumberedRecord` and `SegmentedRecord` hold `result: Result<_, SequenceError>` and
   are built with `new`, instead of `success`/`failure` and separate `result`/`error` options.
+- **Breaking:** Python's `SegmenationResult` is renamed `SegmentationResult`, fixing its spelling.
+  `Annotator.segment` and `segment_domains` return it as before; only code naming the class changes.
+- **Breaking:** Python's `SegmentationResult` declares its regions in sequence order, `prefix` first
+  and `postfix` last, as every other interface does, so `as_dict()` joined in order rebuilds the
+  sequence. `prefix` and `postfix` came after `fr4`.
 - **Breaking:** JavaScript uses camelCase throughout, as JavaScript and TypeScript code expects: `number`
   results have `queryStart` and `queryEnd` instead of `query_start` and `query_end`, and the
   constructor's third parameter is declared as `minConfidence`. Every other field name is the same as in
@@ -113,10 +162,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** JavaScript `segment` and `segmentDomains` results that failed set every region to `null`,
   as Python, Polars and the CLI do, instead of leaving the region fields out.
 - **Breaking:** Polars `number` and `numbering_method` return the same struct, with the fields Python's
-  `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering`,
-  `query_start`, `query_end` and `error`. `numbering` is a list of `{position, residue}` structs; explode
-  and unnest it for one row per residue. `number` returned `positions` and `residues` lists instead of
-  `numbering`, and had no `confidence` (#38); neither had `query_start` or `query_end`.
+  `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering`, `query_start`,
+  `query_end`, `error` and `error_kind`. `numbering` is a list of `{position, residue}` structs;
+  explode and unnest it for one row per residue. `number` returned `positions` and `residues` lists
+  instead of `numbering`, and had no `confidence` (#38); neither had `query_start` or `query_end`.
 - Chain and scheme names are parsed once, in Rust, for every interface. Python drops its own alias
   tables, so Python, JavaScript, Polars and the CLI accept the same names and report the same error
   message for an unknown one. The chain groups `ig`, `tcr` and `all`, which only the CLI accepted, now

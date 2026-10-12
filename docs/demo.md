@@ -20,7 +20,7 @@ hide:
     <label class="immunum-field immunum-field-seq">
       <span>Amino-acid sequence</span>
       <textarea id="seq-input" rows="4" spellcheck="false" autocomplete="off"
-        placeholder="Paste a heavy, light, or TCR chain sequence..."></textarea>
+        placeholder="Paste a heavy, light or TCR chain, or an scFv with several domains..."></textarea>
     </label>
 
     <div class="immunum-examples">
@@ -28,6 +28,7 @@ hide:
       <button type="button" data-example="IGH">IGH</button>
       <button type="button" data-example="IGL">IGL</button>
       <button type="button" data-example="TRB">TRB</button>
+      <button type="button" data-example="scFv">scFv (VH–linker–VL)</button>
     </div>
 
     <div class="immunum-controls">
@@ -79,13 +80,12 @@ hide:
 
   <div id="immunum-result" class="immunum-result" hidden>
     <div class="immunum-result-header">
-      <span class="immunum-badge" id="result-chain">—</span>
+      <span class="immunum-badge" id="result-domain-count">—</span>
       <span class="immunum-badge" id="result-scheme">—</span>
-      <span class="immunum-badge" id="result-range">—</span>
-      <span class="immunum-badge" id="result-confidence-value">—</span>
     </div>
 
     <div class="immunum-legend">
+      <span class="region-prefix">Flank</span>
       <span class="region-fr1">FR1</span>
       <span class="region-cdr1">CDR1</span>
       <span class="region-fr2">FR2</span>
@@ -95,13 +95,14 @@ hide:
       <span class="region-fr4">FR4</span>
     </div>
 
-    <div id="result-grid" class="immunum-grid"></div>
-
     <div class="immunum-aligned">
-      <span class="immunum-aligned-label">Aligned region</span>
-      <pre id="result-aligned"></pre>
+      <span class="immunum-aligned-label">Sequence</span>
+      <pre id="result-sequence"></pre>
     </div>
+
+    <div id="result-domains"></div>
   </div>
+  <div class="immunum-version" id="immunum-version" hidden></div>
 </div>
 
 ## Resources

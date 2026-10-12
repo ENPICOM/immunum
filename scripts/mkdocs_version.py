@@ -17,7 +17,7 @@ CARGO_TOML = ROOT / "Cargo.toml"
 def read_version() -> str:
     match = re.search(r'^version = "([^"]+)"', CARGO_TOML.read_text(), re.MULTILINE)
     if match is None:
-        raise ValueError(f"No `version = \"...\"` found in {CARGO_TOML}")
+        raise ValueError(f'No `version = "..."` found in {CARGO_TOML}')
     return match.group(1)
 
 

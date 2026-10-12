@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.10.2,<2.0", "polars>1.30.0,<2.0"]
+requires = ["maturin>=1.10.2,<2.0", "polars>1.30.0"]
 build-backend = "maturin"
 
 [project]
@@ -7,7 +7,7 @@ name = "immunum"
 dynamic = ["version"]
 description = "Flexible and fast antibody sequence annotation in Rust with python bindings"
 readme = "README.md"
-requires-python = ">=3.10, <3.14"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -23,24 +23,41 @@ Homepage = "https://immunum.enpicom.com"
 Documentation = "https://immunum.enpicom.com"
 Repository = "https://github.com/ENPICOM/immunum"
 
+[project.optional-dependencies]
+# `pip install "immunum[polars]"` for immunum.polars
+polars = ["polars>1.30.0"]
+
+[project.scripts]
+# The Rust CLI, so `pip install immunum` and `uvx immunum` give the `immunum` command
+immunum = "immunum._internal:_run_cli"
+
 [tool.maturin]
 module-name = "immunum._internal"
-features = ["python", "polars"]
+features = ["python", "polars", "cli"]
 profile = "release"
 
 
 [dependency-groups]
 polars = ["polars>1.30.0"]
 docs = [
-    "markdown-exec[ansi]",
     "mkdocs<2.0",
     "mkdocs-autorefs",
-    "mkdocs-macros-plugin",
     "mkdocs-material",
-    "mkdocs-simple-hooks",
     "mkdocstrings[python]",
+    # 11.0.1 fixes a security advisory; 12 breaks mkdocstrings' code highlighting
+    "pymdown-extensions>=11.0.1,<12",
+]
+# What the test suite needs, so CI can test a Python the lint and audit tools don't support yet
+test = [
+    { include-group = "polars" },
+    "pytest-benchmark>=5.2.3",
+    "pytest-markdown-docs>=0.9.1",
+    "pytest-xdist>=3.8.0",
+    "pytest>=8.4.2",
+    "rtoml>=0.14.0",
 ]
 dev = [
+    { include-group = "test" },
     "coverage>=7.10.6",
     "go-task-bin>=3.44.1",
     "hypothesis>=6.151.9",
@@ -49,11 +66,6 @@ dev = [
     "pre-commit>=4.3.0",
     "pyrefly>=0.53.0",
     "pysentry-rs>=0.4.6",
-    "pytest-benchmark>=5.2.3",
-    "pytest-markdown-docs>=0.9.1",
-    "pytest-xdist>=3.8.0",
-    "pytest>=8.4.2",
-    "rtoml>=0.13.0",
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]

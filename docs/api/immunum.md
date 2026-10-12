@@ -1,9 +1,8 @@
 # immunum
 
+`immunum.__version__` is the version of immunum that is installed, such as `"2.0.0"`.
+
 ::: immunum.Annotator
-    options:
-      members: true
-      filters: ["!^_"]
 
 ::: immunum.regions_for
 
@@ -12,11 +11,5 @@
 ::: immunum.Error
 
 ::: immunum.NumberingResult
-    options:
-      members: true
-      filters: ["!^_"]
 
-::: immunum.SegmenationResult
-    options:
-      members: true
-      filters: ["!^_"]
+::: immunum.SegmentationResult

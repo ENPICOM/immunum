@@ -315,6 +315,12 @@ pub fn wasm_regions_for(scheme: &str, chain: &str) -> Result<JsValue, JsValue> {
     Ok(spans.into())
 }
 
+/// The version of immunum this module was built from, such as `"2.0.0"`.
+#[wasm_bindgen]
+pub fn version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

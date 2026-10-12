@@ -55,6 +55,7 @@
 //! - [`numbering`] — IMGT, Kabat, Chothia, Martin and AHo numbering rules
 //! - [`scoring`] — position-specific scoring matrices
 //! - [`io`] — FASTA parsing and TSV/JSON/JSONL output
+//! - `cli` — the `immunum` command line (`cli` feature)
 //! - [`types`] — core domain types
 //! - [`error`] — error types
 
@@ -69,6 +70,8 @@ pub mod types;
 pub mod io;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod validation;
+#[cfg(all(feature = "cli", not(target_arch = "wasm32")))]
+pub mod cli;
 
 pub use numbering::aho;
 pub use numbering::chothia;

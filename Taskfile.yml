@@ -163,7 +163,8 @@ tasks:
     docs-build:
         deps:
             - task: build-wasm-web
-        cmd: uv run --no-sync --group docs mkdocs build {{.CLI_ARGS}}
+        # --strict: a broken link or other warning fails the build, in `task ci` as in a release
+        cmd: uv run --no-sync --group docs mkdocs build --strict {{.CLI_ARGS}}
 
     benchmark-cli:
         desc: "Speed benchmark using Criterion (benches/speed_benchmark.rs)"

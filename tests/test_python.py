@@ -496,7 +496,9 @@ class TestErrorCases:
     def test_scheme_supports_chain(self, case):
         expected = case["scheme_supports_chain"]
         if isinstance(expected, bool):
-            assert immunum.scheme_supports_chain(case["scheme"], case["chain"]) is expected
+            assert (
+                immunum.scheme_supports_chain(case["scheme"], case["chain"]) is expected
+            )
             return
         with pytest.raises(immunum.Error) as raised:
             immunum.scheme_supports_chain(case["scheme"], case["chain"])

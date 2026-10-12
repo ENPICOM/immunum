@@ -66,7 +66,8 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --features python,polars --interpreter python3.13
+          # Features come from [tool.maturin] in pyproject.toml, which includes the CLI
+          args: --release --interpreter python3.13
           sccache: "true"
 
       - name: Upload wheels
@@ -80,6 +81,10 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: macos-latest
+    strategy:
+      matrix:
+        # Apple Silicon natively, Intel by cross-compiling on the same runner
+        target: [aarch64, x86_64]
     steps:
       - uses: actions/checkout@v6
 
@@ -91,14 +96,41 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: aarch64
-          args: --release --features python,polars
+          target: ${{ matrix.target }}
+          args: --release
           sccache: "true"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
-          name: wheels-macos-aarch64
+          name: wheels-macos-${{ matrix.target }}
+          path: target/wheels/*.whl
+          if-no-files-found: error
+
+  build-windows:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          architecture: x64
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: x64
+          args: --release
+          sccache: "true"
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-windows-x64
           path: target/wheels/*.whl
           if-no-files-found: error
 
@@ -123,7 +155,7 @@ jobs:
           if-no-files-found: error
 
   create-release:
-    needs: [check-version, build-linux, build-macos, build-sdist]
+    needs: [check-version, build-linux, build-macos, build-windows, build-sdist]
     if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -163,13 +195,14 @@ jobs:
             echo
             echo "## Install"
             echo
-            echo "**Python** — \`pip install immunum==$VERSION\`"
-            echo "**JavaScript / WASM** — \`npm install immunum@$VERSION\`"
-            echo "**Rust** — \`cargo add immunum@$VERSION\`"
+            echo "- **Python** — \`pip install immunum==$VERSION\`, or \`pip install \"immunum[polars]==$VERSION\"\` for the Polars plugin"
+            echo "- **CLI** — \`uvx immunum@$VERSION --help\`, or \`cargo install immunum@$VERSION\`"
+            echo "- **JavaScript / WASM** — \`npm install immunum@$VERSION\`"
+            echo "- **Rust** — \`cargo add immunum@$VERSION\`"
             echo
             echo "## Build info"
             echo
-            echo "- **Python wheels:** 3.13 (abi3, compatible with 3.9+) — Linux x86_64, Linux aarch64 (manylinux), macOS Apple Silicon"
+            echo "- **Python wheels:** Python 3.10+ (abi3) — Linux x86_64 and aarch64 (manylinux), macOS Apple Silicon and Intel, Windows x64"
             echo "- **WASM package:** Node.js (CommonJS)"
             echo "- **Rust crate:** published to crates.io"
           } > release_notes.md
@@ -179,7 +212,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.check-version.outputs.version }}"
+          # --target: tag the commit the artifacts were built from, even if main has moved on
           gh release create "v$VERSION" \
+            --target "${{ github.sha }}" \
             --title "Release v$VERSION" \
             --notes-file release_notes.md \
             dist/*
@@ -228,7 +263,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        # The same pinned version CI tests the package with
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
 
       - name: Build WASM package
         run: wasm-pack build --release --target nodejs --features wasm --no-default-features
@@ -270,51 +308,12 @@ jobs:
         run: cargo publish
 
   publish-docs:
-    needs: [check-version, create-release]
+    # After the packages, so the site never documents a version that failed to publish
+    needs: [check-version, publish-pypi, publish-npm, publish-crate]
     if: needs.check-version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    environment:
-      name: docs
-      url: https://immunum.enpicom.com
     permissions:
       id-token: write # Required for AWS OIDC
       contents: read
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          python-version: "3.13"
-
-      - name: Setup Taskfile
-        run: uv tool install go-task-bin
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Build docs site
-        # build-ci installs the Python package so mkdocstrings can import it;
-        # docs-build builds the web WASM bundle and runs mkdocs build -> site/
-        run: |
-          task build-ci
-          task docs-build -- --strict
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: ${{ vars.DOCS_AWS_ROLE_ARN }}
-          aws-region: ${{ vars.DOCS_AWS_REGION }}
-
-      - name: Sync site to S3
-        run: aws s3 sync site/ "s3://${{ vars.DOCS_S3_BUCKET }}/" --delete
-
-      - name: Invalidate CloudFront cache
-        if: vars.DOCS_CLOUDFRONT_DISTRIBUTION_ID != ''
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.DOCS_CLOUDFRONT_DISTRIBUTION_ID }}" \
-            --paths "/*"
+    uses: ./.github/workflows/docs.yml
+    with:
+      ref: v${{ needs.check-version.outputs.version }}

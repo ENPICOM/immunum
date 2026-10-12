@@ -11,13 +11,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # The bindings are abi3: one build serves every Python, so the full checks run on the oldest
+  # supported Python and on macOS, and the jobs below cover the newest Python and Windows.
   ci:
     if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - { os: ubuntu-latest, python-version: "3.10" }
+          - { os: macos-latest, python-version: "3.13" }
     env:
       UV_PYTHON: ${{ matrix.python-version }}
 
@@ -36,10 +39,54 @@ jobs:
         run: uv tool install go-task-bin
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        # The same pinned version the release builds the npm package with
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
 
       - name: Run CI
         run: task ci
+
+  # The test suite alone, with only the `test` group: on the newest Python, which lint and audit
+  # tools often don't support for a while after its release, and on Windows, which the release
+  # builds wheels for. Task's commands assume a Unix shell, so these call cargo and pytest directly.
+  ci-tests:
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, python-version: "3.15" }
+          - { os: windows-latest, python-version: "3.13" }
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+      # Windows writes redirected output as cp1252, which can't encode the box drawing in the
+      # Polars tables the docs examples print
+      PYTHONUTF8: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build
+        run: uv sync --locked --no-default-groups --group test
+
+      - name: Rust tests
+        # Linux runs them in the full checks above
+        if: runner.os == 'Windows'
+        run: |
+          cargo test --no-default-features
+          cargo test --test cli
+
+      - name: Python tests
+        run: uv run --no-sync pytest README.md docs tests immunum --benchmark-disable -n auto
 
   ci-pr:
     if: github.event_name == 'pull_request'
@@ -66,7 +113,9 @@ jobs:
         run: uv tool install go-task-bin
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
 
       - name: Run CI
         run: task ci
