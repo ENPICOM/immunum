@@ -169,7 +169,7 @@ def number(
             `chains`, `scheme` and `min_confidence`.
 
     Returns:
-        pl.Expr: numbering expression
+        A struct expression with the fields above, every one null for a null sequence.
 
     Raises:
         immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.
@@ -193,7 +193,8 @@ def number_domains(
     a single struct with `error` and `error_kind` set and every other field null: `low_confidence`
     when no alignment reaches `min_confidence`, as `number` reports it, or `domain_too_short` when
     the best alignment is confident but shorter than a domain must be. So does an invalid sequence
-    (too short, too long or not amino acids), with `invalid_sequence`.
+    (shorter than 30 or longer than 10,000 residues, or holding a character that isn't a letter),
+    with `invalid_sequence`.
 
     A domain that lacks its first IMGT positions (a light chain starting at position 2, say) and
     directly follows other residues, such as a linker, can have the residue just before it
@@ -255,7 +256,7 @@ def number_domains(
             `chains`, `scheme` and `min_confidence`.
 
     Returns:
-        pl.Expr: domains expression
+        A list-of-struct expression with one struct per domain; null for a null sequence.
 
     Raises:
         immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.
@@ -339,7 +340,7 @@ def segment(
             `chains`, `scheme` and `min_confidence`.
 
     Returns:
-        pl.Expr: segmentation expression
+        A struct expression with the regions above, every field null for a null sequence.
 
     Raises:
         immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.
@@ -418,7 +419,7 @@ def segment_domains(
             `chains`, `scheme` and `min_confidence`.
 
     Returns:
-        pl.Expr: domains expression
+        A list-of-struct expression with one struct per domain; null for a null sequence.
 
     Raises:
         immunum.Error: If `chains`, `scheme` or `min_confidence` is wrong, as for `Annotator`.

@@ -35,7 +35,6 @@ theme:
         icon: material/brightness-4
         name: Switch to system preference
   locale: en
-  navigation_depth: 3
   features:
     - navigation.tracking
     - navigation.instant
@@ -45,7 +44,6 @@ theme:
     - navigation.tabs.sticky
     - navigation.footer
     - content.tabs.link
-    - content.code.annotation
     - content.code.copy
 
 nav:
@@ -82,6 +80,9 @@ plugins:
             show_if_no_docstring: false
             filters: ["!^_"]
             show_attribute_values: false
+            merge_init_into_class: true
+            docstring_options:
+              returns_multiple_items: false
 
 markdown_extensions:
   - pymdownx.snippets:
@@ -99,7 +100,16 @@ markdown_extensions:
       alternate_style: true
   - footnotes
 
+# wasm-pack writes these next to the bundle the demo loads; they aren't site pages or assets
+exclude_docs: |
+  assets/wasm/README.md
+  assets/wasm/LICENSE
+  assets/wasm/package.json
+  assets/wasm/*.d.ts
+
 validation:
+  omitted_files: warn
   links:
-    unrecognized_links: ignore
-    anchors: ignore
+    not_found: warn
+    unrecognized_links: warn
+    anchors: warn

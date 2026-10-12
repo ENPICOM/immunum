@@ -1,0 +1,86 @@
+name: Docs
+
+# Builds the documentation site from a tag and publishes it. The release workflow calls this for
+# each new version; run it by hand to republish docs without releasing a new version.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Tag to build the docs from, such as v2.0.0
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag to build the docs from, such as v2.0.0. Empty builds the latest release tag.
+        type: string
+        required: false
+
+permissions:
+  id-token: write # Required for AWS OIDC
+  contents: read
+
+jobs:
+  publish-docs:
+    runs-on: ubuntu-latest
+    environment:
+      name: docs
+      url: https://immunum.enpicom.com
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Tags, to find the latest release
+
+      - name: Check out the tag
+        run: |
+          REF="${{ inputs.ref }}"
+          if [ -z "$REF" ]; then
+            REF=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          fi
+          if ! git rev-parse --verify --quiet "refs/tags/$REF" >/dev/null; then
+            echo "::error::No tag '$REF'"
+            exit 1
+          fi
+          echo "Building docs from $REF"
+          git checkout --quiet "$REF"
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Setup Taskfile
+        run: uv tool install go-task-bin
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build docs site
+        # build-ci installs the Python package so mkdocstrings can import it;
+        # docs-build builds the web WASM bundle and runs a strict mkdocs build -> site/
+        run: |
+          task build-ci
+          task docs-build
+
+      - name: Add the error page S3 serves
+        # The S3 website's error document is error.html; MkDocs writes the 404 page as 404.html
+        run: cp site/404.html site/error.html
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.DOCS_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.DOCS_AWS_REGION }}
+
+      - name: Sync site to S3
+        run: aws s3 sync site/ "s3://${{ vars.DOCS_S3_BUCKET }}/" --delete
+
+      - name: Invalidate CloudFront cache
+        if: vars.DOCS_CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.DOCS_CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"

@@ -4,7 +4,8 @@ class Error(ValueError):
     """immunum was set up or called wrongly, such as with an unknown chain name."""
 
     kind: str
-    """What went wrong, as a stable code, such as ``"invalid_chain"``."""
+    """What went wrong, as a stable code: ``"invalid_chain"``, ``"invalid_scheme"``,
+    ``"unsupported_chain"`` or ``"invalid_min_confidence"``."""
 
 class _Annotator:
     def __init__(

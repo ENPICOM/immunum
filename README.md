@@ -7,7 +7,7 @@ Try it in your browser: [interactive demo](https://immunum.enpicom.com/demo/).
 [![Crates.io](https://img.shields.io/crates/v/immunum)](https://crates.io/crates/immunum)
 [![PyPI](https://img.shields.io/pypi/v/immunum)](https://pypi.org/project/immunum/)
 [![npm](https://img.shields.io/npm/v/immunum)](https://www.npmjs.com/package/immunum)
-[![License: MIT](https://img.shields.io/crates/l/immunum)](LICENSE)
+[![License: MIT](https://img.shields.io/crates/l/immunum)](https://github.com/ENPICOM/immunum/blob/main/LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/ENPICOM/immunum/ci.yml?label=CI)](https://github.com/ENPICOM/immunum/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-immunum.enpicom.com-blue)](https://immunum.enpicom.com)
 
@@ -19,7 +19,7 @@ Available as:
 
 - **Rust crate** — core library and CLI
 - **Python package** — with a [Polars](https://pola.rs) plugin for vectorized batch processing
-- **npm package** — for Node.js and browsers
+- **npm package** — for Node.js
 
 ### Supported chains
 
@@ -43,7 +43,8 @@ Chain type is automatically detected by aligning against all loaded chains and s
 - **AHo** — antibody chains (IGH, IGK, IGL)
 
 Every scheme is derived from the internal IMGT numbering. Region (FR/CDR) boundaries follow each
-scheme's own definition and differ between heavy and light chains.
+scheme's own definition: IMGT and AHo use the same boundaries for every chain, while Kabat, Chothia
+and Martin place their CDRs differently on heavy and light chains.
 
 ## Table of Contents
 
@@ -53,12 +54,8 @@ scheme's own definition and differ between heavy and light chains.
   - [Segmentation](#segmentation)
   - [Multiple domains](#multiple-domains)
   - [Polars plugin](#polars-plugin)
-- [JavaScript / npm](#javascript--npm)
-  - [Installation](#installation-1)
-  - [Usage](#usage)
+- [JavaScript (npm)](#javascript-npm)
 - [Rust](#rust)
-  - [Installation](#installation-2)
-  - [Usage](#usage-1)
 - [CLI](#cli)
   - [Options](#options)
   - [Input](#input)
@@ -166,7 +163,7 @@ The `number` expression returns a struct with the fields `Annotator.number` retu
 
 Every expression takes either `chains`, `scheme` and `min_confidence`, or a prebuilt `Annotator` as `annotator=`. Either way the annotator is built when the expression is, so an unknown name raises `immunum.Error` right there.
 
-## JavaScript / npm
+## JavaScript (npm)
 
 ### Installation
 
@@ -236,11 +233,14 @@ console.log(failed.error);     // "sequence length 4 is below minimum 30"
 
 ### Installation
 
-Add to `Cargo.toml`:
+```bash
+cargo add immunum
+```
 
-```toml
-[dependencies]
-immunum = "1.3"
+The default `cli` feature builds the `immunum` command-line tool and its dependencies. To use only the library, leave it out:
+
+```bash
+cargo add immunum --no-default-features
 ```
 
 ### Usage
@@ -349,8 +349,8 @@ immunum number sequences.fasta | awk -F'\t' 'NR==1 || ($5+0 >= 105 && $5+0 <= 11
 # Filter to heavy chain results only
 immunum number -c all sequences.fasta | awk -F'\t' 'NR==1 || $2=="H"'
 
-# Extract CDR3 sequences with jq
-immunum number -f json sequences.fasta | jq '[.[] | {id: .sequence_id, numbering}]'
+# CDR3 of each sequence with jq
+immunum segment -f json sequences.fasta | jq -r '.[] | [.sequence_id, .cdr3] | @tsv'
 ```
 
 ## Errors
@@ -366,7 +366,7 @@ immunum fails in two ways, and every interface reports each the same way:
 | `invalid_scheme`         | raised             | an unknown scheme name                                       |
 | `unsupported_chain`      | raised             | a scheme other than IMGT asked to number a TCR chain         |
 | `invalid_min_confidence` | raised             | `min_confidence` outside `[0, 1]`                            |
-| `invalid_sequence`       | returned           | a sequence too short, too long, or holding a non-letter      |
+| `invalid_sequence`       | returned           | a sequence shorter than 30 or longer than 10,000 residues, or holding a non-letter |
 | `low_confidence`         | returned           | no alignment reaches `min_confidence`                        |
 | `domain_too_short`       | returned           | from `*_domains` only: the best alignment is confident but shorter than a domain (30 residues), and no other domain is found |
 
@@ -421,7 +421,7 @@ task test         # test all code
 ### Linting
 
 ```bash
-task format  # formats python and rust code
+task format  # formats python code and checks rust formatting
 task lint    # runs linting for python and rust
 ```
 
@@ -431,12 +431,15 @@ There are multiple benchmarks in the repository. For full list, see `task | grep
 
 ```bash
 $ task | grep benchmark
+* bencher-python:               Run Python benchmarks with bencher. Alerts are disabled, used only for tracking performance
+* bencher-rust:                 Run Criterion benchmarks with bencher
 * benchmark:                    Run all benchmarks and produce plots for them
 * benchmark-accuracy:           Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)
 * benchmark-cli:                Speed benchmark using Criterion (benches/speed_benchmark.rs)
 * benchmark-comparison:         Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)
 * benchmark-speed:              Speed benchmark: sizes 100..1M, 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum
 * benchmark-speed-polars:       Speed benchmark for immunum polars across all chain/scheme fixtures
+* plots:                        Produce plots from benchmark results
 ```
 
 ## Project structure

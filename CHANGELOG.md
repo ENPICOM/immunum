@@ -24,6 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   letters; otherwise a missing file is an error (exit status 1).
 - CLI: the `--min-confidence` help said sequences below it are skipped; they get an error record.
 - Python: unpickling a corrupt `Annotator` raised `PanicException`; it raises `ValueError`.
+- The comparison benchmark (`task benchmark`, `task benchmark-accuracy`) read the Polars `positions`
+  and `residues` fields this release replaces, so it failed; it reads `numbering`.
+- Documentation: corrected statements that no longer held, such as the Rust install line (`"1.3"`),
+  the npm package working in browsers (it is built for Node.js), every scheme placing CDRs
+  differently on heavy and light chains (only Kabat, Chothia and Martin do), and what makes a
+  sequence `invalid_sequence`. The Python API reference renders return values as one entry, no
+  longer lists private members, and describes every result field.
+- Documentation site: a missing page showed the storage bucket's raw error instead of the site's 404
+  page; the license badge and the contents links to the JavaScript and Rust sections went nowhere;
+  and wasm-pack's copy of the README was published as a duplicate "Index" page. `task docs-build`,
+  run by `task ci`, now fails on broken links.
+- The docs are published by their own workflow, which the release runs and which can be run by hand
+  for a release tag, so a docs fix no longer needs a new version. The release publishes them after
+  the packages.
 
 ### Added
 - Rust: `Annotator::domains(sequence)` finds every variable domain in a sequence, ordered by position.
@@ -82,8 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`. JavaScript throws
   `Error` objects with the same `kind` (`ImmunumError` in the TypeScript types).
 - CLI: when any record has an error, a one-line summary goes to stderr.
-- JavaScript: `version()` returns the version of immunum the module was built from, as Python's
-  `immunum.__version__` does.
+- Python: `immunum.__version__`, the installed version, which was only reachable as
+  `immunum._internal.__version__`. JavaScript: `version()` returns the version of immunum the module
+  was built from, as `immunum.__version__` does in Python.
 - The documentation's demo page numbers and segments every domain in a sequence, with an scFv
   example. It colours the whole sequence by region, with flanks and linkers dimmed, and shows each
   domain's chain, query range, confidence, FR/CDR segments and numbering. It shows the immunum
@@ -114,6 +129,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are built with `new`, instead of `success`/`failure` and separate `result`/`error` options.
 - **Breaking:** Python's `SegmenationResult` is renamed `SegmentationResult`, fixing its spelling.
   `Annotator.segment` and `segment_domains` return it as before; only code naming the class changes.
+- **Breaking:** Python's `SegmentationResult` declares its regions in sequence order, `prefix` first
+  and `postfix` last, as every other interface does, so `as_dict()` joined in order rebuilds the
+  sequence. `prefix` and `postfix` came after `fr4`.
 - **Breaking:** JavaScript uses camelCase throughout, as JavaScript and TypeScript code expects: `number`
   results have `queryStart` and `queryEnd` instead of `query_start` and `query_end`, and the
   constructor's third parameter is declared as `minConfidence`. Every other field name is the same as in
@@ -121,10 +139,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** JavaScript `segment` and `segmentDomains` results that failed set every region to `null`,
   as Python, Polars and the CLI do, instead of leaving the region fields out.
 - **Breaking:** Polars `number` and `numbering_method` return the same struct, with the fields Python's
-  `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering`,
-  `query_start`, `query_end` and `error`. `numbering` is a list of `{position, residue}` structs; explode
-  and unnest it for one row per residue. `number` returned `positions` and `residues` lists instead of
-  `numbering`, and had no `confidence` (#38); neither had `query_start` or `query_end`.
+  `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering`, `query_start`,
+  `query_end`, `error` and `error_kind`. `numbering` is a list of `{position, residue}` structs;
+  explode and unnest it for one row per residue. `number` returned `positions` and `residues` lists
+  instead of `numbering`, and had no `confidence` (#38); neither had `query_start` or `query_end`.
 - Chain and scheme names are parsed once, in Rust, for every interface. Python drops its own alias
   tables, so Python, JavaScript, Polars and the CLI accept the same names and report the same error
   message for an unknown one. The chain groups `ig`, `tcr` and `all`, which only the CLI accepted, now

@@ -119,14 +119,13 @@ def _run_immunum_multithreaded(
 
 def _extract_numbering_immunum_multithreaded(
     result: polars.DataFrame,
-) -> list[dict[str, str]]:
-    result = result.unnest("n")
+) -> list[dict[str, str] | None]:
+    # `numbering` is a list of {position, residue} structs, null when the sequence failed
     return [
-        dict(zip(pos, res)) if pos is not None and res is not None else None
-        for pos, res in zip(
-            result.get_column("positions").to_list(),
-            result.get_column("residues").to_list(),
-        )
+        {r["position"]: r["residue"] for r in numbering}
+        if numbering is not None
+        else None
+        for numbering in result.get_column("n").struct.field("numbering").to_list()
     ]
 
 
