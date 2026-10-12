@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Python: unpickling a corrupt `Annotator` raised `PanicException`; it raises `ValueError`.
 - CLI: when the reader of its output stopped early, as in `immunum number seqs.fasta | head`, the
   command printed `error: write error: Broken pipe` and exited 1. It now stops quietly with status 0.
+- Python wheels: `rand` 0.9.5 and `xxhash-rust` 0.8.19, which Polars compiles in, fix two
+  low-severity advisories. CI tests against Polars 2.0, which `immunum[polars]` installs; the lockfile
+  had the yanked Polars 1.39.2.
 - `cargo install immunum` also installed the developer tools `benchmark` and `debug-validation`,
   which only work in a checkout of the repository. They now need the new `dev-tools` feature
   (`cargo run --features dev-tools --bin benchmark`), so only `immunum` is installed, and the `cli`
