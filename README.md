@@ -279,6 +279,16 @@ Setting up returns `immunum::Error`; numbering one sequence returns `immunum::Se
 
 ## CLI
 
+### Installation
+
+The command-line tool isn't part of the Python or npm package. Build it with Cargo, which needs Rust 1.89 or newer (install it with [rustup](https://rustup.rs)):
+
+```bash
+cargo install immunum
+```
+
+### Commands
+
 ```bash
 immunum number [OPTIONS] [INPUT] [OUTPUT]
 immunum segment [OPTIONS] [INPUT] [OUTPUT]
@@ -426,6 +436,13 @@ task lint    # runs linting for python and rust
 ```
 
 ### Benchmarking
+
+The validation tools in `src/bin` read the fixtures in a checkout, so they're behind the `dev-tools` feature and not installed with the CLI. `benchmark` writes the per-scheme accuracy in `BENCHMARKS.toml`; `debug-validation <CHAIN> [SCHEME] [HEADER]` shows the alignments behind each mismatch:
+
+```bash
+cargo run --release --features dev-tools --bin benchmark
+cargo run --release --features dev-tools --bin debug-validation -- H kabat
+```
 
 There are multiple benchmarks in the repository. For full list, see `task | grep benchmark`:
 

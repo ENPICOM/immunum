@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   letters; otherwise a missing file is an error (exit status 1).
 - CLI: the `--min-confidence` help said sequences below it are skipped; they get an error record.
 - Python: unpickling a corrupt `Annotator` raised `PanicException`; it raises `ValueError`.
+- `cargo install immunum` also installed the developer tools `benchmark` and `debug-validation`,
+  which only work in a checkout of the repository. They now need the new `dev-tools` feature
+  (`cargo run --features dev-tools --bin benchmark`), so only `immunum` is installed, and the `cli`
+  feature no longer pulls in `chrono` and `toml`. The README says how to install the CLI.
 - The comparison benchmark (`task benchmark`, `task benchmark-accuracy`) read the Polars `positions`
   and `residues` fields this release replaces, so it failed; it reads `numbering`.
 - Documentation: corrected statements that no longer held, such as the Rust install line (`"1.3"`),
@@ -105,6 +109,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version it runs, read from the loaded WebAssembly module.
 
 ### Changed
+- The crate declares `rust-version = "1.89"`, the oldest Rust that builds every feature, so an older
+  toolchain is told what it needs instead of failing in a dependency.
 - **Breaking:** error messages drop their category prefix, which `error_kind` and `kind` now carry, and
   read the same in every interface: `Invalid sequence: sequence length 4 is below minimum 30` is now
   `sequence length 4 is below minimum 30`, `Low confidence: 0.0416 < threshold 0.5000` is now
