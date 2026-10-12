@@ -5,7 +5,7 @@ use polars::prelude::*;
 use polars_arrow::bitmap::MutableBitmap;
 use polars_arrow::offset::Offsets;
 use polars_core::utils::rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use polars_core::runtime::THREAD_POOL;
+use polars_core::POOL;
 use pyo3_polars::derive::polars_expr;
 use pyo3_polars::PolarsAllocator;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -126,8 +126,8 @@ type Numbering = Result<NumberedRow, SequenceError>;
 
 // One numbering struct per sequence
 fn numbering_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Series> {
-    let values: Vec<Option<&str>> = ca.iter().collect();
-    let rows: Vec<Option<Numbering>> = THREAD_POOL.install(|| {
+    let values: Vec<Option<&str>> = ca.into_iter().collect();
+    let rows: Vec<Option<Numbering>> = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
@@ -167,8 +167,8 @@ fn domains_series<D: Send>(
     structs: impl Fn(PlSmallStr, &[Option<Result<D, SequenceError>>]) -> PolarsResult<Series>,
 ) -> PolarsResult<Series> {
     let len = ca.len();
-    let values: Vec<Option<&str>> = ca.iter().collect();
-    let rows: Vec<Option<Vec<Result<D, SequenceError>>>> = THREAD_POOL.install(|| {
+    let values: Vec<Option<&str>> = ca.into_iter().collect();
+    let rows: Vec<Option<Vec<Result<D, SequenceError>>>> = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {
@@ -328,8 +328,8 @@ fn segment_domains_class_struct_expr(
 
 // One segmentation struct per sequence
 fn segmentation_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Series> {
-    let values: Vec<Option<&str>> = ca.iter().collect();
-    let rows: Vec<Option<Result<SegmentResult, SequenceError>>> = THREAD_POOL.install(|| {
+    let values: Vec<Option<&str>> = ca.into_iter().collect();
+    let rows: Vec<Option<Result<SegmentResult, SequenceError>>> = POOL.install(|| {
         values
             .par_iter()
             .map_with(annotator, |ann, opt_v| {

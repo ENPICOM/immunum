@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 const DEFAULT_SCORE: f32 = -4.0;
 
 /// A position-specific scoring matrix for a chain type
-#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoringMatrix {
     /// Scoring data for each position
@@ -18,7 +18,7 @@ pub struct ScoringMatrix {
 }
 
 /// Scores and gap penalties for a single position
-#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PositionScores {
     /// IMGT position number

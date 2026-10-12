@@ -11,7 +11,7 @@ use strum_macros::{Display, EnumIter, EnumMessage, EnumString};
 use pyo3::prelude::*;
 
 /// A chain type. Parses case-insensitively from its locus (`IGH`), letter (`H`) or name (`heavy`).
-#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(
     Debug, EnumString, EnumMessage, Display, PartialEq, Serialize, Deserialize, Clone, Copy,
 )]
@@ -134,7 +134,7 @@ impl Chain {
 }
 
 /// Numbering schemes for output. Parses case-insensitively from its name (`kabat`) or initial (`k`).
-#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(
     Debug,
     EnumString,
@@ -218,7 +218,7 @@ pub fn scheme_supports_chain(scheme: &str, chain: &str) -> Result<bool> {
 
 /// Position in a numbered sequence
 /// Can be a simple number or a number with an insertion letter (e.g., "111A")
-#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {
     /// The numeric part of the position (max 128 for IMGT)

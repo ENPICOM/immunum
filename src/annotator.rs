@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Result of numbering a sequence
-#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
+#[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NumberingResult {
     /// Detected chain type
@@ -134,7 +134,7 @@ pub fn per_domain<T>(results: Result<Vec<T>, SequenceError>) -> Vec<Result<T, Se
 /// Annotator for numbering sequences
 #[cfg_attr(
     feature = "python",
-    pyclass(name = "_Annotator", module = "immunum._internal", skip_from_py_object)
+    pyclass(name = "_Annotator", module = "immunum._internal")
 )]
 #[cfg_attr(feature = "wasm", wasm_bindgen::prelude::wasm_bindgen(skip_typescript))]
 #[derive(Clone, Serialize, Deserialize)]
