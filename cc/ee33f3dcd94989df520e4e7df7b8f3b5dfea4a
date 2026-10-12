@@ -1,0 +1,38 @@
+.github/workflows/docs.yml
+  h_acea35c6bbea0b 1-86
+.github/workflows/release.yml
+  h_acea35c6bbea0b 273-274,279-281
+CHANGELOG.md
+  h_acea35c6bbea0b 27-40,99-101,132-134,142-145
+README.md
+  h_acea35c6bbea0b 10,22,46-47,57,166,236-238,240-243,352-353,369,424,434-435,442
+Taskfile.yml
+  h_acea35c6bbea0b 166-167
+benches/bench_comparison.py
+  h_acea35c6bbea0b 122-123,125-128
+docs/api/immunum.md
+  h_acea35c6bbea0b 3-4
+docs/usage/polars.md
+  h_acea35c6bbea0b 70-72,143
+docs/usage/python.md
+  h_acea35c6bbea0b 69-73
+immunum/__init__.py
+  h_acea35c6bbea0b 3,15-17,43-46,54,66-69,71,73,75,77,79,81,83,85,90-93,96,99-100,111-112,146-147,149-150,152,154-155,157,159-161,166-169,242-246,278-279,290-293,355-356,359-361,393-394
+immunum/_internal.pyi
+  h_acea35c6bbea0b 7-8
+immunum/polars.py
+  h_acea35c6bbea0b 172,196-197,259,343,422
+mkdocs.yml
+  h_acea35c6bbea0b 83-85,103-109,111,113-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ccee33f3dcd94989df520e4e7df7b8f3b5dfea4a",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
