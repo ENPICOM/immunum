@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.10.2,<2.0", "polars>1.30.0,<2.0"]
+requires = ["maturin>=1.10.2,<2.0", "polars>1.30.0"]
 build-backend = "maturin"
 
 [project]
@@ -44,6 +44,8 @@ docs = [
     "mkdocs-autorefs",
     "mkdocs-material",
     "mkdocstrings[python]",
+    # 11.0.1 fixes a security advisory; 12 breaks mkdocstrings' code highlighting
+    "pymdown-extensions>=11.0.1,<12",
 ]
 # What the test suite needs, so CI can test a Python the lint and audit tools don't support yet
 test = [

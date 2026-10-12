@@ -36,7 +36,7 @@ impl Direction {
 /// The vector of these is always query-indexed (length == query length).
 /// Consensus positions skipped by the aligner are not represented here;
 /// the covered consensus range is captured by `Alignment::cons_start`/`cons_end`.
-#[cfg_attr(feature = "python", pyclass(get_all))]
+#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlignedPosition {
     /// Aligned to consensus position N
@@ -46,7 +46,7 @@ pub enum AlignedPosition {
 }
 
 /// Result of aligning a sequence to a consensus
-#[cfg_attr(feature = "python", pyclass(get_all))]
+#[cfg_attr(feature = "python", pyclass(get_all, skip_from_py_object))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Alignment {
     /// Alignment score

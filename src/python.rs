@@ -21,7 +21,7 @@ create_exception!(
 
 // `e` raised as `immunum.Error`, with its message and its `kind`
 fn raise(e: crate::Error) -> PyErr {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let err = Error::new_err(e.to_string());
         match err.value(py).setattr("kind", e.kind()) {
             Ok(()) => err,
@@ -207,7 +207,7 @@ fn _run_cli(py: Python<'_>) -> PyResult<i32> {
         "signal",
         (signal.getattr("SIGINT")?, signal.getattr("SIG_DFL")?),
     )?;
-    Ok(py.allow_threads(|| crate::cli::run(argv)))
+    Ok(py.detach(|| crate::cli::run(argv)))
 }
 
 #[pymodule]
