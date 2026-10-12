@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   letters; otherwise a missing file is an error (exit status 1).
 - CLI: the `--min-confidence` help said sequences below it are skipped; they get an error record.
 - Python: unpickling a corrupt `Annotator` raised `PanicException`; it raises `ValueError`.
+- CLI: when the reader of its output stopped early, as in `immunum number seqs.fasta | head`, the
+  command printed `error: write error: Broken pipe` and exited 1. It now stops quietly with status 0.
 - `cargo install immunum` also installed the developer tools `benchmark` and `debug-validation`,
   which only work in a checkout of the repository. They now need the new `dev-tools` feature
   (`cargo run --features dev-tools --bin benchmark`), so only `immunum` is installed, and the `cli`
@@ -100,6 +102,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`. JavaScript throws
   `Error` objects with the same `kind` (`ImmunumError` in the TypeScript types).
 - CLI: when any record has an error, a one-line summary goes to stderr.
+- The Python package installs the `immunum` command, so `uvx immunum number seqs.fasta` runs the CLI
+  without Rust or a separate install, and `pip install immunum` puts it on the path. It is the same
+  CLI as `cargo install immunum`, now in the library as `immunum::cli::run`; Ctrl-C stops it as it
+  stops the native binary.
+- CLI: `immunum --version` prints the version.
 - Python: `immunum.__version__`, the installed version, which was only reachable as
   `immunum._internal.__version__`. JavaScript: `version()` returns the version of immunum the module
   was built from, as `immunum.__version__` does in Python.

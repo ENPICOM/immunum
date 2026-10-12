@@ -281,11 +281,20 @@ Setting up returns `immunum::Error`; numbering one sequence returns `immunum::Se
 
 ### Installation
 
-The command-line tool isn't part of the Python or npm package. Build it with Cargo, which needs Rust 1.89 or newer (install it with [rustup](https://rustup.rs)):
+The Python package installs the `immunum` command, so `uvx` runs it without installing anything first:
+
+```bash
+uvx immunum number sequences.fasta
+pip install immunum   # or install it, with the Python library
+```
+
+Or build it with Cargo, which needs Rust 1.89 or newer (install it with [rustup](https://rustup.rs)):
 
 ```bash
 cargo install immunum
 ```
+
+`immunum --version` prints the version you're running.
 
 ### Commands
 
@@ -463,7 +472,8 @@ $ task | grep benchmark
 
 ```
 src/
-├── main.rs          # CLI binary (immunum number / immunum segment)
+├── main.rs          # CLI binary: runs cli.rs
+├── cli.rs           # The immunum command (number / segment), also installed by the Python package
 ├── lib.rs           # Public API
 ├── annotator.rs     # Sequence annotation, chain detection and domain search
 ├── alignment.rs     # Needleman-Wunsch semi-global alignment

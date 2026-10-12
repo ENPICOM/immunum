@@ -52,6 +52,43 @@ fn stdin_dash_arg() {
         .stdout(predicate::str::contains("4qo1_A|Heavy|A"));
 }
 
+// A reader that stops early, as `immunum number seqs.fasta | head` does, isn't an error: the run
+// ends quietly with status 0 instead of printing a broken-pipe error and exiting 1
+#[test]
+fn closed_output_pipe_ends_quietly() {
+    use std::io::{Read, Write};
+    use std::process::{Command, Stdio};
+
+    // Far more output than a pipe buffers, so writing hits the closed pipe
+    let fasta = fs::read("fixtures/ig.fasta").unwrap().repeat(200);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_immunum"))
+        .arg("number")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let feeder = std::thread::spawn(move || stdin.write_all(&fasta));
+    let mut first_bytes = [0u8; 64];
+    // Read the start of the output, then drop the pipe
+    child
+        .stdout
+        .take()
+        .unwrap()
+        .read_exact(&mut first_bytes)
+        .unwrap();
+    feeder.join().unwrap().unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "status {:?}, stderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&output.stderr), "");
+}
+
 #[test]
 fn stdin_raw_sequence() {
     immunum()

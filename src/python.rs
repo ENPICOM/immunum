@@ -194,6 +194,22 @@ fn _scheme_supports_chain(scheme: &str, chain: &str) -> PyResult<bool> {
     scheme_supports_chain(scheme, chain).map_err(raise)
 }
 
+/// The `immunum` command the Python package installs: runs the CLI on `sys.argv` and returns its
+/// exit status, which the console script passes to `sys.exit`.
+#[cfg(feature = "cli")]
+#[pyfunction]
+fn _run_cli(py: Python<'_>) -> PyResult<i32> {
+    let argv: Vec<std::ffi::OsString> = py.import("sys")?.getattr("argv")?.extract()?;
+    // Python acts on Ctrl-C only once control returns to it, which a run in Rust doesn't do until
+    // it ends. The default handler stops the command at once, as it stops the native binary.
+    let signal = py.import("signal")?;
+    signal.call_method1(
+        "signal",
+        (signal.getattr("SIGINT")?, signal.getattr("SIG_DFL")?),
+    )?;
+    Ok(py.allow_threads(|| crate::cli::run(argv)))
+}
+
 #[pymodule]
 fn _internal(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -201,5 +217,7 @@ fn _internal(py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_class::<Annotator>()?;
     m.add_function(wrap_pyfunction!(_regions_for, m)?)?;
     m.add_function(wrap_pyfunction!(_scheme_supports_chain, m)?)?;
+    #[cfg(feature = "cli")]
+    m.add_function(wrap_pyfunction!(_run_cli, m)?)?;
     Ok(())
 }
