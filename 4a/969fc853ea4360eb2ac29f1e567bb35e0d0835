@@ -1,0 +1,32 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 11-17,38-39
+CONTRIBUTING.md
+  h_acea35c6bbea0b 39
+Taskfile.yml
+  h_acea35c6bbea0b 106-121,132
+docs/assets/immunum-batch.js
+  h_acea35c6bbea0b 1-159
+docs/assets/immunum-webtool.js
+  h_acea35c6bbea0b 3-27,30-46,68-69,72-75,144-154,156,165-169,350,352,367-375,377-408,410-422,424-439,442-444,448,503-504,506-510,517,519-527,537-539,541-544,562-563,576-626,630-644,676-677,683-723,726,729,732,735,748,750,773
+docs/assets/immunum-worker.js
+  h_acea35c6bbea0b 1-27
+docs/concepts.md
+  h_acea35c6bbea0b 325-326
+docs/demo.md
+  h_acea35c6bbea0b 23,25-26,29-36,43,94-132,135,194-206
+docs/stylesheets/extra.css
+  h_acea35c6bbea0b 478-535
+tests/test_demo.mjs
+  h_acea35c6bbea0b 1-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4a969fc853ea4360eb2ac29f1e567bb35e0d0835",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
