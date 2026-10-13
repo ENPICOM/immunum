@@ -1,0 +1,78 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 8-10,11-16,17-34,37-44,47-60
+CITATION.cff
+  h_acea35c6bbea0b 1-26
+CONTRIBUTING.md
+  h_acea35c6bbea0b 1-37,38,39-127,128,129-141
+Cargo.toml
+  h_acea35c6bbea0b 12
+README.md
+  h_acea35c6bbea0b 3,5-9,17,19,22-25,34-35,37-38,40-42,44-45,47,51,54-57,59,61-63,65-67,69-73,76,78,80-81,83-85,87,89-90,93-94,96-99,105,107-109,111-113,115,117,127-128,131,133,138-144,147,149,154,157-158,161-162,164,167-171,174,176,178-181,183,185-189,191,193-194,196,198,200,202
+docs/api/index.md
+  h_acea35c6bbea0b 3-10
+docs/api/javascript.md
+  h_acea35c6bbea0b 1-7,8-25,26
+docs/assets/immunum-webtool.js
+  h_acea35c6bbea0b 2,25-41,51-52,55,57-58,62,67-70,72-73,76-78,81,87-90,95-105,108-109,111-112,114-120,123-145,148-150,152,186-187,189-199,205,209-232,235-292,310,326-327,329,335-336,342-460,462-479,481-526,530-538,542,546-582,584-585,592,605
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 9-21,24-25,28-30,32,50,58,70,77-78,82,90,94-96
+docs/citation.md
+  h_acea35c6bbea0b 1-42
+docs/concepts.md
+  h_acea35c6bbea0b 1-310,311-380,382-407
+docs/contributing/index.md
+  h_acea35c6bbea0b 7
+docs/demo.md
+  h_acea35c6bbea0b 23-24,26,82-83,91-98,120-144
+docs/getting-started.md
+  h_acea35c6bbea0b 1-12,13,14-25
+docs/index.md
+  h_acea35c6bbea0b 1-9
+docs/stylesheets/extra.css
+  h_acea35c6bbea0b 10-15,76,93-101,104,108-113,169-175,217,292-318,412-423
+docs/usage/cli.md
+  h_acea35c6bbea0b 1-206
+docs/usage/errors.md
+  h_acea35c6bbea0b 1-138
+docs/usage/index.md
+  h_acea35c6bbea0b 1,3,5-9,11-13,15-19,20,21-23,25-26
+docs/usage/javascript.md
+  h_acea35c6bbea0b 1-2,3-7,8-83,84-109,110-113
+docs/usage/polars.md
+  h_acea35c6bbea0b 1,3-5,7-9,11,13-124,269
+docs/usage/python.md
+  h_acea35c6bbea0b 1,3-6,8,13-28,30-43,46-49,54-74,77,79-81,84,86-96,99-103,105-107,110-113,116,119,121-124,127-143,145-149
+docs/usage/rust.md
+  h_acea35c6bbea0b 1-85
+docs/usage/upgrading.md
+  h_acea35c6bbea0b 19
+mkdocs.yml
+  h_acea35c6bbea0b 2-4,8,52,55-59,63-68,70,75-76,78,85
+pyproject.toml
+  h_acea35c6bbea0b 48
+scripts/mkdocs_pages.py
+  h_acea35c6bbea0b 1-4,5,6-99
+uv.lock
+  h_acea35c6bbea0b 790,841
+.github/workflows/release.yml
+  h_acea35c6bbea0b 272-273
+.gitignore
+  h_acea35c6bbea0b 4-5
+Taskfile.yml
+  h_acea35c6bbea0b 74,76,78-79,105,108
+scripts/build_npm.mjs
+  h_acea35c6bbea0b 1-81
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 2,5,8-9,15-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "62a2c9b2d5c71c3dad71dfbcf0d228bb1ea3b0aa",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
