@@ -1,89 +1,149 @@
-# Python module
+# Python
 
-Here, interface is very simple: first you create an `Annotator` object with fixed chain types and numbering scheme you need (and optional `min_confidence` value), then call `number()` or `segment()` on each sequence.
+Build an `Annotator` once, with the chains to consider, the scheme and optionally
+`min_confidence`, then call it on each sequence. Install with `pip install immunum`
+([Getting started](../getting-started.md#python)); every parameter and field is in the
+[API reference](../api/immunum.md).
 
-**Numbering** assigns a position label to every residue, in the scheme you selected (`imgt`,
-`kabat`, `chothia`, `martin` or `aho`; only `imgt` covers TCR chains):
-
-```python
-from immunum import Annotator
-
-annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
-
-result = annotator.number(
-    "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
-)
-print(result.chain)       # "H"
-print(result.scheme)      # "IMGT"
-print(result.numbering["1"])  # "Q"
-```
-
-**Segmentation** splits the sequence into FR1–FR4 and CDR1–CDR3 regions plus prefix/postfix:
+## Creating an annotator
 
 ```python
 from immunum import Annotator
 
-annotator = Annotator(chains=["H", "K", "L"], scheme="imgt")
-result = annotator.segment(
-    "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
-)
-print(result.cdr3)  # "AREGTTGKPIGAFAH"
-print(result.fr4)   # "WGQGTLVTVSS"
+antibodies = Annotator(chains=["H", "K", "L"], scheme="imgt")
+same = Annotator(chains=["ig"], scheme="IMGT")              # a group, any case
+tcrs = Annotator(chains=["tcr"], scheme="imgt", min_confidence=0.6)
 ```
 
-By default, sequences with an alignment confidence below `0.5` get a result with `error` set
-instead of a numbering. Pass `min_confidence=0.0` to disable this check, or raise the threshold
-to filter non-immunoglobulin sequences more aggressively.
+- `chains`: the chains each sequence is scored against; the best match wins. Codes (`"H"`), names
+  (`"IGH"`, `"heavy"`) and the groups `"ig"`, `"tcr"` and `"all"` are accepted, in any case; see
+  [Chains](../concepts.md#chains). Each chain costs one alignment per sequence, so pass only those
+  you expect.
+- `scheme`: `"imgt"`, `"kabat"`, `"chothia"`, `"martin"` or `"aho"`, or their first letter. Only
+  IMGT numbers TCR chains; see [Numbering schemes](../concepts.md#numbering-schemes).
+- `min_confidence`: sequences whose best alignment scores below it, `0.5` by default, get a
+  `low_confidence` result instead of a numbering. `0.0` turns the check off; see
+  [Confidence](../concepts.md#confidence).
 
-**Region boundaries** come from the same tables numbering assigns residues to, and can be read
-without numbering a sequence:
+## Numbering
+
+`number` gives every residue of the domain a position label:
 
 ```python
-from immunum import regions_for
+from immunum import Annotator
+
+annotator = Annotator(chains=["ig"], scheme="imgt")
+sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+
+result = annotator.number(sequence)
+print(result.chain)           # H
+print(result.scheme)          # IMGT
+print(result.numbering["1"])  # Q
+print(result.numbering["111A"])  # K: insertions carry a letter, so positions are strings
+print(result.query_start, result.query_end)  # 0 121: the numbered residues, 0-based inclusive
+```
+
+## Segmentation
+
+`segment` splits the sequence into FR1–FR4 and CDR1–CDR3, with the residues before and after the
+domain as `prefix` and `postfix`, so the regions always join back into the sequence:
+
+```python
+from immunum import Annotator
+
+annotator = Annotator(chains=["ig"], scheme="imgt")
+sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+
+result = annotator.segment(sequence)
+assert result.fr1 == "QVQLVQSGAEVKRPGSSVTVSCKAS"
+assert result.cdr1 == "GGSFSTYA"
+assert result.cdr2 == "VIPLLTIT"
+assert result.cdr3 == "AREGTTGKPIGAFAH"
+assert result.fr4 == "WGQGTLVTVSS"
+assert "".join(result.as_dict().values()) == sequence
+```
+
+The regions follow the scheme you chose: Kabat puts CDR-H1 at positions 31–35, so the same
+sequence gives a shorter CDR1:
+
+```python
+from immunum import Annotator
+
+kabat = Annotator(chains=["ig"], scheme="kabat")
+sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+print(kabat.segment(sequence).cdr1)  # TYALS
+```
+
+## Multiple domains
+
+`number` and `segment` work on the best-scoring domain. `number_domains` and `segment_domains` do
+the same for every variable domain in a sequence, such as both domains of an scFv, in sequence
+order. Each result is what `number` or `segment` returns for that domain:
+
+```python
+from immunum import Annotator
+
+heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+kappa = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+linker = "GGGGSGGGGSGGGGS"
+
+annotator = Annotator(chains=["ig"], scheme="imgt")
+domains = annotator.number_domains(heavy + linker + kappa)
+assert [d.chain for d in domains] == ["H", "K"]
+
+heavy_regions, kappa_regions = annotator.segment_domains(heavy + linker + kappa)
+assert kappa_regions.prefix == linker
+assert kappa_regions.cdr3 == "QQHYTTPPT"
+```
+
+Every residue lands in exactly one domain's regions: a domain's `prefix` holds the residues since
+the previous domain, and only the last domain has a `postfix`. How domains are found, and a caveat
+about IMGT position 1 after a linker, are in [Multiple domains](../concepts.md#multiple-domains).
+
+## Region boundaries
+
+`regions_for` gives a scheme's FR/CDR boundaries for a chain, both ends inclusive, without numbering
+a sequence; `scheme_supports_chain` tells whether a scheme numbers a chain before you build an
+`Annotator`:
+
+```python
+from immunum import regions_for, scheme_supports_chain
 
 print(regions_for("kabat", "H")["cdr1"])  # (31, 35)
-print(regions_for("imgt", "H")["cdr3"])  # (105, 117)
-```
-
-Both ends are inclusive. IMGT and AHo number every chain alike; Kabat, Chothia and Martin place
-their CDRs differently on heavy and light chains, and only IMGT covers TCR chains.
-
-`scheme_supports_chain` tells whether a scheme numbers a chain before you build an `Annotator`:
-
-```python
-from immunum import scheme_supports_chain
+print(regions_for("imgt", "H")["cdr3"])   # (105, 117)
 
 assert scheme_supports_chain("kabat", "H")
-assert not scheme_supports_chain("kabat", "B")
+assert not scheme_supports_chain("kabat", "B")  # only IMGT numbers TCR chains
+```
+
+## Batches, threads and processes
+
+An `Annotator` is safe to share between threads and can be pickled with its settings, so it works
+with `concurrent.futures` thread and process pools and with `multiprocessing`. Numbering holds the
+GIL, so a thread pool doesn't number faster than one thread; a process pool does, and for large
+datasets [Polars](polars.md) runs on every core without managing a pool yourself.
+
+```python
+import pickle
+from concurrent.futures import ThreadPoolExecutor
+
+from immunum import Annotator
+
+annotator = Annotator(chains=["ig"], scheme="imgt")
+sequences = [
+    "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS",
+    "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK",
+]
+
+with ThreadPoolExecutor() as pool:
+    chains = [r.chain for r in pool.map(annotator.number, sequences)]
+assert chains == ["H", "K"]
+
+copy = pickle.loads(pickle.dumps(annotator))
+assert copy.number(sequences[0]).chain == "H"
 ```
 
 ## Errors
 
-Mistakes in how you set immunum up raise `immunum.Error`, a `ValueError`: an unknown chain or
-scheme, a scheme that doesn't number a chain, or a `min_confidence` outside `[0, 1]`. Its `kind`
-attribute names what went wrong as a stable code (`invalid_chain`, `invalid_scheme`,
-`unsupported_chain` or `invalid_min_confidence`); the message says it for people.
-
-A sequence that can't be numbered doesn't raise, so a loop over many sequences never stops for
-one bad one. Its result has every field `None` except `error`, the message, and `error_kind`:
-`invalid_sequence` (shorter than 30 or longer than 10,000 residues, or holding a character that
-isn't a letter) or `low_confidence` (no alignment reached `min_confidence`). Both are `None` on
-success. `number_domains` and `segment_domains` never return an empty list: a sequence without a
-domain gives that one result, with `low_confidence`, or with `domain_too_short` when the best
-alignment is confident but shorter than a domain must be.
-
-```python
-import immunum
-
-try:
-    immunum.Annotator(chains=["IGX"], scheme="imgt")
-except immunum.Error as e:
-    print(e.kind)  # "invalid_chain"
-    print(e)  # "unknown chain 'IGX' (options: ...)"
-
-annotator = immunum.Annotator(chains=["ig"], scheme="imgt")
-result = annotator.number("AAAA")
-assert result.chain is None
-print(result.error_kind)  # "invalid_sequence"
-print(result.error)  # "sequence length 4 is below minimum 30"
-```
+A setup mistake raises `immunum.Error`; a sequence that can't be numbered returns a result with
+`error` and `error_kind` set and every other field `None`. See [Errors](errors.md#python).

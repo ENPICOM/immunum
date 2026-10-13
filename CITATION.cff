@@ -1,0 +1,26 @@
+# No version or release date here, so this file can't fall behind a release: cite the version you
+# used (`immunum --version`, `immunum.__version__`) alongside it.
+cff-version: 1.2.0
+message: "If you use immunum in your research, please cite it as below, with the version you used."
+type: software
+title: "immunum: antibody and T-cell receptor sequence numbering"
+abstract: >-
+  Fast antibody and T-cell receptor variable domain numbering (IMGT, Kabat, Chothia, Martin, AHo)
+  and FR/CDR segmentation, by semi-global alignment against position-specific scoring matrices
+  built from consensus sequences. Available as a Rust crate and command-line tool, a Python
+  package with a Polars plugin, and an npm package.
+authors:
+  - name: ENPICOM
+    email: dev@enpicom.com
+    website: "https://www.enpicom.com"
+license: MIT
+repository-code: "https://github.com/ENPICOM/immunum"
+url: "https://immunum.enpicom.com"
+keywords:
+  - antibody
+  - T-cell receptor
+  - numbering
+  - IMGT
+  - Kabat
+  - Chothia
+  - bioinformatics

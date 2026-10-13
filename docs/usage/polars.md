@@ -1,12 +1,127 @@
-## Module summary
+# Polars
 
-Install immunum with Polars, which the module needs: `pip install "immunum[polars]"`.
+`immunum.polars` numbers and segments sequences as Polars expressions. They run inside a Polars
+query on every core, work in lazy and streaming queries, and only compute the fields you keep. For
+hundreds of thousands of sequences or more, this is the interface to use.
 
-Polars module uses [`polars`](https://pola.rs) dataframe library, relying on its built-in multiprocessing and query optimization engine to allow you to run your queries blazingly fast. If you have a big of data (hundreds of thousands and more), it's strongly preferred you use this interface.
+It needs Polars: install with `pip install "immunum[polars]"`
+([Getting started](../getting-started.md#python)). Every parameter is in the
+[API reference](../api/polars.md).
 
-Every expression takes either chain and scheme names (`chains`, `scheme` and optionally `min_confidence`), like the examples below, or an `Annotator` you have already built, as `annotator=`. Both return the same fields and run equally fast; an `Annotator` is convenient when your code holds one anyway. `number_domains()` and `segment_domains()` return a list per sequence, one entry per domain, such as both domains of an scFv. `numbering_method()` and `segmentation_method()` are deprecated; use `number(..., annotator=...)` and `segment(..., annotator=...)`.
+## Expressions
 
-Also, note that if you don't need a column, don't materialize it afterwards -- on big dataframes, queries will get **significantly** faster. For instance, example below runs in under a second for dataset with 8M entries (200,000 of them are actual paired sequences), while full numbering would take around 10 times more.
+| Expression | Returns per sequence |
+|---|---|
+| `number` | a struct with the fields `Annotator.number` returns: `chain`, `scheme`, `confidence`, `numbering` (a list of `{position, residue}` structs), `query_start`, `query_end`, `error`, `error_kind` |
+| `segment` | a struct with `prefix`, `fr1`, `cdr1`, `fr2`, `cdr2`, `fr3`, `cdr3`, `fr4`, `postfix`, `error`, `error_kind` |
+| `number_domains`, `segment_domains` | a list of those structs, one per domain, such as both domains of an scFv |
+
+Every expression takes either `chains`, `scheme` and optionally `min_confidence`, as
+[`Annotator`](python.md#creating-an-annotator) does, or a prebuilt `Annotator` as `annotator=`.
+Both give the same result and run as fast. Either way the annotator is built when the expression
+is, so an unknown name raises `immunum.Error` right there, before any query runs.
+`numbering_method()` and `segmentation_method()` are deprecated; use `number(..., annotator=...)`
+and `segment(..., annotator=...)`.
+
+## Example: regions, residues and domains
+
+```python
+import polars as pl
+import immunum.polars as imp
+
+heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS"
+kappa = "DIQMTQSPSSLSASVGDRVTITCRASQDVNTAVAWYQQKPGKAPKLLIYSASFLYSGVPSRFSGSRSGTDFTLTISSLQPEDFATYYCQQHYTTPPTFGQGTKVEIK"
+df = pl.DataFrame({
+    "id": ["heavy", "kappa", "scfv"],
+    "sequence": [heavy, kappa, heavy + "GGGGSGGGGSGGGGS" + kappa],
+})
+
+# One column per region; `segment` takes the best-scoring domain, here the scFv's kappa domain
+regions = df.select(
+    "id",
+    imp.segment("sequence", chains=["ig"], scheme="imgt").struct.unnest(),
+).select("id", "cdr1", "cdr2", "cdr3", "error_kind")
+print(regions)
+# shape: (3, 5)
+# ┌───────┬──────────┬──────────┬─────────────────┬────────────┐
+# │ id    ┆ cdr1     ┆ cdr2     ┆ cdr3            ┆ error_kind │
+# │ ---   ┆ ---      ┆ ---      ┆ ---             ┆ ---        │
+# │ str   ┆ str      ┆ str      ┆ str             ┆ str        │
+# ╞═══════╪══════════╪══════════╪═════════════════╪════════════╡
+# │ heavy ┆ GGSFSTYA ┆ VIPLLTIT ┆ AREGTTGKPIGAFAH ┆ null       │
+# │ kappa ┆ QDVNTA   ┆ SAS      ┆ QQHYTTPPT       ┆ null       │
+# │ scfv  ┆ QDVNTA   ┆ SAS      ┆ QQHYTTPPT       ┆ null       │
+# └───────┴──────────┴──────────┴─────────────────┴────────────┘
+assert regions["cdr3"].to_list() == ["AREGTTGKPIGAFAH", "QQHYTTPPT", "QQHYTTPPT"]
+
+# One row per numbered residue: explode `numbering` and unnest it
+residues = (
+    df.filter(pl.col("id") == "heavy")
+    .select("id", imp.number("sequence", chains=["ig"], scheme="imgt").alias("numbered"))
+    .unnest("numbered")
+    .explode("numbering")
+    .unnest("numbering")
+    .select("id", "chain", "position", "residue")
+    .filter(pl.col("position").is_in(["110", "111", "111A", "112A", "112"]))
+)
+print(residues)
+# shape: (5, 4)
+# ┌───────┬───────┬──────────┬─────────┐
+# │ id    ┆ chain ┆ position ┆ residue │
+# │ ---   ┆ ---   ┆ ---      ┆ ---     │
+# │ str   ┆ str   ┆ str      ┆ str     │
+# ╞═══════╪═══════╪══════════╪═════════╡
+# │ heavy ┆ H     ┆ 110      ┆ T       │
+# │ heavy ┆ H     ┆ 111      ┆ G       │
+# │ heavy ┆ H     ┆ 111A     ┆ K       │
+# │ heavy ┆ H     ┆ 112A     ┆ P       │
+# │ heavy ┆ H     ┆ 112      ┆ I       │
+# └───────┴───────┴──────────┴─────────┘
+assert residues["position"].to_list() == ["110", "111", "111A", "112A", "112"]
+
+# Every domain, one row each, in a lazy query; the linker is the kappa domain's prefix
+domains = (
+    df.lazy()
+    .select("id", imp.segment_domains("sequence", chains=["ig"], scheme="imgt").alias("domain"))
+    .explode("domain")
+    .unnest("domain")
+    .select("id", "prefix", "cdr3")
+    .collect()
+)
+print(domains)
+# shape: (4, 3)
+# ┌───────┬─────────────────┬─────────────────┐
+# │ id    ┆ prefix          ┆ cdr3            │
+# │ ---   ┆ ---             ┆ ---             │
+# │ str   ┆ str             ┆ str             │
+# ╞═══════╪═════════════════╪═════════════════╡
+# │ heavy ┆                 ┆ AREGTTGKPIGAFAH │
+# │ kappa ┆                 ┆ QQHYTTPPT       │
+# │ scfv  ┆                 ┆ AREGTTGKPIGAFAH │
+# │ scfv  ┆ GGGGSGGGGSGGGGS ┆ QQHYTTPPT       │
+# └───────┴─────────────────┴─────────────────┘
+assert domains["cdr3"].to_list() == ["AREGTTGKPIGAFAH", "QQHYTTPPT", "AREGTTGKPIGAFAH", "QQHYTTPPT"]
+```
+
+## Performance
+
+- Select only the fields you need, and as late as possible: on big data, queries get
+  **significantly** faster. The first example below runs in under a second on 8M rows (200,000 of
+  them paired sequences), where materialising every field would take about 10 times longer.
+- Pass only the chains you expect: each chain is one more alignment per sequence.
+- Use `pl.scan_*` and `.collect(engine="streaming")` for data larger than memory.
+
+## Errors
+
+A sequence that can't be numbered never fails the query: its struct has `error` and `error_kind`
+set and every other field null. A null sequence gives a struct that's null throughout, `error`
+included, so test success with `chain` (from `number`) or `fr1` (from `segment`) rather than with
+`error` being null. Details and an example: [Errors](errors.md#polars).
+
+## Examples on large datasets
+
+These examples read parquet files of paired sequences that aren't part of the repository, so they
+don't run in the documentation's tests; their output is from a real run.
 
 ### Example: calculating unique cdr3_light/heavy pairs
 
@@ -138,37 +253,6 @@ print(top_framework_groups("source.parquet", "target.parquet"))
 # └───────────────────────────┴───────────────────┴─────────────────────────────────┴────────────────────────────┴───────────────────┴─────────────────────────────────┴───────┘
 ```
 
-### Errors
-
-Setup mistakes raise `immunum.Error` (a `ValueError`) as soon as you build the expression, before any query runs: an unknown chain or scheme, a scheme that doesn't number a chain, or a `min_confidence` outside `[0, 1]`. Its `kind` attribute names what went wrong as a stable code (`invalid_chain`, `invalid_scheme`, `unsupported_chain` or `invalid_min_confidence`).
-
-A sequence that can't be numbered never fails the query. Its struct has every field null except `error`, the message, and `error_kind`: `invalid_sequence` (shorter than 30 or longer than 10,000 residues, or holding a character that isn't a letter) or `low_confidence` (no alignment reached `min_confidence`). Both are null on success, so `error_kind.is_not_null()` finds the failures. A null sequence isn't numbered and isn't a failure either: its struct has every field null, `error` too, and `number_domains` and `segment_domains` give it a null list. So test success with a field that only success fills, such as `chain` from `number` or `fr1` from `segment`, rather than with `error` being null. The `number_domains` and `segment_domains` lists are never empty: a sequence without a domain gets that one struct, with `low_confidence`, or with `domain_too_short` when the best alignment is confident but shorter than a domain must be.
-
-```python
-import polars as pl
-import immunum
-import immunum.polars as imp
-
-try:
-    imp.number("sequence", chains=["IGX"], scheme="imgt")
-except immunum.Error as e:
-    print(e.kind)  # "invalid_chain"
-
-df = pl.DataFrame({"sequence": ["AAAA", "A" * 40]}).select(
-    imp.number("sequence", chains=["ig"], scheme="imgt").struct.field("error", "error_kind")
-)
-print(df)
-# shape: (2, 2)
-# ┌─────────────────────────────────┬──────────────────┐
-# │ error                           ┆ error_kind       │
-# │ ---                             ┆ ---              │
-# │ str                             ┆ str              │
-# ╞═════════════════════════════════╪══════════════════╡
-# │ sequence length 4 is below min… ┆ invalid_sequence │
-# │ alignment confidence 0.0416 is… ┆ low_confidence   │
-# └─────────────────────────────────┴──────────────────┘
-```
-
 ## Polars integrations
 
 Ecosystem of `polars` has many handy tools for data engineering -- for instance, you can check out [awesome-polars](https://github.com/ddotta/awesome-polars) list. Here we provide examples of two packages that we use actively: [`polars-distance`](https://github.com/ion-elgreco/polars-distance) providing convenient (and fast!) interface for string distance computations, and [`polars-bio`](https://biodatageeks.org/polars-bio/) providing direct interface for reading biological data formats (fasta/fastq/...) into polars dataframes.
@@ -182,7 +266,7 @@ an intermediate file:
 ```python
 import pytest
 import polars as pl
-pb = pytest.importorskip("polars-bio")
+pb = pytest.importorskip("polars_bio")
 import immunum.polars as imp
 
 
