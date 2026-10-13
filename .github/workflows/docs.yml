@@ -1,7 +1,8 @@
 name: Docs
 
 # Builds the documentation site from a tag and publishes it. The release workflow calls this for
-# each new version; run it by hand to republish docs without releasing a new version.
+# each new version; run it by hand to republish docs without releasing a new version, from a tag
+# or, for a docs change made after the release, from a branch such as main.
 on:
   workflow_call:
     inputs:
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Tag to build the docs from, such as v2.0.0. Empty builds the latest release tag.
+        description: Tag or branch to build the docs from, such as v2.0.0 or main. Empty builds the latest release tag.
         type: string
         required: false
 
@@ -31,18 +32,23 @@ jobs:
         with:
           fetch-depth: 0 # Tags, to find the latest release
 
-      - name: Check out the tag
+      - name: Check out the tag or branch
+        env:
+          REF: ${{ inputs.ref }}
         run: |
-          REF="${{ inputs.ref }}"
           if [ -z "$REF" ]; then
             REF=$(git tag --list 'v*' --sort=-v:refname | head -1)
           fi
-          if ! git rev-parse --verify --quiet "refs/tags/$REF" >/dev/null; then
-            echo "::error::No tag '$REF'"
+          if git rev-parse --verify --quiet "refs/tags/$REF" >/dev/null; then
+            TARGET="$REF"
+          elif git rev-parse --verify --quiet "refs/remotes/origin/$REF" >/dev/null; then
+            TARGET="origin/$REF"
+          else
+            echo "::error::No tag or branch '$REF'"
             exit 1
           fi
-          echo "Building docs from $REF"
-          git checkout --quiet "$REF"
+          echo "Building docs from $REF ($(git rev-parse --short "$TARGET"))"
+          git checkout --quiet "$TARGET"
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
