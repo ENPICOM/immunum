@@ -44,8 +44,8 @@ docs = [
     "mkdocs-autorefs",
     "mkdocs-material",
     "mkdocstrings[python]",
-    # 11.0.1 fixes a security advisory; 12 breaks mkdocstrings' code highlighting
     "pymdown-extensions>=11.0.1,<12",
+    "tomli; python_version < '3.11'",
 ]
 # What the test suite needs, so CI can test a Python the lint and audit tools don't support yet
 test = [

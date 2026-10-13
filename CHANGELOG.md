@@ -5,7 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Documentation: a Getting started page (install for every interface, supported Python versions and
+  wheel platforms, and which interface to use), a Concepts and FAQ page (chains and their aliases and
+  groups, how the schemes' regions differ, what confidence measures and how to pick
+  `min_confidence`, prefix and postfix, the domain search and input rules), guides for the command
+  line (input formats, every TSV column and JSON field, how `--all-domains` shifts the columns, exit
+  statuses), JavaScript and Rust, one Errors page for every interface, the TypeScript declarations
+  as the JavaScript API reference, the per-scheme accuracy from `BENCHMARKS.toml` on the benchmarks
+  page, and Citation and Contributing pages.
+- `CITATION.cff`, so GitHub offers "Cite this repository", and `CONTRIBUTING.md` with the
+  development setup and project layout that were in the README.
+- The documentation's demo accepts pasted FASTA, re-numbers when a setting changes, runs on
+  Ctrl/Cmd+Enter, copies and downloads results as TSV or JSON, makes a shareable link, compares the
+  schemes' regions per domain, explains how to read the result, fits a phone screen and shows
+  keyboard focus on its chain and scheme buttons.
+
+### Changed
+- The README is a quickstart for each interface; the details moved to the documentation site, where
+  each topic now lives on one page. The site has a description for link previews, "edit this page"
+  links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
+  to other tabs' pages.
+- The crate's `documentation` link points to docs.rs.
+
+### Fixed
+- Documentation: the Polars page's examples ran nothing but the error example; it now has a
+  runnable example with its real output. The Polars advice to find successes by a null `error`
+  counted null sequences as successes. The benchmarks page names the versions of the tools it
+  compares and says how each plot's error bars are computed.
+
 ## [2.0.0] - 2026-10-12
+
+### Highlights
+- **Multiple domains per sequence:** `number_domains` and `segment_domains` in every interface, and
+  `--all-domains` on the CLI, number and segment each variable domain, such as both domains of an scFv.
+- **CLI:** a new `immunum segment` command, and the CLI now ships with the Python package, so
+  `uvx immunum` or `pip install immunum` gets it without Rust.
+- **Machine-readable errors:** every failed result carries an `error_kind`, and setup mistakes raise
+  `immunum.Error` (Python) or an `Error` with a `kind` (JavaScript).
+- **Polars:** results have the same fields as Python's, and every expression accepts a prebuilt
+  `Annotator`.
+- **Python:** wheels for Windows x64 and Intel macOS, support for Python 3.14 and 3.15, an
+  `immunum[polars]` extra, and an `Annotator` that can be shared across threads.
+- **Docs:** the demo page numbers every domain in a sequence, and a new "Upgrading to 2.0" guide covers
+  the breaking changes.
 
 ### Fixed
 - Polars: `number`, `segment`, `numbering_method` and `segmentation_method` paired the numbering with the
