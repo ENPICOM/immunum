@@ -23,6 +23,7 @@ Run with:
 
 from __future__ import annotations
 
+import gc
 import math
 import multiprocessing
 import os
@@ -179,6 +180,19 @@ def _antpack_number(seqs: list[str]) -> list:
     return _antpack_annotator.analyze_seqs(seqs)
 
 
+@contextmanager
+def _frozen_heap() -> Iterator[None]:
+    """Keep the harness's objects out of a forked worker's garbage collection, so the worker shares
+    their memory instead of copying it: a collection touches every object it tracks. Without this,
+    AntPack's 32 workers on a million sequences ran a 125 GB machine out of memory."""
+    gc.collect()
+    gc.freeze()
+    try:
+        yield
+    finally:
+        gc.unfreeze()
+
+
 def _antpack_runners(chains: set[str]) -> list[Runner]:
     from antpack import SingleChainAnnotator  # type: ignore[import]
 
@@ -198,9 +212,12 @@ def _antpack_runners(chains: set[str]) -> list[Runner]:
         # workers averaged 0.19 s on the 10,000 headline sequences against fork's 0.13 s. A forked
         # worker inherits the harness's heap, which is why `main` frees each tool's results
         # before the next tool runs.
-        with multiprocessing.Pool(
-            NCPU, initializer=_antpack_init, initargs=(chain_list,)
-        ) as pool:
+        with (
+            _frozen_heap(),
+            multiprocessing.Pool(
+                NCPU, initializer=_antpack_init, initargs=(chain_list,)
+            ) as pool,
+        ):
             pool.map(
                 _antpack_number, [["EVQLVESGGG"]] * NCPU * 4
             )  # workers up and ready
@@ -236,7 +253,8 @@ def _anarci_runners(chains: set[str]) -> list[Runner]:
     def parallel(seqs: list[str]) -> Iterator[Callable[[], Any]]:
         named = [(str(i), s) for i, s in enumerate(seqs)]
         # Splits the sequences over a process pool it starts itself, one hmmscan per worker
-        yield lambda: run_anarci(named, scheme="imgt", allow=chains, ncpu=NCPU)[1]
+        with _frozen_heap():
+            yield lambda: run_anarci(named, scheme="imgt", allow=chains, ncpu=NCPU)[1]
 
     def extract(numbered: list, _seqs: list[str]) -> list[Numbering]:
         return [_anarci_style_numbering(n[0][0]) if n else None for n in numbered]
