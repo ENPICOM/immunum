@@ -1,0 +1,14 @@
+benches/bench_comparison.py
+  h_acea35c6bbea0b 26,183-195,215-220,256-257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4519f9d9d660f7188e37884aaa6f2553d2e72e22",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
