@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runnable example with its real output. The Polars advice to find successes by a null `error`
   counted null sequences as successes. The benchmarks page names the versions of the tools it
   compares and says how each plot's error bars are computed.
+- The comparison benchmark's all-core ANARCI run only raised hmmscan's thread count; it now splits
+  the sequences over ANARCI's process pool (`run_anarci`). Its single-core ANARCII run could keep
+  the torch thread count an earlier run had set, and its AntPack and ANARCII all-core runs timed
+  starting a process pool or loading the model; these happen before the clock starts now. The
+  benchmark tasks install a release build of immunum, where a previous dev build could stay.
 
 ## [2.0.0] - 2026-10-12
 

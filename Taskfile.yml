@@ -171,8 +171,9 @@ tasks:
         cmd: cargo bench --no-default-features {{.CLI_ARGS}}
 
     benchmark-comparison:
-        desc: "Speed + correctness benchmark: immunum vs antpack vs anarci (1k IGH sequences)"
-        cmd: uv run --group benchmark pytest benches/bench_comparison.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
+        desc: "Speed + correctness benchmark under pytest-benchmark: immunum vs antpack, ANARCI and ANARCII (10k IGH sequences)"
+        deps: [build-benchmark]
+        cmd: uv run --no-sync pytest benches/bench_comparison.py -v --benchmark-columns=min,mean,stddev --benchmark-group-by=func {{.CLI_ARGS}}
 
     benchmark-speed-polars:
         desc: "Speed benchmark for immunum polars across all chain/scheme fixtures"
@@ -220,14 +221,29 @@ tasks:
             - task: bencher-rust
             - task: bencher-python
 
+    build-benchmark:
+        desc: "Install the benchmark tools and a release build of immunum, which an earlier dev build would otherwise stay in place of"
+        run: once
+        cmd: uv sync --all-extras --all-groups -C "build-args=--profile release" --reinstall-package immunum --locked
+
+    benchmark-headline:
+        desc: "The README comparison: 10,000 NGS antibody sequences (mixed H/K/L), 5 rounds, every tool on one core and on all"
+        deps: [build-benchmark]
+        cmd: |
+            uv run --no-sync python benches/bench_comparison.py \
+              --fasta fixtures/SRR_HKL_10k.fasta --rounds 5 \
+              --output ./resources/benchmark_results/results_headline.csv \
+              --timeout 30m {{.CLI_ARGS}}
+
     benchmark-accuracy:
         desc: "Accuracy benchmark across all fixtures (1k sequences, 7 rounds each)"
+        deps: [build-benchmark]
         cmds:
             - |
                 for f in fixtures/validation/*_imgt.csv; do
                   base=$(basename "$f" .csv)
                   chain=$(echo "$base" | cut -d_ -f2)
-                  uv run --group benchmark python benches/bench_comparison.py \
+                  uv run --no-sync python benches/bench_comparison.py \
                     --chain "$chain" \
                     --sizes 1000 --rounds 7 \
                     --output "./resources/benchmark_results/results_${base}.csv" \
@@ -236,15 +252,17 @@ tasks:
 
     benchmark-speed:
         desc: "Speed benchmark: sizes 100..1M, 3 rounds, H/imgt. Pass CLI_ARGS to filter tools, e.g. -- --tools immunum"
+        deps: [build-benchmark]
         cmd: |
-            uv run --group benchmark python benches/bench_comparison.py \
-              --sizes 1_000_000 --sizes 500 --sizes 1000 --sizes 5000 --sizes 10_000 --sizes 50_000 --sizes 100_000 --sizes 500_000 --sizes 100 \
+            uv run --no-sync python benches/bench_comparison.py \
+              --sizes 100 --sizes 500 --sizes 1000 --sizes 5000 --sizes 10_000 --sizes 50_000 --sizes 100_000 --sizes 500_000 --sizes 1_000_000 \
               --rounds 3 --output ./resources/benchmark_results/results_speed.csv \
               --timeout 10m --no-correctness-check {{.CLI_ARGS}}
 
     benchmark:
         desc: "Run all benchmarks and produce plots for them"
         cmds:
+            - task: benchmark-headline
             - task: benchmark-accuracy
             - task: benchmark-speed
             - task: plots
