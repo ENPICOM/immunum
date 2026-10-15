@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keyboard focus on its chain and scheme buttons.
 
 ### Changed
+- Numbering is faster, with identical results: an annotator aligns a sequence against all its chains
+  in one pass, one chain per SIMD lane, instead of one chain after another. The CLI numbers 10,000
+  sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with
+  `ig`, 3.4 times with `tcr` and 3.5 times with `all`; Polars builds its numbering column with two
+  allocations per sequence instead of two per residue.
 - The README is a quickstart for each interface; the details moved to the documentation site, where
   each topic now lives on one page. The site has a description for link previews, "edit this page"
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
