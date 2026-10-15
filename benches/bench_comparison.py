@@ -12,7 +12,7 @@ Single core / every core, per tool:
 - immunum: `Annotator.number` in a loop / the `immunum.polars` expression
 - antpack: `SingleChainAnnotator.analyze_seqs` / the same, split over a process pool
 - ANARCI: `anarci(..., ncpu=1)` / `run_anarci(..., ncpu=<cores>)`
-- ANARCII: `Anarcii(mode="speed")` with torch held to one thread / to eight
+- ANARCII: `Anarcii(mode="speed")` with torch held to one thread / to `--anarcii-threads` (8)
 
 Run with:
     task benchmark-headline      # 10,000 NGS sequences, mixed H/K/L (the README figure)
@@ -247,16 +247,21 @@ def _anarci_runners(chains: set[str]) -> list[Runner]:
     ]
 
 
-def _anarcii_runners(chains: set[str]) -> list[Runner]:
+# How many torch threads ANARCII gets on all cores. More threads can be slower, by a lot: numbering
+# 1,000 sequences took 16 s on 1 thread, 5 s on 8 and 111 s on 24 on a 24-core Core Ultra 9 285HX;
+# on a 32-core AMD EPYC 7543 VM, 8 threads took 14.6 s and 16 took 13.5 s; on a 32-core Ampere
+# Neoverse-N1 VM, 8 threads took 82 s and 32 took 32 s. Measure a machine's best and pass it with
+# `--anarcii-threads`.
+DEFAULT_ANARCII_THREADS = min(8, NCPU)
+
+
+def _anarcii_runners(chains: set[str], threads_parallel: int) -> list[Runner]:
     import torch
     from anarcii import Anarcii  # type: ignore[import]
 
     # Built once: loading the model takes seconds. `ncpu` only sets torch's thread count, which
     # is global, so each run sets it again rather than trusting the model it was built with.
     model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
-    # More torch threads stop helping well before every core: numbering 1,000 sequences on a
-    # 24-core Core Ultra 9 285HX took 16 s on 1 thread, 6 s on 4, 5 s on 8 and 111 s on 24
-    threads_parallel = min(8, NCPU)
 
     def runner(
         threads: int,
@@ -284,16 +289,24 @@ def _anarcii_runners(chains: set[str]) -> list[Runner]:
     ]
 
 
-def make_runners(chains: set[str], tools: Optional[list[str]] = None) -> list[Runner]:
+def make_runners(
+    chains: set[str],
+    tools: Optional[list[str]] = None,
+    anarcii_threads: int = DEFAULT_ANARCII_THREADS,
+) -> list[Runner]:
     """Every runner for `chains` (one-letter codes) whose tool is installed and supports them.
 
-    `tools` keeps the runners named exactly so or `<tool>_*`."""
+    `tools` keeps the runners named exactly so or `<tool>_*`; `anarcii_threads` is the torch thread
+    count of ANARCII's all-core run."""
     factories: list[tuple[str, Callable[[set[str]], list[Runner]]]] = [
         ("immunum", _immunum_runners),
         ("anarci", _anarci_runners),
     ]
     if chains <= AB_CHAINS:
-        factories += [("antpack", _antpack_runners), ("anarcii", _anarcii_runners)]
+        factories += [
+            ("antpack", _antpack_runners),
+            ("anarcii", lambda c: _anarcii_runners(c, anarcii_threads)),
+        ]
     runners: list[Runner] = []
     for module, factory in factories:
         try:
@@ -437,6 +450,12 @@ def main(
             help="Skip extract and correctness computation; only time the run step.",
         ),
     ] = False,
+    anarcii_threads: Annotated[
+        int,
+        typer.Option(
+            help="Torch threads for ANARCII's all-core run; the fastest count differs per machine"
+        ),
+    ] = DEFAULT_ANARCII_THREADS,
 ) -> None:
     if fasta is not None:
         chains, label = set(AB_CHAINS), "".join(sorted(AB_CHAINS))
@@ -454,9 +473,12 @@ def main(
         df_full = polars.read_csv(fixture, infer_schema=False)
         check = not no_correctness_check
 
-    typer.echo(", ".join(f"{k} {v}" for k, v in _versions().items()))
+    typer.echo(
+        ", ".join(f"{k} {v}" for k, v in _versions().items())
+        + f", ANARCII all-core threads {anarcii_threads}"
+    )
     timeout_s = _parse_duration(timeout)
-    runners = make_runners(chains, tools)
+    runners = make_runners(chains, tools, anarcii_threads)
     position_cols = [c for c in df_full.columns if c not in META_COLS]
     # Without scoring, a sample needs only the sequences, not ~150 reference columns per row
     sample = df_full if check else df_full.select("sequence")
