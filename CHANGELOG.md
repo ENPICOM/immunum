@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
   to other tabs' pages.
 - The crate's `documentation` link points to docs.rs.
+- The comparison benchmarks are re-run against AntPack 0.3.8.6.2, ANARCI 2026.2.13.2 and ANARCII
+  2.0.8 on two 32-core cloud VMs, x86 (AMD EPYC 7543) and ARM (Neoverse-N1), with a new headline
+  run (10,000 sequencing-run antibody sequences, mixed H/K/L, `task benchmark-headline`) whose x86
+  times the README shows. The benchmarks page has both machines' times, and records the machines
+  and the date. The scaling plot shows the current tools instead of March's.
 
 ### Fixed
 - Documentation: the Polars page's examples ran nothing but the error example; it now has a

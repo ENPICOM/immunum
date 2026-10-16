@@ -16,6 +16,22 @@ Documentation: [immunum.enpicom.com](https://immunum.enpicom.com).
 [![Docs](https://img.shields.io/badge/docs-immunum.enpicom.com-blue)](https://immunum.enpicom.com)
 <!-- --8<-- [end:intro] -->
 
+## Performance
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ENPICOM/immunum/main/docs/assets/benchmark_headline_dark.svg">
+    <img alt="Time to number 10,000 antibody sequences on 1 core: immunum 0.75 s, AntPack 1.41 s, ANARCII 254 s, ANARCI 279 s; on 32 cores: immunum 0.11 s, AntPack 0.17 s, ANARCI 8.14 s, ANARCII 133 s" src="https://raw.githubusercontent.com/ENPICOM/immunum/main/docs/assets/benchmark_headline_light.svg" width="560">
+  </picture>
+</p>
+
+Numbering 10,000 antibody sequences from a sequencing run (heavy, kappa and lambda mixed, IMGT) on
+a 32-core AMD EPYC 7543 VM. On 1 core immunum is 1.9 times as fast as AntPack, about 370 times as
+fast as ANARCI and 340 times as fast as ANARCII; on 32 cores, 1.6 times as fast as AntPack. On a
+32-core ARM VM (Neoverse-N1, as in AWS Graviton2) it leads AntPack by 1.3 times on 1 core and 2.0
+times on 32 cores. The [benchmarks](https://immunum.enpicom.com/benchmarks/) have the method, the
+versions compared and accuracy per chain.
+
 <!-- --8<-- [start:overview] -->
 ## Overview
 

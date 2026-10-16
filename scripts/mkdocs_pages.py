@@ -5,7 +5,8 @@
   without wasm-bindgen's loader functions, which the Node.js package doesn't have.
 - `<!-- benchmark-accuracy -->` becomes a table of the per-scheme accuracy in BENCHMARKS.toml.
 - `<!-- benchmark-speed -->` becomes a table of the mean times in the headline comparison,
-  resources/benchmark_results/results_headline.csv.
+  resources/benchmark_results/results_headline.csv; `<!-- benchmark-speed: arm/results_headline.csv
+  -->` (on one line) reads that file in resources/benchmark_results instead.
 - `<!-- immunum-version -->` becomes the version the site documents, which mkdocs_version.py
   reads from Cargo.toml; that hook must run first.
 - A page that only includes one file through pymdownx.snippets, such as the changelog, gets an
@@ -29,7 +30,11 @@ else:
 ROOT = Path(__file__).resolve().parents[1]
 TYPESCRIPT = ROOT / "docs" / "assets" / "wasm" / "immunum.d.ts"
 BENCHMARKS = ROOT / "BENCHMARKS.toml"
-HEADLINE = ROOT / "resources" / "benchmark_results" / "results_headline.csv"
+RESULTS = ROOT / "resources" / "benchmark_results"
+SPEED_MARKER = re.compile(r"<!-- benchmark-speed(?:: (\S+))? -->")
+# The benchmark machines' core count, which the results files don't record; scripts/plots.py has
+# the same constant for the plots
+CORES = 32
 # Tool, then its runner on one core and on all cores in bench_comparison.py
 HEADLINE_TOOLS = [
     ("immunum", "immunum_singlethreaded", "immunum_multithreaded"),
@@ -88,10 +93,10 @@ def benchmark_accuracy() -> str:
     return f"Last run: {results['last_updated']}.\n\n" + "\n".join(rows)
 
 
-def benchmark_speed() -> str:
+def benchmark_speed(path: Path) -> str:
     times: dict[str, list[float]] = {}
     numbered: dict[str, list[int]] = {}
-    with HEADLINE.open() as f:
+    with path.open() as f:
         rows = list(csv.DictReader(f))
     size = int(rows[0]["sample_size"])
     for row in rows:
@@ -103,7 +108,7 @@ def benchmark_speed() -> str:
         return f"{t:,.2f} s | {size / t:,.0f}"
 
     table = [
-        "| Tool | One core | Sequences/s | All cores | Sequences/s | Numbered |",
+        f"| Tool | 1 core | Sequences/s | {CORES} cores | Sequences/s | Numbered |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for label, single, multi in HEADLINE_TOOLS:
@@ -128,8 +133,10 @@ def on_page_markdown(
         )
     if "<!-- benchmark-accuracy -->" in markdown:
         markdown = markdown.replace("<!-- benchmark-accuracy -->", benchmark_accuracy())
-    if "<!-- benchmark-speed -->" in markdown:
-        markdown = markdown.replace("<!-- benchmark-speed -->", benchmark_speed())
+    markdown = SPEED_MARKER.sub(
+        lambda m: benchmark_speed(RESULTS / (m.group(1) or "results_headline.csv")),
+        markdown,
+    )
 
     lines = [line for line in markdown.splitlines() if line.strip()]
     included = {m.group(1) for line in lines if (m := SNIPPET.match(line.strip()))}

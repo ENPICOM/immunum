@@ -56,6 +56,11 @@ mt_label_map = {
 
 # The headline run: one batch of NGS antibody sequences, H, K and L mixed
 HEADLINE_SIZE = headline_df["sample_size"].max()
+# The benchmark machines' core count, which the results files don't record; scripts/mkdocs_pages.py
+# has the same constant for the docs tables
+CORES = 32
+SINGLE_CORE = "1 core"
+ALL_CORES = f"{CORES} cores"
 perf_base = headline_df.with_columns(
     (pl.col("sample_size") / pl.col("time_s")).alias("throughput")
 )
@@ -111,8 +116,8 @@ def make_perf_barplot(data: pl.DataFrame, title: str) -> alt.Chart:
 
 
 plot_perf = (
-    make_perf_barplot(p1_data, f"Single core (n={HEADLINE_SIZE:,})")
-    | make_perf_barplot(p3_data, f"All cores (n={HEADLINE_SIZE:,})")
+    make_perf_barplot(p1_data, f"{SINGLE_CORE} (n={HEADLINE_SIZE:,})")
+    | make_perf_barplot(p3_data, f"{ALL_CORES} (n={HEADLINE_SIZE:,})")
 ).resolve_scale(y="shared")
 
 
@@ -181,12 +186,12 @@ plot_scaling = (
     make_scaling_plot(
         speed_df.filter(pl.col("tool").is_in(single_tools)),
         single_label_map,
-        "Single-threaded",
+        SINGLE_CORE,
     )
     & make_scaling_plot(
         speed_df.filter(pl.col("tool").is_in(mt_tools)),
         mt_label_map,
-        "Multi-threaded",
+        ALL_CORES,
     )
 ).resolve_scale(y="shared", color="shared")
 
@@ -286,7 +291,7 @@ def _configure_for_export(chart):
     )
 
 
-# ── README figure: time for the headline batch, one core and all ─────────────
+# ── README figure: time for the headline batch, on 1 core and on all ─────────
 def make_headline_chart(foreground: str, muted: str) -> alt.VConcatChart:
     """Horizontal bars of mean wall time per tool, fastest first, for a light or dark page."""
 
@@ -338,8 +343,8 @@ def make_headline_chart(foreground: str, muted: str) -> alt.VConcatChart:
 
     return (
         alt.vconcat(
-            panel(p1_data, "Single core"),
-            panel(p3_data, "All cores"),
+            panel(p1_data, SINGLE_CORE),
+            panel(p3_data, ALL_CORES),
             spacing=18,
         )
         .resolve_scale(x="independent", y="independent")
