@@ -1,0 +1,60 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 37-41
+README.md
+  h_acea35c6bbea0b 19-34
+docs/assets/benchmark_headline_dark.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_headline_light.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_plot1_performance.html
+  h_acea35c6bbea0b 17,24
+docs/assets/benchmark_plot1_performance.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_plot2_correctness.html
+  h_acea35c6bbea0b 17,24
+docs/assets/benchmark_plot2_correctness.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_plot3_scaling.html
+  h_acea35c6bbea0b 17,24
+docs/assets/benchmark_plot3_scaling.svg
+  h_acea35c6bbea0b 1
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 22-28,30-31,33-42,44,46,48-51,53-95,111-119,125-129
+resources/benchmark_results/arm/results_headline.csv
+  h_acea35c6bbea0b 1-41
+resources/benchmark_results/arm/results_speed.csv
+  h_acea35c6bbea0b 1-178
+resources/benchmark_results/results_ab_H_imgt.csv
+  h_acea35c6bbea0b 1-57
+resources/benchmark_results/results_ab_K_imgt.csv
+  h_acea35c6bbea0b 1-57
+resources/benchmark_results/results_ab_L_imgt.csv
+  h_acea35c6bbea0b 1-57
+resources/benchmark_results/results_headline.csv
+  h_acea35c6bbea0b 1-41
+resources/benchmark_results/results_speed.csv
+  h_acea35c6bbea0b 1-181
+resources/benchmark_results/results_tcr_A_imgt.csv
+  h_acea35c6bbea0b 1-29
+resources/benchmark_results/results_tcr_B_imgt.csv
+  h_acea35c6bbea0b 1-29
+resources/benchmark_results/results_tcr_D_imgt.csv
+  h_acea35c6bbea0b 1-29
+resources/benchmark_results/results_tcr_G_imgt.csv
+  h_acea35c6bbea0b 1-29
+scripts/mkdocs_pages.py
+  h_acea35c6bbea0b 8-9,33-37,96,99,111,136-139
+scripts/plots.py
+  h_acea35c6bbea0b 59-63,119-120,189,194,294,346-347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "deed6f231feeb252a84cab938801b5374bebb9e3",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
