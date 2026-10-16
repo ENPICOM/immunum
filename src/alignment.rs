@@ -67,10 +67,98 @@ pub struct Alignment {
     pub query_end: usize,
 }
 
-/// Reusable buffer for alignment DP matrix to avoid repeated allocation
+/// Most scoring matrices aligned in one pass, one per lane: eight `f32` lanes fill a 256-bit vector
+const MAX_LANES: usize = 8;
+
+/// The score row for a byte outside A-Z, after the rows for A to Z
+const OTHER_LETTER: usize = 26;
+
+/// Scoring matrices packed to align a query against all of them in one pass.
+///
+/// Filling the alignment matrix is latency-bound: each cell waits for the one to its left. Matrices
+/// placed in separate lanes of the same cells don't depend on each other, so aligning against up to
+/// [`MAX_LANES`] of them takes about as long as against one. Each lane does exactly the arithmetic a
+/// lone alignment does, so its result is the same.
+///
+/// Only the scores and penalties are packed; the matrices stay with whoever built this, which passes
+/// them to [`align_best`] alongside it.
+#[derive(Debug, Clone)]
+pub(crate) struct PackedScoringMatrices {
+    groups: Vec<LaneGroup>,
+}
+
+impl PackedScoringMatrices {
+    pub(crate) fn new<'a>(matrices: impl IntoIterator<Item = &'a [PositionScores]>) -> Self {
+        let matrices: Vec<&[PositionScores]> = matrices.into_iter().collect();
+        Self {
+            groups: matrices.chunks(MAX_LANES).map(LaneGroup::new).collect(),
+        }
+    }
+}
+
+/// Up to [`MAX_LANES`] matrices, column by column, one lane per matrix. A shorter matrix is padded to
+/// the longest with scores and penalties of -∞, which make every padding cell -∞: a cell depends
+/// only on cells to its left and above it, so padding never reaches a real cell, and it never beats
+/// a lane's row maximum, which keeps that and the traceback within the lane's own columns.
+#[derive(Debug, Clone)]
+struct LaneGroup {
+    /// 1, 4 or [`MAX_LANES`]; the lanes after the first `filled` are padding
+    lanes: usize,
+    /// How many of the lanes hold a matrix
+    filled: usize,
+    columns: usize,
+    /// `[(letter * columns + column) * lanes + lane]`, the letter being `byte - b'A'` or
+    /// [`OTHER_LETTER`]
+    scores: Vec<f32>,
+    /// `[column * lanes + lane]`
+    gap_penalties: Vec<f32>,
+    /// `[column * lanes + lane]`
+    insertion_penalties: Vec<f32>,
+}
+
+impl LaneGroup {
+    fn new(matrices: &[&[PositionScores]]) -> Self {
+        let lanes = match matrices.len() {
+            1 => 1,
+            2..=4 => 4,
+            _ => MAX_LANES,
+        };
+        let columns = matrices.iter().map(|m| m.len()).max().unwrap_or(0);
+        let padding = f32::NEG_INFINITY;
+        let mut scores = vec![padding; (OTHER_LETTER + 1) * columns * lanes];
+        let mut gap_penalties = vec![padding; columns * lanes];
+        let mut insertion_penalties = vec![padding; columns * lanes];
+        for (lane, positions) in matrices.iter().enumerate() {
+            for (column, position) in positions.iter().enumerate() {
+                for letter in 0..=OTHER_LETTER {
+                    scores[(letter * columns + column) * lanes + lane] =
+                        position.score_for(b'A' + letter as u8);
+                }
+                gap_penalties[column * lanes + lane] = position.gap_penalty;
+                insertion_penalties[column * lanes + lane] = position.insertion_penalty;
+            }
+        }
+        Self {
+            lanes,
+            filled: matrices.len(),
+            columns,
+            scores,
+            gap_penalties,
+            insertion_penalties,
+        }
+    }
+}
+
+/// Reusable buffer for the alignment matrices, to avoid allocating them for every alignment
 pub struct AlignBuffer {
+    /// `[(row * (columns + 1) + column) * lanes + lane]`
     dp_scores: Vec<f32>,
+    /// [`Direction`]s, laid out as `dp_scores`
     dp_traceback: Vec<u8>,
+    /// Each row's best score, `[row * lanes + lane]`
+    row_max: Vec<f32>,
+    /// The column of each row's best score, laid out as `row_max`
+    row_best_column: Vec<u32>,
 }
 
 impl Default for AlignBuffer {
@@ -84,19 +172,25 @@ impl AlignBuffer {
         Self {
             dp_scores: Vec::new(),
             dp_traceback: Vec::new(),
+            row_max: Vec::new(),
+            row_best_column: Vec::new(),
         }
     }
 
-    fn ensure_capacity(&mut self, total: usize) {
-        if self.dp_scores.len() < total {
-            // Exactly `total`, so the memory held is what the longest query needed. The old contents
-            // aren't copied: `align` writes every cell before reading it.
-            self.dp_scores = vec![0.0; total];
-            self.dp_traceback = vec![0; total];
+    fn ensure_capacity(&mut self, cells: usize, rows: usize) {
+        // Exactly what is asked, so the memory held is what the longest query needed. The old
+        // contents aren't copied: a fill writes every cell before reading it.
+        if self.dp_scores.len() < cells {
+            self.dp_scores = vec![0.0; cells];
+            self.dp_traceback = vec![0; cells];
+        }
+        if self.row_max.len() < rows {
+            self.row_max = vec![0.0; rows];
+            self.row_best_column = vec![0; rows];
         }
     }
 
-    /// Free the matrices if they take more than `cells` cells
+    /// Free the matrices if they take more than `cells` cells, counting every lane
     pub(crate) fn release_above(&mut self, cells: usize) {
         if self.dp_scores.capacity() > cells {
             *self = Self::new();
@@ -108,18 +202,12 @@ impl AlignBuffer {
 /// against position-specific scoring matrices derived from consensus sequences.
 ///
 /// Leading/trailing gaps in the consensus and query are free (semi-global).
-/// Returns the optimal [`Alignment`] with scored positions, or an error if the sequence is empty.
+/// Returns the optimal [`Alignment`] with scored positions.
 pub fn align(
     query: &str,
     positions: &[PositionScores],
     align_buffer: Option<&mut AlignBuffer>,
 ) -> Alignment {
-    let query_bytes = query.as_bytes();
-    let query_len = query_bytes.len();
-    let cons_len = positions.len();
-    let stride = cons_len + 1;
-
-    // Use provided buffer or allocate a local one
     let mut local_buf;
     let buf = match align_buffer {
         Some(buf) => buf,
@@ -128,154 +216,245 @@ pub fn align(
             &mut local_buf
         }
     };
+    align_best(
+        query,
+        &PackedScoringMatrices::new([positions]),
+        |_| positions,
+        buf,
+    )
+    .1
+}
 
-    // Reuse buffer, growing only if needed
-    let total = (query_len + 1) * stride;
-    buf.ensure_capacity(total);
-    let dp_scores = &mut buf.dp_scores[..total];
-    let dp_traceback = &mut buf.dp_traceback[..total];
+/// The best alignment of `query` against the packed matrices, with the index of its matrix: the
+/// highest score, or the first matrix of those that tie for it. Each matrix's alignment is the one
+/// [`align`] makes against it alone. `matrix(k)` is the `k`-th matrix `packed` was built from: the
+/// packed copy has the scores and penalties the fill needs, the matrix itself the details of each
+/// position that finding the end and the traceback read.
+pub(crate) fn align_best<'a>(
+    query: &str,
+    packed: &PackedScoringMatrices,
+    matrix: impl Fn(usize) -> &'a [PositionScores],
+    buf: &mut AlignBuffer,
+) -> (usize, Alignment) {
+    let query = query.as_bytes();
+    let mut best: Option<(usize, Alignment)> = None;
+    let mut first_matrix = 0;
+    for group in &packed.groups {
+        match group.lanes {
+            1 => fill::<1>(query, group, buf),
+            4 => fill::<4>(query, group, buf),
+            _ => fill::<MAX_LANES>(query, group, buf),
+        }
+        // The group's best lane, the first on a tie
+        let mut group_best: Option<(usize, AlignmentEnd)> = None;
+        for lane in 0..group.filled {
+            let positions = matrix(first_matrix + lane);
+            let end = alignment_end(&Lane::new(buf, group, lane), positions, query.len());
+            if group_best.as_ref().is_none_or(|(_, b)| end.score > b.score) {
+                group_best = Some((lane, end));
+            }
+        }
+        let (lane, end) = group_best.expect("a group has a matrix");
+        // Built now, while the matrices still hold this group
+        if best.as_ref().is_none_or(|(_, b)| end.score > b.score) {
+            let alignment = traced_alignment(
+                &Lane::new(buf, group, lane),
+                matrix(first_matrix + lane),
+                query,
+                end,
+            );
+            best = Some((first_matrix + lane, alignment));
+        }
+        first_matrix += group.filled;
+    }
+    best.expect("there is a matrix")
+}
 
-    // Initialize first row: all zeros for scores, gaps in query are free (semi-global)
-    dp_scores[0] = 0.0;
-    dp_traceback[0] = Direction::Match.as_u8();
-    for j in 1..stride {
-        dp_scores[j] = 0.0;
-        dp_traceback[j] = Direction::GapInQuery.as_u8();
+/// Fill the score and traceback matrices of every lane in `group`, with each row's best cell
+// Indexing every per-lane array by lane is what lets the lane loop vectorise
+#[allow(clippy::needless_range_loop)]
+fn fill<const L: usize>(query: &[u8], group: &LaneGroup, buf: &mut AlignBuffer) {
+    let columns = group.columns;
+    let stride = columns + 1;
+    let rows = query.len() + 1;
+    buf.ensure_capacity(rows * stride * L, rows * L);
+    let scores = buf.dp_scores[..rows * stride * L].as_chunks_mut::<L>().0;
+    let traceback = buf.dp_traceback[..rows * stride * L].as_chunks_mut::<L>().0;
+    let row_max = buf.row_max[..rows * L].as_chunks_mut::<L>().0;
+    let row_best_column = buf.row_best_column[..rows * L].as_chunks_mut::<L>().0;
+    let letter_scores = group.scores.as_chunks::<L>().0;
+    let gap_penalties = &group.gap_penalties.as_chunks::<L>().0[..columns];
+    let insertion_penalties = &group.insertion_penalties.as_chunks::<L>().0[..columns];
+
+    // Leading gaps in the query and the consensus are free: the first row and column score 0. Their
+    // traceback is never read, as the traceback stops on reaching either.
+    scores[..stride].fill([0.0; L]);
+    row_max[0] = [f32::NEG_INFINITY; L];
+    row_best_column[0] = [0; L];
+
+    for (i, &residue) in query.iter().enumerate() {
+        let letter = (residue.to_ascii_uppercase().wrapping_sub(b'A') as usize).min(OTHER_LETTER);
+        let match_scores = &letter_scores[letter * columns..][..columns];
+        let (above, below) = scores.split_at_mut((i + 1) * stride);
+        let prev = &above[i * stride..][..stride];
+        let curr = &mut below[..stride];
+        let directions = &mut traceback[(i + 1) * stride..][..stride];
+        curr[0] = [0.0; L];
+
+        let mut left = [0.0f32; L];
+        let mut best = [f32::NEG_INFINITY; L];
+        let mut best_column = [0u32; L];
+        for j in 0..columns {
+            let mut cell = [0.0f32; L];
+            let mut direction = [0u8; L];
+            for l in 0..L {
+                let from_match = prev[j][l] + match_scores[j][l];
+                // Gap in query (skip consensus position)
+                let from_gap_query = left[l] + gap_penalties[j][l];
+                // Gap in consensus (insertion in query sequence)
+                let from_gap_cons = prev[j + 1][l] + insertion_penalties[j][l];
+                // The best of the three, a tie going to the match, then the gap in the query, then
+                // the gap in the consensus. Each cell waits on the cell to its left; the better of
+                // the match and the gap in the consensus needs only the row above, so it's chosen
+                // first, off that wait. Selects rather than branches, so the lane loop vectorises.
+                let match_first = from_match >= from_gap_cons;
+                let from_above = if match_first {
+                    from_match
+                } else {
+                    from_gap_cons
+                };
+                let take_above = if match_first {
+                    from_above >= from_gap_query
+                } else {
+                    from_above > from_gap_query
+                };
+                cell[l] = if take_above {
+                    from_above
+                } else {
+                    from_gap_query
+                };
+                direction[l] = if !take_above {
+                    Direction::GapInQuery.as_u8()
+                } else if match_first {
+                    Direction::Match.as_u8()
+                } else {
+                    Direction::GapInConsensus.as_u8()
+                };
+                let better = cell[l] > best[l];
+                best[l] = if better { cell[l] } else { best[l] };
+                best_column[l] = if better { j as u32 + 1 } else { best_column[l] };
+            }
+            curr[j + 1] = cell;
+            directions[j + 1] = direction;
+            left = cell;
+        }
+        row_max[i + 1] = best;
+        row_best_column[i + 1] = best_column;
+    }
+}
+
+/// One lane of the filled matrices
+struct Lane<'a> {
+    buf: &'a AlignBuffer,
+    stride: usize,
+    lanes: usize,
+    lane: usize,
+}
+
+impl<'a> Lane<'a> {
+    fn new(buf: &'a AlignBuffer, group: &LaneGroup, lane: usize) -> Self {
+        Self {
+            buf,
+            stride: group.columns + 1,
+            lanes: group.lanes,
+            lane,
+        }
     }
 
-    // Initialize first column: gaps in consensus are free (semi-global)
-    for i in 1..=query_len {
-        dp_scores[i * stride] = 0.0;
-        dp_traceback[i * stride] = Direction::GapInConsensus.as_u8();
+    fn score(&self, i: usize, j: usize) -> f32 {
+        self.buf.dp_scores[(i * self.stride + j) * self.lanes + self.lane]
     }
 
-    // Track per-row maximum score and its column index during the fill.
-    // This enables true semi-global alignment with free end gaps on all four ends:
+    fn direction(&self, i: usize, j: usize) -> Direction {
+        Direction::from_u8(self.buf.dp_traceback[(i * self.stride + j) * self.lanes + self.lane])
+    }
+
+    fn row_max(&self, i: usize) -> f32 {
+        self.buf.row_max[i * self.lanes + self.lane]
+    }
+
+    fn row_best_column(&self, i: usize) -> usize {
+        self.buf.row_best_column[i * self.lanes + self.lane] as usize
+    }
+}
+
+/// Where an alignment ends, and its score
+struct AlignmentEnd {
+    score: f32,
+    i: usize,
+    j: usize,
+}
+
+fn alignment_end(lane: &Lane, positions: &[PositionScores], query_len: usize) -> AlignmentEnd {
+    let cons_len = positions.len();
+
+    // Each row's best cell enables true semi-global alignment with free end gaps on all four ends:
     // - Free leading query/consensus gaps: via first row/column = 0 initialization
     // - Free trailing consensus gaps: by picking best j per row (not forcing j = cons_len)
     // - Free trailing query gaps: by picking the row i with the highest per-row max score
     //   (if trailing query residues degrade the score, best_i < query_len)
-    let mut row_max_score = vec![f32::NEG_INFINITY; query_len + 1];
-    let mut row_best_j = vec![0usize; query_len + 1];
-
-    // Fill DP matrix
-    for i in 1..=query_len {
-        let aa = query_bytes[i - 1].to_ascii_uppercase();
-        let curr_row = i * stride;
-        let prev_row = curr_row - stride;
-
-        for j in 1..=cons_len {
-            let cons_pos = &positions[j - 1];
-
-            // Match/mismatch score using direct array index
-            let match_score = cons_pos.score_for(aa);
-            let from_match = dp_scores[prev_row + j - 1] + match_score;
-
-            // Gap in query (skip consensus position)
-            let from_gap_query = dp_scores[curr_row + j - 1] + cons_pos.gap_penalty;
-
-            // Gap in consensus (insertion in query sequence)
-            let from_gap_cons = dp_scores[prev_row + j] + cons_pos.insertion_penalty;
-
-            // Choose best
-            let (best_score, best_dir) =
-                if from_match >= from_gap_query && from_match >= from_gap_cons {
-                    (from_match, Direction::Match.as_u8())
-                } else if from_gap_query >= from_gap_cons {
-                    (from_gap_query, Direction::GapInQuery.as_u8())
-                } else {
-                    (from_gap_cons, Direction::GapInConsensus.as_u8())
-                };
-
-            dp_scores[curr_row + j] = best_score;
-            dp_traceback[curr_row + j] = best_dir;
-
-            if best_score > row_max_score[i] {
-                row_max_score[i] = best_score;
-                row_best_j[i] = j;
-            }
-        }
-    }
-
+    //
     // Default: full query consumption (standard semi-global behavior).
     // Override only if early termination gives meaningfully better score (clips suffix).
     // The threshold prevents clipping valid antibody endings that score slightly negative.
     const SUFFIX_CLIP_THRESHOLD: f32 = 50.0;
     let mut best_i = query_len;
-    let mut best_j = row_best_j[query_len];
+    let mut best_j = lane.row_best_column(query_len);
     for i in 1..query_len {
-        if row_max_score[i] > row_max_score[query_len] + SUFFIX_CLIP_THRESHOLD
-            && row_max_score[i] > row_max_score[best_i]
+        if lane.row_max(i) > lane.row_max(query_len) + SUFFIX_CLIP_THRESHOLD
+            && lane.row_max(i) > lane.row_max(best_i)
         {
             best_i = i;
-            best_j = row_best_j[i];
+            best_j = lane.row_best_column(i);
         }
     }
-    let mut best_score = row_max_score[best_i];
+    let mut score = lane.row_max(best_i);
 
     // Drop trailing residues inserted after the last position or matched to an unoccupied one
     // (gap_penalty == 0): a single such residue costs < SUFFIX_CLIP_THRESHOLD and would otherwise
     // be numbered. Take the score from where the walk stops so it matches the kept alignment.
-    {
-        let (mut i, mut j) = (best_i, best_j);
-        while i > 0 && j > 0 {
-            let unoccupied = positions[j - 1].gap_penalty == 0.0;
-            match Direction::from_u8(dp_traceback[i * stride + j]) {
-                Direction::GapInConsensus if j == cons_len => i -= 1,
-                Direction::Match if unoccupied => {
-                    i -= 1;
-                    j -= 1;
-                }
-                Direction::GapInQuery if unoccupied => j -= 1,
-                _ => break,
+    let (mut i, mut j) = (best_i, best_j);
+    while i > 0 && j > 0 {
+        let unoccupied = positions[j - 1].gap_penalty == 0.0;
+        match lane.direction(i, j) {
+            Direction::GapInConsensus if j == cons_len => i -= 1,
+            Direction::Match if unoccupied => {
+                i -= 1;
+                j -= 1;
             }
-        }
-        if i != best_i {
-            best_i = i;
-            best_j = j;
-            best_score = dp_scores[i * stride + j];
+            Direction::GapInQuery if unoccupied => j -= 1,
+            _ => break,
         }
     }
-
-    let (
-        aligned_positions,
-        confidence_score,
-        max_confidence_score,
-        cons_start,
-        cons_end,
-        query_start,
-        query_end,
-    ) = build_traceback(
-        dp_traceback,
-        stride,
-        query_bytes,
-        positions,
-        query_len,
-        best_i,
-        best_j,
-    );
-
-    Alignment {
-        score: best_score,
-        positions: aligned_positions,
-        cons_start,
-        cons_end,
-        confidence_score,
-        max_confidence_score,
-        query_start,
-        query_end,
+    if i != best_i {
+        best_i = i;
+        best_j = j;
+        score = lane.score(i, j);
+    }
+    AlignmentEnd {
+        score,
+        i: best_i,
+        j: best_j,
     }
 }
 
-fn build_traceback(
-    dp_traceback: &[u8],
-    stride: usize,
-    query_bytes: &[u8],
+fn traced_alignment(
+    lane: &Lane,
     positions: &[PositionScores],
-    query_len: usize,
-    traceback_end_i: usize,
-    cons_end: usize,
-) -> (Vec<AlignedPosition>, f32, f32, u8, u8, usize, usize) {
+    query_bytes: &[u8],
+    end: AlignmentEnd,
+) -> Alignment {
+    let query_len = query_bytes.len();
     // positions.len() == query_len always; trailing suffix residues become Insertion()
     let mut aligned_positions = Vec::with_capacity(query_len);
 
@@ -284,14 +463,14 @@ fn build_traceback(
 
     // Tracked during backward traversal: first Aligned seen = cons_end, last = cons_start
     let mut cons_start: u8 = 1;
-    let mut cons_end_pos: u8 = 128;
+    let mut cons_end: u8 = 128;
     let mut found_aligned = false;
 
-    let mut i = traceback_end_i;
-    let mut j = cons_end;
+    let mut i = end.i;
+    let mut j = end.j;
 
     while i > 0 && j > 0 {
-        match Direction::from_u8(dp_traceback[i * stride + j]) {
+        match lane.direction(i, j) {
             Direction::Match => {
                 let pos = &positions[j - 1];
                 aligned_positions.push(AlignedPosition::Aligned(pos.position));
@@ -304,7 +483,7 @@ fn build_traceback(
 
                 // Going backwards: first Aligned = cons_end, every Aligned updates cons_start
                 if !found_aligned {
-                    cons_end_pos = pos.position;
+                    cons_end = pos.position;
                     found_aligned = true;
                 }
                 cons_start = pos.position;
@@ -341,21 +520,22 @@ fn build_traceback(
 
     aligned_positions.reverse();
 
-    // Append trailing Insertion() for suffix residues beyond traceback_end_i
-    let query_end = traceback_end_i.saturating_sub(1);
-    for _ in traceback_end_i..query_len {
+    // Append trailing Insertion() for suffix residues beyond the alignment's end
+    let query_end = end.i.saturating_sub(1);
+    for _ in end.i..query_len {
         aligned_positions.push(AlignedPosition::Insertion());
     }
 
-    (
-        aligned_positions,
+    Alignment {
+        score: end.score,
+        positions: aligned_positions,
+        cons_start,
+        cons_end,
         confidence_score,
         max_confidence_score,
-        cons_start,
-        cons_end_pos,
         query_start,
         query_end,
-    )
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -365,6 +545,63 @@ mod tests {
 
     fn test_align(query: &str, positions: &[PositionScores]) -> Alignment {
         align(query, positions, None)
+    }
+
+    #[test]
+    fn aligning_against_several_matrices_at_once_matches_aligning_against_each() {
+        use Chain::*;
+        // Every lane width, a group with padding lanes and consensuses of different lengths, and
+        // more matrices than lanes; the repeated IGH and IGK tie with the first ones, which must win
+        let sets: [&[Chain]; 5] = [
+            &[IGH],
+            &[IGK, IGL],
+            &[IGH, IGK, IGL],
+            &[IGH, IGK, IGL, TRA, TRB, TRG, TRD],
+            &[TRA, IGH, IGK, IGL, TRB, TRG, TRD, IGH, IGK],
+        ];
+        let mut queries = Vec::new();
+        for fixture in ["ab_H", "ab_K", "ab_L", "tcr_A", "tcr_B", "tcr_G", "tcr_D"] {
+            let path = std::path::PathBuf::from(format!("fixtures/validation/{fixture}_imgt.csv"));
+            for entry in crate::load_validation_csv(&path)
+                .unwrap()
+                .into_iter()
+                .take(25)
+            {
+                // Whole, and cut short at both ends so alignments clip and start inside the domain
+                let s = entry.sequence;
+                queries.push(s[s.len() / 4..s.len() * 3 / 4].to_string());
+                queries.push(s);
+            }
+        }
+        let mut buf = AlignBuffer::new();
+        for chains in sets {
+            let matrices: Vec<ScoringMatrix> =
+                chains.iter().map(|&c| ScoringMatrix::load(c)).collect();
+            let packed = PackedScoringMatrices::new(matrices.iter().map(|m| &m.positions[..]));
+            for query in &queries {
+                let alone: Vec<Alignment> = matrices
+                    .iter()
+                    .map(|m| align(query, &m.positions, None))
+                    .collect();
+                let mut expected = 0;
+                for (k, alignment) in alone.iter().enumerate() {
+                    if alignment.score > alone[expected].score {
+                        expected = k;
+                    }
+                }
+                let (index, alignment) =
+                    align_best(query, &packed, |k| &matrices[k].positions[..], &mut buf);
+                assert_eq!(
+                    index, expected,
+                    "{chains:?} chose a different matrix for {query}"
+                );
+                assert_eq!(
+                    serde_json::to_value(&alignment).unwrap(),
+                    serde_json::to_value(&alone[expected]).unwrap(),
+                    "{chains:?} aligned {query} differently"
+                );
+            }
+        }
     }
     #[test]
     fn test_align_simple() {

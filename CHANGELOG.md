@@ -24,17 +24,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keyboard focus on its chain and scheme buttons.
 
 ### Changed
+- Numbering is faster, with identical results: an annotator aligns a sequence against all its chains
+  in one pass, one chain per SIMD lane, instead of one chain after another. The CLI numbers 10,000
+  sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with
+  `ig`, 3.4 times with `tcr` and 3.5 times with `all`; Polars builds its numbering column with two
+  allocations per sequence instead of two per residue.
 - The README is a quickstart for each interface; the details moved to the documentation site, where
   each topic now lives on one page. The site has a description for link previews, "edit this page"
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
   to other tabs' pages.
 - The crate's `documentation` link points to docs.rs.
+- The comparison benchmarks are re-run against AntPack 0.3.8.6.2, ANARCI 2026.2.13.2 and ANARCII
+  2.0.8 on two 32-core cloud VMs, x86 (AMD EPYC 7543) and ARM (Neoverse-N1), with a new headline
+  run (10,000 sequencing-run antibody sequences, mixed H/K/L, `task benchmark-headline`) whose x86
+  times the README shows. The benchmarks page has both machines' times, and records the machines
+  and the date. The scaling plot shows the current tools instead of March's.
 
 ### Fixed
 - Documentation: the Polars page's examples ran nothing but the error example; it now has a
   runnable example with its real output. The Polars advice to find successes by a null `error`
   counted null sequences as successes. The benchmarks page names the versions of the tools it
   compares and says how each plot's error bars are computed.
+- The comparison benchmark's all-core ANARCI run only raised hmmscan's thread count; it now splits
+  the sequences over ANARCI's process pool (`run_anarci`). Its single-core ANARCII run could keep
+  the torch thread count an earlier run had set, and its AntPack and ANARCII all-core runs timed
+  starting a process pool or loading the model; these happen before the clock starts now. The
+  benchmark tasks install a release build of immunum, where a previous dev build could stay.
 
 ## [2.0.0] - 2026-10-12
 

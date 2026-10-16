@@ -9,6 +9,7 @@ use polars_core::POOL;
 use pyo3_polars::derive::polars_expr;
 use pyo3_polars::PolarsAllocator;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt::Write;
 
 #[global_allocator]
 static ALLOC: PolarsAllocator = PolarsAllocator::new();
@@ -98,31 +99,44 @@ fn number_domains_class_struct_expr(
     number_domains_series(inputs[0].str()?, kwargs.annotator)
 }
 
-// A numbering, with its positions and residues formatted for the output columns
-struct NumberedRow {
+// A numbering, with its positions and residues formatted for the output columns. A row's positions
+// share one string and its residues are a slice of the sequence, so building the columns doesn't
+// allocate, and then free, two strings per residue.
+struct NumberedRow<'a> {
     result: NumberingResult,
-    positions: Vec<String>,
-    residues: Vec<String>,
+    // Every position's text back to back; `position_ends` holds where each one ends
+    positions: String,
+    position_ends: Vec<usize>,
+    // The numbered residues, one byte each: a sequence is ASCII letters
+    residues: &'a str,
 }
 
-impl NumberedRow {
+impl<'a> NumberedRow<'a> {
     // `result` numbered `sequence`
-    fn new(result: NumberingResult, sequence: &str) -> Self {
-        let (positions, residues) = result
-            .residues(sequence)
-            .expect("`result` numbered `sequence`")
-            .map(|(pos, ch)| (pos.to_string(), ch.to_string()))
-            .unzip();
+    fn new(result: NumberingResult, sequence: &'a str) -> Self {
+        let residues = result
+            .numbered(sequence)
+            .expect("`result` numbered `sequence`");
+        let mut positions = String::with_capacity(4 * result.positions.len());
+        let position_ends = result
+            .positions
+            .iter()
+            .map(|position| {
+                write!(positions, "{position}").expect("writing to a String can't fail");
+                positions.len()
+            })
+            .collect();
         Self {
             result,
             positions,
+            position_ends,
             residues,
         }
     }
 }
 
 // One numbering struct: the numbering, or the error that took its place
-type Numbering = Result<NumberedRow, SequenceError>;
+type Numbering<'a> = Result<NumberedRow<'a>, SequenceError>;
 
 // One numbering struct per sequence
 fn numbering_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Series> {
@@ -130,10 +144,11 @@ fn numbering_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult<Se
     let rows: Vec<Option<Numbering>> = POOL.install(|| {
         values
             .par_iter()
-            .map_with(annotator, |ann, opt_v| {
+            .map(|opt_v| {
                 let value = (*opt_v)?;
                 Some(
-                    ann.number(value)
+                    annotator
+                        .number(value)
                         .map(|result| NumberedRow::new(result, value)),
                 )
             })
@@ -159,21 +174,22 @@ fn number_domains_series(ca: &StringChunked, annotator: Annotator) -> PolarsResu
 }
 
 // A list per sequence of one struct per domain, or of a single error struct for a sequence that
-// can't be searched. `domains` finds a sequence's domains; `structs` turns them into structs.
-fn domains_series<D: Send>(
-    ca: &StringChunked,
+// can't be searched. `domains` finds a sequence's domains, which may borrow from it; `structs` turns
+// them into structs.
+fn domains_series<'a, D: Send>(
+    ca: &'a StringChunked,
     annotator: Annotator,
-    domains: impl Fn(&Annotator, &str) -> crate::Result<Vec<D>, SequenceError> + Send + Sync,
+    domains: impl Fn(&Annotator, &'a str) -> crate::Result<Vec<D>, SequenceError> + Send + Sync,
     structs: impl Fn(PlSmallStr, &[Option<Result<D, SequenceError>>]) -> PolarsResult<Series>,
 ) -> PolarsResult<Series> {
     let len = ca.len();
-    let values: Vec<Option<&str>> = ca.into_iter().collect();
+    let values: Vec<Option<&'a str>> = ca.into_iter().collect();
     let rows: Vec<Option<Vec<Result<D, SequenceError>>>> = POOL.install(|| {
         values
             .par_iter()
-            .map_with(annotator, |ann, opt_v| {
+            .map(|opt_v| {
                 let value = (*opt_v)?;
-                Some(per_domain(domains(ann, value)))
+                Some(per_domain(domains(&annotator, value)))
             })
             .collect()
     });
@@ -220,13 +236,19 @@ fn numbering_struct(name: PlSmallStr, rows: &[Option<Numbering>]) -> PolarsResul
         .iter()
         .flatten()
         .flatten()
-        .map(|row| row.positions.len())
+        .map(|row| row.position_ends.len())
         .sum();
     let mut positions = StringChunkedBuilder::new("position".into(), numbered_residues);
     let mut residues = StringChunkedBuilder::new("residue".into(), numbered_residues);
     for row in rows.iter().flatten().flatten() {
-        row.positions.iter().for_each(|p| positions.append_value(p));
-        row.residues.iter().for_each(|r| residues.append_value(r));
+        let mut start = 0;
+        for &end in &row.position_ends {
+            positions.append_value(&row.positions[start..end]);
+            start = end;
+        }
+        for i in 0..row.residues.len() {
+            residues.append_value(&row.residues[i..i + 1]);
+        }
     }
     let flat = StructChunked::from_series(
         "".into(),
@@ -254,7 +276,7 @@ fn numbering_struct(name: PlSmallStr, rows: &[Option<Numbering>]) -> PolarsResul
                 chain.append_value(row.result.chain.to_string());
                 scheme.append_value(row.result.scheme.to_string());
                 confidence.append_value(row.result.confidence);
-                offsets.try_push(row.positions.len())?;
+                offsets.try_push(row.position_ends.len())?;
                 numbered.push(true);
                 query_start.append_value(row.result.query_start as u32);
                 query_end.append_value(row.result.query_end as u32);
@@ -332,9 +354,9 @@ fn segmentation_series(ca: &StringChunked, annotator: Annotator) -> PolarsResult
     let rows: Vec<Option<Result<SegmentResult, SequenceError>>> = POOL.install(|| {
         values
             .par_iter()
-            .map_with(annotator, |ann, opt_v| {
+            .map(|opt_v| {
                 let value = (*opt_v)?;
-                Some(ann.segment(value))
+                Some(annotator.segment(value))
             })
             .collect()
     });

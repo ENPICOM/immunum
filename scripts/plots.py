@@ -20,22 +20,15 @@ accuracy_files = glob.glob("resources/benchmark_results/results_*_imgt.csv")
 acc_df = pl.concat([pl.read_csv(f) for f in accuracy_files])
 
 speed_df = pl.read_csv("resources/benchmark_results/results_speed.csv")
+headline_df = pl.read_csv("resources/benchmark_results/results_headline.csv")
 
 # Derive available values from data
 acc_sizes = sorted(acc_df["sample_size"].unique().to_list())
 acc_size_label = ", ".join(f"n={s:,}" for s in acc_sizes)
 
-# Summarise accuracy data (mean per tool/chain/segment)
 segments = ["FR1", "CDR1", "FR2", "CDR2", "FR3", "CDR3", "FR4"]
-acc_summary = (
-    acc_df.group_by(["tool", "chain"])
-    .agg([pl.col(s).mean() for s in segments])
-    .sort(["chain", "tool"])
-)
 
-# ── Plots 1 & 3: Performance boxplots at fixed batch size ────────────────────
-BATCH_SIZE = 10_000
-
+# ── Plots 1 & 3: Performance at a fixed batch size ───────────────────────────
 single_tools = [
     "immunum_singlethreaded",
     "anarci",
@@ -44,9 +37,9 @@ single_tools = [
 ]
 single_label_map = {
     "immunum_singlethreaded": "immunum",
-    "anarci": "anarci",
-    "anarcii2": "anarcii2",
-    "antpack": "antpack",
+    "anarci": "ANARCI",
+    "anarcii2": "ANARCII",
+    "antpack": "AntPack",
 }
 mt_tools = [
     "immunum_multithreaded",
@@ -56,14 +49,19 @@ mt_tools = [
 ]
 mt_label_map = {
     "immunum_multithreaded": "immunum",
-    "antpack_parallel": "antpack",
-    "anarci_parallel": "anarci",
-    "anarcii2_parallel": "anarcii2",
+    "antpack_parallel": "AntPack",
+    "anarci_parallel": "ANARCI",
+    "anarcii2_parallel": "ANARCII",
 }
 
-METHODS = ["immunum", "anarci", "anarcii2", "antpack"]
-
-perf_base = speed_df.filter(pl.col("sample_size") == BATCH_SIZE).with_columns(
+# The headline run: one batch of NGS antibody sequences, H, K and L mixed
+HEADLINE_SIZE = headline_df["sample_size"].max()
+# The benchmark machines' core count, which the results files don't record; scripts/mkdocs_pages.py
+# has the same constant for the docs tables
+CORES = 32
+SINGLE_CORE = "1 core"
+ALL_CORES = f"{CORES} cores"
+perf_base = headline_df.with_columns(
     (pl.col("sample_size") / pl.col("time_s")).alias("throughput")
 )
 
@@ -118,8 +116,8 @@ def make_perf_barplot(data: pl.DataFrame, title: str) -> alt.Chart:
 
 
 plot_perf = (
-    make_perf_barplot(p1_data, f"Single-threaded (n={int(BATCH_SIZE):,})")
-    | make_perf_barplot(p3_data, f"Multi-threaded (n={int(BATCH_SIZE):,})")
+    make_perf_barplot(p1_data, f"{SINGLE_CORE} (n={HEADLINE_SIZE:,})")
+    | make_perf_barplot(p3_data, f"{ALL_CORES} (n={HEADLINE_SIZE:,})")
 ).resolve_scale(y="shared")
 
 
@@ -188,12 +186,12 @@ plot_scaling = (
     make_scaling_plot(
         speed_df.filter(pl.col("tool").is_in(single_tools)),
         single_label_map,
-        "Single-threaded",
+        SINGLE_CORE,
     )
     & make_scaling_plot(
         speed_df.filter(pl.col("tool").is_in(mt_tools)),
         mt_label_map,
-        "Multi-threaded",
+        ALL_CORES,
     )
 ).resolve_scale(y="shared", color="shared")
 
@@ -214,7 +212,7 @@ p2_data = (
 )
 
 CHAIN_ORDER = ["H", "K", "L", "A", "B", "G", "D"]
-METHOD_ORDER = ["immunum", "antpack", "anarci", "anarcii2"]
+METHOD_ORDER = ["immunum", "AntPack", "ANARCI", "ANARCII"]
 
 p2_pdf = p2_data.to_pandas()
 
@@ -293,21 +291,78 @@ def _configure_for_export(chart):
     )
 
 
-chart = (
-    alt.vconcat(plot_perf, plot2)
-    .resolve_scale(color="independent")
-    .configure(background=WHITE)
-    .configure_axis(
-        labelColor=BLACK,
-        titleColor=BLACK,
-        gridColor="#dddddd",
-        domainColor=BLACK,
-        tickColor=BLACK,
+# ── README figure: time for the headline batch, on 1 core and on all ─────────
+def make_headline_chart(foreground: str, muted: str) -> alt.VConcatChart:
+    """Horizontal bars of mean wall time per tool, fastest first, for a light or dark page."""
+
+    def panel(data: pl.DataFrame, title: str) -> alt.LayerChart:
+        summary = (
+            data.group_by("method")
+            .agg(pl.col("time_s").mean().alias("mean_time"))
+            .sort("mean_time")
+            .with_columns(
+                pl.col("mean_time")
+                .map_elements(
+                    lambda t: f"{t:.2f}s" if t < 10 else f"{t:.0f}s",
+                    return_dtype=pl.String,
+                )
+                .alias("label")
+            )
+        )
+        order = summary["method"].to_list()
+        base = alt.Chart(summary).encode(
+            y=alt.Y(
+                "method:N",
+                sort=order,
+                title=None,
+                axis=alt.Axis(
+                    labelFontSize=13,
+                    labelFontWeight="bold",
+                    labelPadding=8,
+                    ticks=False,
+                    domain=False,
+                ),
+            ),
+            x=alt.X("mean_time:Q", title=None, axis=None),
+        )
+        bars = base.mark_bar(height=18, cornerRadiusEnd=3).encode(
+            color=alt.condition(
+                alt.datum.method == "immunum",
+                alt.value("#e2711d"),
+                alt.value(muted),
+            )
+        )
+        labels = base.mark_text(
+            align="left", dx=6, fontSize=12, color=foreground
+        ).encode(text="label:N")
+        return alt.layer(bars, labels).properties(
+            width=420,
+            height=110,
+            title=alt.TitleParams(title, anchor="start", fontSize=13),
+        )
+
+    return (
+        alt.vconcat(
+            panel(p1_data, SINGLE_CORE),
+            panel(p3_data, ALL_CORES),
+            spacing=18,
+        )
+        .resolve_scale(x="independent", y="independent")
+        .configure(background="transparent", font="Helvetica, Arial, sans-serif")
+        .configure_axis(labelColor=foreground)
+        .configure_title(color=foreground)
+        .configure_view(stroke=None)
     )
-    .configure_title(color=BLACK)
-    .configure_legend(labelColor=BLACK, titleColor=BLACK)
-    .configure_view(stroke=BLACK)
-)
+
+
+for theme, foreground, muted in [
+    ("light", "#1f2328", "#9aa4b2"),
+    ("dark", "#e6edf3", "#6e7781"),
+]:
+    svg_path = f"docs/assets/benchmark_headline_{theme}.svg"
+    make_headline_chart(foreground, muted).save(svg_path)
+    print(f"Saved {svg_path}")
+
 
 for name, p in [
     ("plot1_performance", plot_perf),
