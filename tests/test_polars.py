@@ -352,7 +352,10 @@ class TestPolarsErrorCases:
     @pytest.mark.parametrize("case", ERROR_CASES["sequences"])
     def test_sequence_error_is_returned(self, case, function):
         expr = getattr(imp, function)(
-            "sequence", chains=case["chains"], scheme=case["scheme"]
+            "sequence",
+            chains=case["chains"],
+            scheme=case["scheme"],
+            min_confidence=case["min_confidence"],
         )
         [row] = (
             polars.DataFrame({"sequence": [case["sequence"]]})
@@ -372,7 +375,10 @@ class TestPolarsErrorCases:
     )
     def test_domains_return_the_error_as_their_only_result(self, case, function):
         expr = getattr(imp, function)(
-            "sequence", chains=case["chains"], scheme=case["scheme"]
+            "sequence",
+            chains=case["chains"],
+            scheme=case["scheme"],
+            min_confidence=case["min_confidence"],
         )
         [[domain]] = (
             polars.DataFrame({"sequence": [case["sequence"]]})
@@ -389,7 +395,10 @@ class TestPolarsErrorCases:
     @pytest.mark.parametrize("case", ERROR_CASES["domain_errors"])
     def test_a_domain_error_numbers_fine_on_its_own(self, case, function):
         expr = getattr(imp, function)(
-            "sequence", chains=case["chains"], scheme=case["scheme"]
+            "sequence",
+            chains=case["chains"],
+            scheme=case["scheme"],
+            min_confidence=case["min_confidence"],
         )
         [row] = (
             polars.DataFrame({"sequence": [case["sequence"]]})

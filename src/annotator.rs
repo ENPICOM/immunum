@@ -71,15 +71,13 @@ impl SegmentResult {
 
 /// Default minimum confidence threshold for accepting a numbering result.
 ///
-/// Based on empirical analysis of validated sequences:
-/// - Antibody sequences (IGH/IGK/IGL): min ~0.51, median ~0.78-0.85
-/// - TCR sequences (TRA/TRB/TRG/TRD): min ~0.28, median ~0.62-0.83
-///
-/// A threshold of 0.5 filters non-immunoglobulin sequences while retaining
-/// all validated antibody sequences. Some low-scoring TCR sequences (notably
-/// TCR-A p5=0.39, TCR-B p5=0.49) may fall below this threshold due to less
-/// complete consensus data. Set to 0.0 to disable filtering.
-pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.5;
+/// Confidence puts each counted consensus position between what a random residue scores there (0)
+/// and what the chain's reference residues score there (1), over the whole domain, so a sequence
+/// that covers little of it scores low. On the bundled validation sets every full-length sequence
+/// of every chain scores at least 0.45, while shuffled sequences and ordinary proteins stay
+/// below 0.31: 0.4 separates them. A fragment scores roughly the share of the domain it covers;
+/// lower the threshold to keep short ones. Set to 0.0 to disable filtering.
+pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.4;
 
 /// Minimum allowed input sequence length.
 pub const MIN_SEQUENCE_LENGTH: usize = 30;
@@ -640,9 +638,11 @@ mod tests {
 
     // The residues after a domain are aligned on their own, so a domain that lost its N-terminal
     // residues can skip the consensus positions it lacks, as it can at the start of a sequence.
+    // Confidence counts the share of the domain that is there, so a domain missing a half to a
+    // third of it needs a threshold below the default.
     #[test]
     fn an_n_truncated_domain_after_another_numbers_like_on_its_own() {
-        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, Some(0.2)).unwrap();
         for start in [40, 60, 80] {
             let truncated = &FULL_IGH[start..];
             let domains = annotator

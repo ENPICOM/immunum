@@ -57,9 +57,12 @@ pub struct Alignment {
     pub cons_start: u8,
     /// Last aligned consensus position (IMGT position number)
     pub cons_end: u8,
-    /// Sum of scores at confidence-relevant positions (occupancy > 0.5)
+    /// Evidence for the chain: at each aligned position that counts for confidence, the score of
+    /// the residue there minus what a random residue scores there on average
     pub confidence_score: f32,
-    /// Sum of max possible scores at confidence-relevant positions
+    /// The same evidence for a typical sequence of the chain covering the whole domain: at every
+    /// position that counts for confidence, its typical score minus its random score. Confidence
+    /// is `confidence_score / max_confidence_score`, clamped to 0–1
     pub max_confidence_score: f32,
     /// 0-based index of the first antibody residue in the query (0 when no prefix)
     pub query_start: usize,
@@ -226,10 +229,12 @@ pub fn align(
 }
 
 /// The best alignment of `query` against the packed matrices, with the index of its matrix: the
-/// highest score, or the first matrix of those that tie for it. Each matrix's alignment is the one
-/// [`align`] makes against it alone. `matrix(k)` is the `k`-th matrix `packed` was built from: the
-/// packed copy has the scores and penalties the fill needs, the matrix itself the details of each
-/// position that finding the end and the traceback read.
+/// highest confidence, or the first matrix of those that tie for it. Confidence is comparable
+/// across matrices where the raw score isn't: a chain whose reference residues vary more scores
+/// lower even on its own sequences. Each matrix's alignment is the one [`align`] makes against it
+/// alone. `matrix(k)` is the `k`-th matrix `packed` was built from: the packed copy has the scores
+/// and penalties the fill needs, the matrix itself the details of each position that finding the
+/// end and the traceback read.
 pub(crate) fn align_best<'a>(
     query: &str,
     packed: &PackedScoringMatrices,
@@ -237,7 +242,7 @@ pub(crate) fn align_best<'a>(
     buf: &mut AlignBuffer,
 ) -> (usize, Alignment) {
     let query = query.as_bytes();
-    let mut best: Option<(usize, Alignment)> = None;
+    let mut best: Option<(usize, Alignment, f32)> = None;
     let mut first_matrix = 0;
     for group in &packed.groups {
         match group.lanes {
@@ -246,28 +251,31 @@ pub(crate) fn align_best<'a>(
             _ => fill::<MAX_LANES>(query, group, buf),
         }
         // The group's best lane, the first on a tie
-        let mut group_best: Option<(usize, AlignmentEnd)> = None;
+        let mut group_best: Option<(usize, AlignmentEnd, f32)> = None;
         for lane in 0..group.filled {
             let positions = matrix(first_matrix + lane);
-            let end = alignment_end(&Lane::new(buf, group, lane), positions, query.len());
-            if group_best.as_ref().is_none_or(|(_, b)| end.score > b.score) {
-                group_best = Some((lane, end));
+            let view = Lane::new(buf, group, lane);
+            let end = alignment_end(&view, positions, query.len());
+            let confidence = confidence_at(&view, positions, query, &end);
+            if group_best.as_ref().is_none_or(|(_, _, c)| confidence > *c) {
+                group_best = Some((lane, end, confidence));
             }
         }
-        let (lane, end) = group_best.expect("a group has a matrix");
+        let (lane, end, confidence) = group_best.expect("a group has a matrix");
         // Built now, while the matrices still hold this group
-        if best.as_ref().is_none_or(|(_, b)| end.score > b.score) {
+        if best.as_ref().is_none_or(|(_, _, c)| confidence > *c) {
             let alignment = traced_alignment(
                 &Lane::new(buf, group, lane),
                 matrix(first_matrix + lane),
                 query,
                 end,
             );
-            best = Some((first_matrix + lane, alignment));
+            best = Some((first_matrix + lane, alignment, confidence));
         }
         first_matrix += group.filled;
     }
-    best.expect("there is a matrix")
+    let (index, alignment, _) = best.expect("there is a matrix");
+    (index, alignment)
 }
 
 /// Fill the score and traceback matrices of every lane in `group`, with each row's best cell
@@ -448,6 +456,52 @@ fn alignment_end(lane: &Lane, positions: &[PositionScores], query_len: usize) ->
     }
 }
 
+/// Evidence a residue gives for the chain at a position: its score minus what a random residue
+/// scores there on average, or nothing at a position that doesn't count for confidence
+fn evidence(pos: &PositionScores, residue: u8) -> f32 {
+    if pos.counts_for_confidence {
+        pos.score_for(residue.to_ascii_uppercase()) - pos.random_score
+    } else {
+        0.0
+    }
+}
+
+/// The evidence a typical sequence of the chain gives over the whole domain
+fn typical_evidence(positions: &[PositionScores]) -> f32 {
+    positions
+        .iter()
+        .filter(|pos| pos.counts_for_confidence)
+        .map(|pos| pos.typical_score - pos.random_score)
+        .sum()
+}
+
+/// The confidence of the alignment ending at `end`, unclamped, without building it: positions the
+/// alignment doesn't reach, or skips, add no evidence and count as random
+fn confidence_at(
+    lane: &Lane,
+    positions: &[PositionScores],
+    query: &[u8],
+    end: &AlignmentEnd,
+) -> f32 {
+    let typical = typical_evidence(positions);
+    if typical <= 0.0 {
+        return 0.0;
+    }
+    let (mut i, mut j, mut found) = (end.i, end.j, 0.0f32);
+    while i > 0 && j > 0 {
+        match lane.direction(i, j) {
+            Direction::Match => {
+                found += evidence(&positions[j - 1], query[i - 1]);
+                i -= 1;
+                j -= 1;
+            }
+            Direction::GapInQuery => j -= 1,
+            Direction::GapInConsensus => i -= 1,
+        }
+    }
+    found / typical
+}
+
 fn traced_alignment(
     lane: &Lane,
     positions: &[PositionScores],
@@ -458,8 +512,9 @@ fn traced_alignment(
     // positions.len() == query_len always; trailing suffix residues become Insertion()
     let mut aligned_positions = Vec::with_capacity(query_len);
 
+    // Positions the alignment doesn't reach, or skips, add no evidence: they count as random
     let mut confidence_score = 0.0f32;
-    let mut max_confidence_score = 0.0f32;
+    let max_confidence_score = typical_evidence(positions);
 
     // Tracked during backward traversal: first Aligned seen = cons_end, last = cons_start
     let mut cons_start: u8 = 1;
@@ -475,11 +530,7 @@ fn traced_alignment(
                 let pos = &positions[j - 1];
                 aligned_positions.push(AlignedPosition::Aligned(pos.position));
 
-                if pos.counts_for_confidence {
-                    let aa = query_bytes[i - 1].to_ascii_uppercase();
-                    confidence_score += pos.score_for(aa);
-                    max_confidence_score += pos.max_score;
-                }
+                confidence_score += evidence(pos, query_bytes[i - 1]);
 
                 // Going backwards: first Aligned = cons_end, every Aligned updates cons_start
                 if !found_aligned {
@@ -493,13 +544,6 @@ fn traced_alignment(
             }
 
             Direction::GapInQuery => {
-                let pos = &positions[j - 1];
-
-                if pos.counts_for_confidence {
-                    confidence_score += pos.gap_penalty;
-                    max_confidence_score += pos.max_score;
-                }
-
                 // No query residue consumed — do not push to aligned_positions
                 j -= 1;
             }
@@ -583,9 +627,11 @@ mod tests {
                     .iter()
                     .map(|m| align(query, &m.positions, None))
                     .collect();
+                // The highest confidence wins, the first matrix on a tie
+                let confidence = |a: &Alignment| a.confidence_score / a.max_confidence_score;
                 let mut expected = 0;
                 for (k, alignment) in alone.iter().enumerate() {
-                    if alignment.score > alone[expected].score {
+                    if confidence(alignment) > confidence(&alone[expected]) {
                         expected = k;
                     }
                 }

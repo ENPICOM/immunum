@@ -20,7 +20,7 @@ As a library dependency, leave out the CLI: `cargo add immunum --no-default-feat
 use immunum::{Annotator, Chain, Scheme};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Chains to consider, the scheme, and the minimum confidence (None: 0.5)
+    // Chains to consider, the scheme, and the minimum confidence (None: 0.4)
     let annotator = Annotator::new(&[Chain::IGH, Chain::IGK, Chain::IGL], Scheme::IMGT, None)?;
     // Or from names as a user writes them, groups included
     let same = Annotator::from_names(["ig"], "imgt", None)?;

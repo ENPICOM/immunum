@@ -35,10 +35,18 @@ chain is expected, such as `regions_for`.
 ### Chain detection
 
 The annotator aligns the sequence to the consensus profile of every chain you asked for and keeps
-the chain whose alignment scores highest. The [confidence](#confidence) is then computed for that
-alignment. Each requested chain is one more alignment per sequence, so time grows roughly in
-proportion to the number of chains: `["all"]` takes about five times as long as `["H"]`. Pass only the
-chains you expect in your data.
+the chain with the highest [confidence](#confidence). Raw alignment scores aren't compared: a
+chain whose reference sequences vary more, such as TRA, scores lower even on its own sequences.
+Each requested chain is one more alignment per sequence, so time grows roughly in proportion to
+the number of chains: `["all"]` takes about five times as long as `["H"]`. Pass only the chains
+you expect in your data.
+
+Only the requested chains compete. Variable domains share their fold, so a sequence of a chain
+you didn't ask for usually passes the default threshold as the closest requested chain: a light
+chain numbered with `["H"]` comes out as a heavy chain, a TCR numbered with `["ig"]` as an
+antibody chain. If you don't know what your data holds, use `["all"]`: then none of the 6,155
+validation sequences gets a chain of the wrong receptor family. The only chain calls it gets
+wrong are 39 TRA sequences called TRD, which use V genes the two chains share.
 
 ## Numbering schemes
 
@@ -150,8 +158,9 @@ assert cdr1 == ["27", "28", "29", "36", "37", "38"]
 
 ## Confidence
 
-Every result carries a `confidence` between 0 and 1: how well the sequence matches the consensus
-profile of the detected chain. It is computed from the alignment:
+Every result carries a `confidence` between 0 and 1: how much of a typical domain of the detected
+chain the sequence shows, where 0 is what a random sequence would show and 1 a typical sequence of
+that chain. It is computed from the alignment:
 
 1. Each consensus position scores every amino acid by BLOSUM62, averaged over the residues seen
    at that position in the chain's reference sequences and weighted by their frequency. Letters
@@ -159,19 +168,23 @@ profile of the detected chain. It is computed from the alignment:
 2. Only positions occupied in more than 90% of the reference sequences count. In the heavy-chain
    profile that is every framework position but only 21 of the 35 CDR positions: the centre of
    each loop, where shorter loops have no residue, doesn't count.
-3. Over the counted positions between the first and last consensus position the alignment
-   reaches, immunum sums the score of the residue aligned there, or the position's gap penalty
-   when the alignment skips it.
-4. That sum is divided by the best possible sum over the same positions and clamped to 0–1.
+3. Each counted position has two reference points: the score a random residue gets there on
+   average (by BLOSUM62's background amino-acid frequencies), and the score the residues seen
+   there in the reference sequences get on average.
+4. Where the alignment places a residue on a counted position, immunum adds that residue's score
+   minus the random one. Positions the alignment skips or doesn't reach add nothing, as a random
+   residue would.
+5. That sum is divided by the same sum for a typical sequence over every counted position, and
+   clamped to 0–1.
 
-Inserted residues, and residues before or after the domain, don't enter the score. Because only
-the reached positions count, a fragment can score as high as a full domain: the first 30
-residues of the heavy chain above score 0.77, the whole domain 0.78. Changing CDR3 residues
-barely moves the score; changing a conserved framework residue does.
+Inserted residues, and residues before or after the domain, don't enter the score. Because every
+counted position is in the divisor, a fragment scores about the share of the domain it covers:
+the first 30 residues of the heavy chain below score 0.23, its first 60 0.47, the whole domain
+0.91. Changing CDR3 residues barely moves the score; changing a conserved framework residue does.
 
 ### Minimum confidence
 
-An annotator has a `min_confidence`, 0.5 unless you pass another value in `[0, 1]`. When the best
+An annotator has a `min_confidence`, 0.4 unless you pass another value in `[0, 1]`. When the best
 alignment of a sequence scores below it, the sequence isn't numbered: its result has `error_kind`
 `low_confidence` and the score in `error`. In the [domain search](#multiple-domains) it also
 decides when to stop looking for further domains.
@@ -183,14 +196,14 @@ heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITIT
 gfp = "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK"
 
 annotator = Annotator(chains=["ig"], scheme="imgt")
-print(round(annotator.number(heavy).confidence, 3))  # 0.785
+print(round(annotator.number(heavy).confidence, 3))  # 0.915
 
 result = annotator.number(gfp)
 print(result.error_kind)  # low_confidence
-print(result.error)  # alignment confidence 0.1525 is below min_confidence 0.5000
+print(result.error)  # alignment confidence 0.0118 is below min_confidence 0.4000
 
 unfiltered = Annotator(chains=["ig"], scheme="imgt", min_confidence=0.0)
-print(round(unfiltered.number(gfp).confidence, 3))  # 0.153
+print(round(unfiltered.number(gfp).confidence, 3))  # 0.012
 ```
 
 ### Choosing a value
@@ -198,22 +211,27 @@ print(round(unfiltered.number(gfp).confidence, 3))  # 0.153
 Scores of the bundled validation sequences (`fixtures/validation`), numbered with
 `chains=["all"]`:
 
-| Chain | Sequences | Lowest | Median | Below 0.5 |
+| Chain | Sequences | Lowest | Median | Below 0.4 |
 |-------|-----------|--------|--------|-----------|
-| H     | 2452      | 0.550  | 0.803  | 0         |
-| K     | 1485      | 0.583  | 0.850  | 0         |
-| L     | 371       | 0.553  | 0.821  | 0         |
-| A     | 865       | 0.285  | 0.645  | 77        |
-| B     | 934       | 0.269  | 0.765  | 57        |
-| G     | 25        | 0.567  | 0.849  | 0         |
-| D     | 23        | 0.766  | 0.825  | 0         |
+| H     | 2452      | 0.707  | 0.931  | 0         |
+| K     | 1485      | 0.767  | 0.954  | 0         |
+| L     | 371       | 0.717  | 0.973  | 0         |
+| A     | 865       | 0.455  | 0.884  | 0         |
+| B     | 934       | 0.410  | 0.954  | 0         |
+| G     | 25        | 0.816  | 1.000  | 0         |
+| D     | 23        | 1.000  | 1.000  | 0         |
 
-Green fluorescent protein scores 0.153 and hen egg-white lysozyme 0.082 against the antibody
-chains.
+Sequences that aren't immune receptors score far lower: none of 5,000 shuffled sequencing reads
+or 3,000 ordinary human proteins (from UniProt, without immunoglobulin domains) reaches 0.31.
+Green fluorescent protein scores 0.012 and hen egg-white lysozyme 0.143 against the antibody
+chains. Proteins with an immunoglobulin V-set domain that are neither antibodies nor TCRs, such
+as SIRPα and VpreB, can score up to about 0.6, as their domains resemble antibody variable
+domains.
 
-- Keep 0.5 for antibodies: it kept every antibody in the validation sets.
-- Lower it for TCR α and β chains, where the default rejects some real sequences: at 0.25 every
-  TRA and TRB validation sequence passes.
+- Keep 0.4 for whole domains: every validation sequence of every chain passes it, and no
+  shuffled read or ordinary protein does.
+- Lower it for fragments, which score about the share of the domain they cover: around 0.2 keeps
+  pieces of a third of a domain.
 - Raise it to reject sequences that align poorly, such as heavily mutated or engineered domains,
   at the cost of losing some real ones.
 - `0.0` disables the filter. Every valid sequence then gets numbered, even one that isn't an
@@ -259,10 +277,10 @@ sequence.
 
 ## Multiple domains
 
-`number` and `segment` return one domain: the best-scoring alignment of the whole sequence. For
-an scFv with a heavy and a kappa domain, `number` returns the kappa domain, because it scores
-higher. `number_domains` and `segment_domains` return every domain, ordered by position. On the
-command line, `--all-domains` does the same.
+`number` and `segment` return one domain: the alignment of the whole sequence with the highest
+confidence. For an scFv with a heavy and a kappa domain, `number` returns the kappa domain,
+because its confidence is higher. `number_domains` and `segment_domains` return every domain,
+ordered by position. On the command line, `--all-domains` does the same.
 
 The domain search:
 
@@ -300,10 +318,12 @@ heavy_regions, kappa_regions = annotator.segment_domains(scfv)
 assert heavy_regions.postfix == ""
 assert kappa_regions.prefix == linker
 
-# The last 28 residues of the heavy chain, then 40 glycines
+# The last 28 residues of the heavy chain, then 40 glycines. A fragment scores about the share of
+# the domain it covers, 0.20 here, so it needs a lower threshold than the default
+fragments = Annotator(chains=["ig"], scheme="imgt", min_confidence=0.15)
 fragment = heavy[-28:] + "G" * 40
-assert annotator.number(fragment).error is None
-(result,) = annotator.number_domains(fragment)
+assert fragments.number(fragment).error is None
+(result,) = fragments.number_domains(fragment)
 assert result.error_kind == "domain_too_short"
 print(result.error)  # domain length 28 is below minimum 30
 ```
@@ -350,13 +370,12 @@ See [Errors](usage/errors.md#error-kinds) for every error kind.
 
 ### Why is my sequence `low_confidence`?
 
-Its best alignment scored below `min_confidence` (0.5 by default). The `error` message gives the
+Its best alignment scored below `min_confidence` (0.4 by default). The `error` message gives the
 score. Common causes:
 
 - It isn't an antibody or TCR variable domain.
-- You didn't ask for its chain. The TCR β chain 1AO7_E from the validation set scores 0.30
-  against `["ig"]` and 0.76 against `["tcr"]`.
-- It is a TCR α or β chain that scores low; see [Choosing a value](#choosing-a-value).
+- It is a fragment, which scores about the share of the domain it covers; see
+  [Choosing a value](#choosing-a-value).
 - It is a nucleotide sequence; see [below](#how-do-i-number-nucleotide-sequences).
 - It holds many non-standard letters such as `X` at conserved positions.
 

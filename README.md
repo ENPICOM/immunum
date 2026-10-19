@@ -47,7 +47,8 @@ with BLOSUM62-based substitution scores.
 | IGL (lambda) | TRD (delta) |
 |              | TRG (gamma) |
 
-The chain is detected by aligning against every chain you allow and keeping the best match.
+The chain is detected by aligning against every chain you allow and keeping the one with the
+highest confidence.
 Positions follow one of five schemes, all derived from the internal IMGT numbering:
 
 - **IMGT**: all 7 chains

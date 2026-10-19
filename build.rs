@@ -6,6 +6,13 @@ use std::path::Path;
 // Standard amino acid order for indexing
 const AMINO_ACIDS: &[u8] = b"ACDEFGHIKLMNPQRSTVWY";
 
+// BLOSUM62's background frequency of each amino acid in AMINO_ACIDS, summing to 1: the
+// composition of a random protein sequence, for the score a random residue gets on average
+const BACKGROUND_FREQUENCIES: [f32; 20] = [
+    0.074, 0.025, 0.054, 0.054, 0.047, 0.074, 0.026, 0.068, 0.058, 0.099, // A C D E F G H I K L
+    0.025, 0.045, 0.039, 0.034, 0.052, 0.057, 0.051, 0.073, 0.013, 0.032, // M N P Q R S T V W Y
+];
+
 // Gap and insertion penalty constants
 // These control how the alignment algorithm handles gaps and insertions
 const CDR_BASE_GAP_PENALTY: f32 = -6.0;
@@ -147,6 +154,8 @@ struct PositionScores {
     insertion_penalty: f32,
     max_score: f32,
     counts_for_confidence: bool,
+    random_score: f32,
+    typical_score: f32,
 }
 
 struct PositionData {
@@ -238,6 +247,23 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
 
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let counts_for_confidence = pos_data.occupancy > 0.9;
+        // The two ends of the confidence scale at this position: what a random residue scores on
+        // average, and what the residues seen here in the reference sequences score on average
+        let random_score: f32 = BACKGROUND_FREQUENCIES
+            .iter()
+            .zip(scores_20)
+            .map(|(q, s)| q * s)
+            .sum();
+        let (seen_score, seen_frequency) = pos_data
+            .aa_frequencies
+            .iter()
+            .filter_map(|(aa, freq)| aa_to_index(*aa).map(|i| (freq * scores_20[i], *freq)))
+            .fold((0.0f32, 0.0f32), |(s, f), (ds, df)| (s + ds, f + df));
+        let typical_score = if seen_frequency > 0.0 {
+            seen_score / seen_frequency
+        } else {
+            random_score
+        };
 
         position_scores.push(PositionScores {
             position: pos_data.position,
@@ -246,6 +272,8 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
             insertion_penalty,
             max_score,
             counts_for_confidence,
+            random_score,
+            typical_score,
         });
     }
 

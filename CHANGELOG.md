@@ -22,8 +22,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Ctrl/Cmd+Enter, copies and downloads results as TSV or JSON, makes a shareable link, compares the
   schemes' regions per domain, explains how to read the result, fits a phone screen and shows
   keyboard focus on its chain and scheme buttons.
+- Rust: `PositionScores` has `random_score` and `typical_score`, the average score at the position
+  of a random residue and of the residues seen there in the chain's reference sequences.
 
 ### Changed
+- **Confidence is redefined, and the default `min_confidence` is 0.4 instead of 0.5.** Confidence
+  now measures how much of a typical domain of the chain the sequence shows: each aligned residue
+  at a conserved position counts its score above what a random residue scores there, divided by
+  what a typical sequence of the chain scores over the whole domain. 0 is random sequence, 1 a
+  typical sequence of the chain, and a fragment scores about the share of the domain it covers.
+  Every validation sequence of every chain now passes the default, including the 9% of TRA and 6%
+  of TRB the old 0.5 rejected, and two sequencing reads of the benchmark run; no shuffled read or
+  ordinary protein tested does, where the old 0.5 let through 11% of shuffled reads. Every
+  confidence value changes. Numbering fragments may need a lower `min_confidence`, about 0.2.
+  In Rust, `Alignment::confidence_score` and `max_confidence_score` carry the new sums.
+- The chain is the one with the highest confidence instead of the highest alignment score, which
+  favoured antibody chains: with `all`, no validation TCR is called an antibody chain any more
+  (31 were) and the wrong chain calls drop from 45 to 39, all TRA sequences with V genes shared
+  with TRD. Numbering against a chain is unchanged.
 - Numbering is faster, with identical results: an annotator aligns a sequence against all its chains
   in one pass, one chain per SIMD lane, instead of one chain after another. The CLI numbers 10,000
   sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with

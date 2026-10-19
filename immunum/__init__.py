@@ -186,7 +186,7 @@ class Annotator:
 
             A group of chains is accepted too: ``"ig"`` (IGH, IGK, IGL), ``"tcr"``
             (TRA, TRB, TRG, TRD) or ``"all"``. Pass all chains you want to consider;
-            the annotator scores each and picks the best-matching one.
+            the annotator aligns against each and picks the one with the highest confidence.
 
         scheme: Numbering scheme to use for output positions. Accepted values
             (case-insensitive):
@@ -202,9 +202,9 @@ class Annotator:
 
         min_confidence: Minimum alignment confidence threshold in the range ``[0, 1]``.
             Sequences scoring below this value get a result with ``error`` set and
-            ``error_kind`` ``"low_confidence"``. Defaults to ``0.5``, which filters
-            non-immunoglobulin sequences while retaining all validated antibody
-            sequences. Pass ``0.0`` to disable filtering.
+            ``error_kind`` ``"low_confidence"``. Defaults to ``0.4``, which keeps every
+            validated antibody and TCR domain and rejects sequences that aren't immune
+            receptor domains. Fragments score lower; pass ``0.0`` to disable filtering.
 
     Raises:
         immunum.Error: A ``ValueError`` raised when the arguments are wrong. Its
