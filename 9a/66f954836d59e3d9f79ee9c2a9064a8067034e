@@ -1,0 +1,26 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 68-70
+benches/bench_comparison.py
+  h_acea35c6bbea0b 8
+docs/assets/benchmark_plot2_correctness.html
+  h_acea35c6bbea0b 24
+docs/assets/benchmark_plot2_correctness.svg
+  h_acea35c6bbea0b 1
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 31-33,44-46,119-124
+resources/benchmark_results/results_tcr_A_imgt.csv
+  h_acea35c6bbea0b 2-3,6-7,10-11,14-15,18-19,22-23,26-27
+resources/benchmark_results/results_tcr_B_imgt.csv
+  h_acea35c6bbea0b 2-3,6-7,10-11,14-15,18-19,22-23,26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9a66f954836d59e3d9f79ee9c2a9064a8067034e",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
