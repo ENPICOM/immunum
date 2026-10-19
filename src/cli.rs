@@ -37,8 +37,8 @@ struct AnnotateArgs {
     /// Numbering scheme: imgt (i), kabat (k), chothia (c), martin (m), aho (a)
     #[arg(short, long, default_value = "imgt")]
     scheme: String,
-    /// Chain filter: h,k,l,a,b,g,d or groups: ig, tcr, all
-    #[arg(short, long, default_value = "ig")]
+    /// Chain filter: h,k,l,a,b,g,d or groups: ig, tcr, all (every chain the scheme numbers)
+    #[arg(short, long, default_value = "all")]
     chain: String,
     /// Output format: tsv, json, jsonl
     #[arg(short, long, default_value = "tsv")]

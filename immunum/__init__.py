@@ -185,7 +185,8 @@ class Annotator:
             - TCR delta chain:       ``"TRD"`` / ``"D"`` / ``"delta"``
 
             A group of chains is accepted too: ``"ig"`` (IGH, IGK, IGL), ``"tcr"``
-            (TRA, TRB, TRG, TRD) or ``"all"``. Pass all chains you want to consider;
+            (TRA, TRB, TRG, TRD) or ``"all"`` (every chain the scheme numbers: IGH, IGK
+            and IGL with schemes other than IMGT). Pass all chains you want to consider;
             the annotator aligns against each and picks the one with the highest confidence.
 
         scheme: Numbering scheme to use for output positions. Accepted values

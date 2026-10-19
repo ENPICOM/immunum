@@ -40,6 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   favoured antibody chains: with `all`, no validation TCR is called an antibody chain any more
   (31 were) and the wrong chain calls drop from 45 to 39, all TRA sequences with V genes shared
   with TRD. Numbering against a chain is unchanged.
+- **The command line tries every chain by default (`-c all`) instead of only antibody chains
+  (`-c ig`).** Only the requested chains compete, and with the new confidence a sequence of the
+  other receptor family passes the default threshold as the closest requested chain: under
+  `-c ig`, 1,832 of the 1,847 validation TCRs are numbered as antibody chains, where the old
+  confidence rejected them. With `all`, 1,808 of them get their own chain and none an antibody
+  chain. Antibody output is the same, but numbering takes about 1.5 times as long; pass `-c ig`
+  for antibody-only data. The other interfaces have no default chains.
+- **`all` is every chain the scheme numbers:** with `kabat`, `chothia`, `martin` or `aho` it is
+  H, K and L, where it raised `unsupported_chain`, so the command line's default works with every
+  scheme. Naming a TCR chain, or `tcr`, with those schemes still raises it. In Rust,
+  `Chain::parse_names` takes the scheme.
 - Numbering is faster, with identical results: an annotator aligns a sequence against all its chains
   in one pass, one chain per SIMD lane, instead of one chain after another. The CLI numbers 10,000
   sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with
