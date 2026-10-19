@@ -1,0 +1,52 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 25-26,29-42
+README.md
+  h_acea35c6bbea0b 50-51
+build.rs
+  h_acea35c6bbea0b 9-15,157-158,250-266,275-276
+docs/assets/immunum-webtool.js
+  h_acea35c6bbea0b 40
+docs/concepts.md
+  h_acea35c6bbea0b 38-49,161-163,171-183,187,199,203,206,214,216-234,280-283,321-323,325-326,373,377-378
+docs/demo.md
+  h_acea35c6bbea0b 70-71
+docs/usage/cli.md
+  h_acea35c6bbea0b 33
+docs/usage/python.md
+  h_acea35c6bbea0b 18-21,24
+docs/usage/rust.md
+  h_acea35c6bbea0b 23
+immunum/__init__.py
+  h_acea35c6bbea0b 189,205-207
+immunum/polars.py
+  h_acea35c6bbea0b 167,254,338,417
+src/alignment.rs
+  h_acea35c6bbea0b 60-61,63-65,232-237,245,254,257-261,264,266,273,277-278,459-504,515,517,533,630-631,634
+src/annotator.rs
+  h_acea35c6bbea0b 74-80,641-642,645
+src/scoring.rs
+  h_acea35c6bbea0b 35,37-42
+src/wasm.rs
+  h_acea35c6bbea0b 207-208,223
+tests/cli.rs
+  h_acea35c6bbea0b 11-14,20,100,111,124,138,154,164,174,188,198,214,232,270,445,493,523,583,622-625
+tests/error_cases.json
+  h_acea35c6bbea0b 2,79,87,95,98,105
+tests/test_polars.py
+  h_acea35c6bbea0b 355-358,378-381,398-401
+tests/test_python.py
+  h_acea35c6bbea0b 511-513,526-528,539-541
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 230,304,314,353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a5023cd32a04c116a00a02f748ff1b0f9d9c8756",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
