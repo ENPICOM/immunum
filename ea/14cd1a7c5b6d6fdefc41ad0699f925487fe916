@@ -1,0 +1,18 @@
+docs/assets/benchmark_plot2_correctness.html
+  h_acea35c6bbea0b 24
+docs/assets/benchmark_plot2_correctness.svg
+  h_acea35c6bbea0b 1
+scripts/plots.py
+  h_acea35c6bbea0b 216-218,232,251-252,254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ea14cd1a7c5b6d6fdefc41ad0699f925487fe916",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
