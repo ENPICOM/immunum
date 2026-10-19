@@ -28,7 +28,7 @@ Both commands take the same options.
 | Option | Values | Default |
 | --- | --- | --- |
 | `-s`, `--scheme` | `imgt` (`i`), `kabat` (`k`), `chothia` (`c`), `martin` (`m`), `aho` (`a`); case-insensitive | `imgt` |
-| `-c`, `--chain` | Chains to try: `h`, `k`, `l`, `a`, `b`, `g`, `d`, or a group: `ig` (H, K, L), `tcr` (A, B, G, D), `all`. Comma-separate several (`-c h,k`). Names such as `heavy` or `igh` also work; see [Chains](../concepts.md#chains) | `ig` |
+| `-c`, `--chain` | Chains to try: `h`, `k`, `l`, `a`, `b`, `g`, `d`, or a group: `ig` (H, K, L), `tcr` (A, B, G, D), `all` (every chain the scheme numbers: H, K and L with schemes other than IMGT). Comma-separate several (`-c h,k`). Names such as `heavy` or `igh` also work; see [Chains](../concepts.md#chains). Only the chains given compete, so a TCR numbered with `-c ig` comes out as an antibody chain; pass `-c ig` or `-c tcr` when you know your data, which is faster | `all` |
 | `-f`, `--format` | `tsv`, `json`, `jsonl` | `tsv` |
 | `--min-confidence` | Number in [0, 1]. A sequence whose alignment confidence is below it gets an error record with `error_kind` `low_confidence` | `0.4` |
 | `--all-domains` | Flag. Number or segment every variable domain in each sequence (for example both domains of an scFv), one record per domain, with a 0-based `domain` column or field. With `segment`, every residue lands in exactly one domain's regions. A sequence without a domain gets one error record | off |

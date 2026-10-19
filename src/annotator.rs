@@ -178,17 +178,14 @@ impl Annotator {
     }
 
     /// An annotator from chain and scheme names, as a user writes them: see [`Chain::parse_names`]
-    /// for the chains and [`Scheme`] for the scheme.
+    /// for the chains, where `all` is every chain the scheme numbers, and [`Scheme`] for the scheme.
     pub fn from_names<'a>(
         chains: impl IntoIterator<Item = &'a str>,
         scheme: &str,
         min_confidence: Option<f32>,
     ) -> Result<Self> {
-        Self::new(
-            &Chain::parse_names(chains)?,
-            scheme.parse()?,
-            min_confidence,
-        )
+        let scheme = scheme.parse()?;
+        Self::new(&Chain::parse_names(chains, scheme)?, scheme, min_confidence)
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme

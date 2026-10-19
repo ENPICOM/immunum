@@ -25,7 +25,7 @@ Wherever a list of chains is expected, a group can stand in for several chains:
 |-------|--------------------|
 | `ig`  | H, K, L            |
 | `tcr` | A, B, G, D         |
-| `all` | H, K, L, A, B, G, D |
+| `all` | every chain the scheme numbers: H, K, L, A, B, G, D with IMGT; H, K, L with the others |
 
 Each list entry is one name: `["ig", "B"]` asks for H, K, L and B, while `"igh,igk"` is rejected
 as an unknown chain. (The command line splits its `--chain` value on commas itself; see
@@ -37,9 +37,8 @@ chain is expected, such as `regions_for`.
 The annotator aligns the sequence to the consensus profile of every chain you asked for and keeps
 the chain with the highest [confidence](#confidence). Raw alignment scores aren't compared: a
 chain whose reference sequences vary more, such as TRA, scores lower even on its own sequences.
-Each requested chain is one more alignment per sequence, so time grows roughly in proportion to
-the number of chains: `["all"]` takes about five times as long as `["H"]`. Pass only the chains
-you expect in your data.
+All requested chains are aligned in one pass, but each one adds work: `["all"]` takes about 1.5 to
+2 times as long as `["H"]`. Pass only the chains you expect in your data.
 
 Only the requested chains compete. Variable domains share their fold, so a sequence of a chain
 you didn't ask for usually passes the default threshold as the closest requested chain: a light
@@ -58,9 +57,9 @@ wrong are 39 TRA sequences called TRD, which use V genes the two chains share.
 | Martin  | `martin`, `m`             | `Martin`    | H, K, L         |
 | AHo     | `aho`, `a`                | `Aho`       | H, K, L         |
 
-Only IMGT numbers T-cell receptor chains. Asking another scheme for one raises an
+Only IMGT numbers T-cell receptor chains. Asking another scheme for one, or for `tcr`, raises an
 `unsupported_chain` error when the annotator is built; `scheme_supports_chain(scheme, chain)`
-tells you beforehand.
+tells you beforehand. `all` asks for the antibody chains only with those schemes.
 
 Every sequence is aligned once against IMGT-numbered consensus profiles (IMGT positions 1–128).
 The other schemes are derived from that alignment by per-scheme rules that map IMGT positions to
