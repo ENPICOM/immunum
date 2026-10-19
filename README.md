@@ -181,8 +181,8 @@ More in the [Rust guide](https://immunum.enpicom.com/usage/rust/) and on
 ```bash
 $ immunum number sequences.fasta | head -3
 sequence_id	chain	scheme	confidence	position	residue	error	error_kind
-seq_1	H	IMGT	0.7845	1	Q
-seq_1	H	IMGT	0.7845	2	V
+seq_1	H	IMGT	0.9146	1	Q
+seq_1	H	IMGT	0.9146	2	V
 $ immunum segment -s kabat -f jsonl sequences.fasta
 ```
 

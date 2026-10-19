@@ -336,7 +336,7 @@ print(result.error)  # domain length 28 is below minimum 30
   character and its 0-based position.
 - **Non-standard letters** such as `X`, `B` or `Z` are accepted and numbered, but score as a
   mismatch (−4), so they lower the [confidence](#confidence) at counted positions: one `X` at
-  IMGT position 6 of the heavy chain above lowers it from 0.785 to 0.767.
+  IMGT position 6 of the heavy chain above lowers it from 0.915 to 0.899.
 - **Case**: lower and upper case score the same, and residues come back as you gave them.
 - **Whitespace**: the Python, JavaScript and Rust APIs take the sequence as given, so a trailing
   newline or a space inside the sequence is an invalid character; strip it first. The command

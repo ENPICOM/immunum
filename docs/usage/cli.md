@@ -90,11 +90,11 @@ TSV has a header row, then one row per numbered residue:
 A failed sequence gives one row with only `sequence_id`, `error` and `error_kind` filled.
 
 ```text
-$ immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS | head -4
+$ immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSSISSSSSYIYYADSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCARDRGYSSGWYFDYWGQGTLVTVSS | head -4
 sequence_id	chain	scheme	confidence	position	residue	error	error_kind
-seq_1	H	IMGT	0.9344	1	E
-seq_1	H	IMGT	0.9344	2	V
-seq_1	H	IMGT	0.9344	3	Q
+seq_1	H	IMGT	1.0000	1	E
+seq_1	H	IMGT	1.0000	2	V
+seq_1	H	IMGT	1.0000	3	Q
 
 $ immunum number AAAAAAAAAA
 sequence_id	chain	scheme	confidence	position	residue	error	error_kind
@@ -117,8 +117,8 @@ JSON and JSONL have one record per sequence:
 | `error_kind` | `null`, or the error kind |
 
 ```text
-$ immunum number -f jsonl EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS
-{"sequence_id":"seq_1","chain":"H","scheme":"IMGT","confidence":0.93440181016922,"numbering":{"1":"E","2":"V","3":"Q",…},"query_start":0,"query_end":34,"error":null,"error_kind":null}
+$ immunum number -f jsonl EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSSISSSSSYIYYADSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCARDRGYSSGWYFDYWGQGTLVTVSS
+{"sequence_id":"seq_1","chain":"H","scheme":"IMGT","confidence":1.0,"numbering":{"1":"E","2":"V","3":"Q",…},"query_start":0,"query_end":120,"error":null,"error_kind":null}
 ```
 
 ### segment
@@ -142,7 +142,7 @@ $ immunum segment -f jsonl fixtures/ig.fasta | head -1
 ```text
 $ immunum number --all-domains scfvs.fasta | head -2
 sequence_id	domain	chain	scheme	confidence	position	residue	error	error_kind
-scfv1	0	H	IMGT	0.7012	2	V
+scfv1	0	H	IMGT	0.8338	2	V
 
 $ immunum segment --all-domains scfvs.fasta | cut -f1,2,9
 sequence_id	domain	cdr3
