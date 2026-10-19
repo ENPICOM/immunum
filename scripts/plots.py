@@ -213,6 +213,9 @@ p2_data = (
 
 CHAIN_ORDER = ["H", "K", "L", "A", "B", "G", "D"]
 METHOD_ORDER = ["immunum", "AntPack", "ANARCI", "ANARCII"]
+# Every column on the same 0–100% axis: left to the data, a column whose error bars pass 100% got
+# a taller axis than AntPack's, whose 100% bars have no spread, so their tops didn't line up
+PCT_SCALE = alt.Scale(domain=[0, 100], nice=False)
 
 p2_pdf = p2_data.to_pandas()
 
@@ -226,6 +229,7 @@ for i, method in enumerate(METHOD_ORDER):
         y=alt.Y(
             "mean(pct_correct):Q",
             title="% Correct" if i == 0 else "",
+            scale=PCT_SCALE,
             axis=alt.Axis(labelFontSize=8, titleFontSize=9),
         ),
         x=alt.X(
@@ -244,9 +248,10 @@ for i, method in enumerate(METHOD_ORDER):
             alt.Tooltip("stdev(pct_correct):Q", format=".2f", title="Std %"),
         ],
     )
-    errorbars = base.mark_errorbar(extent="stdev").encode(
+    # Clipped at the frame: a standard deviation above a mean near 100% would pass 100%
+    errorbars = base.mark_errorbar(extent="stdev", clip=True).encode(
         x=alt.X("segment:N", sort=segments),
-        y=alt.Y("pct_correct:Q"),
+        y=alt.Y("pct_correct:Q", scale=PCT_SCALE),
         color=alt.Color("method:N", legend=None),
     )
     c = (
