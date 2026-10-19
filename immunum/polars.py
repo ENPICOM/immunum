@@ -164,7 +164,7 @@ def number(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 
@@ -251,7 +251,7 @@ def number_domains(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 
@@ -335,7 +335,7 @@ def segment(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 
@@ -414,7 +414,7 @@ def segment_domains(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 

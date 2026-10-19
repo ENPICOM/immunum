@@ -227,7 +227,7 @@ describe("number()", () => {
 
   for (const c of ERROR_CASES.sequences) {
     it(`returns ${c.kind} with every other field null for ${c.sequence} (does not throw)`, () => {
-      const result = new Annotator(c.chains, c.scheme).number(c.sequence);
+      const result = new Annotator(c.chains, c.scheme, c.min_confidence ?? undefined).number(c.sequence);
       assert.deepEqual(result, {
         chain: null,
         scheme: null,
@@ -301,7 +301,7 @@ describe("numberDomains() and segmentDomains()", () => {
   for (const method of ["numberDomains", "segmentDomains"]) {
     for (const c of [...ERROR_CASES.sequences, ...ERROR_CASES.domain_errors]) {
       it(`${method} returns one ${c.kind} result for ${c.sequence}`, () => {
-        const domains = new Annotator(c.chains, c.scheme)[method](c.sequence);
+        const domains = new Annotator(c.chains, c.scheme, c.min_confidence ?? undefined)[method](c.sequence);
         assert.equal(domains.length, 1);
         assert.equal(domains[0].error, c.message);
         assert.equal(domains[0].errorKind, c.kind);
@@ -311,7 +311,7 @@ describe("numberDomains() and segmentDomains()", () => {
 
   for (const c of ERROR_CASES.domain_errors) {
     it(`number() and segment() succeed for ${c.sequence}, which holds no domain`, () => {
-      const annotator = new Annotator(c.chains, c.scheme);
+      const annotator = new Annotator(c.chains, c.scheme, c.min_confidence ?? undefined);
       assert.equal(annotator.number(c.sequence).error, null);
       assert.equal(annotator.segment(c.sequence).error, null);
     });
@@ -350,7 +350,7 @@ describe("segment()", () => {
 
   for (const c of ERROR_CASES.sequences) {
     it(`returns ${c.kind} with every region null for ${c.sequence} (does not throw)`, () => {
-      const result = new Annotator(c.chains, c.scheme).segment(c.sequence);
+      const result = new Annotator(c.chains, c.scheme, c.min_confidence ?? undefined).segment(c.sequence);
       assert.equal(result.error, c.message);
       assert.equal(result.errorKind, c.kind);
       for (const key of ["prefix", "fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4", "postfix"]) {

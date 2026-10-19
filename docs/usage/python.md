@@ -15,13 +15,13 @@ same = Annotator(chains=["ig"], scheme="IMGT")              # a group, any case
 tcrs = Annotator(chains=["tcr"], scheme="imgt", min_confidence=0.6)
 ```
 
-- `chains`: the chains each sequence is scored against; the best match wins. Codes (`"H"`), names
-  (`"IGH"`, `"heavy"`) and the groups `"ig"`, `"tcr"` and `"all"` are accepted, in any case; see
-  [Chains](../concepts.md#chains). Each chain costs one alignment per sequence, so pass only those
-  you expect.
+- `chains`: the chains each sequence is aligned against; the one with the highest confidence
+  wins. Codes (`"H"`), names (`"IGH"`, `"heavy"`) and the groups `"ig"`, `"tcr"` and `"all"` are
+  accepted, in any case; see [Chains](../concepts.md#chains). Each chain costs one alignment per
+  sequence, so pass only those you expect.
 - `scheme`: `"imgt"`, `"kabat"`, `"chothia"`, `"martin"` or `"aho"`, or their first letter. Only
   IMGT numbers TCR chains; see [Numbering schemes](../concepts.md#numbering-schemes).
-- `min_confidence`: sequences whose best alignment scores below it, `0.5` by default, get a
+- `min_confidence`: sequences whose best alignment scores below it, `0.4` by default, get a
   `low_confidence` result instead of a numbering. `0.0` turns the check off; see
   [Confidence](../concepts.md#confidence).
 

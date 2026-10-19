@@ -30,7 +30,7 @@ Both commands take the same options.
 | `-s`, `--scheme` | `imgt` (`i`), `kabat` (`k`), `chothia` (`c`), `martin` (`m`), `aho` (`a`); case-insensitive | `imgt` |
 | `-c`, `--chain` | Chains to try: `h`, `k`, `l`, `a`, `b`, `g`, `d`, or a group: `ig` (H, K, L), `tcr` (A, B, G, D), `all`. Comma-separate several (`-c h,k`). Names such as `heavy` or `igh` also work; see [Chains](../concepts.md#chains) | `ig` |
 | `-f`, `--format` | `tsv`, `json`, `jsonl` | `tsv` |
-| `--min-confidence` | Number in [0, 1]. A sequence whose alignment confidence is below it gets an error record with `error_kind` `low_confidence` | `0.5` |
+| `--min-confidence` | Number in [0, 1]. A sequence whose alignment confidence is below it gets an error record with `error_kind` `low_confidence` | `0.4` |
 | `--all-domains` | Flag. Number or segment every variable domain in each sequence (for example both domains of an scFv), one record per domain, with a 0-based `domain` column or field. With `segment`, every residue lands in exactly one domain's regions. A sequence without a domain gets one error record | off |
 
 ## Input

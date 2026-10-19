@@ -37,7 +37,7 @@ const REGIONS = ["fr1", "cdr1", "fr2", "cdr2", "fr3", "cdr3", "fr4"];
 const SEGMENTS = ["prefix", ...REGIONS, "postfix"];
 const CDRS = ["cdr1", "cdr2", "cdr3"];
 
-const DEFAULT_MIN_CONFIDENCE = "0.5";
+const DEFAULT_MIN_CONFIDENCE = "0.4";
 
 const $ = (id) => document.getElementById(id);
 

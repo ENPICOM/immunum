@@ -508,7 +508,9 @@ class TestErrorCases:
     @pytest.mark.parametrize("case", ERROR_CASES["sequences"])
     @pytest.mark.parametrize("method", ["number", "segment"])
     def test_sequence_error_is_returned(self, case, method):
-        annotator = immunum.Annotator(case["chains"], case["scheme"])
+        annotator = immunum.Annotator(
+            case["chains"], case["scheme"], case["min_confidence"]
+        )
         result = getattr(annotator, method)(case["sequence"])
         assert (result.error, result.error_kind) == (case["message"], case["kind"])
         others = [
@@ -521,7 +523,9 @@ class TestErrorCases:
     )
     @pytest.mark.parametrize("method", ["number", "segment"])
     def test_domains_return_the_error_as_their_only_result(self, case, method):
-        annotator = immunum.Annotator(case["chains"], case["scheme"])
+        annotator = immunum.Annotator(
+            case["chains"], case["scheme"], case["min_confidence"]
+        )
         [domain] = getattr(annotator, f"{method}_domains")(case["sequence"])
         assert (domain.error, domain.error_kind) == (case["message"], case["kind"])
         others = [
@@ -532,5 +536,7 @@ class TestErrorCases:
     @pytest.mark.parametrize("case", ERROR_CASES["domain_errors"])
     @pytest.mark.parametrize("method", ["number", "segment"])
     def test_a_domain_error_numbers_fine_on_its_own(self, case, method):
-        annotator = immunum.Annotator(case["chains"], case["scheme"])
+        annotator = immunum.Annotator(
+            case["chains"], case["scheme"], case["min_confidence"]
+        )
         assert getattr(annotator, method)(case["sequence"]).error is None

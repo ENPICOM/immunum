@@ -204,8 +204,8 @@ export function regionsFor(scheme: string, chain: string): RegionSpans;
  *   - TCR delta chain:       `"TRD"` / `"D"` / `"delta"`
  *
  *   A group of chains is accepted too: `"ig"` (IGH, IGK, IGL), `"tcr"` (TRA, TRB, TRG,
- *   TRD) or `"all"`. Pass all chains you want to consider; the annotator scores each and
- *   picks the best-matching one.
+ *   TRD) or `"all"`. Pass all chains you want to consider; the annotator aligns against
+ *   each and picks the one with the highest confidence.
  *
  * @param scheme - Numbering scheme to use for output positions. Accepted values
  *   (case-insensitive):
@@ -220,7 +220,7 @@ export function regionsFor(scheme: string, chain: string): RegionSpans;
  *
  * @param minConfidence - Optional minimum alignment confidence threshold in the
  *   range `[0, 1]`. Sequences scoring below this value are rejected with an error.
- *   Defaults to `0.5` when `null` or omitted.
+ *   Defaults to `0.4` when `null` or omitted.
  *
  * @throws {ImmunumError} `invalid_chain` for an unknown chain name or no chains,
  *   `invalid_scheme` for an unknown scheme, `unsupported_chain` for a chain the scheme
