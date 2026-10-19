@@ -65,7 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.0.8 on two 32-core cloud VMs, x86 (AMD EPYC 7543) and ARM (Neoverse-N1), with a new headline
   run (10,000 sequencing-run antibody sequences, mixed H/K/L, `task benchmark-headline`) whose x86
   times the README shows. The benchmarks page has both machines' times, and records the machines
-  and the date. The scaling plot shows the current tools instead of March's.
+  and the date. The scaling plot shows the current tools instead of March's. immunum's TRA and TRB
+  accuracy is re-run with the new confidence: 99.5% and 99.8% of residues correct instead of
+  90.8% and 93.6%, as it now numbers every reference sequence.
 
 ### Fixed
 - Documentation: the Polars page's examples ran nothing but the error example; it now has a

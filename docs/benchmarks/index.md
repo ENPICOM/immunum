@@ -28,7 +28,9 @@ recommends for benchmarking: the last one under the GPL, before AntPack's licenc
 academic, non-commercial use only.
 
 All results on this page were measured on 2026-10-15 on two otherwise idle cloud VMs of the same
-size, 32 cores and 125 GiB of memory, running Ubuntu 26.04 and Python 3.12:
+size, 32 cores and 125 GiB of memory, running Ubuntu 26.04 and Python 3.12, before immunum's
+confidence was redefined; immunum's TRA and TRB accuracy was re-run with it on 2026-10-19 (see
+[Correctness by segment](#correctness-by-segment)):
 
 - **x86**: AMD EPYC 7543 (Zen 3)
 - **ARM**: Arm Neoverse-N1, the core design of AWS Graviton2
@@ -39,7 +41,9 @@ The time to number 10,000 antibody sequences from a sequencing run
 (`fixtures/SRR_HKL_10k.fasta`: heavy, kappa and lambda chains mixed) in IMGT, with every tool
 allowed the H, K and L chains. Mean of 5 rounds, each a fresh sample (with replacement) of the
 file's 10,000 sequences. Lower is better. "Numbered" counts the sequences each tool returned a
-numbering for; immunum turned away the few that fell below its default `min_confidence` of 0.5.
+numbering for; immunum turned away the few that fell below its then default `min_confidence` of
+0.5. With the current confidence and its default of 0.4, immunum numbers all 10,000 in every
+round.
 
 #### x86
 
@@ -112,11 +116,12 @@ and IGL, and the TCR chains TRA, TRB, TRG and TRD. Only the single-core runs are
 all-core runs number identically. FR and CDR columns correspond to the seven IMGT regions (FR1–FR4
 and CDR1–CDR3). Because the antibody ground truth is derived from antpack/ANARCI agreement, those
 two tools score 100% on IGH, IGK and IGL by construction — see the note above. A sequence a tool
-doesn't number counts every one of its residues as wrong. That is most of what immunum loses on
-TRA and TRB: its default `min_confidence` of 0.5 turns away about 9% of the TRA and 6% of the TRB
-references, which `BENCHMARKS.toml`, run without a threshold, numbers at 99.4% and 99.8% of
-residues correct. Bars are the mean over the 7 rounds; error bars span one standard deviation
-above and below it.
+doesn't number counts every one of its residues as wrong. immunum's TRA and TRB rows were re-run
+on 2026-10-19 with the current confidence, on the same samples: its default `min_confidence` of
+0.4 now numbers every reference, where the old confidence's 0.5 turned away about 9% of TRA and
+6% of TRB and scored 90.8% and 93.6% of residues correct, against 99.5% and 99.8% now. Its other
+chains score the same as in the run of 2026-10-15. Bars are the mean over the 7 rounds; error
+bars span one standard deviation above and below it.
 
 <iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 

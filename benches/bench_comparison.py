@@ -5,7 +5,7 @@ Every tool runs through its Python API on the same sequences, once on a single c
 every core. Only the numbering is timed: building annotators, loading models and starting
 antpack's process pool happen before the clock starts. ANARCI's parallel mode is the exception,
 because `run_anarci` starts its own process pool on every call. Every tool keeps its default
-settings, immunum's `min_confidence` of 0.5 included.
+settings, immunum's default `min_confidence` included.
 
 Single core / every core, per tool:
 
