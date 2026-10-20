@@ -10,6 +10,7 @@
 # ///
 
 import glob
+import math
 
 import polars as pl
 import altair as alt
@@ -212,74 +213,92 @@ p2_data = (
 )
 
 CHAIN_ORDER = ["H", "K", "L", "A", "B", "G", "D"]
+# Full chain names as row labels, so the row header title is free to carry the one shared y title
+CHAIN_LABEL_EXPR = (
+    "{'H': 'IGH', 'K': 'IGK', 'L': 'IGL', 'A': 'TRA', 'B': 'TRB', 'G': 'TRG', 'D': 'TRD'}"
+    "[datum.value]"
+)
 METHOD_ORDER = ["immunum", "AntPack", "ANARCI", "ANARCII"]
-# Every column on the same 0–100% axis: left to the data, a column whose error bars pass 100% got
-# a taller axis than AntPack's, whose 100% bars have no spread, so their tops didn't line up
-PCT_SCALE = alt.Scale(domain=[0, 100], nice=False)
+# The colours Vega's default scheme gives the tools in plots 1 and 3, pinned so this plot's legend
+# and bars can follow METHOD_ORDER instead of the alphabetical order that colour assignment uses
+METHOD_COLORS = ["#72b7b2", "#e45756", "#4c78a8", "#f58518"]
 
-p2_pdf = p2_data.to_pandas()
+p2_summary = (
+    p2_data.group_by("method", "chain", "segment")
+    .agg(
+        pl.col("pct_correct").mean().alias("mean_pct"),
+        pl.col("pct_correct").std().fill_null(0).alias("std_pct"),
+    )
+    .with_columns(
+        (pl.col("mean_pct") - pl.col("std_pct")).alias("err_lo"),
+        # A standard deviation above a mean near 100% would pass 100%
+        pl.min_horizontal(pl.col("mean_pct") + pl.col("std_pct"), 100).alias("err_hi"),
+    )
+)
+# Zoomed in on the top of the axis, where every mean sits: on 0–100% a 97% bar is
+# indistinguishable from a 100% one. The floor is the lowest error bar's end, rounded down
+PCT_FLOOR = math.floor(p2_summary["err_lo"].min())
+PCT_SCALE = alt.Scale(domain=[PCT_FLOOR, 100], nice=False)
 
-_method_cols = []
-for i, method in enumerate(METHOD_ORDER):
-    sub = p2_pdf[p2_pdf["method"] == method]
-    if sub.empty:
-        continue
-    base = alt.Chart(sub)
-    bars = base.mark_bar(opacity=0.7).encode(
-        y=alt.Y(
-            "mean(pct_correct):Q",
-            title="% Correct" if i == 0 else "",
-            scale=PCT_SCALE,
-            axis=alt.Axis(labelFontSize=8, titleFontSize=9),
-        ),
-        x=alt.X(
-            "segment:N",
-            title=None,
-            sort=segments,
-            axis=alt.Axis(labelAngle=-60, labelFontSize=7),
-            scale=alt.Scale(paddingInner=0.3),
-        ),
-        color=alt.Color("method:N", legend=None),
-        tooltip=[
-            "method",
-            "chain",
-            "segment",
-            alt.Tooltip("mean(pct_correct):Q", format=".2f", title="Mean %"),
-            alt.Tooltip("stdev(pct_correct):Q", format=".2f", title="Std %"),
-        ],
-    )
-    # Clipped at the frame: a standard deviation above a mean near 100% would pass 100%
-    errorbars = base.mark_errorbar(extent="stdev", clip=True).encode(
-        x=alt.X("segment:N", sort=segments),
-        y=alt.Y("pct_correct:Q", scale=PCT_SCALE),
-        color=alt.Color("method:N", legend=None),
-    )
-    c = (
-        (bars + errorbars)
-        .properties(width=90, height=60, title=alt.TitleParams(method, fontSize=11))
-        .facet(
-            row=alt.Row(
-                "chain:N",
-                sort=CHAIN_ORDER,
-                header=alt.Header(
-                    labelAngle=0,
-                    labelAlign="right",
-                    labelFontSize=10,
-                    title="Chain" if i == 0 else None,
-                    titleFontSize=10,
-                ),
-            ),
-        )
-        .resolve_scale(y="shared")
-    )
-    _method_cols.append(c)
-
-plot2 = alt.hconcat(
-    *_method_cols,
-    title=alt.TitleParams(
-        f"Correctness by segment ({acc_size_label})", fontSize=13, anchor="middle"
+_p2_base = alt.Chart()
+# Outlined like plot 1's bars. Clipped: with the axis starting above 0 a bar runs down past the frame
+_p2_bars = _p2_base.mark_bar(
+    opacity=0.7, stroke="black", strokeWidth=1.5, clip=True
+).encode(
+    x=alt.X(
+        "segment:N",
+        title="Region",
+        sort=segments,
+        axis=alt.Axis(labelAngle=0),
+        scale=alt.Scale(paddingInner=0.25),
     ),
-    spacing=10,
+    xOffset=alt.XOffset("method:N", sort=METHOD_ORDER),
+    y=alt.Y(
+        "mean_pct:Q",
+        title=None,
+        scale=PCT_SCALE,
+        axis=alt.Axis(tickCount=4),
+    ),
+    color=alt.Color(
+        "method:N",
+        title="Method",
+        scale=alt.Scale(domain=METHOD_ORDER, range=METHOD_COLORS),
+    ),
+    tooltip=[
+        "method",
+        "chain",
+        "segment",
+        alt.Tooltip("mean_pct:Q", format=".2f", title="Mean %"),
+        alt.Tooltip("std_pct:Q", format=".2f", title="Std %"),
+    ],
+)
+_p2_errorbars = _p2_base.mark_rule(color="black", strokeWidth=2, clip=True).encode(
+    x=alt.X("segment:N", sort=segments),
+    xOffset=alt.XOffset("method:N", sort=METHOD_ORDER),
+    y=alt.Y("err_lo:Q", scale=PCT_SCALE),
+    y2="err_hi:Q",
+)
+
+plot2 = (
+    alt.layer(_p2_bars, _p2_errorbars, data=p2_summary)
+    .properties(width=480, height=70)
+    .facet(
+        row=alt.Row(
+            "chain:N",
+            sort=CHAIN_ORDER,
+            header=alt.Header(
+                labelAngle=0,
+                labelAlign="right",
+                labelExpr=CHAIN_LABEL_EXPR,
+                # Shared y title: one label left of all rows instead of one per row
+                title="% Correct",
+            ),
+        ),
+        spacing=14,
+        title=f"Correctness by segment ({acc_size_label})",
+    )
+    # TCR rows only have immunum and ANARCI: their bars take the width of the tools missing there
+    .resolve_scale(xOffset="independent")
 )
 
 # ── Save ─────────────────────────────────────────────────────────────────────

@@ -111,9 +111,9 @@ If you want to add another tool to the comparison, please open an issue on our
 
 ### Correctness by segment
 
-Per-region residue accuracy (%) for each tool, one row per chain: the antibody chains IGH, IGK
+Per-region residue accuracy (%) for each tool, side by side, one row per chain: the antibody chains IGH, IGK
 and IGL, and the TCR chains TRA, TRB, TRG and TRD. Only the single-core runs are shown; the
-all-core runs number identically. FR and CDR columns correspond to the seven IMGT regions (FR1–FR4
+all-core runs number identically. FR and CDR groups correspond to the seven IMGT regions (FR1–FR4
 and CDR1–CDR3). Because the antibody ground truth is derived from antpack/ANARCI agreement, those
 two tools score 100% on IGH, IGK and IGL by construction — see the note above. A sequence a tool
 doesn't number counts every one of its residues as wrong. immunum's TRA and TRB rows were re-run
@@ -121,7 +121,8 @@ on 2026-10-19 with the current confidence, on the same samples: its default `min
 0.4 now numbers every reference, where the old confidence's 0.5 turned away about 9% of TRA and
 6% of TRB and scored 90.8% and 93.6% of residues correct, against 99.5% and 99.8% now. Its other
 chains score the same as in the run of 2026-10-15. Bars are the mean over the 7 rounds; error
-bars span one standard deviation above and below it.
+bars span one standard deviation above and below it. The axis is zoomed in on the top few percent,
+where every mean sits, so bars are cut off at its bottom rather than starting at 0%.
 
 <iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 
