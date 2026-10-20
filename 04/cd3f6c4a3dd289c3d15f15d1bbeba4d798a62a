@@ -1,0 +1,20 @@
+docs/assets/benchmark_plot2_correctness.html
+  h_acea35c6bbea0b 24
+docs/assets/benchmark_plot2_correctness.svg
+  h_acea35c6bbea0b 1
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 114,116,124-125
+scripts/plots.py
+  h_acea35c6bbea0b 13,216-220,222-224,226-230,232-235,237-241,243-253,255-301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "04cd3f6c4a3dd289c3d15f15d1bbeba4d798a62a",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
