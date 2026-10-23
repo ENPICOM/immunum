@@ -23,7 +23,7 @@ tasks:
         cmds:
             - task: build
               vars: { PROFILE: "{{.PROFILE}}", CLI_ARGS: "--locked" }
-            - pre-commit install
+            - uv run --no-sync pre-commit install
 
     build-ci:
         vars:
