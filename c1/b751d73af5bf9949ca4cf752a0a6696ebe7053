@@ -1,0 +1,84 @@
+.github/workflows/ci.yml
+  h_acea35c6bbea0b 15-16,23,51-54,61
+.gitignore
+  h_acea35c6bbea0b 19-21
+BENCHMARKS.toml
+  h_acea35c6bbea0b 1-2,14,26,36-37,54-55,60-62,66-67,72-73,90-91
+CHANGELOG.md
+  h_acea35c6bbea0b 36,59-74,86-93
+CONTRIBUTING.md
+  h_acea35c6bbea0b 25-26,123,126,130,143
+README.md
+  h_acea35c6bbea0b 40-41,184-185,211-219
+Taskfile.yml
+  h_acea35c6bbea0b 26
+build.rs
+  h_acea35c6bbea0b 26-28
+docs/assets/benchmark_plot2_correctness.html
+  h_acea35c6bbea0b 24
+docs/assets/benchmark_plot2_correctness.svg
+  h_acea35c6bbea0b 1
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 32-34,124-133
+docs/concepts.md
+  h_acea35c6bbea0b 181,198,202,205,215-220,225,339
+docs/usage/cli.md
+  h_acea35c6bbea0b 145
+docs/usage/polars.md
+  h_acea35c6bbea0b 256
+docs/usage/rust.md
+  h_acea35c6bbea0b 31
+fixtures/validation/tcr_D_imgt.csv
+  h_acea35c6bbea0b 2-24
+immunum/polars.py
+  h_acea35c6bbea0b 129-130
+pyproject.toml
+  h_acea35c6bbea0b 89-95
+resources/benchmark_results/results_ab_H_imgt.csv
+  h_acea35c6bbea0b 2-3,10-11,18-19,26-27,34-35,42-43,50-51
+resources/benchmark_results/results_ab_K_imgt.csv
+  h_acea35c6bbea0b 2-3,10-11,18-19,26-27,34-35,42-43,50-51
+resources/benchmark_results/results_tcr_B_imgt.csv
+  h_acea35c6bbea0b 2-3,6-7,10-11,14-15,18-19,22-23,26-27
+resources/benchmark_results/results_tcr_D_imgt.csv
+  h_acea35c6bbea0b 2-29
+resources/benchmark_results/results_tcr_G_imgt.csv
+  h_acea35c6bbea0b 2-3,6-7,10-11,14-15,18-19,22-23,26-27
+resources/consensus/IGH.csv
+  h_acea35c6bbea0b 2-22,24-31,34-40,42-50,52-60,62-102,104-109,111-116,119,121-127
+resources/consensus/IGK.csv
+  h_acea35c6bbea0b 2-23,25-41,43-58,66-80,83-103,105-117,120,123-127
+resources/consensus/IGL.csv
+  h_acea35c6bbea0b 2-22,24-31,35-40,42-60,62-87,89-102,104-116,119,122-126
+resources/consensus/README.md
+  h_acea35c6bbea0b 1,3-25,29-30,32-35,37-39,41-47,49-85
+resources/consensus/TRA.csv
+  h_acea35c6bbea0b 2-15,17-23,25-31,36-41,43-60,63-69,75-102,104,106-129
+resources/consensus/TRB.csv
+  h_acea35c6bbea0b 2-6,8-30,37-42,44-60,64-82,84-104,106-111,114-121,123-124,126-128
+resources/consensus/TRD.csv
+  h_acea35c6bbea0b 2,6,8-12,16-18,22-23,27,30-31,46,48-49,51-53,55-73,78,80-82,87-88,91,95,97-98,108-109,124,126
+resources/consensus/TRG.csv
+  h_acea35c6bbea0b 2-23,25-32,36-41,44-60,63-98,100-102,107,109-116,118,120-121,124,126-129
+resources/consensus/germlines.tsv
+  h_acea35c6bbea0b 1-1684
+scripts/README.md
+  h_acea35c6bbea0b 3,7-11,14
+scripts/generate_consensus.py
+  h_acea35c6bbea0b 1,4,6-10,14-18,20-68,75-344,347,349,354-361,363-370,372,376-377,379-380,383-421
+tests/error_cases.json
+  h_acea35c6bbea0b 98
+uv.lock
+  h_acea35c6bbea0b 22,36,60,118-122,153,546,548,550,558,576,578,580,684,742,778,780-784,787-802,830,832-836,839-854,1132,1506,1508,1510,1527,1587,1608,1666-1670,1855,1958-1959,2081-2089,2098,2205-2209,2329,2406-2409,2417-2418,2420-2431,2433,2438,2440-2443,2445,2468,2471-2475,2477,2479
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c1b751d73af5bf9949ca4cf752a0a6696ebe7053",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
