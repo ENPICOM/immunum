@@ -32,8 +32,14 @@ pub struct PositionScores {
     pub insertion_penalty: f32,
     /// Best possible score at this position (max of all amino acid scores)
     pub max_score: f32,
-    /// Whether this position counts toward the confidence score (occupancy > 0.5)
+    /// Whether this position counts toward the confidence score (occupancy > 0.9)
     pub counts_for_confidence: bool,
+    /// The score a random residue gets here on average, by BLOSUM62's background amino-acid
+    /// frequencies: 0 on the confidence scale
+    pub random_score: f32,
+    /// The score the residues seen here in the chain's reference sequences get on average: 1 on
+    /// the confidence scale
+    pub typical_score: f32,
 }
 
 impl PositionScores {

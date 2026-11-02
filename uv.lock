@@ -15,8 +15,20 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "anarci"
+version = "2026.2.13.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "biopython", marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a2/31/8db2bb1f75c54a774129b02a7c81377809c4486fefdde0ff8d9fd3f8d1a3/anarci-2026.2.13.2.tar.gz", hash = "sha256:0b383e7abd2c4f65231f15b1b80cad6b8aad223c693c90c173b8b062da3d493b", size = 2250461, upload-time = "2026-02-13T02:59:17.909Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/50/1345543216a281cab84030a73ee4918b87e7249679926392d8fa44cb9420/anarci-2026.2.13.2-py3-none-any.whl", hash = "sha256:8f88d49857abc2c5427c6cc903ebdac7b35e6636635eaa9d60bd8f0d4e7d14b7", size = 1166101, upload-time = "2026-02-13T02:59:15.665Z" },
+]
+
+[[package]]
 name = "anarcii"
-version = "2.0.5"
+version = "2.0.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gemmi", marker = "python_full_version >= '3.11'" },
@@ -26,9 +38,9 @@ dependencies = [
     { name = "sortedcontainers", marker = "python_full_version >= '3.11'" },
     { name = "torch", marker = "python_full_version >= '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/ce/f4a3d83789bbca44d1cf7ad1dba7b91c865f4b8eee225657949ce1c19ae0/anarcii-2.0.5.tar.gz", hash = "sha256:6f526b8fef981f24361d7f94e99c13a97388a63c1ce6ba098cacdf21e1755213", size = 17550828, upload-time = "2025-12-16T08:59:36.489Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/6e/09d47ef9d629b385bc5f1208b04476bedc427405f87a09a1baa6039328ae/anarcii-2.0.8.tar.gz", hash = "sha256:38bdcbca15dfbb79ff8b7006390756ceb43803cbf9d2392f93fe464970bcad92", size = 17551782, upload-time = "2026-06-30T14:44:47.873Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ac/fe/892729b8e1b943e7b9891a791df1a0aa1e3282908981dbaf5e6803e39bfa/anarcii-2.0.5-py3-none-any.whl", hash = "sha256:7f209cba563f9a8f93e34e53053beae68a9f1691942bf01619d0bc7dfbdcbebf", size = 17559284, upload-time = "2025-12-16T08:59:33.181Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/48/dc4e9f1c7101e0a4bf8879c273cfead5e0eda66ea9942cdf0220e07798aa/anarcii-2.0.8-py3-none-any.whl", hash = "sha256:6ac81caef04a9cad1af1ea320b35bdced620fe2bfdd0b8b17b98131495b584ca", size = 17560083, upload-time = "2026-06-30T14:44:44.409Z" },
 ]
 
 [[package]]
@@ -42,20 +54,37 @@ wheels = [
 
 [[package]]
 name = "antpack"
-version = "0.2.7"
+version = "0.3.8.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", marker = "python_full_version >= '3.11'" },
-    { name = "pybind11", marker = "python_full_version >= '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d6/70/08e6a1883c546a6fe66bb49955326173cf34e340cad84d355e440e979048/antpack-0.2.7.tar.gz", hash = "sha256:bd62faedf1543c40be27ce9e9ae2d91ce2fa6e7b3ccaeda9d832beec6e760506", size = 13724644, upload-time = "2024-06-19T05:46:08.471Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/2e/b9f99d86027a20055bab36b8c42141cbb1cd3f2dc8b291660e42ef01201c/antpack-0.2.7-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0df9ab7f70bde5b81877561785e7935aa185abb0b109d543777e4fdfe726f09d", size = 14113913, upload-time = "2024-06-19T05:46:37.081Z" },
-    { url = "https://files.pythonhosted.org/packages/74/af/801807a017ee2bbda01a4d53657cfb45b80e1bd5125dfd61da09072cc7af/antpack-0.2.7-cp310-cp310-win_amd64.whl", hash = "sha256:becb64687fdbfda9c72674ac4d3bd18342ee1eb03a695612fab9c17f795966e0", size = 14054684, upload-time = "2024-06-19T05:49:21.085Z" },
-    { url = "https://files.pythonhosted.org/packages/15/56/a5335f4ea8a7ba9564e49a2be900acbb734b8bd90e91965e9e1c7f439a5e/antpack-0.2.7-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:21180cefc3e231259e4f3346b69dc8d19b6fd2e79db2b311017bc37f69f857c3", size = 14115835, upload-time = "2024-06-19T05:46:52.969Z" },
-    { url = "https://files.pythonhosted.org/packages/e9/4f/987441673ee264932679b81390da9312b096a330aa2558fe356b9a68c948/antpack-0.2.7-cp311-cp311-win_amd64.whl", hash = "sha256:19419fa3d1a2785abf33a85e010a5736b323b4b72637115d8b71e236ed5b03a4", size = 14055880, upload-time = "2024-06-19T05:49:38.783Z" },
-    { url = "https://files.pythonhosted.org/packages/f1/c0/8bc769f0c77b7a162b26046e82d575a1a2cbdebe91207111bb32d5e6b4a0/antpack-0.2.7-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:eeeb439ba38ebc0abd3d727c9e2910c3beeb1f8b203bd26d225450ff7aca3ae9", size = 14114723, upload-time = "2024-06-19T05:47:17.589Z" },
-    { url = "https://files.pythonhosted.org/packages/8d/e7/73caabcef037c923e01d406314868069fede3f01b3d4357032fa156760d0/antpack-0.2.7-cp312-cp312-win_amd64.whl", hash = "sha256:67e498ee04bcc6e7633b4c2f6e9eda29929b1b6a576e67f709f8f43e5cc6ae7e", size = 14055803, upload-time = "2024-06-19T05:49:59.144Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/f1/4aa1911fe5937ebe9a5520b2d7597002058002103ff74b2aed0c7d79e851/antpack-0.3.8.6.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:7e34736dc48416a27ffd6046c5c7afea82c24d0a7d8c0ce31c50c9f75cebaef3", size = 14837510, upload-time = "2026-02-10T19:43:36.39Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/46/82001db09be665979714de229debc9dee30fe2814021158b0d25c1383eaf/antpack-0.3.8.6.2-cp310-cp310-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:5e9dba7dd9f5607033077aa4de5337c80e9f054db9c881db1c3e7e6ee8f34d6a", size = 15028393, upload-time = "2026-02-10T19:43:49.267Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/c8/3ecb03678f498d3543f0d246e72345710d416a3f4f7175e71899977a7329/antpack-0.3.8.6.2-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:601dd7d61e5aaa680e3878c202278563da096d471c1a68b517c5056b0a6cca40", size = 15049049, upload-time = "2026-02-10T19:44:02.073Z" },
+    { url = "https://files.pythonhosted.org/packages/50/d1/f9325dd9aa96e2b3c794ad8f119da6c98515dad03daa1028cfd0831d4b0c/antpack-0.3.8.6.2-cp310-cp310-win32.whl", hash = "sha256:099b74f0646274589286c9dcaca22465b30c7189f6f11a49473703886ef24e69", size = 14828332, upload-time = "2026-02-10T19:44:15.232Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/d5/63fd28a3bb6c95fc881ab7be518e758559ecd6edb9352e0e67922cf8a41a/antpack-0.3.8.6.2-cp310-cp310-win_amd64.whl", hash = "sha256:c09f85bda38fd1649f2caff983bda5ffa57975442d2e04cd88a25ea9cf4577a5", size = 14859775, upload-time = "2026-02-10T19:44:28.291Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/3b/cff8241786dd95b05e2f2575bb026b7eb217c6ff877d9249c9c02d20fcd9/antpack-0.3.8.6.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:f08273861ca8b692ee2475975b9c84c423a1b94343696e4e5030a2355dc84b07", size = 14837317, upload-time = "2026-02-10T19:44:41.515Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/9c/0b5f832b9fd86b92cf6cbc0afa15df3d77a8d7c552df896ebbb86808b5db/antpack-0.3.8.6.2-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:856bfc891c3c25fc1bce8e92d9f47395f5a09557d42a77f6c0cd0e00d42884ae", size = 15028192, upload-time = "2026-02-10T19:44:54.551Z" },
+    { url = "https://files.pythonhosted.org/packages/35/5d/1ecb943608e9866e69d90bc5a4c6a1de6b46214b91a7e5f3ea3f906e9cb6/antpack-0.3.8.6.2-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4641f8a9684e60af9dab730e8a0fc9f0d9e27a8528b4b03686ed569530b99114", size = 15048841, upload-time = "2026-02-10T19:45:09.304Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/95/cdee66e3f1d8210f1eecb5957cbf04855cce0aaa6c15390a977f7ea96e78/antpack-0.3.8.6.2-cp311-cp311-win32.whl", hash = "sha256:38254bc757a628753353fd046dc60ea9709394fe763b3cb44fbbb6e6934757b4", size = 14828115, upload-time = "2026-02-10T19:45:22.889Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/18/934567097c90ab4ed95e0dd4048574eef476baee55a9075b52632be349db/antpack-0.3.8.6.2-cp311-cp311-win_amd64.whl", hash = "sha256:8ac74155c9d1818f1d5a2fc17ed7baa6b1ebbb89d6c60a224a1284d4238ab2f7", size = 14859642, upload-time = "2026-02-10T19:45:35.862Z" },
+    { url = "https://files.pythonhosted.org/packages/70/e6/9bb5b785394a6927aed1af2f8c593364b1dba955fad0a0fd9a7bcac9faf4/antpack-0.3.8.6.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1dd96b8da03898eec2beb86b3382adbc4f789037b281ef12396aad6ee059ea62", size = 14836262, upload-time = "2026-02-10T19:45:48.767Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/be/7995254d9f60a4cf8feaaaba1edb532597c38f971311760fa64c6b5b7454/antpack-0.3.8.6.2-cp312-cp312-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7a17d2a609bbbb8af4bad0e8735be66b29cfd291b990fd1727aec2835443c6b0", size = 15027298, upload-time = "2026-02-10T19:46:01.592Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/e9/d97088d79dc70db70da4d44b12336e34cc4e539f7da528d76d6ad8ae1c74/antpack-0.3.8.6.2-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4cbe73cdd7282cf4cd321c4f1aa714c7a01ac38cc8911bacce565eb130c62154", size = 15047943, upload-time = "2026-02-10T19:46:14.747Z" },
+    { url = "https://files.pythonhosted.org/packages/35/4d/854792041cc988bc6c2e476acc05261ab89ad7d61eb351cd87e74651dbaf/antpack-0.3.8.6.2-cp312-cp312-win32.whl", hash = "sha256:77565e260eb58dac67a449e5ec4d13881e0322aea3bd9eb3f76dac1f1c898b6e", size = 14827399, upload-time = "2026-02-10T19:46:27.583Z" },
+    { url = "https://files.pythonhosted.org/packages/20/f0/53f77bbcb2fd0e37cdf67feb7584abe97cb6f473704efacd8347c8506d0f/antpack-0.3.8.6.2-cp312-cp312-win_amd64.whl", hash = "sha256:408bc6b8fd1ca5d05d11c092fd4370645acbc499f34e135644ae7b45e2968db7", size = 14858870, upload-time = "2026-02-10T19:46:40.373Z" },
+    { url = "https://files.pythonhosted.org/packages/58/b9/505f5ef33eb4a5d986c93d0dc32ab1994e6bf24fa79b31db98525fd957c1/antpack-0.3.8.6.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:7ff3f78b7db811c99b80e03f9d782839eefde0ecfc24e5680f1bc176809ba5fe", size = 14836226, upload-time = "2026-02-10T19:46:52.73Z" },
+    { url = "https://files.pythonhosted.org/packages/df/6b/4d293b61b40b0514b10b7bb98cdadd0a5b752d19f04d618580ee06cf275d/antpack-0.3.8.6.2-cp313-cp313-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:87bd64dcb58ad34369d9cfe95d064b89a831ad6eef48c27d99f6d7aeaa32a581", size = 15026983, upload-time = "2026-02-10T19:47:05.634Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/12/afbe144d951f60efa71c03bde6a9a1f564acc51a884174e7ce0279f438bb/antpack-0.3.8.6.2-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f01c96724991f9a7107c97ff27e97caff11980bd56ff8f4e78973b60e1159da2", size = 15047901, upload-time = "2026-02-10T19:47:18.641Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/f9/d6a2c23f9f97b066c260e77c643335e2029df57fd4de4c367940c74956a8/antpack-0.3.8.6.2-cp313-cp313-win32.whl", hash = "sha256:08e2e58a9659d4286d545e4c1c5ef4360c1ce157573bb8f07d3b2534bda523e8", size = 14827368, upload-time = "2026-02-10T19:47:31.32Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/7f/794302c35a6a133ba4a69dd9127f016e159b16c5dcef1028934abf059e9a/antpack-0.3.8.6.2-cp313-cp313-win_amd64.whl", hash = "sha256:7dbc60d15f7b27da9cd12144e8a18a5259209fa2ed1846f5bf78f8e7753f9e70", size = 14858826, upload-time = "2026-02-10T19:47:44.759Z" },
+    { url = "https://files.pythonhosted.org/packages/66/78/ea75a4742df6130828f9c0cf7cfb3468005e545b5a6e092f8f8386181578/antpack-0.3.8.6.2-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:9c9066d6c99bf4200a9188173869e726bf0b02f12a059c31b20d5212bb5608ba", size = 14836305, upload-time = "2026-02-10T19:47:58.704Z" },
+    { url = "https://files.pythonhosted.org/packages/22/c5/73fbd7244ed741f85f177b455c6351aa78e01c2b301f134adb03421763b8/antpack-0.3.8.6.2-cp314-cp314-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ccf307ae434cbf7357067c32c491001996ab23d0dd077e54be26601bd1def652", size = 15027234, upload-time = "2026-02-10T19:48:11.653Z" },
+    { url = "https://files.pythonhosted.org/packages/93/89/45ed6acd99a68e2bc487b3291752dc9aabe3e087d9272cca7e09c3de1573/antpack-0.3.8.6.2-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e39237f76617fd37de09bb8975e38b2637742f4823de92e20412536af058a5fa", size = 15047882, upload-time = "2026-02-10T19:48:25.605Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/7c/d3a62cfbcab441cde43d26ae98c9544011dfbb4a4c7b2880285033f0d2fd/antpack-0.3.8.6.2-cp314-cp314-win32.whl", hash = "sha256:637f1a057d347913fd6e637297148c4160520e89ea6fc5f36607c7d1597bd288", size = 14844362, upload-time = "2026-02-10T19:48:40.121Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/ba/263404a0f8fb80e53be0c3fe9eac347a5693959fd785be2db9579333de22/antpack-0.3.8.6.2-cp314-cp314-win_amd64.whl", hash = "sha256:a1bc8a250873bf2435fa98f07777fcd4ec7f72fa475ee6682055fc5f5b239afd", size = 14876703, upload-time = "2026-02-10T19:48:53.336Z" },
 ]
 
 [[package]]
@@ -746,6 +775,7 @@ polars = [
 
 [package.dev-dependencies]
 benchmark = [
+    { name = "anarci", marker = "python_full_version >= '3.11'" },
     { name = "anarcii", marker = "python_full_version >= '3.11'" },
     { name = "antpack", marker = "python_full_version >= '3.11'" },
     { name = "biopython", marker = "python_full_version >= '3.11'" },
@@ -797,8 +827,9 @@ provides-extras = ["polars"]
 
 [package.metadata.requires-dev]
 benchmark = [
-    { name = "anarcii", marker = "python_full_version >= '3.11'", specifier = ">=2.0.5" },
-    { name = "antpack", marker = "python_full_version >= '3.11'", specifier = "~=0.2.7" },
+    { name = "anarci", marker = "python_full_version >= '3.11'", specifier = "==2026.2.13.2" },
+    { name = "anarcii", marker = "python_full_version >= '3.11'", specifier = "==2.0.8" },
+    { name = "antpack", marker = "python_full_version >= '3.11'", specifier = "==0.3.8.6.2" },
     { name = "biopython", marker = "python_full_version >= '3.11'", specifier = ">=1.86" },
     { name = "polars", marker = "python_full_version >= '3.11'", specifier = ">1.30.0" },
     { name = "scikit-bio", marker = "python_full_version >= '3.11'", specifier = "==0.6.2" },
@@ -1664,15 +1695,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/37/a8/d832f7293ebb21690860d2e01d8115e5ff6f2ae8bbdc953f0eb0fa4bd2c7/py-cpuinfo-9.0.0.tar.gz", hash = "sha256:3cdbbf3fac90dc6f118bfd64384f309edeadd902d7c8fb17f02ffa1fc3f49690", size = 104716, upload-time = "2022-10-25T20:38:06.303Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e0/a9/023730ba63db1e494a271cb018dcd361bd2c917ba7004c3e49d5daf795a2/py_cpuinfo-9.0.0-py3-none-any.whl", hash = "sha256:859625bc251f64e21f077d099d4162689c762b5d6a4c3c97553d56241c9674d5", size = 22335, upload-time = "2022-10-25T20:38:27.636Z" },
-]
-
-[[package]]
-name = "pybind11"
-version = "3.0.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a5/98/9118a0659646f1628c592ef9bb48e0056efa6bf27c951fd12a178e0136fb/pybind11-3.0.2.tar.gz", hash = "sha256:432f01aeb68e361a3a7fc7575c2c7f497595bf640f747acd909ff238dd766e06", size = 577131, upload-time = "2026-02-17T04:46:52.556Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/c5/e98d9c51f3d5300d5e40ad9037dd6b3b60736fd02ab68dcc98c96be7592d/pybind11-3.0.2-py3-none-any.whl", hash = "sha256:f8a6500548919cc33bcd220d5f984688326f574fa97f1107f2f4fdb4c6fb019f", size = 310158, upload-time = "2026-02-17T04:46:49.91Z" },
 ]
 
 [[package]]

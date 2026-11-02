@@ -108,9 +108,13 @@ fn unknown_chain_among(name: &str, groups: &[(&str, &[Chain])]) -> Error {
 }
 
 impl Chain {
-    /// Parse chain names, each a chain (see [`Chain`]) or a group of chains: `ig`, `tcr` or `all`.
-    /// Case-insensitive and trimmed. A chain named more than once is kept once, where first named.
-    pub fn parse_names<'a>(names: impl IntoIterator<Item = &'a str>) -> Result<Vec<Chain>> {
+    /// Parse chain names, each a chain (see [`Chain`]) or a group of chains: `ig`, `tcr` or `all`,
+    /// which is every chain `scheme` numbers. Case-insensitive and trimmed. A chain named more than
+    /// once is kept once, where first named.
+    pub fn parse_names<'a>(
+        names: impl IntoIterator<Item = &'a str>,
+        scheme: Scheme,
+    ) -> Result<Vec<Chain>> {
         let mut chains = Vec::new();
         for name in names {
             let name = name.trim();
@@ -123,8 +127,10 @@ impl Chain {
                     .parse::<Chain>()
                     .map_err(|_| unknown_chain_among(name, &CHAIN_GROUPS))?][..],
             };
+            // Other names keep chains the scheme doesn't number, for the annotator to reject
+            let all = group.is_some_and(|(group, _)| group == "all");
             for &chain in named {
-                if !chains.contains(&chain) {
+                if (!all || scheme.supports(chain)) && !chains.contains(&chain) {
                     chains.push(chain);
                 }
             }
@@ -493,20 +499,34 @@ mod tests {
 
     #[test]
     fn parse_names_expands_each_group() {
-        let ig = Chain::parse_names(["ig"]).unwrap();
+        let ig = Chain::parse_names(["ig"], Scheme::IMGT).unwrap();
         assert_eq!(ig, vec![Chain::IGH, Chain::IGK, Chain::IGL]);
 
-        let tcr = Chain::parse_names(["tcr"]).unwrap();
+        let tcr = Chain::parse_names(["tcr"], Scheme::IMGT).unwrap();
         assert_eq!(tcr, vec![Chain::TRA, Chain::TRB, Chain::TRG, Chain::TRD]);
 
-        let all = Chain::parse_names(["all"]).unwrap();
+        let all = Chain::parse_names(["all"], Scheme::IMGT).unwrap();
         assert_eq!(all, ALL_CHAINS);
+    }
+
+    // `all` is every chain the scheme numbers; a TCR chain or `tcr` named outright is kept, so the
+    // annotator rejects it instead of numbering fewer chains than asked for
+    #[test]
+    fn all_is_every_chain_the_scheme_numbers() {
+        for scheme in [Scheme::Kabat, Scheme::Chothia, Scheme::Martin, Scheme::Aho] {
+            assert_eq!(Chain::parse_names(["all"], scheme).unwrap(), IG_CHAINS);
+            assert_eq!(
+                Chain::parse_names(["all", "b"], scheme).unwrap(),
+                vec![Chain::IGH, Chain::IGK, Chain::IGL, Chain::TRB]
+            );
+            assert_eq!(Chain::parse_names(["tcr"], scheme).unwrap(), TCR_CHAINS);
+        }
     }
 
     // Groups were only accepted by the CLI; every surface now parses names through `parse_names`.
     #[test]
     fn parse_names_mixes_chains_and_groups_and_drops_repeats() {
-        let chains = Chain::parse_names([" Heavy", "ig", "TCR", "b"]).unwrap();
+        let chains = Chain::parse_names([" Heavy", "ig", "TCR", "b"], Scheme::IMGT).unwrap();
         assert_eq!(
             chains,
             vec![
@@ -519,13 +539,15 @@ mod tests {
                 Chain::TRD
             ]
         );
-        assert!(Chain::parse_names(["ig", "IGX"]).is_err());
+        assert!(Chain::parse_names(["ig", "IGX"], Scheme::IMGT).is_err());
     }
 
     #[test]
     fn an_unknown_chain_lists_the_names_that_would_parse() {
         let single = "IGX".parse::<Chain>().unwrap_err().to_string();
-        let listed = Chain::parse_names(["IGX"]).unwrap_err().to_string();
+        let listed = Chain::parse_names(["IGX"], Scheme::IMGT)
+            .unwrap_err()
+            .to_string();
         for chain in ALL_CHAINS {
             for name in chain.get_serializations() {
                 assert_eq!(name.parse::<Chain>().unwrap(), *chain);

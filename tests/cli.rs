@@ -8,12 +8,16 @@ fn immunum() -> assert_cmd::Command {
     cargo::cargo_bin_cmd!("immunum")
 }
 
+/// A full heavy-chain variable domain (IGHV3-21, IGHJ4): a short fragment no longer passes the
+/// default `min_confidence`, as confidence counts how much of the domain is there
+const IGH: &str = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSSISSSSSYIYYADSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCARDRGYSSGWYFDYWGQGTLVTVSS";
+
 // --- Basic input modes ---
 
 #[test]
 fn raw_sequence_argument() {
     immunum()
-        .args(["number", "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS"])
+        .args(["number", IGH])
         .assert()
         .success()
         .stdout(predicate::str::contains(
@@ -93,7 +97,7 @@ fn closed_output_pipe_ends_quietly() {
 fn stdin_raw_sequence() {
     immunum()
         .args(["number"])
-        .write_stdin("EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS\n")
+        .write_stdin(format!("{IGH}\n"))
         .assert()
         .success()
         .stdout(predicate::str::contains("seq_1"));
@@ -104,7 +108,7 @@ fn stdin_raw_sequence() {
 #[test]
 fn output_tsv_default() {
     immunum()
-        .args(["number", "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS"])
+        .args(["number", IGH])
         .assert()
         .success()
         .stdout(predicate::str::contains("\t"));
@@ -117,7 +121,7 @@ fn output_json() {
             "number",
             "-f",
             "json",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+            IGH,
         ])
         .assert()
         .success()
@@ -131,7 +135,7 @@ fn output_jsonl() {
             "number",
             "-f",
             "jsonl",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+            IGH,
         ])
         .assert()
         .success()
@@ -147,7 +151,7 @@ fn scheme_kabat() {
             "number",
             "-s",
             "kabat",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+            IGH,
         ])
         .assert()
         .success()
@@ -157,7 +161,7 @@ fn scheme_kabat() {
 #[test]
 fn chain_filter_tcr() {
     immunum()
-        .args(["number", "-c", "tcr", "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS"])
+        .args(["number", "-c", "tcr", IGH])
         .assert()
         .success();
 }
@@ -167,7 +171,7 @@ fn chain_aliases_case_insensitive() {
     // All these should be equivalent
     for alias in ["h", "heavy", "igh", "H", "Heavy", "IGH"] {
         immunum()
-            .args(["number", "-c", alias, "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS"])
+            .args(["number", "-c", alias, IGH])
             .assert()
             .success()
             .stdout(predicate::str::contains("\tH\t"));
@@ -181,7 +185,7 @@ fn chain_filter_takes_a_comma_separated_list() {
             "number",
             "-c",
             "k, h",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+            IGH,
         ])
         .assert()
         .success()
@@ -191,7 +195,7 @@ fn chain_filter_takes_a_comma_separated_list() {
             "number",
             "-c",
             "k,xyz",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+            IGH,
         ])
         .assert()
         .failure();
@@ -207,7 +211,7 @@ fn output_to_file() {
     immunum()
         .args([
             "number",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+            IGH,
             out_path.to_str().unwrap(),
         ])
         .assert()
@@ -225,7 +229,7 @@ fn output_to_file() {
 fn stdin_multiple_raw_sequences() {
     immunum()
         .args(["number"])
-        .write_stdin("EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS\nDIQMTQSPSSLSASVGDRVTITC\n")
+        .write_stdin(format!("{IGH}\nDIQMTQSPSSLSASVGDRVTITC\n"))
         .assert()
         .success()
         .stdout(predicate::str::contains("seq_1").and(predicate::str::contains("seq_2")));
@@ -263,7 +267,7 @@ fn valid_sequence_has_null_error_jsonl() {
             "number",
             "-f",
             "jsonl",
-            "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS",
+            IGH,
         ])
         .output()
         .unwrap();
@@ -438,7 +442,7 @@ fn segment_all_domains_puts_every_residue_in_one_record() {
 #[test]
 fn mixed_batch_always_emits_one_record_per_input() {
     // Two sequences: one valid IGH, one garbage
-    let input = "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS\nAAAAAAAAAAAAAAAAA\n";
+    let input = format!("{IGH}\nAAAAAAAAAAAAAAAAA\n");
     let output = immunum()
         .args(["number", "-f", "jsonl"])
         .write_stdin(input)
@@ -486,7 +490,7 @@ fn error_record_appears_in_tsv() {
 #[test]
 fn success_rows_leave_error_columns_empty_in_tsv() {
     let output = immunum()
-        .args(["number", "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS"])
+        .args(["number", IGH])
         .output()
         .unwrap();
 
@@ -516,7 +520,7 @@ fn no_input_on_terminal_shows_error() {
 #[test]
 fn invalid_format_shows_error() {
     immunum()
-        .args(["number", "-f", "xml", "EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS"])
+        .args(["number", "-f", "xml", IGH])
         .assert()
         .failure()
         .stderr(predicate::str::contains("unknown format"));
@@ -576,7 +580,7 @@ fn setup_errors_exit_with_the_shared_message() {
         if let Some(min_confidence) = case["min_confidence"].as_f64() {
             args.extend(["--min-confidence".to_string(), min_confidence.to_string()]);
         }
-        args.push("EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS".to_string());
+        args.push(IGH.to_string());
         immunum()
             .args(&args)
             .assert()
@@ -615,6 +619,10 @@ fn run_case(command: &str, case: &serde_json::Value, all_domains: bool) -> Vec<u
     let chains = chain_list(case);
     let mut args = vec![command, "-f", "jsonl", "-c", &chains];
     args.extend(["-s", case["scheme"].as_str().unwrap()]);
+    let min_confidence = case["min_confidence"].as_f64().map(|c| c.to_string());
+    if let Some(min_confidence) = &min_confidence {
+        args.extend(["--min-confidence", min_confidence]);
+    }
     if all_domains {
         args.push("--all-domains");
     }

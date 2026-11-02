@@ -1,8 +1,11 @@
 //! High-level API for sequence annotation and chain detection
 use std::cell::RefCell;
 use std::ops::Range;
+use std::sync::OnceLock;
 
-use crate::alignment::{align, AlignBuffer, AlignedPosition, Alignment};
+use crate::alignment::{
+    align_best, AlignBuffer, AlignedPosition, Alignment, PackedScoringMatrices,
+};
 use crate::error::{Error, Result, SequenceError};
 use crate::numbering::{apply_numbering, segment as segment_positions, SEGMENT_NAMES};
 use crate::scoring::ScoringMatrix;
@@ -68,15 +71,13 @@ impl SegmentResult {
 
 /// Default minimum confidence threshold for accepting a numbering result.
 ///
-/// Based on empirical analysis of validated sequences:
-/// - Antibody sequences (IGH/IGK/IGL): min ~0.51, median ~0.78-0.85
-/// - TCR sequences (TRA/TRB/TRG/TRD): min ~0.28, median ~0.62-0.83
-///
-/// A threshold of 0.5 filters non-immunoglobulin sequences while retaining
-/// all validated antibody sequences. Some low-scoring TCR sequences (notably
-/// TCR-A p5=0.39, TCR-B p5=0.49) may fall below this threshold due to less
-/// complete consensus data. Set to 0.0 to disable filtering.
-pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.5;
+/// Confidence puts each counted consensus position between what a random residue scores there (0)
+/// and what the chain's reference residues score there (1), over the whole domain, so a sequence
+/// that covers little of it scores low. On the bundled validation sets every full-length sequence
+/// of every chain scores at least 0.45, while shuffled sequences and ordinary proteins stay
+/// below 0.31: 0.4 separates them. A fragment scores roughly the share of the domain it covers;
+/// lower the threshold to keep short ones. Set to 0.0 to disable filtering.
+pub const DEFAULT_MIN_CONFIDENCE: f32 = 0.4;
 
 /// Minimum allowed input sequence length.
 pub const MIN_SEQUENCE_LENGTH: usize = 30;
@@ -116,10 +117,10 @@ thread_local! {
     static ALIGN_BUFFER: RefCell<AlignBuffer> = RefCell::new(AlignBuffer::new());
 }
 
-/// The most alignment matrix cells a thread keeps between calls: what a 1,000-residue query needs
-/// against a 128-position consensus, about 650 KB. A longer query still aligns, but its matrices are
-/// freed when its call returns.
-const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
+/// The most alignment matrix cells a thread keeps between calls, counting every chain aligned at
+/// once: what a 1,000-residue query needs against eight 128-position consensuses, about 5 MB. A
+/// longer query still aligns, but its matrices are freed when its call returns.
+const KEPT_ALIGN_CELLS: usize = 1_001 * 129 * 8;
 
 /// Per-domain results as every interface returns them: one per domain from
 /// [`Annotator::number_domains`] or [`Annotator::segment_domains`], or, when the sequence couldn't
@@ -143,6 +144,10 @@ pub struct Annotator {
     pub(crate) scheme: Scheme,
     pub(crate) chains: Vec<Chain>,
     pub(crate) min_confidence: f32,
+    /// `matrices` packed to align against all of them at once; built on first use, so a
+    /// deserialized annotator builds it too
+    #[serde(skip)]
+    packed: OnceLock<PackedScoringMatrices>,
 }
 
 impl Annotator {
@@ -168,21 +173,19 @@ impl Annotator {
             scheme,
             chains: chains.to_vec(),
             min_confidence: min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
+            packed: OnceLock::new(),
         })
     }
 
     /// An annotator from chain and scheme names, as a user writes them: see [`Chain::parse_names`]
-    /// for the chains and [`Scheme`] for the scheme.
+    /// for the chains, where `all` is every chain the scheme numbers, and [`Scheme`] for the scheme.
     pub fn from_names<'a>(
         chains: impl IntoIterator<Item = &'a str>,
         scheme: &str,
         min_confidence: Option<f32>,
     ) -> Result<Self> {
-        Self::new(
-            &Chain::parse_names(chains)?,
-            scheme.parse()?,
-            min_confidence,
-        )
+        let scheme = scheme.parse()?;
+        Self::new(&Chain::parse_names(chains, scheme)?, scheme, min_confidence)
     }
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
@@ -305,26 +308,17 @@ impl Annotator {
         Domain::new(chain, alignment, confidence, part.start, sequence.len())
     }
 
-    /// Align the sequence to all loaded chain types and return the best match
-    /// If multiple chains were provided during initialization, this will align to all
-    /// of them and return the best match. If only one chain was provided, it will
-    /// align to that chain directly.
+    /// Align the sequence to every loaded chain type and return the best match: the highest
+    /// alignment score, the first chain of those that tie for it
     fn get_best_alignment(&self, sequence: &str) -> (Chain, Alignment) {
+        let packed = self.packed.get_or_init(|| {
+            PackedScoringMatrices::new(self.matrices.iter().map(|(_, m)| &m.positions[..]))
+        });
         ALIGN_BUFFER.with_borrow_mut(|buf| {
-            // Align to all loaded chain types and find best match by raw alignment score
-            let mut best: Option<(Chain, Alignment)> = None;
-            for (chain, matrix) in &self.matrices {
-                let alignment = align(sequence, &matrix.positions, Some(&mut *buf));
-                let is_better = match &best {
-                    Some((_, prev)) => alignment.score > prev.score,
-                    None => true,
-                };
-                if is_better {
-                    best = Some((*chain, alignment));
-                }
-            }
+            let (index, alignment) =
+                align_best(sequence, packed, |k| &self.matrices[k].1.positions[..], buf);
             buf.release_above(KEPT_ALIGN_CELLS);
-            best.expect("`Annotator::new` rejects an empty chain list")
+            (self.matrices[index].0, alignment)
         })
     }
 }
@@ -475,7 +469,7 @@ impl NumberingResult {
     }
 
     // The residues of `sequence` this result numbered
-    fn numbered<'a>(&self, sequence: &'a str) -> Result<&'a str> {
+    pub(crate) fn numbered<'a>(&self, sequence: &'a str) -> Result<&'a str> {
         sequence
             .get(self.query_start..=self.query_end)
             .ok_or(Error::WrongSequence {
@@ -641,9 +635,11 @@ mod tests {
 
     // The residues after a domain are aligned on their own, so a domain that lost its N-terminal
     // residues can skip the consensus positions it lacks, as it can at the start of a sequence.
+    // Confidence counts the share of the domain that is there, so a domain missing a half to a
+    // third of it needs a threshold below the default.
     #[test]
     fn an_n_truncated_domain_after_another_numbers_like_on_its_own() {
-        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None).unwrap();
+        let annotator = Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, Some(0.2)).unwrap();
         for start in [40, 60, 80] {
             let truncated = &FULL_IGH[start..];
             let domains = annotator

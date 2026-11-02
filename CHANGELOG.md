@@ -22,8 +22,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Ctrl/Cmd+Enter, copies and downloads results as TSV or JSON, makes a shareable link, compares the
   schemes' regions per domain, explains how to read the result, fits a phone screen and shows
   keyboard focus on its chain and scheme buttons.
+- Rust: `PositionScores` has `random_score` and `typical_score`, the average score at the position
+  of a random residue and of the residues seen there in the chain's reference sequences.
 
 ### Changed
+- **Confidence is redefined, and the default `min_confidence` is 0.4 instead of 0.5.** Confidence
+  now measures how much of a typical domain of the chain the sequence shows: each aligned residue
+  at a conserved position counts its score above what a random residue scores there, divided by
+  what a typical sequence of the chain scores over the whole domain. 0 is random sequence, 1 a
+  typical sequence of the chain, and a fragment scores about the share of the domain it covers.
+  Every validation sequence of every chain now passes the default, including the 9% of TRA and 6%
+  of TRB the old 0.5 rejected, and two sequencing reads of the benchmark run; no shuffled read or
+  ordinary protein tested does, where the old 0.5 let through 10% of shuffled reads. Every
+  confidence value changes. Numbering fragments may need a lower `min_confidence`, about 0.2.
+  In Rust, `Alignment::confidence_score` and `max_confidence_score` carry the new sums.
+- The chain is the one with the highest confidence instead of the highest alignment score, which
+  favoured antibody chains: with `all`, no validation TCR is called an antibody chain any more
+  (31 were) and the wrong chain calls drop from 45 to 39, all TRA sequences with V genes shared
+  with TRD. Numbering against a chain is unchanged.
+- **The command line tries every chain by default (`-c all`) instead of only antibody chains
+  (`-c ig`).** Only the requested chains compete, and with the new confidence a sequence of the
+  other receptor family passes the default threshold as the closest requested chain: under
+  `-c ig`, 1,832 of the 1,847 validation TCRs are numbered as antibody chains, where the old
+  confidence rejected them. With `all`, 1,808 of them get their own chain and none an antibody
+  chain. Antibody output is the same, but numbering takes about 1.5 times as long; pass `-c ig`
+  for antibody-only data. The other interfaces have no default chains.
+- **`all` is every chain the scheme numbers:** with `kabat`, `chothia`, `martin` or `aho` it is
+  H, K and L, where it raised `unsupported_chain`, so the command line's default works with every
+  scheme. Naming a TCR chain, or `tcr`, with those schemes still raises it. In Rust,
+  `Chain::parse_names` takes the scheme.
+- Numbering is faster, with identical results: an annotator aligns a sequence against all its chains
+  in one pass, one chain per SIMD lane, instead of one chain after another. The CLI numbers 10,000
+  sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with
+  `ig`, 3.4 times with `tcr` and 3.5 times with `all`; Polars builds its numbering column with two
+  allocations per sequence instead of two per residue.
 - The consensus sequences behind the scoring matrices are built from IMGT/GENE-DB germlines (release
   202641-7, CC BY 4.0) instead of RepSeqIO germlines numbered with AntPack. V genes keep IMGT's own
   gapping, the CDR3 of each V-J germline is placed by the IMGT rule, and the antibody germlines come from
@@ -31,8 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `uv run --no-sync python -m scripts.generate_consensus` downloads the data and regenerates the files;
   `resources/consensus/README.md` describes the method and the IMGT publications to cite, and
   `resources/consensus/germlines.tsv` lists the alleles used.
-- Alignment confidence values shift slightly for the same input, since the scoring matrices changed; for
-  example IMGT 113 of IGL now counts towards the confidence score.
+- The positions that count towards the confidence follow the new consensus; for example IMGT 113 of
+  IGL now counts.
 - TRD numbers the TRDV genes with IMGT's gapping: human TRDV1 has the CDR2-IMGT QGS (56, 57, 65) and
   residues at 69-72, as in IMGT's allele alignment of TRDV1 and the IMGT region boundaries IgBLAST ships.
   The TRD validation fixture (`fixtures/validation/tcr_D_imgt.csv`, all TRDV1) followed ANARCI, with the
@@ -45,6 +77,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
   to other tabs' pages.
 - The crate's `documentation` link points to docs.rs.
+- The comparison benchmarks are re-run against AntPack 0.3.8.6.2, ANARCI 2026.2.13.2 and ANARCII
+  2.0.8 on two 32-core cloud VMs, x86 (AMD EPYC 7543) and ARM (Neoverse-N1), with a new headline
+  run (10,000 sequencing-run antibody sequences, mixed H/K/L, `task benchmark-headline`) whose x86
+  times the README shows. The benchmarks page has both machines' times, and records the machines
+  and the date. The scaling plot shows the current tools instead of March's. immunum's TRA and TRB
+  accuracy is re-run with the new confidence: 99.5% and 99.8% of residues correct instead of
+  90.8% and 93.6%, as it now numbers every reference sequence. immunum's accuracy, and ANARCI's on
+  the new TRD fixture (93.0% of residues correct), are re-run with the IMGT-derived consensus.
 - Development needs Python 3.11 or newer (the package still supports 3.10): the `dev` and
   `benchmark` groups require it, so the lock only holds a filelock release with the fixes for its
   security advisories. CI runs the full checks on 3.11 and the test suite on 3.10.
@@ -57,6 +97,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runnable example with its real output. The Polars advice to find successes by a null `error`
   counted null sequences as successes. The benchmarks page names the versions of the tools it
   compares and says how each plot's error bars are computed.
+- The comparison benchmark's all-core ANARCI run only raised hmmscan's thread count; it now splits
+  the sequences over ANARCI's process pool (`run_anarci`). Its single-core ANARCII run could keep
+  the torch thread count an earlier run had set, and its AntPack and ANARCII all-core runs timed
+  starting a process pool or loading the model; these happen before the clock starts now. The
+  benchmark tasks install a release build of immunum, where a previous dev build could stay.
 
 ## [2.0.0] - 2026-10-12
 

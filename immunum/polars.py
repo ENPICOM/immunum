@@ -126,8 +126,8 @@ def number(
     # │ ---   ┆ ---    ┆ ---        ┆ ---                             ┆ ---         ┆ ---       ┆ ---   ┆ ---        │
     # │ str   ┆ str    ┆ f32        ┆ list[struct[2]]                 ┆ u32         ┆ u32       ┆ str   ┆ str        │
     # ╞═══════╪════════╪════════════╪═════════════════════════════════╪═════════════╪═══════════╪═══════╪════════════╡
-    # │ H     ┆ IMGT   ┆ 0.772661   ┆ [{"1","Q"}, {"2","V"}, … {"128… ┆ 0           ┆ 121       ┆ null  ┆ null       │
-    # │ K     ┆ IMGT   ┆ 0.898609   ┆ [{"1","D"}, {"2","I"}, … {"127… ┆ 0           ┆ 106       ┆ null  ┆ null       │
+    # │ H     ┆ IMGT   ┆ 0.906176   ┆ [{"1","Q"}, {"2","V"}, … {"128… ┆ 0           ┆ 121       ┆ null  ┆ null       │
+    # │ K     ┆ IMGT   ┆ 0.987639   ┆ [{"1","D"}, {"2","I"}, … {"127… ┆ 0           ┆ 106       ┆ null  ┆ null       │
     # └───────┴────────┴────────────┴─────────────────────────────────┴─────────────┴───────────┴───────┴────────────┘
 
     # One row per numbered residue
@@ -164,7 +164,7 @@ def number(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 
@@ -251,7 +251,7 @@ def number_domains(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 
@@ -335,7 +335,7 @@ def segment(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 
@@ -414,7 +414,7 @@ def segment_domains(
         scheme (str | None): numbering scheme, as for `Annotator`. Required unless
             `annotator` is given.
         min_confidence (float | None, optional): minimum alignment confidence, as for
-            `Annotator`. Defaults to None (corresponds to 0.5).
+            `Annotator`. Defaults to None (corresponds to 0.4).
         annotator (Annotator | None, optional): a prebuilt `Annotator` to use instead of
             `chains`, `scheme` and `min_confidence`.
 

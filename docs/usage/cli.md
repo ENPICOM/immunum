@@ -28,9 +28,9 @@ Both commands take the same options.
 | Option | Values | Default |
 | --- | --- | --- |
 | `-s`, `--scheme` | `imgt` (`i`), `kabat` (`k`), `chothia` (`c`), `martin` (`m`), `aho` (`a`); case-insensitive | `imgt` |
-| `-c`, `--chain` | Chains to try: `h`, `k`, `l`, `a`, `b`, `g`, `d`, or a group: `ig` (H, K, L), `tcr` (A, B, G, D), `all`. Comma-separate several (`-c h,k`). Names such as `heavy` or `igh` also work; see [Chains](../concepts.md#chains) | `ig` |
+| `-c`, `--chain` | Chains to try: `h`, `k`, `l`, `a`, `b`, `g`, `d`, or a group: `ig` (H, K, L), `tcr` (A, B, G, D), `all` (every chain the scheme numbers: H, K and L with schemes other than IMGT). Comma-separate several (`-c h,k`). Names such as `heavy` or `igh` also work; see [Chains](../concepts.md#chains). Only the chains given compete, so a TCR numbered with `-c ig` comes out as an antibody chain; pass `-c ig` or `-c tcr` when you know your data, which is faster | `all` |
 | `-f`, `--format` | `tsv`, `json`, `jsonl` | `tsv` |
-| `--min-confidence` | Number in [0, 1]. A sequence whose alignment confidence is below it gets an error record with `error_kind` `low_confidence` | `0.5` |
+| `--min-confidence` | Number in [0, 1]. A sequence whose alignment confidence is below it gets an error record with `error_kind` `low_confidence` | `0.4` |
 | `--all-domains` | Flag. Number or segment every variable domain in each sequence (for example both domains of an scFv), one record per domain, with a 0-based `domain` column or field. With `segment`, every residue lands in exactly one domain's regions. A sequence without a domain gets one error record | off |
 
 ## Input
@@ -90,11 +90,11 @@ TSV has a header row, then one row per numbered residue:
 A failed sequence gives one row with only `sequence_id`, `error` and `error_kind` filled.
 
 ```text
-$ immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS | head -4
+$ immunum number EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSSISSSSSYIYYADSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCARDRGYSSGWYFDYWGQGTLVTVSS | head -4
 sequence_id	chain	scheme	confidence	position	residue	error	error_kind
-seq_1	H	IMGT	0.9570	1	E
-seq_1	H	IMGT	0.9570	2	V
-seq_1	H	IMGT	0.9570	3	Q
+seq_1	H	IMGT	1.0000	1	E
+seq_1	H	IMGT	1.0000	2	V
+seq_1	H	IMGT	1.0000	3	Q
 
 $ immunum number AAAAAAAAAA
 sequence_id	chain	scheme	confidence	position	residue	error	error_kind
@@ -117,8 +117,8 @@ JSON and JSONL have one record per sequence:
 | `error_kind` | `null`, or the error kind |
 
 ```text
-$ immunum number -f jsonl EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMS
-{"sequence_id":"seq_1","chain":"H","scheme":"IMGT","confidence":0.9569804072380066,"numbering":{"1":"E","2":"V","3":"Q",…},"query_start":0,"query_end":34,"error":null,"error_kind":null}
+$ immunum number -f jsonl EVQLVESGGGLVKPGGSLKLSCAASGFTFSSYAMSWVRQAPGKGLEWVSSISSSSSYIYYADSVKGRFTISRDNAKNSLYLQMNSLRAEDTAVYYCARDRGYSSGWYFDYWGQGTLVTVSS
+{"sequence_id":"seq_1","chain":"H","scheme":"IMGT","confidence":1.0,"numbering":{"1":"E","2":"V","3":"Q",…},"query_start":0,"query_end":120,"error":null,"error_kind":null}
 ```
 
 ### segment
@@ -142,7 +142,7 @@ $ immunum segment -f jsonl fixtures/ig.fasta | head -1
 ```text
 $ immunum number --all-domains scfvs.fasta | head -2
 sequence_id	domain	chain	scheme	confidence	position	residue	error	error_kind
-scfv1	0	H	IMGT	0.7105	2	V
+scfv1	0	H	IMGT	0.8440	2	V
 
 $ immunum segment --all-domains scfvs.fasta | cut -f1,2,9
 sequence_id	domain	cdr3

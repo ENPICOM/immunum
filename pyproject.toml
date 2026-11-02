@@ -69,10 +69,13 @@ dev = [
     "ruff>=0.15.4",
     "ty>=0.0.19",
 ]
+# The tools immunum is compared with, pinned so a re-run measures the same versions. antpack stays
+# on 0.3.8.6.2, the last GPL release before its licence changed to academic, non-commercial use only.
 benchmark = [
     { include-group = "polars" },
-    "anarcii>=2.0.5",
-    "antpack~=0.2.7",
+    "anarci==2026.2.13.2",
+    "anarcii==2.0.8; python_version >= '3.11'",
+    "antpack==0.3.8.6.2",
     "biopython>=1.86",
     "scikit-bio==0.6.2",
     "typer>=0.24.1",
