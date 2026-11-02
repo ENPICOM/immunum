@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   typical sequence of the chain, and a fragment scores about the share of the domain it covers.
   Every validation sequence of every chain now passes the default, including the 9% of TRA and 6%
   of TRB the old 0.5 rejected, and two sequencing reads of the benchmark run; no shuffled read or
-  ordinary protein tested does, where the old 0.5 let through 11% of shuffled reads. Every
+  ordinary protein tested does, where the old 0.5 let through 10% of shuffled reads. Every
   confidence value changes. Numbering fragments may need a lower `min_confidence`, about 0.2.
   In Rust, `Alignment::confidence_score` and `max_confidence_score` carry the new sums.
 - The chain is the one with the highest confidence instead of the highest alignment score, which
@@ -56,6 +56,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with
   `ig`, 3.4 times with `tcr` and 3.5 times with `all`; Polars builds its numbering column with two
   allocations per sequence instead of two per residue.
+- The consensus sequences behind the scoring matrices are built from IMGT/GENE-DB germlines (release
+  202641-7, CC BY 4.0) instead of RepSeqIO germlines numbered with AntPack. V genes keep IMGT's own
+  gapping, the CDR3 of each V-J germline is placed by the IMGT rule, and the antibody germlines come from
+  human, mouse, rat, rabbit, rhesus, pig and cow, plus alpaca for IGH; TCR germlines from human and mouse.
+  `uv run --no-sync python -m scripts.generate_consensus` downloads the data and regenerates the files;
+  `resources/consensus/README.md` describes the method and the IMGT publications to cite, and
+  `resources/consensus/germlines.tsv` lists the alleles used.
+- The positions that count towards the confidence follow the new consensus; for example IMGT 113 of
+  IGL now counts.
+- TRD numbers the TRDV genes with IMGT's gapping: human TRDV1 has the CDR2-IMGT QGS (56, 57, 65) and
+  residues at 69-72, as in IMGT's allele alignment of TRDV1 and the IMGT region boundaries IgBLAST ships.
+  The TRD validation fixture (`fixtures/validation/tcr_D_imgt.csv`, all TRDV1) followed ANARCI, with the
+  CDR2 at 56-59 and 63-65 and nothing at 69-73; its positions 56-74 now follow IMGT. Across the other
+  chains and schemes, `BENCHMARKS.toml` moves by at most 0.27 percentage points of perfect sequences.
+- The insertion penalty at the CDR centers (IMGT 32/33, 60/61, 111/112) is -1.9 instead of -2.0, which
+  the IMGT-derived consensus needs to keep numbering bovine ultralong CDR3s (PDB 4k3e) through FR4.
 - The README is a quickstart for each interface; the details moved to the documentation site, where
   each topic now lives on one page. The site has a description for link previews, "edit this page"
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
@@ -67,7 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   times the README shows. The benchmarks page has both machines' times, and records the machines
   and the date. The scaling plot shows the current tools instead of March's. immunum's TRA and TRB
   accuracy is re-run with the new confidence: 99.5% and 99.8% of residues correct instead of
-  90.8% and 93.6%, as it now numbers every reference sequence.
+  90.8% and 93.6%, as it now numbers every reference sequence. immunum's accuracy, and ANARCI's on
+  the new TRD fixture (93.0% of residues correct), are re-run with the IMGT-derived consensus.
+- Development needs Python 3.11 or newer (the package still supports 3.10): the `dev` and
+  `benchmark` groups require it, so the lock only holds a filelock release with the fixes for its
+  security advisories. CI runs the full checks on 3.11 and the test suite on 3.10.
+
+### Removed
+- `scripts/generate_vj_combinations.py` and `scripts/utils.py`, the RepSeqIO/AntPack consensus pipeline.
 
 ### Fixed
 - Documentation: the Polars page's examples ran nothing but the error example; it now has a

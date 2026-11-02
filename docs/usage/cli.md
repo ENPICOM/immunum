@@ -142,7 +142,7 @@ $ immunum segment -f jsonl fixtures/ig.fasta | head -1
 ```text
 $ immunum number --all-domains scfvs.fasta | head -2
 sequence_id	domain	chain	scheme	confidence	position	residue	error	error_kind
-scfv1	0	H	IMGT	0.8338	2	V
+scfv1	0	H	IMGT	0.8440	2	V
 
 $ immunum segment --all-domains scfvs.fasta | cut -f1,2,9
 sequence_id	domain	cdr3

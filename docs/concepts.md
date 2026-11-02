@@ -178,7 +178,7 @@ that chain. It is computed from the alignment:
 
 Inserted residues, and residues before or after the domain, don't enter the score. Because every
 counted position is in the divisor, a fragment scores about the share of the domain it covers:
-the first 30 residues of the heavy chain below score 0.23, its first 60 0.47, the whole domain
+the first 30 residues of the heavy chain below score 0.22, its first 60 0.47, the whole domain
 0.91. Changing CDR3 residues barely moves the score; changing a conserved framework residue does.
 
 ### Minimum confidence
@@ -195,14 +195,14 @@ heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITIT
 gfp = "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK"
 
 annotator = Annotator(chains=["ig"], scheme="imgt")
-print(round(annotator.number(heavy).confidence, 3))  # 0.915
+print(round(annotator.number(heavy).confidence, 3))  # 0.906
 
 result = annotator.number(gfp)
 print(result.error_kind)  # low_confidence
-print(result.error)  # alignment confidence 0.0118 is below min_confidence 0.4000
+print(result.error)  # alignment confidence 0.0135 is below min_confidence 0.4000
 
 unfiltered = Annotator(chains=["ig"], scheme="imgt", min_confidence=0.0)
-print(round(unfiltered.number(gfp).confidence, 3))  # 0.012
+print(round(unfiltered.number(gfp).confidence, 3))  # 0.013
 ```
 
 ### Choosing a value
@@ -212,17 +212,17 @@ Scores of the bundled validation sequences (`fixtures/validation`), numbered wit
 
 | Chain | Sequences | Lowest | Median | Below 0.4 |
 |-------|-----------|--------|--------|-----------|
-| H     | 2452      | 0.707  | 0.931  | 0         |
-| K     | 1485      | 0.767  | 0.954  | 0         |
-| L     | 371       | 0.717  | 0.973  | 0         |
-| A     | 865       | 0.455  | 0.884  | 0         |
-| B     | 934       | 0.410  | 0.954  | 0         |
-| G     | 25        | 0.816  | 1.000  | 0         |
+| H     | 2452      | 0.716  | 0.934  | 0         |
+| K     | 1485      | 0.779  | 0.957  | 0         |
+| L     | 371       | 0.715  | 0.964  | 0         |
+| A     | 865       | 0.652  | 0.895  | 0         |
+| B     | 934       | 0.519  | 0.950  | 0         |
+| G     | 25        | 0.836  | 1.000  | 0         |
 | D     | 23        | 1.000  | 1.000  | 0         |
 
 Sequences that aren't immune receptors score far lower: none of 5,000 shuffled sequencing reads
 or 3,000 ordinary human proteins (from UniProt, without immunoglobulin domains) reaches 0.31.
-Green fluorescent protein scores 0.012 and hen egg-white lysozyme 0.143 against the antibody
+Green fluorescent protein scores 0.013 and hen egg-white lysozyme 0.144 against the antibody
 chains. Proteins with an immunoglobulin V-set domain that are neither antibodies nor TCRs, such
 as SIRPα and VpreB, can score up to about 0.6, as their domains resemble antibody variable
 domains.
@@ -336,7 +336,7 @@ print(result.error)  # domain length 28 is below minimum 30
   character and its 0-based position.
 - **Non-standard letters** such as `X`, `B` or `Z` are accepted and numbered, but score as a
   mismatch (−4), so they lower the [confidence](#confidence) at counted positions: one `X` at
-  IMGT position 6 of the heavy chain above lowers it from 0.915 to 0.899.
+  IMGT position 6 of the heavy chain above lowers it from 0.906 to 0.892.
 - **Case**: lower and upper case score the same, and residues come back as you gave them.
 - **Whitespace**: the Python, JavaScript and Rust APIs take the sequence as given, so a trailing
   newline or a space inside the sequence is an invalid character; strip it first. The command

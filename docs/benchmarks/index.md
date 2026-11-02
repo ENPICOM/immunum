@@ -29,7 +29,9 @@ academic, non-commercial use only.
 
 All results on this page were measured on 2026-10-15 on two otherwise idle cloud VMs of the same
 size, 32 cores and 125 GiB of memory, running Ubuntu 26.04 and Python 3.12, before immunum's
-confidence was redefined; immunum's TRA and TRB accuracy was re-run with it on 2026-10-19 (see
+confidence was redefined and its consensus rebuilt from IMGT germlines; immunum's TRA and TRB
+accuracy was re-run with the new confidence on 2026-10-19, and immunum's accuracy and ANARCI's on
+TRD with the IMGT-derived consensus on 2026-11-02 (see
 [Correctness by segment](#correctness-by-segment)):
 
 - **x86**: AMD EPYC 7543 (Zen 3)
@@ -119,10 +121,16 @@ two tools score 100% on IGH, IGK and IGL by construction — see the note above.
 doesn't number counts every one of its residues as wrong. immunum's TRA and TRB rows were re-run
 on 2026-10-19 with the current confidence, on the same samples: its default `min_confidence` of
 0.4 now numbers every reference, where the old confidence's 0.5 turned away about 9% of TRA and
-6% of TRB and scored 90.8% and 93.6% of residues correct, against 99.5% and 99.8% now. Its other
-chains score the same as in the run of 2026-10-15. Bars are the mean over the 7 rounds; error
-bars span one standard deviation above and below it. The axis is zoomed in on the top few percent,
-where every mean sits, so bars are cut off at its bottom rather than starting at 0%.
+6% of TRB and scored 90.8% and 93.6% of residues correct, against 99.5% and 99.8% now. immunum's
+rows were re-run again on 2026-11-02 with the IMGT-derived consensus, on the same samples, and
+moved by at most 0.11 percentage points in any region; its IGL and TRA rows stayed the same and
+keep the earlier runs' times. The TRD fixture (all TRDV1) follows IMGT's gapping of TRDV1, with
+the CDR2 at 56, 57 and 65 and residues at 69–72; ANARCI puts the CDR2 at 56–59 and 63–65 and
+leaves 69–73 empty, so it scores 93.0% on TRD, re-run on 2026-11-02 against that fixture.
+immunum's TRD consensus is built from the same IMGT gapping of TRDV1, so its 100% on TRD
+FR1–FR3, CDR1 and CDR2 is by construction too. Bars are the mean over the 7 rounds; error bars
+span one standard deviation above and below it. The axis starts at 66%, just below ANARCI's TRD
+CDR2, so bars are cut off at its bottom rather than starting at 0%.
 
 <iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 

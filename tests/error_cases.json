@@ -95,7 +95,7 @@
       "min_confidence": null,
       "sequence": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       "kind": "low_confidence",
-      "message": "alignment confidence 0.0485 is below min_confidence 0.4000"
+      "message": "alignment confidence 0.0480 is below min_confidence 0.4000"
     }
   ],
   "domain_errors": [
