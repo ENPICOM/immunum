@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
   to other tabs' pages.
 - The crate's `documentation` link points to docs.rs.
+- Development needs Python 3.11 or newer (the package still supports 3.10): the `dev` and
+  `benchmark` groups require it, so the lock only holds a filelock release with the fixes for its
+  security advisories. CI runs the full checks on 3.11 and the test suite on 3.10.
 
 ### Fixed
 - Documentation: the Polars page's examples ran nothing but the error example; it now has a

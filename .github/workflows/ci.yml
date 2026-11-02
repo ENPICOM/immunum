@@ -12,14 +12,15 @@ env:
 
 jobs:
   # The bindings are abi3: one build serves every Python, so the full checks run on the oldest
-  # supported Python and on macOS, and the jobs below cover the newest Python and Windows.
+  # Python the dev tools support and on macOS, and the jobs below cover the oldest and newest
+  # supported Python and Windows.
   ci:
     if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-          - { os: ubuntu-latest, python-version: "3.10" }
+          - { os: ubuntu-latest, python-version: "3.11" }
           - { os: macos-latest, python-version: "3.13" }
     env:
       UV_PYTHON: ${{ matrix.python-version }}
@@ -47,15 +48,17 @@ jobs:
       - name: Run CI
         run: task ci
 
-  # The test suite alone, with only the `test` group: on the newest Python, which lint and audit
-  # tools often don't support for a while after its release, and on Windows, which the release
-  # builds wheels for. Task's commands assume a Unix shell, so these call cargo and pytest directly.
+  # The test suite alone, with only the `test` group: on the oldest supported Python, which the
+  # `dev` group doesn't support; on the newest, which lint and audit tools often don't support for
+  # a while after its release; and on Windows, which the release builds wheels for. Task's
+  # commands assume a Unix shell, so these call cargo and pytest directly.
   ci-tests:
     if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
+          - { os: ubuntu-latest, python-version: "3.10" }
           - { os: ubuntu-latest, python-version: "3.15" }
           - { os: windows-latest, python-version: "3.13" }
     env:

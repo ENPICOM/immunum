@@ -83,6 +83,13 @@ benchmark = [
 default-groups = ["dev"]
 cache-keys = [{ file = "./Cargo.toml" }, { file = "./**/*.rs" }]
 
+# The package supports 3.10, which is end-of-life; the dev tools don't have to. filelock
+# (via pre-commit, and torch for the benchmarks) only fixes its security advisories in
+# releases that require 3.11, and pysentry flags every version in the lock.
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.11" }
+benchmark = { requires-python = ">=3.11" }
+
 [tool.uv.workspace]
 members = ["."]
 
@@ -125,31 +132,6 @@ enabled = ["pypa", "pypi", "osv"]
 
 [tool.pysentry.defaults]
 groups = ["polars", "dev"]
-
-# filelock is a dev-only transitive dependency (pre-commit -> virtualenv). The fixes
-# for these advisories landed in filelock 4.2.1, which requires Python >= 3.11, so the
-# Python 3.10 lock fork stays on 4.1.0. Python >= 3.11 resolves to a fixed release.
-# Drop this list together with Python 3.10 support.
-[tool.pysentry.ignore]
-ids = [
-    "GHSA-2g95-wg33-c5x2",
-    "GHSA-567q-5qvw-pf92",
-    "GHSA-6627-m3xw-93mp",
-    "GHSA-69hj-f68j-2879",
-    "GHSA-8mx5-7m5m-r77g",
-    "GHSA-9c4x-gm8v-wgc4",
-    "GHSA-9j6q-wvj5-jgjg",
-    "GHSA-9vhv-jxww-xfm5",
-    "GHSA-crv4-6mhj-j5jh",
-    "GHSA-cwqr-hh33-gh44",
-    "GHSA-fj95-fr6c-h845",
-    "GHSA-fq56-3cx3-fjxp",
-    "GHSA-jqc4-5cvw-7w85",
-    "GHSA-m462-7rxw-wvpg",
-    "GHSA-rfpc-qcw5-3pc4",
-    "GHSA-v4x8-3wr5-3wq8",
-    "GHSA-wfhq-q4j2-c37m",
-]
 
 [tool.ty.src]
 include = ["immunum"]
