@@ -22,6 +22,8 @@ Also, by default, `task` caches results, but you can ignore it by running `task 
 
 ### Building local environment
 
+The development environment needs Python 3.11 or newer; the package itself supports 3.10.
+
 ```bash
 # build a dev environment
 task build-local
