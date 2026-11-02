@@ -132,7 +132,10 @@ def download_imgt(cache_dir: Path) -> tuple[Path, str]:
         if not path.exists():
             url = IMGT_DOWNLOAD_URL + urllib.parse.quote(name)
             print(f"Downloading {url}")
-            urllib.request.urlretrieve(url, path)
+            # Download to a temporary name so an interrupted transfer is never cached.
+            partial = path.with_name(name + ".part")
+            urllib.request.urlretrieve(url, partial)
+            partial.replace(path)
     release = (cache_dir / IMGT_RELEASE).read_text().strip()
     return cache_dir / IMGT_FASTA, release
 
