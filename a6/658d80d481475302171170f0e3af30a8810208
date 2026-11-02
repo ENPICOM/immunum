@@ -1,0 +1,56 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 59-60
+README.md
+  h_acea35c6bbea0b 24,29-31
+docs/assets/benchmark_headline_dark.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_headline_light.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_plot1_performance.html
+  h_acea35c6bbea0b 24
+docs/assets/benchmark_plot1_performance.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_plot2_correctness.html
+  h_acea35c6bbea0b 24
+docs/assets/benchmark_plot2_correctness.svg
+  h_acea35c6bbea0b 1
+docs/assets/benchmark_plot3_scaling.html
+  h_acea35c6bbea0b 24
+docs/assets/benchmark_plot3_scaling.svg
+  h_acea35c6bbea0b 1
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 22-23,30,48-49,58-59,93-97,117
+resources/benchmark_results/arm/results_headline.csv
+  h_acea35c6bbea0b 2-41
+resources/benchmark_results/arm/results_speed.csv
+  h_acea35c6bbea0b 2-178
+resources/benchmark_results/results_ab_H_imgt.csv
+  h_acea35c6bbea0b 2-57
+resources/benchmark_results/results_ab_K_imgt.csv
+  h_acea35c6bbea0b 2-57
+resources/benchmark_results/results_ab_L_imgt.csv
+  h_acea35c6bbea0b 2-57
+resources/benchmark_results/results_headline.csv
+  h_acea35c6bbea0b 2-41
+resources/benchmark_results/results_speed.csv
+  h_acea35c6bbea0b 2-181
+resources/benchmark_results/results_tcr_A_imgt.csv
+  h_acea35c6bbea0b 2-29
+resources/benchmark_results/results_tcr_B_imgt.csv
+  h_acea35c6bbea0b 2-29
+resources/benchmark_results/results_tcr_D_imgt.csv
+  h_acea35c6bbea0b 1-29
+resources/benchmark_results/results_tcr_G_imgt.csv
+  h_acea35c6bbea0b 2-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a6658d80d481475302171170f0e3af30a8810208",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
