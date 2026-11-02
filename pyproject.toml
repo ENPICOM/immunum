@@ -87,6 +87,13 @@ benchmark = [
 default-groups = ["dev"]
 cache-keys = [{ file = "./Cargo.toml" }, { file = "./**/*.rs" }]
 
+# The package supports 3.10, which is end-of-life; the dev tools don't have to. filelock
+# (via pre-commit, and torch for the benchmarks) only fixes its security advisories in
+# releases that require 3.11, and pysentry flags every version in the lock.
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.11" }
+benchmark = { requires-python = ">=3.11" }
+
 [tool.uv.workspace]
 members = ["."]
 

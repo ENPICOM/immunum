@@ -114,12 +114,16 @@ Per-region residue accuracy (%) for each tool, one row per chain: the antibody c
 and IGL, and the TCR chains TRA, TRB, TRG and TRD. Only the single-core runs are shown; the
 all-core runs number identically. FR and CDR columns correspond to the seven IMGT regions (FR1–FR4
 and CDR1–CDR3). Because the antibody ground truth is derived from antpack/ANARCI agreement, those
-two tools score 100% on IGH, IGK and IGL by construction — see the note above. A sequence a tool
-doesn't number counts every one of its residues as wrong. That is most of what immunum loses on
-TRA and TRB: its default `min_confidence` of 0.5 turns away about 9% of the TRA and 6% of the TRB
-references, which `BENCHMARKS.toml`, run without a threshold, numbers at 99.4% and 99.8% of
-residues correct. Bars are the mean over the 7 rounds; error bars span one standard deviation
-above and below it.
+two tools score 100% on IGH, IGK and IGL by construction — see the note above. On the TCR chains
+ANARCI isn't the ground truth: it scores 96.9% on TRA, 99.1% on TRB, 99.9% on TRG and 93.0% on TRD.
+The TRD fixture (all TRDV1) follows IMGT's gapping of TRDV1, with the CDR2 at 56, 57 and 65 and
+residues at 69–72; ANARCI puts the CDR2 at 56–59 and 63–65 and leaves 69–73 empty. immunum's TRD
+consensus is built from the same IMGT gapping of TRDV1, so its 100% on TRD FR1–FR3, CDR1 and CDR2
+is by construction too. A sequence a tool doesn't number counts every one of its residues as wrong.
+That is most of what immunum loses on TRA and TRB: its default `min_confidence` of 0.5 turns away
+about 9% of the TRA and 6% of the TRB references, which `BENCHMARKS.toml`, run without a threshold,
+numbers at 99.4% and 99.8% of residues correct. Bars are the mean over the 7 rounds; error bars
+span one standard deviation above and below it.
 
 <iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 

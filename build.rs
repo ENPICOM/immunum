@@ -16,7 +16,9 @@ const CONSERVED_MULTIPLIER: f32 = 2.0;
 const VARIABLE_MULTIPLIER: f32 = 1.0;
 
 const NO_INSERTION_PENALTY: f32 = -50.0;
-const CDR_INSERTION_PENALTY: f32 = -2.0;
+// Pinned by bovine ultralong CDR3s (PDB 4k3e, `test_ultralong_cdr3_is_not_clipped`): their ~48 extra
+// residues at 111/112 must cost less than stopping before FR4. Re-check after regenerating the consensus.
+const CDR_INSERTION_PENALTY: f32 = -1.9;
 
 // IMGT CDR center positions where insertions are absorbed
 const CDR_CENTER_POSITIONS: &[u32] = &[32, 33, 60, 61, 111, 112];

@@ -37,8 +37,8 @@ versions compared and accuracy per chain.
 
 `immunum` numbers antibody and T-cell receptor variable domain sequences and splits them
 into framework and complementarity-determining regions. It uses Needleman-Wunsch
-semi-global alignment against position-specific scoring matrices built from consensus sequences,
-with BLOSUM62-based substitution scores.
+semi-global alignment against position-specific scoring matrices built from consensus sequences of
+[IMGT](https://www.imgt.org) germline genes, with BLOSUM62-based substitution scores.
 
 | Antibody     | TCR         |
 | ------------ | ----------- |
@@ -180,8 +180,8 @@ More in the [Rust guide](https://immunum.enpicom.com/usage/rust/) and on
 ```bash
 $ immunum number sequences.fasta | head -3
 sequence_id	chain	scheme	confidence	position	residue	error	error_kind
-seq_1	H	IMGT	0.7845	1	Q
-seq_1	H	IMGT	0.7845	2	V
+seq_1	H	IMGT	0.7727	1	Q
+seq_1	H	IMGT	0.7727	2	V
 $ immunum segment -s kabat -f jsonl sequences.fasta
 ```
 
@@ -206,6 +206,15 @@ back as a result with `error` and `error_kind` set, so a batch never stops for o
 
 If you use immunum in your research, please cite it: [CITATION.cff](CITATION.cff) has the details,
 and GitHub's "Cite this repository" button formats them.
+
+## Germline data
+
+The consensus sequences are built from the germline V and J genes of
+[IMGT/GENE-DB](https://www.imgt.org/genedb/) (release 202641-7), part of IMGT®, the international
+ImMunoGeneTics information system®, whose data are licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+[`resources/consensus/README.md`](https://github.com/ENPICOM/immunum/blob/main/resources/consensus/README.md)
+describes how they are generated and lists the IMGT publications to cite.
 
 ## Contributing
 

@@ -22,6 +22,8 @@ Also, by default, `task` caches results, but you can ignore it by running `task 
 
 ### Building local environment
 
+The development environment needs Python 3.11 or newer; the package itself supports 3.10.
+
 ```bash
 # build a dev environment
 task build-local
@@ -118,14 +120,14 @@ src/
     └── debug_validation.rs # Alignment mismatch visualization
 benches/             # Criterion and Python speed/correctness benchmarks
 resources/
-├── consensus/         # Consensus sequence CSVs (compiled into scoring matrices)
+├── consensus/         # Consensus CSVs built from IMGT/GENE-DB (compiled into scoring matrices)
 └── benchmark_results/ # Benchmark CSVs the plots on the benchmarks page are made from
 fixtures/
-├── validation/      # ANARCI-numbered reference datasets
+├── validation/      # Reference numberings (ANARCI-numbered; TRD follows IMGT's TRDV gapping)
 ├── ig.fasta         # Example antibody sequences
 └── ig.tsv           # Example TSV input
 docs/                # Documentation site pages, the demo's script and styles
-scripts/             # Python tooling for consensus data, benchmark plots and the docs build
+scripts/             # Python tooling for the consensus generator, benchmark plots and the docs build
 tests/               # CLI, Python, Polars and JS tests, and the shared error_cases.json
 immunum/
 ├── __init__.py      # Python module
@@ -138,4 +140,4 @@ immunum/
 - **Semi-global alignment** forces full query consumption, preventing long CDR3 regions from being treated as trailing gaps.
 - **Anchor positions** at highly conserved FR residues receive 3× gap penalties to stabilize alignment.
 - **FR regions** use alignment-based numbering; **CDR regions** use scheme-specific insertion rules.
-- Scoring matrices are generated at compile time from consensus data via `build.rs`.
+- Scoring matrices are generated at compile time via `build.rs` from consensus data, which `scripts/generate_consensus.py` builds from IMGT/GENE-DB germlines.

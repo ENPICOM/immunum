@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sequence = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITITADRSTSTAYLELNSLRPEDTAVYYCAREGTTGKPIGAFAHWGQGTLVTVSS";
 
     let result = annotator.number(sequence)?;
-    println!("{} {:.2}", result.chain, result.confidence); // H 0.78
+    println!("{} {:.2}", result.chain, result.confidence); // H 0.77
     for (position, residue) in result.residues(sequence)? {
         println!("{position} {residue}"); // 1 Q, 2 V, ... 111A K, ...
     }
