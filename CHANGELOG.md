@@ -56,7 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.0.8 on two 32-core cloud VMs, x86 (AMD EPYC 7543) and ARM (Neoverse-N1), with a new headline
   run (10,000 sequencing-run antibody sequences, mixed H/K/L, `task benchmark-headline`) whose x86
   times the README shows. The benchmarks page has both machines' times, and records the machines
-  and the date. The scaling plot shows the current tools instead of March's.
+  and the date. The scaling and correctness plots show the current tools and immunum with the
+  IMGT-derived consensus instead of the March and April runs.
 - Development needs Python 3.11 or newer (the package still supports 3.10): the `dev` and
   `benchmark` groups require it, so the lock only holds a filelock release with the fixes for its
   security advisories. CI runs the full checks on 3.11 and the test suite on 3.10.

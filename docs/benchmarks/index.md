@@ -19,15 +19,15 @@ references were made, see [Ground-truth labelling](#ground-truth-labelling).
 
 ## Comparison with other tools
 
-immunum (the development version after 2.0.0, with its faster alignment) is compared with three
-established numbering tools:
+immunum (the development version after 2.0.0, with its faster alignment and IMGT-derived
+consensus) is compared with three established numbering tools:
 [AntPack](https://github.com/jlparkI/AntPack) 0.3.8.6.2,
 [ANARCI](https://github.com/oxpig/ANARCI) 2026.2.13.2 and
 [ANARCII](https://github.com/oxpig/ANARCII) 2.0.8. AntPack 0.3.8.6.2 is the release its author
 recommends for benchmarking: the last one under the GPL, before AntPack's licence changed to
 academic, non-commercial use only.
 
-All results on this page were measured on 2026-10-15 on two otherwise idle cloud VMs of the same
+All results on this page were measured on 2026-11-02 on two otherwise idle cloud VMs of the same
 size, 32 cores and 125 GiB of memory, running Ubuntu 26.04 and Python 3.12:
 
 - **x86**: AMD EPYC 7543 (Zen 3)
@@ -45,8 +45,8 @@ numbering for; immunum turned away the few that fell below its default `min_conf
 
 <!-- benchmark-speed -->
 
-On 1 core immunum numbers about 13,400 sequences a second: 1.9 times AntPack's speed, about 370
-times ANARCI's and 340 times ANARCII's. On 32 cores it is 1.6 times as fast as AntPack.
+On 1 core immunum numbers about 13,900 sequences a second: 1.9 times AntPack's speed, about 230
+times ANARCI's and 310 times ANARCII's. On 32 cores it is 2.1 times as fast as AntPack.
 
 <iframe src="../assets/benchmark_plot1_performance.html" width="100%" height="440px" frameborder="0" scrolling="no"></iframe>
 
@@ -55,8 +55,8 @@ times ANARCI's and 340 times ANARCII's. On 32 cores it is 1.6 times as fast as A
 <!-- benchmark-speed: arm/results_headline.csv -->
 
 Each Neoverse-N1 core is slower than an EPYC core, so every tool takes longer on 1 core here, but
-the order is the same: immunum is 1.3 times as fast as AntPack on 1 core and 2.0 times on 32
-cores, and about 150 times ANARCI's and 300 times ANARCII's speed on 1 core.
+the order is the same: immunum is 1.2 times as fast as AntPack on 1 core and 2.2 times on 32
+cores, and about 150 times ANARCI's and 250 times ANARCII's speed on 1 core.
 
 ### How benchmarks are run
 
@@ -90,12 +90,11 @@ Three runs make the results on this page; `task benchmark` runs all three and ma
 - **Scaling** (`task benchmark-speed`): batches of 100 to 1,000,000 IGH sequences, 3 rounds each.
   A tool that takes longer than 10 minutes on a batch is left out of the larger ones.
 
-On the ARM VM the scaling run's last batch, 1,000,000 sequences, ran out of memory: AntPack's 32
-forked workers each copied the harness's memory. That batch was re-run on the same samples once
-the harness froze Python's garbage collector before forking (`gc.freeze()`), which keeps that
-memory shared; nothing else changed. ANARCI's all-core run has no result for that batch on ARM.
-The results are in `resources/benchmark_results` (x86) and `resources/benchmark_results/arm`
-(ARM).
+A tool left out of the larger batches timed out: ANARCI and ANARCII on 1 core after 10,000
+sequences on both VMs, ANARCI on 32 cores after 500,000, and ANARCII on 32 cores after 50,000 on
+x86 and 10,000 on ARM. On the ARM VM, immunum's rows were measured last, after the rest, on the
+same VM. The results are in `resources/benchmark_results` (x86) and
+`resources/benchmark_results/arm` (ARM).
 
 #### Ground-truth labelling
 
@@ -115,7 +114,7 @@ and IGL, and the TCR chains TRA, TRB, TRG and TRD. Only the single-core runs are
 all-core runs number identically. FR and CDR columns correspond to the seven IMGT regions (FR1–FR4
 and CDR1–CDR3). Because the antibody ground truth is derived from antpack/ANARCI agreement, those
 two tools score 100% on IGH, IGK and IGL by construction — see the note above. On the TCR chains
-ANARCI isn't the ground truth: it scores 96.9% on TRA, 99.1% on TRB, 99.9% on TRG and 93.0% on TRD.
+ANARCI isn't the ground truth: it scores 97.0% on TRA, 99.99% on TRB, 99.9% on TRG and 93.0% on TRD.
 The TRD fixture (all TRDV1) follows IMGT's gapping of TRDV1, with the CDR2 at 56, 57 and 65 and
 residues at 69–72; ANARCI puts the CDR2 at 56–59 and 63–65 and leaves 69–73 empty. immunum's TRD
 consensus is built from the same IMGT gapping of TRDV1, so its 100% on TRD FR1–FR3, CDR1 and CDR2
