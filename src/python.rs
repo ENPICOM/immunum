@@ -152,10 +152,8 @@ impl Annotator {
     pub fn __setstate__(&mut self, state: &Bound<'_, PyBytes>) -> PyResult<()> {
         let annotator: Annotator = from_bytes(state.as_bytes())
             .map_err(|e| PyValueError::new_err(format!("invalid Annotator state: {e}")))?;
-        self.matrices = annotator.matrices;
-        self.scheme = annotator.scheme;
-        self.chains = annotator.chains;
-        self.min_confidence = annotator.min_confidence;
+        // The whole annotator, so its packed scoring matrices are rebuilt from the new matrices
+        *self = annotator;
         Ok(())
     }
 

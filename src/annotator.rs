@@ -1,8 +1,11 @@
 //! High-level API for sequence annotation and chain detection
 use std::cell::RefCell;
 use std::ops::Range;
+use std::sync::OnceLock;
 
-use crate::alignment::{align, AlignBuffer, AlignedPosition, Alignment};
+use crate::alignment::{
+    align_best, AlignBuffer, AlignedPosition, Alignment, PackedScoringMatrices,
+};
 use crate::error::{Error, Result, SequenceError};
 use crate::numbering::{apply_numbering, segment as segment_positions, SEGMENT_NAMES};
 use crate::scoring::ScoringMatrix;
@@ -116,10 +119,10 @@ thread_local! {
     static ALIGN_BUFFER: RefCell<AlignBuffer> = RefCell::new(AlignBuffer::new());
 }
 
-/// The most alignment matrix cells a thread keeps between calls: what a 1,000-residue query needs
-/// against a 128-position consensus, about 650 KB. A longer query still aligns, but its matrices are
-/// freed when its call returns.
-const KEPT_ALIGN_CELLS: usize = 1_001 * 129;
+/// The most alignment matrix cells a thread keeps between calls, counting every chain aligned at
+/// once: what a 1,000-residue query needs against eight 128-position consensuses, about 5 MB. A
+/// longer query still aligns, but its matrices are freed when its call returns.
+const KEPT_ALIGN_CELLS: usize = 1_001 * 129 * 8;
 
 /// Per-domain results as every interface returns them: one per domain from
 /// [`Annotator::number_domains`] or [`Annotator::segment_domains`], or, when the sequence couldn't
@@ -143,6 +146,10 @@ pub struct Annotator {
     pub(crate) scheme: Scheme,
     pub(crate) chains: Vec<Chain>,
     pub(crate) min_confidence: f32,
+    /// `matrices` packed to align against all of them at once; built on first use, so a
+    /// deserialized annotator builds it too
+    #[serde(skip)]
+    packed: OnceLock<PackedScoringMatrices>,
 }
 
 impl Annotator {
@@ -168,6 +175,7 @@ impl Annotator {
             scheme,
             chains: chains.to_vec(),
             min_confidence: min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
+            packed: OnceLock::new(),
         })
     }
 
@@ -305,26 +313,17 @@ impl Annotator {
         Domain::new(chain, alignment, confidence, part.start, sequence.len())
     }
 
-    /// Align the sequence to all loaded chain types and return the best match
-    /// If multiple chains were provided during initialization, this will align to all
-    /// of them and return the best match. If only one chain was provided, it will
-    /// align to that chain directly.
+    /// Align the sequence to every loaded chain type and return the best match: the highest
+    /// alignment score, the first chain of those that tie for it
     fn get_best_alignment(&self, sequence: &str) -> (Chain, Alignment) {
+        let packed = self.packed.get_or_init(|| {
+            PackedScoringMatrices::new(self.matrices.iter().map(|(_, m)| &m.positions[..]))
+        });
         ALIGN_BUFFER.with_borrow_mut(|buf| {
-            // Align to all loaded chain types and find best match by raw alignment score
-            let mut best: Option<(Chain, Alignment)> = None;
-            for (chain, matrix) in &self.matrices {
-                let alignment = align(sequence, &matrix.positions, Some(&mut *buf));
-                let is_better = match &best {
-                    Some((_, prev)) => alignment.score > prev.score,
-                    None => true,
-                };
-                if is_better {
-                    best = Some((*chain, alignment));
-                }
-            }
+            let (index, alignment) =
+                align_best(sequence, packed, |k| &self.matrices[k].1.positions[..], buf);
             buf.release_above(KEPT_ALIGN_CELLS);
-            best.expect("`Annotator::new` rejects an empty chain list")
+            (self.matrices[index].0, alignment)
         })
     }
 }
@@ -475,7 +474,7 @@ impl NumberingResult {
     }
 
     // The residues of `sequence` this result numbered
-    fn numbered<'a>(&self, sequence: &'a str) -> Result<&'a str> {
+    pub(crate) fn numbered<'a>(&self, sequence: &'a str) -> Result<&'a str> {
         sequence
             .get(self.query_start..=self.query_end)
             .ok_or(Error::WrongSequence {

@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keyboard focus on its chain and scheme buttons.
 
 ### Changed
+- Numbering is faster, with identical results: an annotator aligns a sequence against all its chains
+  in one pass, one chain per SIMD lane, instead of one chain after another. The CLI numbers 10,000
+  sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with
+  `ig`, 3.4 times with `tcr` and 3.5 times with `all`; Polars builds its numbering column with two
+  allocations per sequence instead of two per residue. A thread now keeps up to about 5 MB of
+  alignment matrices between sequences, up from 650 KB, once it has aligned a 1,000-residue
+  sequence against all chains; a typical antibody against `ig` needs about 340 KB.
 - The consensus sequences behind the scoring matrices are built from IMGT/GENE-DB germlines (release
   202641-7, CC BY 4.0) instead of RepSeqIO germlines numbered with AntPack. V genes keep IMGT's own
   gapping, the CDR3 of each V-J germline is placed by the IMGT rule, and the antibody germlines come from
@@ -45,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
   to other tabs' pages.
 - The crate's `documentation` link points to docs.rs.
+- The comparison benchmarks are re-run against AntPack 0.3.8.6.2, ANARCI 2026.2.13.2 and ANARCII
+  2.0.8 on two 32-core cloud VMs, x86 (AMD EPYC 7543) and ARM (Neoverse-N1), with a new headline
+  run (10,000 sequencing-run antibody sequences, mixed H/K/L, `task benchmark-headline`) whose x86
+  times the README shows. The benchmarks page has both machines' times, and records the machines
+  and the date. The scaling and correctness plots show the current tools and immunum with the
+  IMGT-derived consensus instead of the March and April runs.
 - Development needs Python 3.11 or newer (the package still supports 3.10): the `dev` and
   `benchmark` groups require it, so the lock only holds a filelock release with the fixes for its
   security advisories. CI runs the full checks on 3.11 and the test suite on 3.10.
@@ -57,6 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runnable example with its real output. The Polars advice to find successes by a null `error`
   counted null sequences as successes. The benchmarks page names the versions of the tools it
   compares and says how each plot's error bars are computed.
+- The comparison benchmark's all-core ANARCI run only raised hmmscan's thread count; it now splits
+  the sequences over ANARCI's process pool (`run_anarci`). Its single-core ANARCII run could keep
+  the torch thread count an earlier run had set, its AntPack and ANARCII all-core runs timed
+  starting a process pool or loading the model, and its immunum all-core run timed building the
+  Polars expression and starting Polars' thread pool; these happen before the clock starts now. A
+  run that times out no longer leaves ANARCI's processes running through the runs after it, and
+  results are saved after every run. The benchmark tasks install a release build of immunum, where
+  a previous dev build could stay.
 
 ## [2.0.0] - 2026-10-12
 
