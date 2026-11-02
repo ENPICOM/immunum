@@ -1,7 +1,11 @@
 site_name: "immunum: antibody numbering and segmentation"
+site_description: >-
+  Fast antibody and T-cell receptor sequence numbering (IMGT, Kabat, Chothia, Martin, AHo) and
+  FR/CDR segmentation for Python, Polars, Rust, JavaScript and the command line.
 site_url: https://immunum.enpicom.com
 repo_url: https://github.com/ENPICOM/immunum
 repo_name: ENPICOM/immunum
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -45,27 +49,40 @@ theme:
     - navigation.footer
     - content.tabs.link
     - content.code.copy
+    - content.action.edit
 
 nav:
-  - Home: index.md
+  - Home:
+      - index.md
+      - Getting started: getting-started.md
+      - Concepts and FAQ: concepts.md
+      - Citation: citation.md
   - Demo: demo.md
   - Usage:
       - usage/index.md
-      - Python module: usage/python.md
-      - Polars module: usage/polars.md
+      - Command line: usage/cli.md
+      - Python: usage/python.md
+      - Polars: usage/polars.md
+      - JavaScript: usage/javascript.md
+      - Rust: usage/rust.md
+      - Errors: usage/errors.md
       - Upgrading to 2.0: usage/upgrading.md
+      - Changelog: changelog.md
   - API:
       - api/index.md
       - immunum: api/immunum.md
       - immunum.polars: api/polars.md
+      - JavaScript: api/javascript.md
+      - Rust (docs.rs): https://docs.rs/immunum
   - Benchmarks: benchmarks/index.md
-  - Changelog: changelog.md
+  - Contributing: contributing/index.md
 
 extra_css:
   - stylesheets/extra.css
 
 hooks:
   - scripts/mkdocs_version.py
+  - scripts/mkdocs_pages.py
 
 plugins:
   - search:

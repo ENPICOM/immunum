@@ -1,8 +1,9 @@
 """MkDocs hook: stamp the site with the version it was built from.
 
 The version comes from Cargo.toml (single source; pyproject.toml is dynamic).
-Docs are only deployed from the release workflow, so this always matches the
-published package versions.
+Docs are deployed from a release tag, or by hand from a branch for a docs change
+after a release; Cargo.toml only changes version in a release, so either way this
+is the latest published version.
 """
 
 import re

@@ -44,8 +44,8 @@ docs = [
     "mkdocs-autorefs",
     "mkdocs-material",
     "mkdocstrings[python]",
-    # 11.0.1 fixes a security advisory; 12 breaks mkdocstrings' code highlighting
     "pymdown-extensions>=11.0.1,<12",
+    "tomli; python_version < '3.11'",
 ]
 # What the test suite needs, so CI can test a Python the lint and audit tools don't support yet
 test = [
@@ -82,6 +82,13 @@ benchmark = [
 [tool.uv]
 default-groups = ["dev"]
 cache-keys = [{ file = "./Cargo.toml" }, { file = "./**/*.rs" }]
+
+# The package supports 3.10, which is end-of-life; the dev tools don't have to. filelock
+# (via pre-commit, and torch for the benchmarks) only fixes its security advisories in
+# releases that require 3.11, and pysentry flags every version in the lock.
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.11" }
+benchmark = { requires-python = ">=3.11" }
 
 [tool.uv.workspace]
 members = ["."]

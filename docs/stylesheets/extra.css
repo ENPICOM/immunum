@@ -7,6 +7,12 @@
   --md-accent-fg-color:         #7D5BFF; /* Purple */
 }
 
+/* Keyboard focus ring for the demo's controls: dark on the light palette, light on the dark one,
+   drawn outside the control so it shows on selected (filled) pills too. */
+:root,
+[data-md-color-scheme="default"] { --immunum-focus-ring: #231E60; }
+[data-md-color-scheme="slate"] { --immunum-focus-ring: #C9BDFF; }
+
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color:        #7D5BFF; /* Purple */
   --md-primary-fg-color--light: #3229C1; /* Blue */
@@ -67,6 +73,7 @@
   word-break: break-all;
 }
 .immunum-field textarea:focus { outline: 2px solid var(--md-accent-fg-color); outline-offset: 1px; }
+.immunum-hint { font-size: 0.72rem; color: var(--md-default-fg-color--light); }
 
 .immunum-examples {
   display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
@@ -83,11 +90,26 @@
 }
 .immunum-examples button:hover { background: var(--md-accent-fg-color); color: #fff; }
 
+.immunum-examples button:focus-visible,
+.immunum-actions button:focus-visible,
+.immunum-run:focus-visible,
+.immunum-chain-check:has(input:focus-visible),
+.immunum-scheme-radio:has(input:focus-visible) {
+  outline: 3px solid var(--immunum-focus-ring);
+  outline-offset: 2px;
+}
+
 .immunum-controls {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.75rem;
   align-items: stretch;
+}
+/* A fieldset is at least as wide as its content by default, which pushes the page sideways. */
+.immunum-controls fieldset { min-width: 0; }
+@media (max-width: 40em) {
+  .immunum-controls { grid-template-columns: minmax(0, 1fr); }
+  .immunum-hero-logo { width: 64px; height: 64px; }
 }
 
 .immunum-chain-field {
@@ -144,6 +166,13 @@
   cursor: not-allowed;
 }
 .immunum-chain-check.is-disabled input { cursor: not-allowed; }
+/* A chain the scheme doesn't number keeps its checked state for later, but doesn't look selected. */
+.immunum-chain-check.is-disabled:has(input:checked) {
+  background: var(--md-default-bg-color);
+  border-color: var(--md-default-fg-color--lightest);
+  color: var(--md-default-fg-color--light);
+  box-shadow: none;
+}
 .immunum-scheme-field,
 .immunum-confidence-field {
   border: 1px solid var(--md-default-fg-color--lightest);
@@ -185,7 +214,7 @@
 .immunum-scheme-grid {
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 0.4rem;
 }
 .immunum-scheme-radio {
@@ -260,6 +289,33 @@
   border: 1px solid rgba(220, 53, 69, 0.35);
   font-size: 0.88rem;
 }
+/* The error and notice are live regions that stay in the page; they show only with a message. */
+.immunum-error:empty,
+.immunum-notice:empty { display: none; }
+.immunum-notice {
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--md-accent-fg-color);
+  font-size: 0.85rem;
+}
+
+.immunum-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.immunum-actions button {
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  border: 1px solid var(--md-default-fg-color--lighter);
+  padding: 0.3rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.immunum-actions button:hover { border-color: var(--md-accent-fg-color); color: var(--md-accent-fg-color); }
+.immunum-action-status { font-size: 0.78rem; color: var(--md-default-fg-color--light); }
 
 .immunum-result-header {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem;
@@ -353,6 +409,18 @@
   font-family: var(--md-code-font-family, monospace);
   word-break: break-all;
 }
+
+/* Compare schemes: collapsed by default, its tables scroll inside their own box. */
+.immunum-compare { margin-top: 0.9rem; }
+.immunum-compare > summary { cursor: pointer; font-weight: 600; }
+.immunum-compare > summary:focus-visible { outline: 3px solid var(--immunum-focus-ring); outline-offset: 2px; }
+.immunum-scroll { overflow-x: auto; }
+.immunum-segments.immunum-compare-table th,
+.immunum-segments.immunum-compare-table td { text-align: left; padding-right: 0.8rem; white-space: nowrap; }
+.immunum-segments.immunum-compare-table td.immunum-segment-residues { white-space: normal; min-width: 6rem; }
+.immunum-compare-table tbody th { opacity: 1; }
+.immunum-compare-table tr.is-current th,
+.immunum-compare-table tr.is-current td { font-weight: 700; color: var(--md-accent-fg-color); }
 .immunum-region-tag {
   display: inline-block;
   min-width: 3.5rem;

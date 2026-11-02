@@ -16,7 +16,7 @@ Match on the code, not the message:
 | `Low confidence: 0.0416 < threshold 0.5000` | `alignment confidence 0.0416 is below min_confidence 0.5000` | `low_confidence` |
 | `Invalid chain type: unknown chain 'IGX' …` | `unknown chain 'IGX' …` | `invalid_chain` |
 
-The codes are listed under [Errors](../index.md#errors).
+The codes are listed under [Errors](errors.md#error-kinds).
 
 **`segment` keeps every residue.** Residues the aligner leaves out before or after the domain
 used to be dropped; they're now in `prefix` and `postfix`, so the regions always join back into
