@@ -28,7 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in one pass, one chain per SIMD lane, instead of one chain after another. The CLI numbers 10,000
   sequencing-run antibody sequences on one core 1.1 times as fast with one chain, 2.3 times with
   `ig`, 3.4 times with `tcr` and 3.5 times with `all`; Polars builds its numbering column with two
-  allocations per sequence instead of two per residue.
+  allocations per sequence instead of two per residue. A thread now keeps up to about 5 MB of
+  alignment matrices between sequences, up from 650 KB, once it has aligned a 1,000-residue
+  sequence against all chains; a typical antibody against `ig` needs about 340 KB.
 - The README is a quickstart for each interface; the details moved to the documentation site, where
   each topic now lives on one page. The site has a description for link previews, "edit this page"
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
@@ -47,9 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compares and says how each plot's error bars are computed.
 - The comparison benchmark's all-core ANARCI run only raised hmmscan's thread count; it now splits
   the sequences over ANARCI's process pool (`run_anarci`). Its single-core ANARCII run could keep
-  the torch thread count an earlier run had set, and its AntPack and ANARCII all-core runs timed
-  starting a process pool or loading the model; these happen before the clock starts now. The
-  benchmark tasks install a release build of immunum, where a previous dev build could stay.
+  the torch thread count an earlier run had set, its AntPack and ANARCII all-core runs timed
+  starting a process pool or loading the model, and its immunum all-core run timed building the
+  Polars expression and starting Polars' thread pool; these happen before the clock starts now. A
+  run that times out no longer leaves ANARCI's processes running through the runs after it, and
+  results are saved after every run. The benchmark tasks install a release build of immunum, where
+  a previous dev build could stay.
 
 ## [2.0.0] - 2026-10-12
 

@@ -61,7 +61,8 @@ cores, and about 150 times ANARCI's and 300 times ANARCII's speed on 1 core.
 ### How benchmarks are run
 
 `benches/bench_comparison.py` runs every tool through its Python API on the same sequences, once
-on 1 core and once on all 32, with each tool's default settings:
+on 1 core and once on all 32, with each tool's default settings except ANARCII's mode: it runs in
+its `speed` mode, not its default `accuracy` mode.
 
 | Tool | 1 core | 32 cores |
 |---|---|---|
@@ -70,12 +71,13 @@ on 1 core and once on all 32, with each tool's default settings:
 | ANARCI | `anarci(..., ncpu=1)` | `run_anarci(..., ncpu=32)`, ANARCI's own process pool |
 | ANARCII | `Anarcii(mode="speed")`, torch on 1 thread | the same, torch on 16 threads (x86) or 32 (ARM) |
 
-Only the numbering is timed. Building annotators, loading ANARCII's model and starting AntPack's
-process pool happen before the clock starts; `run_anarci` starts its pool inside the timed call,
-as it does for every caller. ANARCII's all-core thread count is the fastest measured on each
-machine (`--anarcii-threads`): numbering 1,000 sequences took 13.5 s on 16 threads on the x86 VM,
-against 14.6 s on 8 and 15.6 s on 32, and 32 s on 32 threads on the ARM VM, against 82 s on 8
-and 41 s on 1.
+Only the numbering is timed. Building annotators, loading ANARCII's model, starting AntPack's
+process pool and starting Polars' thread pool for immunum happen before the clock starts;
+`run_anarci` starts its pool inside the timed call, as it does for every caller. ANARCII's
+all-core thread count is the fastest measured on each machine: numbering 1,000 sequences took
+13.5 s on 16 threads on the x86 VM, against 14.6 s on 8 and 15.6 s on 32, and 32 s on 32 threads
+on the ARM VM, against 82 s on 8 and 41 s on 1. The harness defaults to 8; each run passes the
+machine's count, for example `task benchmark-headline -- --anarcii-threads 16` on x86.
 
 Three runs make the results on this page; `task benchmark` runs all three and makes the plots
 (`task plots` makes the plots alone):
@@ -84,15 +86,16 @@ Three runs make the results on this page; `task benchmark` runs all three and ma
 - **Accuracy** (`task benchmark-accuracy`): each table in `fixtures/validation/*_imgt.csv`
   sampled to 1,000 sequences, 7 rounds, scored residue by residue per IMGT region (FR1–FR4,
   CDR1–CDR3). AntPack and ANARCII are run on the antibody chains only, so the TCR chains compare
-  immunum with ANARCI. Every tool numbered identically on both machines.
+  immunum with ANARCI. These results are from the x86 VM.
 - **Scaling** (`task benchmark-speed`): batches of 100 to 1,000,000 IGH sequences, 3 rounds each.
   A tool that takes longer than 10 minutes on a batch is left out of the larger ones.
 
 On the ARM VM the scaling run's last batch, 1,000,000 sequences, ran out of memory: AntPack's 32
 forked workers each copied the harness's memory. That batch was re-run on the same samples once
 the harness froze Python's garbage collector before forking (`gc.freeze()`), which keeps that
-memory shared; nothing else changed. The results are in `resources/benchmark_results` (x86) and
-`resources/benchmark_results/arm` (ARM).
+memory shared; nothing else changed. ANARCI's all-core run has no result for that batch on ARM.
+The results are in `resources/benchmark_results` (x86) and `resources/benchmark_results/arm`
+(ARM).
 
 #### Ground-truth labelling
 

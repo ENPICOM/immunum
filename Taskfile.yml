@@ -247,7 +247,7 @@ tasks:
                     --chain "$chain" \
                     --sizes 1000 --rounds 7 \
                     --output "./resources/benchmark_results/results_${base}.csv" \
-                    --timeout 1m
+                    --timeout 1m {{.CLI_ARGS}}
                 done
 
     benchmark-speed:

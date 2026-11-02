@@ -3,9 +3,10 @@ Speed and accuracy comparison: immunum against antpack, ANARCI and ANARCII.
 
 Every tool runs through its Python API on the same sequences, once on a single core and once on
 every core. Only the numbering is timed: building annotators, loading models and starting
-antpack's process pool happen before the clock starts. ANARCI's parallel mode is the exception,
-because `run_anarci` starts its own process pool on every call. Every tool keeps its default
-settings, immunum's `min_confidence` of 0.5 included.
+immunum's and antpack's thread or process pools happen before the clock starts. ANARCI's parallel
+mode is the exception, because `run_anarci` starts its own process pool on every call. Every tool
+keeps its default settings, immunum's `min_confidence` of 0.5 included, except ANARCII, which runs
+in its `speed` mode rather than its default `accuracy` mode.
 
 Single core / every core, per tool:
 
@@ -23,12 +24,15 @@ Run with:
 
 from __future__ import annotations
 
+import ctypes
 import gc
 import math
 import multiprocessing
+import multiprocessing.pool
 import os
 import platform
 import signal
+import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
@@ -38,6 +42,7 @@ from pathlib import Path
 from typing import Annotated, Any, Optional
 
 import polars
+import psutil
 import pytest
 import typer
 
@@ -141,11 +146,13 @@ def _immunum_runners(chains: set[str]) -> list[Runner]:
     @contextmanager
     def multi(seqs: list[str]) -> Iterator[Callable[[], Any]]:
         df = polars.DataFrame({"sequence": seqs})
-        yield lambda: df.select(
-            imp.number(polars.col("sequence"), chains=chain_list, scheme="IMGT").alias(
-                "n"
-            )
-        )
+        expr = imp.number(
+            polars.col("sequence"), chains=chain_list, scheme="IMGT"
+        ).alias("n")
+        # Polars' thread pool started and its threads' alignment buffers allocated, as antpack's
+        # workers are started and warmed before the clock starts
+        df.head(NCPU * 4).select(expr)
+        yield lambda: df.select(expr)
 
     def extract_multi(result: polars.DataFrame, _seqs: list[str]) -> list[Numbering]:
         # `numbering` is a list of {position, residue} structs, null when the sequence failed
@@ -208,13 +215,13 @@ def _antpack_runners(chains: set[str]) -> list[Runner]:
         # Four chunks per worker, so the fast cores of a hybrid CPU don't wait on the slow ones
         size = max(1, math.ceil(len(seqs) / (NCPU * 4)))
         chunks = [seqs[i : i + size] for i in range(0, len(seqs), size)]
-        # Python's default start method, fork on Linux, as AntPack's users get it: forkserver
-        # workers averaged 0.19 s on the 10,000 headline sequences against fork's 0.13 s. A forked
-        # worker inherits the harness's heap, which is why `main` frees each tool's results
-        # before the next tool runs.
+        # Forked workers, Python's default on Linux before 3.14 and what AntPack's users got:
+        # forkserver workers averaged 0.19 s on the 10,000 headline sequences against fork's
+        # 0.13 s. A forked worker inherits the harness's heap, which is why `main` frees each
+        # tool's results before the next tool runs.
         with (
             _frozen_heap(),
-            multiprocessing.Pool(
+            multiprocessing.get_context("fork").Pool(
                 NCPU, initializer=_antpack_init, initargs=(chain_list,)
             ) as pool,
         ):
@@ -279,7 +286,9 @@ def _anarcii_runners(chains: set[str], threads_parallel: int) -> list[Runner]:
 
     # Built once: loading the model takes seconds. `ncpu` only sets torch's thread count, which
     # is global, so each run sets it again rather than trusting the model it was built with.
-    model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
+    # Above `max_seqs_len` sequences ANARCII writes its output to a file and returns the path, so
+    # it's raised to keep every batch in memory, as the other tools do.
+    model = Anarcii(seq_type="antibody", mode="speed", ncpu=1, max_seqs_len=sys.maxsize)
 
     def runner(
         threads: int,
@@ -332,11 +341,19 @@ def make_runners(
         except ImportError:
             typer.echo(f"  {module} not installed, skipping", err=True)
     if tools:
+        available = [r.name for r in runners]
         runners = [
             r
             for r in runners
             if any(r.name == t or r.name.startswith(t + "_") for t in tools)
         ]
+        if not runners:
+            typer.echo(
+                f"No runner matches --tools {' '.join(tools)}; available: "
+                + ", ".join(available),
+                err=True,
+            )
+            raise typer.Exit(1)
     return runners
 
 
@@ -412,6 +429,33 @@ def _timed(fn: Callable[[], Any], timeout_s: float) -> tuple[float, Any]:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old)
     return elapsed, result
+
+
+def _kill_children() -> None:
+    """Stop every process a timed-out run left behind, so none takes cores from the runs after it.
+
+    `run_anarci` leaves its pool running: it goes on through its queued chunks and replaces any
+    worker that dies, so pools are terminated first. Their workers' hmmscan processes outlive them
+    and, as the harness is their subreaper (see `main`), become its children; they are killed with
+    whatever else is left, such as the hmmscan of ANARCI's single-core run."""
+    for obj in gc.get_objects():
+        if isinstance(obj, multiprocessing.pool.Pool):
+            obj.terminate()
+    children = psutil.Process().children(recursive=True)
+    for child in children:
+        try:
+            child.kill()
+        except psutil.NoSuchProcess:
+            pass
+    psutil.wait_procs(children)
+
+
+def _write(rows: list[dict], output: Path) -> None:
+    result_df = polars.DataFrame(rows)
+    if output.suffix == ".parquet":
+        result_df.write_parquet(output)
+    else:
+        result_df.write_csv(output)
 
 
 def _read_fasta(path: Path) -> list[str]:
@@ -496,6 +540,11 @@ def main(
         + f", ANARCII all-core threads {anarcii_threads}"
     )
     timeout_s = _parse_duration(timeout)
+    if sys.platform == "linux":
+        # A process orphaned by a timed-out run, such as hmmscan when its pool worker is killed,
+        # becomes a child of the harness instead of init's, so `_kill_children` finds it.
+        # 36 is PR_SET_CHILD_SUBREAPER.
+        ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)
     runners = make_runners(chains, tools, anarcii_threads)
     position_cols = [c for c in df_full.columns if c not in META_COLS]
     # Without scoring, a sample needs only the sequences, not ~150 reference columns per row
@@ -522,13 +571,18 @@ def main(
             for runner in runners:
                 if runner.name in timed_out:
                     continue
+                timed_out_now = False
                 with runner.prepare(seqs) as run:
                     try:
                         elapsed, raw = _timed(run, timeout_s)
                     except TimeoutError:
-                        _echo_row([runner.name, str(r), f"TIMEOUT (>{timeout})"])
-                        timed_out.add(runner.name)
-                        continue
+                        timed_out_now = True
+                # After the runner's own clean-up, such as antpack closing its pool
+                if timed_out_now:
+                    _kill_children()
+                    _echo_row([runner.name, str(r), f"TIMEOUT (>{timeout})"])
+                    timed_out.add(runner.name)
+                    continue
                 if no_correctness_check:
                     numbered, correctness = None, {}
                 else:
@@ -562,13 +616,9 @@ def main(
                         if reg in correctness
                     ]
                 )
-
-        # After every size, so a run that dies keeps the sizes it finished
-        result_df = polars.DataFrame(rows)
-        if output.suffix == ".parquet":
-            result_df.write_parquet(output)
-        else:
-            result_df.write_csv(output)
+                # After every run, so a run that dies keeps the ones it finished
+                _write(rows, output)
+    _write(rows, output)
     typer.echo(f"\nSaved {len(rows)} rows to {output}")
 
 

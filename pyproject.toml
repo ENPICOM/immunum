@@ -77,6 +77,7 @@ benchmark = [
     "anarcii==2.0.8; python_version >= '3.11'",
     "antpack==0.3.8.6.2",
     "biopython>=1.86",
+    "psutil>=5.9.8",
     "scikit-bio==0.6.2",
     "typer>=0.24.1",
 ]

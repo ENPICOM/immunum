@@ -118,7 +118,7 @@ impl<'a> NumberedRow<'a> {
             .numbered(sequence)
             .expect("`result` numbered `sequence`");
         let mut positions = String::with_capacity(4 * result.positions.len());
-        let position_ends = result
+        let position_ends: Vec<usize> = result
             .positions
             .iter()
             .map(|position| {
@@ -126,6 +126,8 @@ impl<'a> NumberedRow<'a> {
                 positions.len()
             })
             .collect();
+        // The two lists share their offsets, so they must be the same length
+        debug_assert_eq!(position_ends.len(), residues.len());
         Self {
             result,
             positions,

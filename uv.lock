@@ -787,6 +787,7 @@ benchmark = [
     { name = "antpack" },
     { name = "biopython" },
     { name = "polars" },
+    { name = "psutil" },
     { name = "scikit-bio" },
     { name = "typer" },
 ]
@@ -841,6 +842,7 @@ benchmark = [
     { name = "antpack", specifier = "==0.3.8.6.2" },
     { name = "biopython", specifier = ">=1.86" },
     { name = "polars", specifier = ">1.30.0" },
+    { name = "psutil", specifier = ">=5.9.8" },
     { name = "scikit-bio", specifier = "==0.6.2" },
     { name = "typer", specifier = ">=0.24.1" },
 ]

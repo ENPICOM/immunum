@@ -537,6 +537,7 @@ fn traced_alignment(
         query_end,
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,6 +604,7 @@ mod tests {
             }
         }
     }
+
     #[test]
     fn test_align_simple() {
         let matrix = ScoringMatrix::load(Chain::IGH);
