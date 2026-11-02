@@ -286,9 +286,8 @@ def _anarcii_runners(chains: set[str], threads_parallel: int) -> list[Runner]:
 
     # Built once: loading the model takes seconds. `ncpu` only sets torch's thread count, which
     # is global, so each run sets it again rather than trusting the model it was built with.
-    # Above `max_seqs_len` sequences ANARCII writes its output to a file and returns the path, so
-    # it's raised to keep every batch in memory, as the other tools do.
-    model = Anarcii(seq_type="antibody", mode="speed", ncpu=1, max_seqs_len=sys.maxsize)
+    model = Anarcii(seq_type="antibody", mode="speed", ncpu=1)
+    default_max_seqs_len = model.max_seqs_len
 
     def runner(
         threads: int,
@@ -296,6 +295,11 @@ def _anarcii_runners(chains: set[str], threads_parallel: int) -> list[Runner]:
         @contextmanager
         def prepare(seqs: list[str]) -> Iterator[Callable[[], Any]]:
             torch.set_num_threads(threads)
+            # Above `max_seqs_len` sequences ANARCII writes its output to a file and returns the
+            # path, so a larger batch raises it to keep the results in memory, as the other tools
+            # do. It's the size of the chunks ANARCII splits a batch into, which it allocates up
+            # front, so it's raised to the batch's size rather than to no limit.
+            model.max_seqs_len = max(default_max_seqs_len, len(seqs))
             yield lambda: model.number(seqs)
 
         return prepare
