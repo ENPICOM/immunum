@@ -1,0 +1,22 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 14-19
+build.rs
+  h_acea35c6bbea0b 19-20
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 5-6,60-61
+resources/consensus/README.md
+  h_acea35c6bbea0b 34,37-39,62-64
+scripts/generate_consensus.py
+  h_acea35c6bbea0b 57-59,129,131-135,138,141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f5dd477b66d1445657905656e6e18a218a5aec17",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
