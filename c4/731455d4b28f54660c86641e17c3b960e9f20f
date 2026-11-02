@@ -1,0 +1,16 @@
+pyproject.toml
+  h_acea35c6bbea0b 129-153
+uv.lock
+  h_acea35c6bbea0b 553,555-578,580,2068-2069,2617-2618,2783-2784
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c4731455d4b28f54660c86641e17c3b960e9f20f",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
