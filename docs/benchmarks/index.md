@@ -2,7 +2,8 @@
 
 !!! note "These results predate immunum 2.0"
     The speed and scaling plots were produced with immunum 0.9.2 (March 2026) and the
-    correctness plot with immunum 1.0.0 (April 2026). They haven't been re-run for 2.0.
+    correctness plot with immunum 1.0.0 (April 2026). They haven't been re-run for 2.0, except the
+    TRD row of the correctness plot, which was re-run with the IMGT-derived consensus.
 
 immunum is compared against three established antibody numbering tools:
 [antpack~=0.2.7](https://github.com/jlparkI/AntPack),
@@ -56,7 +57,8 @@ antibody ground truth is derived from antpack/ANARCI agreement, those two tools 
 IGH, IGK and IGL by construction — see the note above. On the TCR chains ANARCI isn't the ground
 truth: it scores 96.9% on TRA, 99.1% on TRB, 99.9% on TRG and 93.0% on TRD. The TRD fixture
 (all TRDV1) follows IMGT's gapping of TRDV1, with the CDR2 at 56, 57 and 65 and residues at 69–72;
-ANARCI puts the CDR2 at 56–59 and 63–65 and leaves 69–73 empty.
+ANARCI puts the CDR2 at 56–59 and 63–65 and leaves 69–73 empty. immunum's TRD consensus is built
+from the same IMGT gapping of TRDV1, so its 100% on TRD FR1–FR3, CDR1 and CDR2 is by construction too.
 
 <iframe src="../assets/benchmark_plot2_correctness.html" width="100%" height="700px" frameborder="0" scrolling="yes"></iframe>
 

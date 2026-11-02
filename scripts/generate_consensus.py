@@ -54,8 +54,9 @@ J_MOTIF_FALLBACK = re.compile(r"[FW]..G")
 CDR3_FIRST, CDR3_LAST = 105, 117
 CDR3_DELETION_ORDER = (111, 112, 110, 113, 109, 114, 108, 115, 107, 116, 106, 117)
 
-# Positions the Kabat-derived schemes leave unnumbered on antibody chains, kept out of the
-# antibody consensus so an alignment never places a residue there (see src/numbering/*.rs).
+# IMGT positions kept out of the antibody consensus so an alignment never places a residue there.
+# The Kabat-derived schemes leave 73, and on IGH also 10, unnumbered (src/numbering/kabat.rs);
+# IMGT gaps 10 in lambda V genes, so IGL leaves it out as well.
 SCHEME_HOLES = {"IGH": (10, 73), "IGK": (73,), "IGL": (10, 73)}
 
 # Profile alignment weights for map_columns
@@ -125,19 +126,19 @@ class JGene(NamedTuple):
 
 
 def download_imgt(cache_dir: Path) -> tuple[Path, str]:
-    """Fetch the IMGT/GENE-DB FASTA and its release tag unless already cached."""
+    """Fetch the IMGT/GENE-DB FASTA and its release tag unless both are already cached."""
     cache_dir.mkdir(parents=True, exist_ok=True)
-    for name in (IMGT_RELEASE, IMGT_FASTA):
-        path = cache_dir / name
-        if not path.exists():
-            url = IMGT_DOWNLOAD_URL + urllib.parse.quote(name)
+    fasta, release = cache_dir / IMGT_FASTA, cache_dir / IMGT_RELEASE
+    if not (fasta.exists() and release.exists()):
+        # Fetch both together so the cached release tag always describes the cached FASTA.
+        for path in (release, fasta):
+            url = IMGT_DOWNLOAD_URL + urllib.parse.quote(path.name)
             print(f"Downloading {url}")
             # Download to a temporary name so an interrupted transfer is never cached.
-            partial = path.with_name(name + ".part")
+            partial = path.with_name(path.name + ".part")
             urllib.request.urlretrieve(url, partial)
             partial.replace(path)
-    release = (cache_dir / IMGT_RELEASE).read_text().strip()
-    return cache_dir / IMGT_FASTA, release
+    return fasta, release.read_text().strip()
 
 
 def read_alleles(fasta: Path, region: str, species: set[str]) -> list[Allele]:

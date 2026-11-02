@@ -31,11 +31,12 @@ the CSVs and `germlines.tsv`. The script only uses the Python standard library.
 
    | Chains        | Species                                                                                       |
    |---------------|-----------------------------------------------------------------------------------------------|
-   | IGH, IGK, IGL | human, mouse, rat, rabbit, rhesus macaque, pig, alpaca (IGH only), cow                        |
+   | IGH, IGK, IGL | human, mouse, rat, rabbit, rhesus macaque, pig, alpaca, cow                                   |
    | TRA–TRD       | human, mouse                                                                                  |
 
-   These are the species ANARCI builds its HMMs from. Each gene contributes one allele: the lowest-numbered one
-   that passes the checks below. TRAV/DV genes count towards TRA only.
+   These are the species ANARCI builds its HMMs from. This release has no functional, complete alpaca IGK or IGL
+   genes, so alpaca contributes to IGH only. Each gene contributes one allele: the lowest-numbered one that passes
+   the checks below. TRAV/DV genes count towards TRA only.
 
 2. **V genes on the IMGT numbering.** IMGT gaps the V genes of each species and locus in one alignment, so their
    positions 1–104 are taken as IMGT gives them. Where an allele has an insertion, though, IMGT adds a column for
@@ -58,9 +59,9 @@ the CSVs and `germlines.tsv`. The script only uses the Python standard library.
    holds every residue (and the gap, `-`) at 5% or more, the fraction of combinations with a residue (occupancy),
    and the IMGT region.
 
-6. **Scheme holes.** The Kabat-derived schemes leave IMGT 10 and 73 unnumbered on IGH and IGL, and 73 on IGK
-   (`src/numbering/*.rs`). These positions are left out of the antibody CSVs, and V genes with a residue there
-   are skipped (human IGLV(I)-70 in this release).
+6. **Scheme holes.** The Kabat-derived schemes leave IMGT 73 unnumbered on all antibody chains, and 10 on IGH
+   (`src/numbering/kabat.rs`); IMGT gaps 10 in lambda V genes, so IGL leaves it out as well. These positions are
+   left out of the antibody CSVs, and V genes with a residue there are skipped (human IGLV(I)-70 in this release).
 
 ## Output format
 

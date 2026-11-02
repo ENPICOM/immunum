@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The consensus sequences behind the scoring matrices are built from IMGT/GENE-DB germlines (release
   202641-7, CC BY 4.0) instead of RepSeqIO germlines numbered with AntPack. V genes keep IMGT's own
   gapping, the CDR3 of each V-J germline is placed by the IMGT rule, and the antibody germlines come from
-  human, mouse, rat, rabbit, rhesus, pig, alpaca and cow (no longer spalax and llama, which IMGT/GENE-DB
-  lacks); TCR germlines from human and mouse. `uv run --no-sync python -m scripts.generate_consensus`
-  downloads the data and regenerates the files; `resources/consensus/README.md` describes the method and
-  the IMGT publications to cite, and `resources/consensus/germlines.tsv` lists the alleles used.
+  human, mouse, rat, rabbit, rhesus, pig and cow, plus alpaca for IGH; TCR germlines from human and mouse.
+  `uv run --no-sync python -m scripts.generate_consensus` downloads the data and regenerates the files;
+  `resources/consensus/README.md` describes the method and the IMGT publications to cite, and
+  `resources/consensus/germlines.tsv` lists the alleles used.
+- Alignment confidence values shift slightly for the same input, since the scoring matrices changed; for
+  example IMGT 113 of IGL now counts towards the confidence score.
 - TRD numbers the TRDV genes with IMGT's gapping: human TRDV1 has the CDR2-IMGT QGS (56, 57, 65) and
   residues at 69-72, as in IMGT's allele alignment of TRDV1 and the IMGT region boundaries IgBLAST ships.
   The TRD validation fixture (`fixtures/validation/tcr_D_imgt.csv`, all TRDV1) followed ANARCI, with the
