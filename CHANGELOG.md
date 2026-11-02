@@ -24,6 +24,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keyboard focus on its chain and scheme buttons.
 
 ### Changed
+- The consensus sequences behind the scoring matrices are built from IMGT/GENE-DB germlines (release
+  202641-7, CC BY 4.0) instead of RepSeqIO germlines numbered with AntPack. V genes keep IMGT's own
+  gapping, the CDR3 of each V-J germline is placed by the IMGT rule, and the antibody germlines come from
+  human, mouse, rat, rabbit, rhesus, pig and cow, plus alpaca for IGH; TCR germlines from human and mouse.
+  `uv run --no-sync python -m scripts.generate_consensus` downloads the data and regenerates the files;
+  `resources/consensus/README.md` describes the method and the IMGT publications to cite, and
+  `resources/consensus/germlines.tsv` lists the alleles used.
+- Alignment confidence values shift slightly for the same input, since the scoring matrices changed; for
+  example IMGT 113 of IGL now counts towards the confidence score.
+- TRD numbers the TRDV genes with IMGT's gapping: human TRDV1 has the CDR2-IMGT QGS (56, 57, 65) and
+  residues at 69-72, as in IMGT's allele alignment of TRDV1 and the IMGT region boundaries IgBLAST ships.
+  The TRD validation fixture (`fixtures/validation/tcr_D_imgt.csv`, all TRDV1) followed ANARCI, with the
+  CDR2 at 56-59 and 63-65 and nothing at 69-73; its positions 56-74 now follow IMGT. Across the other
+  chains and schemes, `BENCHMARKS.toml` moves by at most 0.27 percentage points of perfect sequences.
+- The insertion penalty at the CDR centers (IMGT 32/33, 60/61, 111/112) is -1.9 instead of -2.0, which
+  the IMGT-derived consensus needs to keep numbering bovine ultralong CDR3s (PDB 4k3e) through FR4.
 - The README is a quickstart for each interface; the details moved to the documentation site, where
   each topic now lives on one page. The site has a description for link previews, "edit this page"
   links, and no previous/next links on the Demo, Benchmarks and Contributing tabs, where they led
@@ -32,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development needs Python 3.11 or newer (the package still supports 3.10): the `dev` and
   `benchmark` groups require it, so the lock only holds a filelock release with the fixes for its
   security advisories. CI runs the full checks on 3.11 and the test suite on 3.10.
+
+### Removed
+- `scripts/generate_vj_combinations.py` and `scripts/utils.py`, the RepSeqIO/AntPack consensus pipeline.
 
 ### Fixed
 - Documentation: the Polars page's examples ran nothing but the error example; it now has a
