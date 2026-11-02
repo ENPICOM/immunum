@@ -1,0 +1,30 @@
+BENCHMARKS.toml
+  h_acea35c6bbea0b 1-2
+CHANGELOG.md
+  h_acea35c6bbea0b 31-33,52-57
+Taskfile.yml
+  h_acea35c6bbea0b 250
+benches/bench_comparison.py
+  h_acea35c6bbea0b 6-9,27,31,35,45,149-155,218-221,224,289-291,344,350-356,434-460,543-547,574,579-585,619-621
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 64-65,74-80,89,96-98
+pyproject.toml
+  h_acea35c6bbea0b 80
+src/alignment.rs
+  h_acea35c6bbea0b 540,607
+src/polars.rs
+  h_acea35c6bbea0b 121,129-130
+uv.lock
+  h_acea35c6bbea0b 790,845
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2149cbe930195615fb268763eaa843a91423dda4",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
