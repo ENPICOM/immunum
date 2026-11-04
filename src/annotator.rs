@@ -1110,4 +1110,12 @@ mod tests {
             assert_eq!(segments.cdr2, format!("{residue}WAGGST"), "{residue}");
         }
     }
+
+    // Human IGKV1-39*01 and IGKJ1 with an extra S in FR1
+    #[test]
+    fn an_extra_fr1_residue_keeps_residue_1() {
+        let segments = imgt_segments("DIQMTQSPSSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQSYSTPWTFGQGTKVEIK");
+        assert_eq!(segments.prefix, "");
+        assert_eq!(segments.fr1, "DIQMTQSPSSSLSASVGDRVTITCRAS");
+    }
 }

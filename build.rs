@@ -15,7 +15,10 @@ const HIGHLY_CONSERVED_MULTIPLIER: f32 = 3.0;
 const CONSERVED_MULTIPLIER: f32 = 2.0;
 const VARIABLE_MULTIPLIER: f32 = 1.0;
 
-const NO_INSERTION_PENALTY: f32 = -50.0;
+// Pinned by a kappa FR1 with one extra residue (`an_extra_fr1_residue_keeps_residue_1`): inserting it
+// must cost less than shifting FR1 by one and dropping residue 1, which needs above -45. At -30 NGS
+// reads start to gain FR insertions.
+const NO_INSERTION_PENALTY: f32 = -40.0;
 // Pinned by bovine ultralong CDR3s (PDB 4k3e, `test_ultralong_cdr3_is_not_clipped`): their ~48 extra
 // residues at 111/112 must cost less than stopping before FR4. Re-check after regenerating the consensus.
 const CDR_INSERTION_PENALTY: f32 = -1.9;
