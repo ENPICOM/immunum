@@ -1,0 +1,14 @@
+scripts/generate_consensus.py
+  h_acea35c6bbea0b 135-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ffd3a81e8c5b0dc4dd4dc7338729e4679423acad",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

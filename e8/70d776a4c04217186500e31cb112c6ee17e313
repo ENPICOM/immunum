@@ -1,0 +1,18 @@
+.github/workflows/release.yml
+  h_acea35c6bbea0b 271-320
+mkdocs.yml
+  h_acea35c6bbea0b 67-69
+scripts/mkdocs_version.py
+  h_acea35c6bbea0b 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e870d776a4c04217186500e31cb112c6ee17e313",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

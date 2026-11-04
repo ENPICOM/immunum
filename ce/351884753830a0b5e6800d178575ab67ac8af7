@@ -1,0 +1,14 @@
+uv.lock
+  h_acea35c6bbea0b 1765,1770,1772,2391,2396,2401,2403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ce351884753830a0b5e6800d178575ab67ac8af7",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

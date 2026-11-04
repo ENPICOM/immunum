@@ -1,0 +1,19 @@
+docs/api/immunum.md
+  h_acea35c6bbea0b 19
+CHANGELOG.md
+  h_acea35c6bbea0b 80
+immunum/__init__.py
+  h_acea35c6bbea0b 12,267,274,279,281,316,321,361-363
+  h_acea35c6bbea0b 365-370
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "95c59a7729aad4aa9a2529461a5f4e415fbf5624",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

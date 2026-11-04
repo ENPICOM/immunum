@@ -1,0 +1,34 @@
+.github/workflows/release.yml
+  h_acea35c6bbea0b 69-70,96
+CHANGELOG.md
+  h_acea35c6bbea0b 27-28,105-109
+README.md
+  h_acea35c6bbea0b 284-291,297-298,475-476
+immunum/_internal.pyi
+  h_acea35c6bbea0b 38
+pyproject.toml
+  h_acea35c6bbea0b 26-29,32
+src/cli.rs
+  h_acea35c6bbea0b 1-252
+src/lib.rs
+  h_acea35c6bbea0b 58,73-74
+src/main.rs
+  h_acea35c6bbea0b 2
+src/python.rs
+  h_acea35c6bbea0b 197-212,220-221
+tests/cli.rs
+  h_acea35c6bbea0b 55-91
+tests/test_cli_command.py
+  h_acea35c6bbea0b 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3da00ba742cc7637b3bc102e6e93ad4c359cbfbd",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

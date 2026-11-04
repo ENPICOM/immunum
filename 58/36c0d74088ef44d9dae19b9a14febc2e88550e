@@ -1,0 +1,38 @@
+.github/workflows/release.yml
+  h_acea35c6bbea0b 272-273
+.gitignore
+  h_acea35c6bbea0b 4-5
+CHANGELOG.md
+  h_acea35c6bbea0b 11-16
+CONTRIBUTING.md
+  h_acea35c6bbea0b 38,129
+README.md
+  h_acea35c6bbea0b 65-67
+Taskfile.yml
+  h_acea35c6bbea0b 74,76,78-79,105,108
+docs/api/javascript.md
+  h_acea35c6bbea0b 8-25
+docs/getting-started.md
+  h_acea35c6bbea0b 13
+docs/usage/index.md
+  h_acea35c6bbea0b 20
+docs/usage/javascript.md
+  h_acea35c6bbea0b 3-7,84-109
+scripts/build_npm.mjs
+  h_acea35c6bbea0b 1-81
+scripts/mkdocs_pages.py
+  h_acea35c6bbea0b 5
+tests/test_wasm.mjs
+  h_acea35c6bbea0b 2,5,8-9,15-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5836c0d74088ef44d9dae19b9a14febc2e88550e",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

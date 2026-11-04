@@ -1,0 +1,24 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 248
+README.md
+  h_acea35c6bbea0b 218-219,264,281,283-284,408,425,427,429,437,439,441,451-454,458-459,467,469-471
+Taskfile.yml
+  h_acea35c6bbea0b 237
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 6,12,17,28,35-37
+scripts/README.md
+  h_acea35c6bbea0b 3
+src/lib.rs
+  h_acea35c6bbea0b 13-15,32,35-37,45,47-49,55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "658d10e34807e9c2bdff46699def2185fb1ddfe8",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

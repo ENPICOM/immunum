@@ -1,0 +1,32 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 110-112
+README.md
+  h_acea35c6bbea0b 74,141
+docs/benchmarks/index.md
+  h_acea35c6bbea0b 3-6,18-19,21-26,32,35,52-57,64-65
+docs/changelog.md
+  h_acea35c6bbea0b 1
+docs/usage/polars.md
+  h_acea35c6bbea0b 3-4,145
+docs/usage/upgrading.md
+  h_acea35c6bbea0b 1-152
+immunum/polars.py
+  h_acea35c6bbea0b 12
+mkdocs.yml
+  h_acea35c6bbea0b 56,62
+pyproject.toml
+  h_acea35c6bbea0b 26-29
+uv.lock
+  h_acea35c6bbea0b 592-596,636-637
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6ec1affc33e857a0f15d9f36e54b3e6feb5865c2",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

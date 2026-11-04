@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_bbf9a998e9c103::t_79b92c4135bfa1 26-42
+src/annotator.rs
+  s_bbf9a998e9c103::t_c9e3ca92246497 439-447,615
+  s_bbf9a998e9c103::t_59b33aaea9add1 612-614
+  s_bbf9a998e9c103::t_4a142e46fd8d7b 616-618
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0bc051ef2940c22baafb25ef3a753e3df1460a6d",
+  "prompts": {},
+  "sessions": {
+    "s_bbf9a998e9c103": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2732e7af-c867-410b-8b7b-4f0cac222a26",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Steven Liebregt <s.liebregt@outlook.com>"
+    }
+  }
+}

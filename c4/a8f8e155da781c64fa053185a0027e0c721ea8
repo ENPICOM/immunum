@@ -1,0 +1,16 @@
+CHANGELOG.md
+  h_acea35c6bbea0b 12-16
+src/annotator.rs
+  h_acea35c6bbea0b 3,8,151-155,159-172,176-177,183,193-195,201-207,252-259,263-264,276,504-505,507-523,525
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c4a8f8e155da781c64fa053185a0027e0c721ea8",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}

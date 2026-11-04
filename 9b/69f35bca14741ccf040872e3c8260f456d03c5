@@ -1,0 +1,26 @@
+.gitattributes
+  h_acea35c6bbea0b 1-2
+.github/workflows/ci.yml
+  h_acea35c6bbea0b 20,39-42,47-74,100-102
+.github/workflows/docs.yml
+  h_acea35c6bbea0b 59-61
+.github/workflows/release.yml
+  h_acea35c6bbea0b 84-113,121,126,133,158,198-201,205,215,217,266-269
+CHANGELOG.md
+  h_acea35c6bbea0b 111-113
+pyproject.toml
+  h_acea35c6bbea0b 10
+uv.lock
+  h_acea35c6bbea0b 3,5-8,10,12,82,168-179,270-301,406-435,452-453,487,553-566,649-664,886-907,1098-1115,1144-1147,1149,1151,1238-1241,1243,1245,1293-1313,1524-1536,1544-1547,1549,1551,1592-1607,1631-1634,1636,1638,1834-1843,1980-1997,2097-2109,2221-2224,2226,2228,2276-2295,2374-2379,2427-2444,2489-2490,2511-2518,2531-2532
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9b69f35bca14741ccf040872e3c8260f456d03c5",
+  "prompts": {},
+  "humans": {
+    "h_acea35c6bbea0b": {
+      "author": "Thijs <tpwmaas@gmail.com>"
+    }
+  }
+}
