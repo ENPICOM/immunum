@@ -1,0 +1,29 @@
+src/alignment.rs
+  s_5b6ede2c467b2c::t_295e2391efacba 215-226,229
+  s_5b6ede2c467b2c::t_648e2f5501daa2 234
+  s_5b6ede2c467b2c::t_be3cc7f29a86be 235,295,298-302,304,310-311,320-322,324-328,332-333
+  s_5b6ede2c467b2c::t_9b396504ac3093 236,293-294,296-297,303,305-309,312-319,323
+  s_5b6ede2c467b2c::t_8bb17e2907859f 214,227-228,230-233
+  s_5b6ede2c467b2c::t_0fd1c91da40bf9 329-331
+src/annotator.rs
+  s_5b6ede2c467b2c::t_457bb2faba8910 1121-1142
+  s_5b6ede2c467b2c::t_2c6d2dd31b66e0 1143
+CHANGELOG.md
+  s_5b6ede2c467b2c::t_c9306485fab03b 67-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ff6d27539ba6928d057257245fdeae71011d01c2",
+  "prompts": {},
+  "sessions": {
+    "s_5b6ede2c467b2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82a7aaf2-1ea2-45d3-a84e-0d5bc9ca8d1b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jorrit Posthuma <git@jorritposthuma.nl>"
+    }
+  }
+}
