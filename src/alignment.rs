@@ -211,6 +211,29 @@ pub fn align(
             best_j = row_best_j[i];
         }
     }
+
+    // When the chosen end doesn't hold the J motif, the best end within SUFFIX_CLIP_THRESHOLD that
+    // does wins: the chosen end numbered a tag as FR4, or stopped before FR4 after a long CDR3.
+    let motif_columns = J_MOTIF.map(|(position, _)| {
+        positions
+            .iter()
+            .position(|p| p.position == position)
+            .map(|k| k + 1)
+    });
+    if let [Some(w), Some(g1), Some(g2)] = motif_columns {
+        let holds_motif =
+            |i, j| matches_j_motif(dp_traceback, stride, query_bytes, i, j, [w, g1, g2]);
+        if !holds_motif(best_i, best_j) {
+            let mut floor = row_max_score[best_i] - SUFFIX_CLIP_THRESHOLD;
+            for i in (1..=query_len).rev() {
+                if row_max_score[i] > floor && holds_motif(i, row_best_j[i]) {
+                    floor = row_max_score[i];
+                    best_i = i;
+                    best_j = row_best_j[i];
+                }
+            }
+        }
+    }
     let mut best_score = row_max_score[best_i];
 
     // Drop trailing residues inserted after the last position or matched to an unoccupied one
@@ -265,6 +288,47 @@ pub fn align(
         query_start,
         query_end,
     }
+}
+
+// The W/F-G-x-G motif that opens FR4 in every IG and TR J-region: IMGT position, allowed residues
+const J_MOTIF: [(u8, &[u8]); 3] = [(118, b"WF"), (119, b"G"), (121, b"G")];
+
+// Whether the alignment ending in cell (i, j) matches the J motif, whose consensus columns are `columns`
+fn matches_j_motif(
+    dp_traceback: &[u8],
+    stride: usize,
+    query_bytes: &[u8],
+    mut i: usize,
+    mut j: usize,
+    columns: [usize; 3],
+) -> bool {
+    if j < columns[2] {
+        return false;
+    }
+    while i > 0 && j >= columns[0] {
+        let motif = columns.iter().position(|&column| column == j);
+        match Direction::from_u8(dp_traceback[i * stride + j]) {
+            Direction::Match => {
+                if let Some(k) = motif {
+                    if !J_MOTIF[k]
+                        .1
+                        .contains(&query_bytes[i - 1].to_ascii_uppercase())
+                    {
+                        return false;
+                    }
+                    if k == 0 {
+                        return true;
+                    }
+                }
+                i -= 1;
+                j -= 1;
+            }
+            Direction::GapInQuery if motif.is_some() => return false,
+            Direction::GapInQuery => j -= 1,
+            Direction::GapInConsensus => i -= 1,
+        }
+    }
+    false
 }
 
 fn build_traceback(

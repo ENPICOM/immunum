@@ -1118,4 +1118,27 @@ mod tests {
         assert_eq!(segments.prefix, "");
         assert_eq!(segments.fr1, "DIQMTQSPSSSLSASVGDRVTITCRAS");
     }
+
+    // Alpaca IGHV3-3*01 up to C104; the FR4 that follows each CDR3 lacks two J residues.
+    const VHH_TO_CDR3: &str = "QVQLVESGGGLVQAGGSLRLSCAASGRTFSSYAMGWFRQAPGKEREFVAAISWSGGSTYYADSVKGRFTISRDNAKNTVYLQMNSLKPEDTAVYYC";
+    const SHORT_FR4: &str = "WGQGTVSS";
+
+    #[test]
+    fn a_tag_after_a_short_fr4_stays_out_of_the_domain() {
+        let cdr3 = "AASGYYSGTSYGPSAS";
+        let segments = imgt_segments(&format!("{VHH_TO_CDR3}{cdr3}{SHORT_FR4}GGGGSHHHHHH"));
+        assert_eq!(segments.cdr3, cdr3);
+        assert!(segments.fr4.starts_with("WGQG"), "{}", segments.fr4);
+        assert!(segments.postfix.ends_with("GGGGSHHHHHH"));
+    }
+
+    #[test]
+    fn a_long_cdr3_before_a_tail_keeps_its_fr4() {
+        let cdr3 = "AADPTRGLSYSGQWERPDYAS";
+        let segments = imgt_segments(&format!(
+            "{VHH_TO_CDR3}{cdr3}{SHORT_FR4}{LINKER}{KAPPA_CONSTANT}"
+        ));
+        assert_eq!(segments.cdr3, cdr3);
+        assert!(segments.fr4.starts_with("WGQG"), "{}", segments.fr4);
+    }
 }

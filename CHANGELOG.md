@@ -64,6 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A kappa chain with an extra FR1 residue was numbered from its second residue: the first went into
   the prefix and FR1 shifted by one. An insertion outside the CDR centres now costs -40 instead of
   -50, so residue 1 is numbered and the extra residue becomes an insertion.
+- The alignment keeps the J motif that opens FR4: Trp or Phe at IMGT 118, Gly at 119 and 121. A His
+  tag after a short FR4 was numbered as FR4, with the domain's own FR4 in CDR3, and a VHH with a long
+  CDR3 followed by a linker and a constant region stopped at IMGT 105, without its CDR3 and FR4.
+  The lambda chain in the test suite had its J region in CDR3 and the constant region's `GQPKA` in
+  FR4; it now has `FGGGTQLTV` as FR4 and `GQPKA` in the postfix. When the best-scoring end lacks the
+  motif, the best end within 50 points that has it is used.
 
 ## [2.0.0] - 2026-10-12
 
