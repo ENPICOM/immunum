@@ -1092,4 +1092,22 @@ mod tests {
                 .unwrap_or_else(|err| panic!("{region} read failed to number under IMGT: {err}"));
         }
     }
+
+    fn imgt_segments(sequence: &str) -> SegmentResult {
+        Annotator::new(ANTIBODY_CHAINS, Scheme::IMGT, None)
+            .unwrap()
+            .segment(sequence)
+            .unwrap()
+    }
+
+    // Mouse IGHV2-9*02 with G54V, a CDR3 and IGHJ4. IGHV2 has a 7-residue CDR2.
+    #[test]
+    fn a_variable_cdr2_residue_keeps_fr2_whole() {
+        for residue in ["I", "N", "H", "Q", "W", "G"] {
+            let sequence = format!("QVQLKESGPGLVAPSQSLSITCTVSGFSLTSYGVHWVRQPPGKGLEWLVV{residue}WAGGSTNYNSALMSRLSISKDNSKSQVFLKMNSLQTDDTAMYYCARDRGYYAMDYWGQGTSVTVSS");
+            let segments = imgt_segments(&sequence);
+            assert_eq!(segments.fr2, "VHWVRQPPGKGLEWLVV", "{residue}");
+            assert_eq!(segments.cdr2, format!("{residue}WAGGST"), "{residue}");
+        }
+    }
 }

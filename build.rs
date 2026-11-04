@@ -126,7 +126,7 @@ fn main() {
 
         // Generate JSON scoring matrix
         let output_path = matrix_out.join(format!("{}.json", chain));
-        write_scoring_matrix(&output_path, &positions).unwrap();
+        write_scoring_matrix(&output_path, &positions, chain.starts_with("IG")).unwrap();
 
         println!(
             "Generated scoring matrix for {}: {}",
@@ -212,7 +212,11 @@ fn process_consensus_csv(content: &str) -> Vec<PositionData> {
     positions
 }
 
-fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Result<()> {
+fn write_scoring_matrix(
+    path: &Path,
+    positions: &[PositionData],
+    antibody: bool,
+) -> std::io::Result<()> {
     let mut position_scores = Vec::new();
 
     for pos_data in positions {
@@ -236,6 +240,7 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
             pos_data.occupancy,
             max_freq,
             &pos_data.region,
+            antibody,
         );
 
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
@@ -301,6 +306,7 @@ fn calculate_gap_penalties(
     occupancy: f32,
     max_freq: f32,
     region: &str,
+    antibody: bool,
 ) -> (f32, f32) {
     let is_cdr = matches!(region, "CDR1" | "CDR2" | "CDR3");
 
@@ -312,10 +318,14 @@ fn calculate_gap_penalties(
     };
 
     // Conservation multiplier: increase penalty significantly for conserved positions
-    // This forces the alignment to respect conserved anchor points in FR regions
+    // This forces the alignment to respect conserved anchor points in FR regions.
+    // An antibody FR2 position every germline fills counts as conserved, however variable its
+    // residue, so a CDR2 with a mutated Ile 56 shortens CDR2 instead of opening a gap at FR2 54.
+    // FR1, FR3 and TCR FR2 keep the lower penalty: there it moved real deletions into the CDRs.
+    let fixed_length_fr2 = antibody && region == "FR2" && occupancy >= 1.0;
     let conservation_multiplier = if occupancy >= 0.5 && max_freq >= 0.9 {
         HIGHLY_CONSERVED_MULTIPLIER
-    } else if occupancy >= 0.5 && max_freq >= 0.7 {
+    } else if (occupancy >= 0.5 && max_freq >= 0.7) || fixed_length_fr2 {
         CONSERVED_MULTIPLIER
     } else {
         VARIABLE_MULTIPLIER

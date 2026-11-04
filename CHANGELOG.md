@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runnable example with its real output. The Polars advice to find successes by a null `error`
   counted null sequences as successes. The benchmarks page names the versions of the tools it
   compares and says how each plot's error bars are computed.
+- IMGT: an antibody whose CDR2 has the conserved Ile 56 mutated got a gap at FR2 54 and an extra
+  CDR2 residue. A mouse IGHV2 VH with G54V and Ile 56 to Asn numbered its CDR2 as `VNWAGGST` instead
+  of `NWAGGST`. A gap at an antibody FR2 position that every germline fills now costs as much as one
+  at a conserved position.
 
 ## [2.0.0] - 2026-10-12
 
