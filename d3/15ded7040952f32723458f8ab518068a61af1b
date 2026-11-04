@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_5b6ede2c467b2c::t_20c58a07224904 67-72
+src/alignment.rs
+  s_5b6ede2c467b2c::t_9343e75ca9d340 214-236,293-333
+src/annotator.rs
+  s_5b6ede2c467b2c::t_6ddfc08d436a59 1121-1143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d315ded7040952f32723458f8ab518068a61af1b",
+  "prompts": {},
+  "sessions": {
+    "s_5b6ede2c467b2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82a7aaf2-1ea2-45d3-a84e-0d5bc9ca8d1b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jorrit Posthuma <git@jorritposthuma.nl>"
+    }
+  }
+}
