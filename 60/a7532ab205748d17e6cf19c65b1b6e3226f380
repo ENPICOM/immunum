@@ -1,0 +1,26 @@
+build.rs
+  s_5b6ede2c467b2c::t_5334f36d761564 321,324
+  s_5b6ede2c467b2c::t_c0c60e20989d3f 322-323
+  s_5b6ede2c467b2c::t_716b8b44f912af 215-218
+  s_5b6ede2c467b2c::t_b4c64d0dc6d3e6 129,219,243,309,325,328
+src/annotator.rs
+  s_5b6ede2c467b2c::t_457bb2faba8910 1095-1112
+CHANGELOG.md
+  s_5b6ede2c467b2c::t_0d580df032b7a0 60-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "60a7532ab205748d17e6cf19c65b1b6e3226f380",
+  "prompts": {},
+  "sessions": {
+    "s_5b6ede2c467b2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "82a7aaf2-1ea2-45d3-a84e-0d5bc9ca8d1b",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jorrit Posthuma <git@jorritposthuma.nl>"
+    }
+  }
+}
