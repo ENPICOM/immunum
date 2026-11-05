@@ -15,10 +15,11 @@ const HIGHLY_CONSERVED_MULTIPLIER: f32 = 3.0;
 const CONSERVED_MULTIPLIER: f32 = 2.0;
 const VARIABLE_MULTIPLIER: f32 = 1.0;
 
+const NO_INSERTION_PENALTY: f32 = -50.0;
 // Pinned by a kappa FR1 with one extra residue (`an_extra_fr1_residue_keeps_residue_1`): inserting it
 // must cost less than shifting FR1 by one and dropping residue 1, which needs above -45. At -30 NGS
 // reads start to gain FR insertions.
-const NO_INSERTION_PENALTY: f32 = -40.0;
+const FR1_INSERTION_PENALTY: f32 = -40.0;
 // Pinned by bovine ultralong CDR3s (PDB 4k3e, `test_ultralong_cdr3_is_not_clipped`): their ~48 extra
 // residues at 111/112 must cost less than stopping before FR4. Re-check after regenerating the consensus.
 const CDR_INSERTION_PENALTY: f32 = -1.9;
@@ -313,6 +314,25 @@ fn conservation_multiplier_floor_for_antibodies(region: &str, multiplier: f32) -
     }
 }
 
+/// The insertion penalty for `position` in `region`.
+///
+/// CDR center positions are permissive, since that is where CDR length variation is absorbed.
+/// Elsewhere insertions are harsh. FR1 is less harsh so a kappa chain with an extra FR1 residue
+/// inserts it instead of leaving residue 1 unaligned, which is free, and shifting FR1 by one. Every
+/// other region keeps the harsher penalty, so a mismatch is never traded for an insertion there.
+fn decide_no_insertion_penalty(position: u32, region: &str) -> f32 {
+    let is_cdr = matches!(region, "CDR1" | "CDR2" | "CDR3");
+    let is_cdr_center = is_cdr && CDR_CENTER_POSITIONS.contains(&position);
+    if is_cdr_center {
+        CDR_INSERTION_PENALTY
+    } else {
+        match region {
+            "FR1" => FR1_INSERTION_PENALTY,
+            _ => NO_INSERTION_PENALTY,
+        }
+    }
+}
+
 /// Return the calculated gap penalty and insertion penalty.
 /// Gap penalty reduced in low occupancy positions, but increased in highly conserved positions.
 /// Insertion penalty is permissive only at CDR center positions where length variation is absorbed.
@@ -353,13 +373,7 @@ fn calculate_gap_penalties(
     // High conservation -> more negative (less permissive)
     let gap_penalty = base_gap_penalty * occupancy * conservation_multiplier;
 
-    // Insertion penalty: permissive at CDR center positions, harsh everywhere else
-    let is_cdr_center = is_cdr && CDR_CENTER_POSITIONS.contains(&position);
-    let insertion_penalty = if is_cdr_center {
-        CDR_INSERTION_PENALTY
-    } else {
-        NO_INSERTION_PENALTY
-    };
+    let insertion_penalty = decide_no_insertion_penalty(position, region);
 
     (gap_penalty, insertion_penalty)
 }
