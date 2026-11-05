@@ -1111,6 +1111,50 @@ mod tests {
         }
     }
 
+    /// The only heavy chains in `fixtures/validation/ab_H_imgt.csv` with a real FR2 deletion,
+    /// with ANARCI's IMGT numbering of FR2 (39-55). 5gjs_H has the same sequence as 5gjt_H.
+    const FR2_DELETION_HEAVY_CHAINS: &[(&str, &str, &str)] = &[
+        (
+            "5gjt_H",
+            "QVQLQESGPGLVKPSETLSLTCSVSGASISSYYWIWIRQPGKGLEWIGRFYTSGSPNYNPSLRSRVTMSVDTSKNQFSLKLTSVTAADTAVYYCAREEHITFGGVIVRYWGQGTLVTVSP",
+            "39W 40I 41W 42I 43R 44Q 46P 47G 48K 49G 50L 51E 52W 53I 54G 55R",
+        ),
+        (
+            "1mfe_H",
+            "EVQVQQSGTVLARPGASVKMSCKASGYTFTNYWMHWIKQRPGGLEWIGAIYPGNSATFYNHKFRAKTKLTAVTSTITAYMELSSLTNEDSAVYYCTRGGHGYYGDYWGQGASLTVSS",
+            "39M 40H 41W 42I 43K 44Q 45R 46P 47G 49G 50L 51E 52W 53I 54G 55A",
+        ),
+        (
+            "1yc8_B",
+            "VQLVESGGGSVQAGGSLRLSCAVSGSTYSPCTTGWVRQAPGGLEWVSSISSPGTIYYQDSVKGRFTISRDNAKNTVYLQMNSLQREDTGMYYCQIQCRSIREYWGQGTQVTVS",
+            "39T 40G 41W 42V 43R 44Q 45A 46P 47G 49G 50L 51E 52W 53V 54S 55S",
+        ),
+    ];
+
+    // Antibody FR2 has a conservation multiplier floor (see `conservation_multiplier_floor` in
+    // build.rs), so a gap anywhere in it costs at least as much as at a conserved position. That
+    // keeps FR2 whole when CDR2 is mutated, but it also makes the real FR2 deletions in these chains
+    // more expensive: 5gjt_H's gap sits at 45, the one antibody FR2 position the floor raised once
+    // the occupancy check was dropped. If the floor grows, these deletions are the first to leave
+    // FR2 for a neighbouring CDR (at a floor of 5.0, 5gjt_H's moves to CDR1). The IGH validation
+    // test would not notice: it asserts a 99% perfect rate, which leaves room for about 20
+    // regressions.
+    #[test]
+    fn a_real_fr2_deletion_stays_in_fr2() {
+        let annotator = Annotator::new(&[Chain::IGH], Scheme::IMGT, None).unwrap();
+        for (header, sequence, expected_fr2) in FR2_DELETION_HEAVY_CHAINS {
+            let result = annotator.number(sequence).unwrap();
+            let fr2 = result
+                .residues(sequence)
+                .unwrap()
+                .filter(|(position, _)| (39..=55).contains(&position.number))
+                .map(|(position, residue)| format!("{position}{residue}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            assert_eq!(fr2, *expected_fr2, "{header}");
+        }
+    }
+
     // Human IGKV1-39*01 and IGKJ1 with an extra S in FR1
     #[test]
     fn an_extra_fr1_residue_keeps_residue_1() {

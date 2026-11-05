@@ -300,6 +300,19 @@ fn calculate_position_scores(aa_frequencies: &[(char, f32)]) -> [f32; 20] {
     scores
 }
 
+/// Raise multiplier to the floor for region, however variable its residue.
+///
+/// Antibody FR2 is floored at conserved, so a CDR2 with a mutated Ile 56 shortens CDR2 instead of
+/// opening a gap at FR2 54. Every other region has no floor: flooring FR1 and FR3 moved real
+/// deletions into the CDRs (1g7j heavy, TRGV4 4MNH_C, several TRB), and flooring TCR FR2 moved the
+/// FR2 deletions of 3QJH_A and 5FKA_A into CDR2, because TCR FR2 has too few conserved anchors.
+fn conservation_multiplier_floor_for_antibodies(region: &str, multiplier: f32) -> f32 {
+    match region {
+        "FR2" => multiplier.max(CONSERVED_MULTIPLIER),
+        _ => multiplier,
+    }
+}
+
 /// Return the calculated gap penalty and insertion penalty.
 /// Gap penalty reduced in low occupancy positions, but increased in highly conserved positions.
 /// Insertion penalty is permissive only at CDR center positions where length variation is absorbed.
@@ -322,17 +335,18 @@ fn calculate_gap_penalties(
 
     // Conservation multiplier: increase penalty significantly for conserved positions
     // This forces the alignment to respect conserved anchor points in FR regions.
-    // An antibody FR2 position every germline fills counts as conserved, however variable its
-    // residue, so a CDR2 with a mutated Ile 56 shortens CDR2 instead of opening a gap at FR2 54.
-    // FR1, FR3 and TCR FR2 keep the lower penalty: there it moved real deletions into the CDRs.
-    let fixed_length_fr2 = antibody && region == "FR2" && occupancy >= 1.0;
-    let conservation_multiplier = if occupancy >= 0.5 && max_freq >= 0.9 {
+    let mut conservation_multiplier = if occupancy >= 0.5 && max_freq >= 0.9 {
         HIGHLY_CONSERVED_MULTIPLIER
-    } else if (occupancy >= 0.5 && max_freq >= 0.7) || fixed_length_fr2 {
+    } else if occupancy >= 0.5 && max_freq >= 0.7 {
         CONSERVED_MULTIPLIER
     } else {
         VARIABLE_MULTIPLIER
     };
+
+    // Floor conservation_multiplier based on regions if antibody
+    if antibody {
+        conservation_multiplier = conservation_multiplier_floor_for_antibodies(region, conservation_multiplier);
+    }
 
     // Gap penalty: scale by occupancy and conservation
     // Low occupancy -> less negative (more permissive)

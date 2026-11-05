@@ -59,8 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compares and says how each plot's error bars are computed.
 - IMGT: an antibody whose CDR2 has the conserved Ile 56 mutated got a gap at FR2 54 and an extra
   CDR2 residue. A mouse IGHV2 VH with G54V and Ile 56 to Asn numbered its CDR2 as `VNWAGGST` instead
-  of `NWAGGST`. A gap at an antibody FR2 position that every germline fills now costs as much as one
-  at a conserved position.
+  of `NWAGGST`. A gap anywhere in antibody FR2 now costs at least as much as one at a conserved
+  position.
 - A kappa chain with an extra FR1 residue was numbered from its second residue: the first went into
   the prefix and FR1 shifted by one. An insertion outside the CDR centres now costs -40 instead of
   -50, so residue 1 is numbered and the extra residue becomes an insertion.
