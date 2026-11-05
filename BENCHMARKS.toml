@@ -1,5 +1,5 @@
-last_updated = "2026-10-12"
-execution_time_secs = 1.4
+last_updated = "2026-11-05"
+execution_time_secs = 1.87
 
 [imgt.A]
 total_sequences = 865
@@ -33,8 +33,8 @@ overall_accuracy = 100.0
 
 [imgt.K]
 total_sequences = 1485
-perfect_sequences = 1480
-perfect_pct = 99.66
+perfect_sequences = 1481
+perfect_pct = 99.73
 overall_accuracy = 99.99
 
 [imgt.L]
@@ -51,8 +51,8 @@ overall_accuracy = 100.0
 
 [kabat.K]
 total_sequences = 1485
-perfect_sequences = 1479
-perfect_pct = 99.6
+perfect_sequences = 1480
+perfect_pct = 99.66
 overall_accuracy = 99.99
 
 [kabat.L]
@@ -69,9 +69,9 @@ overall_accuracy = 99.98
 
 [martin.K]
 total_sequences = 1469
-perfect_sequences = 1461
-perfect_pct = 99.46
-overall_accuracy = 99.98
+perfect_sequences = 1462
+perfect_pct = 99.52
+overall_accuracy = 99.99
 
 [martin.L]
 total_sequences = 383
@@ -87,9 +87,9 @@ overall_accuracy = 99.99
 
 [chothia.K]
 total_sequences = 1485
-perfect_sequences = 1480
-perfect_pct = 99.66
-overall_accuracy = 99.98
+perfect_sequences = 1481
+perfect_pct = 99.73
+overall_accuracy = 99.99
 
 [chothia.L]
 total_sequences = 371
@@ -105,8 +105,8 @@ overall_accuracy = 100.0
 
 [aho.K]
 total_sequences = 1491
-perfect_sequences = 1474
-perfect_pct = 98.86
+perfect_sequences = 1475
+perfect_pct = 98.93
 overall_accuracy = 99.98
 
 [aho.L]

@@ -24,6 +24,15 @@ const FR1_INSERTION_PENALTY: f32 = -40.0;
 // residues at 111/112 must cost less than stopping before FR4. Re-check after regenerating the consensus.
 const CDR_INSERTION_PENALTY: f32 = -1.9;
 
+// Added to the match score of the J motif that opens FR4 in every IG and TR J region: Trp or Phe at
+// IMGT 118 and Gly at 121. 119 is left out because it is not always Gly (TRGJ has Ala, TRAJ16 has
+// FARG). The bonus makes an alignment that reaches the real FR4 outscore one that stops at C104
+// after a long CDR3, or one that numbers a tag after a short FR4 as FR4, so the suffix clip picks
+// the real FR4 end. Pinned with SUFFIX_CLIP_THRESHOLD = 42 in alignment.rs by the lambda chain in
+// the Python tests numbered as kappa: below 6 its J region goes into CDR3 and the constant region's
+// VGQPKA becomes FR4. Trp at IGH 118 then scores 17, which `test_scores_reasonable` allows for.
+const J_MOTIF_BONUS: f32 = 6.0;
+
 // IMGT CDR center positions where insertions are absorbed
 const CDR_CENTER_POSITIONS: &[u32] = &[32, 33, 60, 61, 111, 112];
 
@@ -230,7 +239,8 @@ fn write_scoring_matrix(
         // Map 20 amino acid scores into 26-slot array indexed by (byte - b'A')
         let mut scores = [-4.0f32; 26];
         for (i, &aa_byte) in AMINO_ACIDS.iter().enumerate() {
-            scores[(aa_byte - b'A') as usize] = scores_20[i];
+            scores[(aa_byte - b'A') as usize] =
+                scores_20[i] + extra_motif_bonus(pos_data.position, aa_byte);
         }
 
         // Calculate gap penalties with region-specific and conservation-based penalties
@@ -269,6 +279,15 @@ fn write_scoring_matrix(
     fs::write(path, json)?;
 
     Ok(())
+}
+
+/// The extra match score for `residue` at IMGT `position`: J_MOTIF_BONUS for the J motif residues
+/// (Trp or Phe at 118, Gly at 121), 0 for everything else.
+fn extra_motif_bonus(position: u32, residue: u8) -> f32 {
+    match (position, residue) {
+        (118, b'W' | b'F') | (121, b'G') => J_MOTIF_BONUS,
+        _ => 0.0,
+    }
 }
 
 fn calculate_position_scores(aa_frequencies: &[(char, f32)]) -> [f32; 20] {
@@ -365,7 +384,8 @@ fn calculate_gap_penalties(
 
     // Floor conservation_multiplier based on regions if antibody
     if antibody {
-        conservation_multiplier = conservation_multiplier_floor_for_antibodies(region, conservation_multiplier);
+        conservation_multiplier =
+            conservation_multiplier_floor_for_antibodies(region, conservation_multiplier);
     }
 
     // Gap penalty: scale by occupancy and conservation
