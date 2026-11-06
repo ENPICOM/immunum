@@ -57,6 +57,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runnable example with its real output. The Polars advice to find successes by a null `error`
   counted null sequences as successes. The benchmarks page names the versions of the tools it
   compares and says how each plot's error bars are computed.
+- IMGT: an antibody whose CDR2 has the conserved Ile 56 mutated got a gap at FR2 54 and an extra
+  CDR2 residue. A mouse IGHV2 VH with G54V and Ile 56 to Asn numbered its CDR2 as `VNWAGGST` instead
+  of `NWAGGST`. A gap anywhere in antibody FR2 now costs at least as much as one at a conserved
+  position.
+- A kappa chain with an extra FR1 residue was numbered from its second residue: the first went into
+  the prefix and FR1 shifted by one. An insertion in FR1 now costs -40 instead of -50, so residue 1
+  is numbered and the extra residue becomes an insertion.
+- The alignment keeps the J motif that opens FR4: Trp or Phe at IMGT 118 and Gly at 121. A His
+  tag after a short FR4 was numbered as FR4, with the domain's own FR4 in CDR3, and a VHH with a long
+  CDR3 followed by a linker and a constant region stopped at IMGT 105, without its CDR3 and FR4.
+  The lambda chain in the test suite had its J region in CDR3 and the constant region's `GQPKA` in
+  FR4; it now has `FGGGTQLTV` as FR4 and `GQPKA` in the postfix. Matching the motif residues scores
+  6 points more each, and trailing residues are clipped when that scores 42 points higher instead of
+  50. Confidence rises slightly for chains that match the motif.
 
 ## [2.0.0] - 2026-10-12
 

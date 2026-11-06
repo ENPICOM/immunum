@@ -200,7 +200,10 @@ pub fn align(
     // Default: full query consumption (standard semi-global behavior).
     // Override only if early termination gives meaningfully better score (clips suffix).
     // The threshold prevents clipping valid antibody endings that score slightly negative.
-    const SUFFIX_CLIP_THRESHOLD: f32 = 50.0;
+    // Pinned with J_MOTIF_BONUS in build.rs: at 35 the bovine ultralong CDR3 (4k3e,
+    // `test_ultralong_cdr3_is_not_clipped`) is clipped before its FR4, and at 48 the lambda chain in
+    // the Python tests numbered as kappa keeps the constant region's VGQPKA as FR4.
+    const SUFFIX_CLIP_THRESHOLD: f32 = 42.0;
     let mut best_i = query_len;
     let mut best_j = row_best_j[query_len];
     for i in 1..query_len {
@@ -211,6 +214,7 @@ pub fn align(
             best_j = row_best_j[i];
         }
     }
+
     let mut best_score = row_max_score[best_i];
 
     // Drop trailing residues inserted after the last position or matched to an unoccupied one

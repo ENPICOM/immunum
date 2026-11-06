@@ -16,9 +16,22 @@ const CONSERVED_MULTIPLIER: f32 = 2.0;
 const VARIABLE_MULTIPLIER: f32 = 1.0;
 
 const NO_INSERTION_PENALTY: f32 = -50.0;
+// Pinned by a kappa FR1 with one extra residue (`an_extra_fr1_residue_keeps_residue_1`): inserting it
+// must cost less than shifting FR1 by one and dropping residue 1, which needs above -45. At -30 NGS
+// reads start to gain FR insertions.
+const FR1_INSERTION_PENALTY: f32 = -40.0;
 // Pinned by bovine ultralong CDR3s (PDB 4k3e, `test_ultralong_cdr3_is_not_clipped`): their ~48 extra
 // residues at 111/112 must cost less than stopping before FR4. Re-check after regenerating the consensus.
 const CDR_INSERTION_PENALTY: f32 = -1.9;
+
+// Added to the match score of the J motif that opens FR4 in every IG and TR J region: Trp or Phe at
+// IMGT 118 and Gly at 121. 119 is left out because it is not always Gly (TRGJ has Ala, TRAJ16 has
+// FARG). The bonus makes an alignment that reaches the real FR4 outscore one that stops at C104
+// after a long CDR3, or one that numbers a tag after a short FR4 as FR4, so the suffix clip picks
+// the real FR4 end. Pinned with SUFFIX_CLIP_THRESHOLD = 42 in alignment.rs by the lambda chain in
+// the Python tests numbered as kappa: below 8 its J region goes into CDR3 and the constant region's
+// VGQPKA becomes FR4. Trp at IGH 118 then scores 17, which `test_scores_reasonable` allows for.
+const J_MOTIF_BONUS: f32 = 8.0;
 
 // IMGT CDR center positions where insertions are absorbed
 const CDR_CENTER_POSITIONS: &[u32] = &[32, 33, 60, 61, 111, 112];
@@ -126,7 +139,7 @@ fn main() {
 
         // Generate JSON scoring matrix
         let output_path = matrix_out.join(format!("{}.json", chain));
-        write_scoring_matrix(&output_path, &positions).unwrap();
+        write_scoring_matrix(&output_path, &positions, chain.starts_with("IG")).unwrap();
 
         println!(
             "Generated scoring matrix for {}: {}",
@@ -212,7 +225,11 @@ fn process_consensus_csv(content: &str) -> Vec<PositionData> {
     positions
 }
 
-fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Result<()> {
+fn write_scoring_matrix(
+    path: &Path,
+    positions: &[PositionData],
+    antibody: bool,
+) -> std::io::Result<()> {
     let mut position_scores = Vec::new();
 
     for pos_data in positions {
@@ -222,7 +239,8 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
         // Map 20 amino acid scores into 26-slot array indexed by (byte - b'A')
         let mut scores = [-4.0f32; 26];
         for (i, &aa_byte) in AMINO_ACIDS.iter().enumerate() {
-            scores[(aa_byte - b'A') as usize] = scores_20[i];
+            scores[(aa_byte - b'A') as usize] =
+                scores_20[i] + extra_motif_bonus(pos_data.position, aa_byte);
         }
 
         // Calculate gap penalties with region-specific and conservation-based penalties
@@ -236,6 +254,7 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
             pos_data.occupancy,
             max_freq,
             &pos_data.region,
+            antibody,
         );
 
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
@@ -260,6 +279,15 @@ fn write_scoring_matrix(path: &Path, positions: &[PositionData]) -> std::io::Res
     fs::write(path, json)?;
 
     Ok(())
+}
+
+/// The extra match score for `residue` at IMGT `position`: J_MOTIF_BONUS for the J motif residues
+/// (Trp or Phe at 118, Gly at 121), 0 for everything else.
+fn extra_motif_bonus(position: u32, residue: u8) -> f32 {
+    match (position, residue) {
+        (118, b'W' | b'F') | (121, b'G') => J_MOTIF_BONUS,
+        _ => 0.0,
+    }
 }
 
 fn calculate_position_scores(aa_frequencies: &[(char, f32)]) -> [f32; 20] {
@@ -292,6 +320,38 @@ fn calculate_position_scores(aa_frequencies: &[(char, f32)]) -> [f32; 20] {
     scores
 }
 
+/// Raise multiplier to the floor for region, however variable its residue.
+///
+/// Antibody FR2 is floored at conserved, so a CDR2 with a mutated Ile 56 shortens CDR2 instead of
+/// opening a gap at FR2 54. Every other region has no floor: flooring FR1 and FR3 moved real
+/// deletions into the CDRs (1g7j heavy, TRGV4 4MNH_C, several TRB), and flooring TCR FR2 moved the
+/// FR2 deletions of 3QJH_A and 5FKA_A into CDR2, because TCR FR2 has too few conserved anchors.
+fn conservation_multiplier_floor_for_antibodies(region: &str, multiplier: f32) -> f32 {
+    match region {
+        "FR2" => multiplier.max(CONSERVED_MULTIPLIER),
+        _ => multiplier,
+    }
+}
+
+/// The insertion penalty for `position` in `region`.
+///
+/// CDR center positions are permissive, since that is where CDR length variation is absorbed.
+/// Elsewhere insertions are harsh. FR1 is less harsh so a kappa chain with an extra FR1 residue
+/// inserts it instead of leaving residue 1 unaligned, which is free, and shifting FR1 by one. Every
+/// other region keeps the harsher penalty, so a mismatch is never traded for an insertion there.
+fn insertion_penalty(position: u32, region: &str) -> f32 {
+    let is_cdr = matches!(region, "CDR1" | "CDR2" | "CDR3");
+    let is_cdr_center = is_cdr && CDR_CENTER_POSITIONS.contains(&position);
+    if is_cdr_center {
+        CDR_INSERTION_PENALTY
+    } else {
+        match region {
+            "FR1" => FR1_INSERTION_PENALTY,
+            _ => NO_INSERTION_PENALTY,
+        }
+    }
+}
+
 /// Return the calculated gap penalty and insertion penalty.
 /// Gap penalty reduced in low occupancy positions, but increased in highly conserved positions.
 /// Insertion penalty is permissive only at CDR center positions where length variation is absorbed.
@@ -301,6 +361,7 @@ fn calculate_gap_penalties(
     occupancy: f32,
     max_freq: f32,
     region: &str,
+    antibody: bool,
 ) -> (f32, f32) {
     let is_cdr = matches!(region, "CDR1" | "CDR2" | "CDR3");
 
@@ -312,8 +373,8 @@ fn calculate_gap_penalties(
     };
 
     // Conservation multiplier: increase penalty significantly for conserved positions
-    // This forces the alignment to respect conserved anchor points in FR regions
-    let conservation_multiplier = if occupancy >= 0.5 && max_freq >= 0.9 {
+    // This forces the alignment to respect conserved anchor points in FR regions.
+    let mut conservation_multiplier = if occupancy >= 0.5 && max_freq >= 0.9 {
         HIGHLY_CONSERVED_MULTIPLIER
     } else if occupancy >= 0.5 && max_freq >= 0.7 {
         CONSERVED_MULTIPLIER
@@ -321,18 +382,18 @@ fn calculate_gap_penalties(
         VARIABLE_MULTIPLIER
     };
 
+    // Floor conservation_multiplier based on regions if antibody
+    if antibody {
+        conservation_multiplier =
+            conservation_multiplier_floor_for_antibodies(region, conservation_multiplier);
+    }
+
     // Gap penalty: scale by occupancy and conservation
     // Low occupancy -> less negative (more permissive)
     // High conservation -> more negative (less permissive)
     let gap_penalty = base_gap_penalty * occupancy * conservation_multiplier;
 
-    // Insertion penalty: permissive at CDR center positions, harsh everywhere else
-    let is_cdr_center = is_cdr && CDR_CENTER_POSITIONS.contains(&position);
-    let insertion_penalty = if is_cdr_center {
-        CDR_INSERTION_PENALTY
-    } else {
-        NO_INSERTION_PENALTY
-    };
+    let insertion_penalty = insertion_penalty(position, region);
 
     (gap_penalty, insertion_penalty)
 }

@@ -166,7 +166,7 @@ profile of the detected chain. It is computed from the alignment:
 
 Inserted residues, and residues before or after the domain, don't enter the score. Because only
 the reached positions count, a fragment can score as high as a full domain: the first 30
-residues of the heavy chain above score 0.74, the whole domain 0.77. Changing CDR3 residues
+residues of the heavy chain above score 0.74, the whole domain 0.78. Changing CDR3 residues
 barely moves the score; changing a conserved framework residue does.
 
 ### Minimum confidence
@@ -183,7 +183,7 @@ heavy = "QVQLVQSGAEVKRPGSSVTVSCKASGGSFSTYALSWVRQAPGRGLEWMGGVIPLLTITNYAPRFQGRITIT
 gfp = "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTFSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK"
 
 annotator = Annotator(chains=["ig"], scheme="imgt")
-print(round(annotator.number(heavy).confidence, 3))  # 0.773
+print(round(annotator.number(heavy).confidence, 3))  # 0.779
 
 result = annotator.number(gfp)
 print(result.error_kind)  # low_confidence
@@ -200,13 +200,13 @@ Scores of the bundled validation sequences (`fixtures/validation`), numbered wit
 
 | Chain | Sequences | Lowest | Median | Below 0.5 |
 |-------|-----------|--------|--------|-----------|
-| H     | 2452      | 0.557  | 0.805  | 0         |
-| K     | 1485      | 0.595  | 0.862  | 0         |
-| L     | 371       | 0.552  | 0.817  | 0         |
-| A     | 865       | 0.286  | 0.651  | 76        |
-| B     | 934       | 0.277  | 0.759  | 57        |
-| G     | 25        | 0.590  | 0.846  | 0         |
-| D     | 23        | 0.765  | 0.824  | 0         |
+| H     | 2452      | 0.569  | 0.810  | 0         |
+| K     | 1485      | 0.607  | 0.866  | 0         |
+| L     | 371       | 0.565  | 0.823  | 0         |
+| A     | 865       | 0.306  | 0.664  | 76        |
+| B     | 934       | 0.272  | 0.767  | 43        |
+| G     | 25        | 0.604  | 0.852  | 0         |
+| D     | 23        | 0.775  | 0.831  | 0         |
 
 Green fluorescent protein scores 0.128 and hen egg-white lysozyme 0.083 against the antibody
 chains.
@@ -354,7 +354,7 @@ Its best alignment scored below `min_confidence` (0.5 by default). The `error` m
 score. Common causes:
 
 - It isn't an antibody or TCR variable domain.
-- You didn't ask for its chain. The TCR β chain 1AO7_E from the validation set scores 0.30
+- You didn't ask for its chain. The TCR β chain 1AO7_E from the validation set scores 0.33
   against `["ig"]` and 0.76 against `["tcr"]`.
 - It is a TCR α or β chain that scores low; see [Choosing a value](#choosing-a-value).
 - It is a nucleotide sequence; see [below](#how-do-i-number-nucleotide-sequences).
