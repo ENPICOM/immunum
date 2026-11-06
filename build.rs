@@ -29,9 +29,9 @@ const CDR_INSERTION_PENALTY: f32 = -1.9;
 // FARG). The bonus makes an alignment that reaches the real FR4 outscore one that stops at C104
 // after a long CDR3, or one that numbers a tag after a short FR4 as FR4, so the suffix clip picks
 // the real FR4 end. Pinned with SUFFIX_CLIP_THRESHOLD = 42 in alignment.rs by the lambda chain in
-// the Python tests numbered as kappa: below 6 its J region goes into CDR3 and the constant region's
+// the Python tests numbered as kappa: below 8 its J region goes into CDR3 and the constant region's
 // VGQPKA becomes FR4. Trp at IGH 118 then scores 17, which `test_scores_reasonable` allows for.
-const J_MOTIF_BONUS: f32 = 6.0;
+const J_MOTIF_BONUS: f32 = 8.0;
 
 // IMGT CDR center positions where insertions are absorbed
 const CDR_CENTER_POSITIONS: &[u32] = &[32, 33, 60, 61, 111, 112];
@@ -339,7 +339,7 @@ fn conservation_multiplier_floor_for_antibodies(region: &str, multiplier: f32) -
 /// Elsewhere insertions are harsh. FR1 is less harsh so a kappa chain with an extra FR1 residue
 /// inserts it instead of leaving residue 1 unaligned, which is free, and shifting FR1 by one. Every
 /// other region keeps the harsher penalty, so a mismatch is never traded for an insertion there.
-fn decide_no_insertion_penalty(position: u32, region: &str) -> f32 {
+fn insertion_penalty(position: u32, region: &str) -> f32 {
     let is_cdr = matches!(region, "CDR1" | "CDR2" | "CDR3");
     let is_cdr_center = is_cdr && CDR_CENTER_POSITIONS.contains(&position);
     if is_cdr_center {
@@ -393,7 +393,7 @@ fn calculate_gap_penalties(
     // High conservation -> more negative (less permissive)
     let gap_penalty = base_gap_penalty * occupancy * conservation_multiplier;
 
-    let insertion_penalty = decide_no_insertion_penalty(position, region);
+    let insertion_penalty = insertion_penalty(position, region);
 
     (gap_penalty, insertion_penalty)
 }
