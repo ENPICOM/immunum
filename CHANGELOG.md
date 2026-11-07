@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CDR3 followed by a linker and a constant region stopped at IMGT 105, without its CDR3 and FR4.
   The lambda chain in the test suite had its J region in CDR3 and the constant region's `GQPKA` in
   FR4; it now has `FGGGTQLTV` as FR4 and `GQPKA` in the postfix. Matching the motif residues scores
-  6 points more each, and trailing residues are clipped when that scores 42 points higher instead of
+  8 points more each, and trailing residues are clipped when that scores 42 points higher instead of
   50. Confidence rises slightly for chains that match the motif.
 
 ## [2.0.0] - 2026-10-12

@@ -117,12 +117,12 @@ mod tests {
         let matrix = ScoringMatrix::load(Chain::IGH);
 
         // Check that scores are in reasonable range: BLOSUM62 is roughly -4 to 11, plus the J motif
-        // bonus in build.rs, which lifts Trp at IGH 118 to 17
+        // bonus in build.rs, which lifts Trp at IGH 118 to 19
         for pos in &matrix.positions {
             for (i, &score) in pos.scores.iter().enumerate() {
                 let aa = (b'A' + i as u8) as char;
                 assert!(
-                    (-10.0..=17.0).contains(&score),
+                    (-10.0..=19.0).contains(&score),
                     "Score for {} at position {} is out of range: {}",
                     aa,
                     pos.position,
