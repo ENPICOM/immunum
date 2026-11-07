@@ -30,7 +30,7 @@ const CDR_INSERTION_PENALTY: f32 = -1.9;
 // after a long CDR3, or one that numbers a tag after a short FR4 as FR4, so the suffix clip picks
 // the real FR4 end. Pinned with SUFFIX_CLIP_THRESHOLD = 42 in alignment.rs by the lambda chain in
 // the Python tests numbered as kappa: below 8 its J region goes into CDR3 and the constant region's
-// VGQPKA becomes FR4. Trp at IGH 118 then scores 17, which `test_scores_reasonable` allows for.
+// VGQPKA becomes FR4. Trp at IGH 118 then scores 19, which `test_scores_reasonable` allows for.
 const J_MOTIF_BONUS: f32 = 8.0;
 
 // IMGT CDR center positions where insertions are absorbed
