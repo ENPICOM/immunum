@@ -1,0 +1,23 @@
+CHANGELOG.md
+  s_6d85acec1055df::t_841783209ba153 8
+Cargo.lock
+  s_6d85acec1055df::t_99461f43b2c3b9 1327
+Cargo.toml
+  s_6d85acec1055df::t_761dcdb74b3d42 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1005261554f2c61df3ba359d00c2a3f1080c9771",
+  "prompts": {},
+  "sessions": {
+    "s_6d85acec1055df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "828658ea-8391-4c27-9edd-807849717773",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jorrit Posthuma <git@jorritposthuma.nl>"
+    }
+  }
+}
