@@ -1,0 +1,23 @@
+src/scoring.rs
+  s_6d85acec1055df::t_e6e3a09af9c9b5 120,125
+CHANGELOG.md
+  s_6d85acec1055df::t_b409e52369327a 72
+build.rs
+  s_6d85acec1055df::t_b409e52369327a 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0188d87884d40a189b7c3058daba9c094c1a3644",
+  "prompts": {},
+  "sessions": {
+    "s_6d85acec1055df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "828658ea-8391-4c27-9edd-807849717773",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Jorrit Posthuma <git@jorritposthuma.nl>"
+    }
+  }
+}
