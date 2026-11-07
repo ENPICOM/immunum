@@ -1,6 +1,6 @@
 [package]
 name = "immunum"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2021"
 # The oldest Rust that builds every feature.
 rust-version = "1.89"
