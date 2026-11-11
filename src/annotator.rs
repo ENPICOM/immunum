@@ -12,6 +12,38 @@ use crate::types::{Chain, Position, Scheme};
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
+#[cfg_attr(feature = "python", pyclass(eq, eq_int))]
+#[derive(Debug, Serialize, Clone, Deserialize, Copy, PartialEq, Eq)]
+pub enum Strand {
+    Forward = 0,
+    Reverse = 1,
+}
+
+#[cfg_attr(feature = "python", pyclass(eq))]
+#[derive(Debug, Serialize, Clone, Deserialize, Copy, PartialEq, Eq)]
+/// Describes frameshift including how many bases were consumed for it
+pub enum FrameshiftType {
+    Insertion(u8),
+    Deletion(u8),
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Frameshift {
+    pub span: (usize, usize), //in the query sequence
+    pub type_frameshift: FrameshiftType,
+    pub position: Position, //IMGT number
+    pub repaired: bool,     //if it was repaired
+}
+
+#[cfg_attr(feature = "python", pyclass(get_all))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NucleotideNumbering {
+    pub strand: Strand,
+    pub frameshifts: Vec<Frameshift>,
+    pub sequence_aa: String,
+}
+
 /// Result of numbering a sequence
 #[cfg_attr(feature = "python", pyclass(get_all))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +52,7 @@ pub struct NumberingResult {
     pub chain: Chain,
     /// Numbering scheme used
     pub scheme: Scheme,
-    /// Numbered positions for the aligned region only (length == query_end - query_start + 1)
+    /// Numbered positions for the aligned region only
     pub positions: Vec<Position>,
     /// First aligned consensus position
     pub cons_start: usize,
@@ -28,10 +60,26 @@ pub struct NumberingResult {
     pub cons_end: usize,
     /// Confidence score (normalized alignment score)
     pub confidence: f32,
-    /// 0-based index of the first antibody residue in the query (0 when no prefix)
+    /// 0-based index of the first antibody position in the query (0 when no prefix)
     pub query_start: usize,
-    /// 0-based index of the last antibody residue in the query (query.len()-1 when no suffix)
+    /// 0-based index of the last antibody position in the query (query.len()-1 when no suffix)
     pub query_end: usize,
+
+    // NT additions
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nucleotide: Option<NucleotideNumbering>,
+}
+
+/// Same as SegmentResult without post/prefix
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SegmentResultFixless {
+    pub fr1: String,
+    pub cdr1: String,
+    pub fr2: String,
+    pub cdr2: String,
+    pub fr3: String,
+    pub cdr3: String,
+    pub fr4: String,
 }
 
 /// Result of segmenting a sequence into FR/CDR regions
@@ -46,6 +94,10 @@ pub struct SegmentResult {
     pub cdr3: String,
     pub fr4: String,
     pub postfix: String,
+
+    /// The regions' amino acids, frameshifts repaired. Nucleotide input only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub translated: Option<SegmentResultFixless>,
 }
 
 impl SegmentResult {
@@ -84,9 +136,11 @@ pub const MIN_SEQUENCE_LENGTH: usize = 30;
 /// Maximum allowed input sequence length.
 pub const MAX_SEQUENCE_LENGTH: usize = 10000;
 
+const NT_VOCABULARY: [char; 6] = ['A', 'C', 'T', 'G', 'U', 'N'];
+
 /// Validate that `sequence` contains only standard amino acid characters
 /// (case-insensitive) and that its length is within the allowed bounds.
-fn validate_sequence(sequence: &str) -> Result<(), SequenceError> {
+fn validate_aminoacid_sequence(sequence: &str) -> Result<(), SequenceError> {
     let len = sequence.len();
     if len < MIN_SEQUENCE_LENGTH {
         return Err(SequenceError::InvalidSequence(format!(
@@ -108,6 +162,33 @@ fn validate_sequence(sequence: &str) -> Result<(), SequenceError> {
             )));
         }
     }
+    Ok(())
+}
+
+fn validate_nucleotide_sequence(sequence: &str) -> Result<(), SequenceError> {
+    let len = sequence.len();
+
+    for (i, b) in sequence.chars().enumerate() {
+        if !NT_VOCABULARY.contains(&b) {
+            return Err(SequenceError::InvalidSequence(format!(
+                "invalid character {:?} at position {i}",
+                b
+            )));
+        }
+    }
+    if len < MIN_SEQUENCE_LENGTH * 3 {
+        return Err(SequenceError::InvalidSequence(format!(
+            "sequence length {} is below minimum {}",
+            len, MIN_SEQUENCE_LENGTH
+        )));
+    }
+    if len > MAX_SEQUENCE_LENGTH * 3 {
+        return Err(SequenceError::InvalidSequence(format!(
+            "sequence length {} exceeds maximum {}",
+            len, MAX_SEQUENCE_LENGTH
+        )));
+    }
+
     Ok(())
 }
 
@@ -143,10 +224,20 @@ pub struct Annotator {
     pub(crate) scheme: Scheme,
     pub(crate) chains: Vec<Chain>,
     pub(crate) min_confidence: f32,
+    pub(crate) nucletide_input: bool,
 }
 
 impl Annotator {
     pub fn new(chains: &[Chain], scheme: Scheme, min_confidence: Option<f32>) -> Result<Self> {
+        Annotator::new_nt(chains, scheme, false, min_confidence)
+    }
+
+    pub fn new_nt(
+        chains: &[Chain],
+        scheme: Scheme,
+        nucletide_input: bool,
+        min_confidence: Option<f32>,
+    ) -> Result<Self> {
         if chains.is_empty() {
             return Err(Error::InvalidChain("no chains given".to_string()));
         }
@@ -168,6 +259,7 @@ impl Annotator {
             scheme,
             chains: chains.to_vec(),
             min_confidence: min_confidence.unwrap_or(DEFAULT_MIN_CONFIDENCE),
+            nucletide_input,
         })
     }
 
@@ -187,7 +279,11 @@ impl Annotator {
 
     /// Number a sequence by aligning to the configured chain types and applying the numbering scheme
     pub fn number(&self, sequence: &str) -> Result<NumberingResult, SequenceError> {
-        validate_sequence(sequence)?;
+        if self.nucletide_input {
+            validate_nucleotide_sequence(sequence)?;
+        } else {
+            validate_aminoacid_sequence(sequence)?;
+        }
         Ok(self.best_domain(sequence)?.numbered_as(self.scheme))
     }
 
@@ -246,7 +342,11 @@ impl Annotator {
     /// [`Annotator::number`] reports it, or [`SequenceError::DomainTooShort`] when it is confident but
     /// too short and the residues around it hold no domain either.
     pub fn domains(&self, sequence: &str) -> Result<Vec<Domain>, SequenceError> {
-        validate_sequence(sequence)?;
+        if self.nucletide_input {
+            validate_nucleotide_sequence(sequence)?;
+        } else {
+            validate_aminoacid_sequence(sequence)?;
+        }
         let best = self.best_domain(sequence)?;
         let best_length = best.query_end + 1 - best.query_start;
 
@@ -429,18 +529,24 @@ impl Domain {
             confidence: self.confidence,
             query_start: self.query_start,
             query_end,
+            nucleotide: None,
         }
     }
 }
 
 impl NumberingResult {
     /// Each numbered position with its residue. `sequence` is the whole sequence that was numbered,
-    /// flanking residues included.
+    /// flanking residues included. For nucleotide input the residues are the amino acids the
+    /// codons translate to, frameshifts repaired, not the bases.
     pub fn residues<'a>(
         &'a self,
         sequence: &'a str,
     ) -> Result<impl Iterator<Item = (&'a Position, char)> + 'a> {
-        Ok(self.positions.iter().zip(self.numbered(sequence)?.chars()))
+        let residues = match &self.nucleotide {
+            Some(nucleotide) => nucleotide.sequence_aa.as_str(),
+            None => self.numbered(sequence)?,
+        };
+        Ok(self.positions.iter().zip(residues.chars()))
     }
 
     /// The FR/CDR split of `sequence`, the whole sequence that was numbered. The residues before the
@@ -471,6 +577,7 @@ impl NumberingResult {
             cdr3,
             fr4,
             postfix,
+            translated: None,
         }
     }
 
@@ -1184,5 +1291,888 @@ mod tests {
         ));
         assert_eq!(segments.cdr3, cdr3);
         assert!(segments.fr4.starts_with("WGQG"), "{}", segments.fr4);
+    }
+
+    #[test]
+    fn validate_nucleotide_sequence_correctly_rejects_aa_sequence() {
+        let cdr3 = "AADPTRGLSYSGQWERPDYAS";
+
+        let Err(error) = validate_nucleotide_sequence(cdr3) else {
+            panic!("expected an amino-acid sequence to be rejected");
+        };
+
+        let SequenceError::InvalidSequence(message) = error else {
+            panic!("expected InvalidSequence, got {error:?}");
+        };
+        assert!(message.contains("invalid character"), "{message}");
+    }
+}
+
+/// Nucleotide input
+///
+/// The reads are synthetic naive human antibodies: IMGT germline V, D and J genes (the alleles the
+/// consensus is built from) joined as in V(D)J recombination, with their ends trimmed and a few
+/// random non-templated bases (TdT's N nucleotides) added at each join, from codon 1 to the end of
+/// FR4. Each comes with its translation. A clean read must number exactly as protein mode numbers
+/// that translation, with `query_start`/`query_end` counted in bases.
+///
+/// The errors go where antibody genes have homopolymers, runs of 4+ identical bases, at the same
+/// IMGT positions in most genes: Nanopore, Ion Torrent and 454 miscount them by one base, and today
+/// such a frameshift makes immunum confidently wrong. Losing or doubling one base of a run can
+/// be repaired exactly, so the read must number like its clean read, ending that many bases
+/// earlier or later, at a lower but still accepted confidence. Inside the CDR3 a frameshift
+/// may be a real out-of-frame join instead, so there it must not be repaired.
+///
+/// Every frameshift found is reported in `NumberingResult::frameshifts`: repaired ones, and the
+/// ones left as they are inside the CDR3. Its `span` is taken as the bases the shifted codon
+/// consumed, 0-based and inclusive like `query_start`/`query_end`: 2 for a lost base, 4 for a
+/// doubled one. A homopolymer error can't be placed within its run, so the span only has to
+/// touch the run (one base either side allowed, for placement at a codon boundary), and its
+/// `position` has to be a codon the run touches.
+#[cfg(test)]
+mod nt_tests_synthetic {
+    use super::*;
+    use crate::types::IG_CHAINS;
+
+    // Synthetic naive antibodies, codon 1 through FR4 (bases: 0-based, end exclusive)
+    // Heavy chain: IGHV3-23*01, IGHD3-16*01, IGHJ4*01. Runs: GGGGG 21..26 (FR1 8-9), GGGGGG 42..48
+    // (FR1 16-17), GGGG 128..132 (FR2 48-49), GGGGG 310..315 (CDR3), GGGG 346..350 (118-119).
+    const HEAVY_DNA: &str = "GAGGTGCAGCTGTTGGAGTCTGGGGGAGGCTTGGTACAGCCTGGGGGGTCCCTGAGACTCTCCTGTGCAGCCTCTGGATTCACCTTTAGCAGCTATGCCATGAGCTGGGTCCGCCAGGCTCCAGGGAAGGGGCTGGAGTGGGTCTCAGCTATTAGTGGTAGTGGTGGTAGCACATACTACGCAGACTCCGTGAAGGGCCGGTTCACCATCTCCAGAGACAATTCCAAGAACACGCTGTATCTGCAAATGAACAGCCTGAGAGCCGAGGACACGGCCGTATATTACTGTGCGAAAGGGCATGATTACGTTTGGGGGAGTTATGCTTATACCAGGACAATTGACTACTGGGGCCAAGGAACCCTGGTCACCGTCTCCTCA";
+    const HEAVY_PROTEIN: &str = "EVQLLESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAKGHDYVWGSYAYTRTIDYWGQGTLVTVSS";
+    // Heavy chain: IGHV1-3*01, IGHD5-5*01, IGHJ6*01. Runs: CCCCC 118..123 (FR2 45-46), GGGGG
+    // 346..351 (118-119).
+    const HEAVY_IGHJ6_DNA: &str = "CAGGTCCAGCTTGTGCAGTCTGGGGCTGAGGTGAAGAAGCCTGGGGCCTCAGTGAAGGTTTCCTGCAAGGCTTCTGGATACACCTTCACTAGCTATGCTATGCATTGGGTGCGCCAGGCCCCCGGACAAAGGCTTGAGTGGATGGGATGGATCAACGCTGGCAATGGTAACACAAAATATTCACAGAAGTTCCAGGGCAGAGTCACCATTACCAGGGACACATCCGCGAGCACAGCCTACATGGAGCTGAGCAGCCTGAGATCTGAAGACACGGCTGTGTATTACTGTGCGAGAGACGAAGATACAGCTATGGTTAGCTACTACTACTACTACGGTATGGACGTCTGGGGGCAAGGGACCACGGTCACCGTCTCCTCA";
+    const HEAVY_IGHJ6_PROTEIN: &str = "QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYAMHWVRQAPGQRLEWMGWINAGNGNTKYSQKFQGRVTITRDTSASTAYMELSSLRSEDTAVYYCARDEDTAMVSYYYYYGMDVWGQGTTVTVSS";
+    // Kappa chain: IGKV1-12*01, IGKJ2*01. Runs: CCCC 127..131 (FR2 49-50), GGGG 168..172 (FR3
+    // 70-71), TTTT 245..249 (FR3 98-99), TTTT 290..294 (CDR3 end and 118), GGGG 299..303 (120-121).
+    const KAPPA_DNA: &str = "GACATCCAGATGACCCAGTCTCCATCTTCCGTGTCTGCATCTGTAGGAGACAGAGTCACCATCACTTGTCGGGCGAGTCAGGGTATTAGCAGCTGGTTAGCCTGGTATCAGCAGAAACCAGGGAAAGCCCCTAAGCTCCTGATCTATGCTGCATCCAGTTTGCAAAGTGGGGTCCCATCAAGGTTCAGCGGCAGTGGATCTGGGACAGATTTCACTCTCACCATCAGCAGCCTGCAGCCTGAAGATTTTGCAACTTACTATTGTCAACAGGCTAACAGTTTCCCTCACACTTTTGGCCAGGGGACCAAGCTGGAGATCAAA";
+    const KAPPA_PROTEIN: &str = "DIQMTQSPSSVSASVGDRVTITCRASQGISSWLAWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQANSFPHTFGQGTKLEIK";
+    // Lambda chain: IGLV1-40*01, IGLJ2*01. Runs: CCCC 37..41 (FR1 14-15), GGGG 87..91 (CDR1),
+    // CCCCC 133..138 (FR2 49-50), GGGG 174..178 (FR3 70-71).
+    const LAMBDA_DNA: &str = "CAGTCTGTGCTGACGCAGCCGCCCTCAGTGTCTGGGGCCCCAGGGCAGAGGGTCACCATCTCCTGCACTGGGAGCAGCTCCAACATCGGGGCAGGTTATGATGTACACTGGTACCAGCAGCTTCCAGGAACAGCCCCCAAACTCCTCATCTATGGTAACAGCAATCGGCCCTCAGGGGTCCCTGACCGATTCTCTGGCTCCAAGTCTGGCACCTCAGCCTCCCTGGCCATCACTGGGCTCCAGGCTGAGGATGAGGCTGATTATTACTGCCAGTCCTATGACAGCAGCCTGAGTGGTTCGGTATTCGGCGGAGGGACCAAGCTGACCGTCCTA";
+    const LAMBDA_PROTEIN: &str = "QSVLTQPPSVSGAPGQRVTISCTGSSSNIGAGYDVHWYQQLPGTAPKLLIYGNSNRPSGVPDRFSGSKSGTSASLAITGLQAEDEADYYCQSYDSSLSGSVFGGGTKLTVL";
+    // IGHV3-23*01, IGHD6-6*01, IGHJ4*01 joined out of frame: 353 bases.
+    const OUT_OF_FRAME_HEAVY_DNA: &str = "GAGGTGCAGCTGTTGGAGTCTGGGGGAGGCTTGGTACAGCCTGGGGGGTCCCTGAGACTCTCCTGTGCAGCCTCTGGATTCACCTTTAGCAGCTATGCCATGAGCTGGGTCCGCCAGGCTCCAGGGAAGGGGCTGGAGTGGGTCTCAGCTATTAGTGGTAGTGGTGGTAGCACATACTACGCAGACTCCGTGAAGGGCCGGTTCACCATCTCCAGAGACAATTCCAAGAACACGCTGTATCTGCAAATGAACAGCCTGAGAGCCGAGGACACGGCCGTATATTACTGTGCGAAAGCAGGTATAGCAGCTCCTTTGACTACTGGGGCCAAGGAACCCTGGTCACCGTCTCCTCA";
+    // The first 60 bases of IGHM CH1 and of IGKC, in frame after FR4
+    const IGHM_CH1_START: &str = "GGGAGTGCATCCGCCCCAACCCTTTTCCCCCTCGTCTCCTGTGAGAATTCCCCGTCGGAT";
+    const IGKC_START: &str = "CGAACTGTGGCTGCACCATCTGTCTTCATCTTCCCGCCATCTGATGAGCAGTTGAAATCT";
+    // 360 random bases
+    const RANDOM_DNA: &str = "CAGATTTTCATATTATGCAGAAAATCTACTTCGCCTGATACGAGTCGGTTATCTTCGGATACTGTATAGTCCCACCTGGTGATCCTATGCTTGTGAGTACCCAGAAAATAGCGACGGACCGCGGTGTTAAGTGTCGAGCTACATCACTTCTCATGTAGCCAGAAGGCTGCAACTCATCGACTCTATGTAGTGACCGCGTCGATGTCAAACCCCGGGGGGAGCTCAGATATCCGATACAGGGATGAAGAAATAACCTCATCCCATTGGTGACGAAAGGTTGTAAGTAGCTGGCCGCCGAGATAGCTGAGCGGCGAACCACTAGAAAAGGTTCAGACCCCGGAGCCCAGCCGTCACGATTGT";
+
+    const FIXTURES: [(&str, &str, &str); 4] = [
+        (HEAVY_DNA, HEAVY_PROTEIN, "AKGHDYVWGSYAYTRTIDY"),
+        (HEAVY_IGHJ6_DNA, HEAVY_IGHJ6_PROTEIN, "ARDEDTAMVSYYYYYGMDV"),
+        (KAPPA_DNA, KAPPA_PROTEIN, "QQANSFPHT"),
+        (LAMBDA_DNA, LAMBDA_PROTEIN, "QSYDSSLSGSV"),
+    ];
+
+    // Every confidence is reported (minimum 0), so a test sees the value instead of LowConfidence
+    fn nt(scheme: Scheme) -> Annotator {
+        Annotator::new_nt(IG_CHAINS, scheme, true, Some(0.0)).unwrap()
+    }
+
+    fn protein_numbering(protein: &str, scheme: Scheme) -> NumberingResult {
+        Annotator::new(IG_CHAINS, scheme, Some(0.0))
+            .unwrap()
+            .number(protein)
+            .unwrap()
+    }
+
+    // The standard genetic code, codons in TCAG order; a stop reads as X, as protein mode takes it
+    fn translate(dna: &str) -> String {
+        const CODE: &[u8; 64] = b"FFLLSSSSYYXXCCXWLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG";
+        let index = |b: u8| match b {
+            b'T' => 0,
+            b'C' => 1,
+            b'A' => 2,
+            _ => 3,
+        };
+        dna.as_bytes()
+            .chunks_exact(3)
+            .map(|codon| {
+                // CODE lists the 64 codons in TCAG order: the first base picks a block of 16,
+                // the second a block of 4 within it, the third the codon within that. Read as
+                // a base-4 number with T=0, C=1, A=2, G=3, the codon is its own index into CODE:
+                // TTT = 0 (F), TCA = 0*16 + 1*4 + 2 = 6 (S), GGG = 3*16 + 3*4 + 3 = 63 (G).
+                let first = index(codon[0]);
+                let second = index(codon[1]);
+                let third = index(codon[2]);
+                let amino_acid = CODE[16 * first + 4 * second + third];
+                char::from(amino_acid)
+            })
+            .collect()
+    }
+
+    fn reverse_complement(dna: &str) -> String {
+        dna.bytes()
+            .rev()
+            .map(|b| match b {
+                b'A' => 'T',
+                b'T' => 'A',
+                b'C' => 'G',
+                _ => 'C',
+            })
+            .collect()
+    }
+
+    fn deleted(dna: &str, at: usize, length: usize) -> String {
+        format!("{}{}", &dna[..at], &dna[at + length..])
+    }
+
+    fn inserted(dna: &str, at: usize, bases: &str) -> String {
+        format!("{}{bases}{}", &dna[..at], &dna[at..])
+    }
+
+    // `got` numbers like protein mode's `expected`, its domain spanning bases `span` of the
+    // forward read
+    #[track_caller]
+    fn assert_numbered_like(
+        got: &NumberingResult,
+        expected: &NumberingResult,
+        span: (usize, usize),
+    ) {
+        assert_eq!(got.chain, expected.chain);
+        assert_eq!(got.positions, expected.positions);
+        assert_eq!(
+            (got.query_start, got.query_end),
+            span,
+            "domain span in bases"
+        );
+        assert_eq!(nucleotide(got).strand, Strand::Forward);
+        assert_one_residue_per_position(got);
+    }
+
+    // The nucleotide part of a result, which nucleotide input always gives
+    #[track_caller]
+    fn nucleotide(got: &NumberingResult) -> &NucleotideNumbering {
+        got.nucleotide
+            .as_ref()
+            .expect("nucleotide input gives a nucleotide part")
+    }
+
+    // Nucleotide input always gives its amino acids, one for each numbered position
+    #[track_caller]
+    fn assert_one_residue_per_position(got: &NumberingResult) {
+        let residues = &nucleotide(got).sequence_aa;
+        assert_eq!(residues.chars().count(), got.positions.len(), "{residues}");
+    }
+
+    // The domain's amino acids are `protein`
+    #[track_caller]
+    fn assert_residues(got: &NumberingResult, protein: &str) {
+        assert_eq!(nucleotide(got).sequence_aa, protein);
+    }
+
+    // Read in one frame from start to end: no frameshift reported
+    #[track_caller]
+    fn assert_in_frame(got: &NumberingResult) {
+        let frameshifts = &nucleotide(got).frameshifts;
+        assert!(frameshifts.is_empty(), "{frameshifts:?}");
+    }
+
+    // The IMGT positions of the clean read's codons that bases `bases` (of the clean read) touch,
+    // one base either side included
+    fn codon_positions(clean: &NumberingResult, bases: Range<usize>) -> &[Position] {
+        let first = bases.start.saturating_sub(1) / 3;
+        let last = (bases.end / 3).min(clean.positions.len() - 1);
+        &clean.positions[first..=last]
+    }
+
+    // `got` is one frameshift of `kind`, `repaired` or not, its span the 2 or 4 bases it consumed
+    // and touching bases `near` of the read (one base either side allowed), numbered at one of
+    // `positions`
+    #[track_caller]
+    fn assert_frameshift(
+        got: &Frameshift,
+        kind: FrameshiftType,
+        repaired: bool,
+        near: Range<usize>,
+        positions: &[Position],
+    ) {
+        assert_eq!(got.type_frameshift, kind, "{got:?}");
+        assert_eq!(got.repaired, repaired, "{got:?}");
+        let (start, end) = got.span;
+        let consumed = match kind {
+            FrameshiftType::Deletion(n) => 3 - usize::from(n),
+            FrameshiftType::Insertion(n) => 3 + usize::from(n),
+        };
+        assert_eq!(end + 1 - start, consumed, "bases consumed: {got:?}");
+        assert!(
+            start <= near.end && end + 1 >= near.start,
+            "{got:?} isn't next to bases {near:?}"
+        );
+        assert!(
+            positions.contains(&got.position),
+            "{got:?} isn't numbered at one of {positions:?}"
+        );
+    }
+
+    // `read` is `clean_dna` with sequencing errors: it must number like the clean protein, its
+    // domain still spanning the whole read, and score below the clean read without falling under
+    // the default minimum confidence. Returns the read's numbering and the clean one, for the
+    // caller to check the frameshifts.
+    #[track_caller]
+    fn assert_repaired(
+        read: &str,
+        clean_dna: &str,
+        clean_protein: &str,
+    ) -> (NumberingResult, NumberingResult) {
+        let clean = protein_numbering(clean_protein, Scheme::IMGT);
+        assert_eq!(3 * clean_protein.len(), clean_dna.len());
+        let got = nt(Scheme::IMGT).number(read).unwrap();
+        assert_numbered_like(&got, &clean, (0, read.len() - 1));
+        assert!(
+            got.confidence < clean.confidence,
+            "a repair must cost confidence: {} vs clean {}",
+            got.confidence,
+            clean.confidence
+        );
+        assert!(
+            got.confidence >= DEFAULT_MIN_CONFIDENCE,
+            "{}",
+            got.confidence
+        );
+        (got, clean)
+    }
+
+    // One base of the homopolymer `dna[run]` lost, and one doubled: both reads are repaired, each
+    // with one repaired frameshift at the run. Every base of a run reads the same when lost or
+    // doubled, so the first one stands for all. The base the repair restores (or drops) is the
+    // run's own, so the amino acids come back exactly as in the clean protein, and `segment`
+    // gives the clean protein's regions in `translated` while its bases still rebuild the read.
+    #[track_caller]
+    fn assert_run_errors_repaired(dna: &str, protein: &str, run: Range<usize>) {
+        let base = &dna[run.start..run.start + 1];
+        assert_eq!(
+            dna[run.clone()],
+            base.repeat(run.len()),
+            "the fixture's run"
+        );
+        assert_ne!(
+            &dna[run.end..run.end + 1],
+            base,
+            "the run ends at {}",
+            run.end
+        );
+        for (read, kind, run_in_read) in [
+            (
+                deleted(dna, run.start, 1),
+                FrameshiftType::Deletion(1),
+                run.start..run.end - 1,
+            ),
+            (
+                inserted(dna, run.start, base),
+                FrameshiftType::Insertion(1),
+                run.start..run.end + 1,
+            ),
+        ] {
+            let (got, clean) = assert_repaired(&read, dna, protein);
+            assert_residues(&got, protein);
+            let segments = nt(Scheme::IMGT).segment(&read).unwrap();
+            assert_segmented(&segments, &read, protein);
+            let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+                panic!(
+                    "one frameshift expected: {:?}",
+                    nucleotide(&got).frameshifts
+                );
+            };
+            let positions = codon_positions(&clean, run.clone());
+            assert_frameshift(frameshift, kind, true, run_in_read, positions);
+        }
+    }
+
+    // `segment` on nucleotide input: the regions are bases and rebuild `dna` (the domain's
+    // strand), and `translated` holds each region's amino acids exactly as protein mode cuts
+    // `protein`
+    #[track_caller]
+    fn assert_segmented(got: &SegmentResult, dna: &str, protein: &str) {
+        let bases: String = got.regions().map(|(_, region)| region).concat();
+        assert_eq!(bases, dna, "the regions rebuild the read");
+        let expected = Annotator::new(IG_CHAINS, Scheme::IMGT, Some(0.0))
+            .unwrap()
+            .segment(protein)
+            .unwrap();
+        let aa = got
+            .translated
+            .as_ref()
+            .expect("nucleotide input gives translated regions");
+        let regions = [
+            ("fr1", &aa.fr1, &expected.fr1),
+            ("cdr1", &aa.cdr1, &expected.cdr1),
+            ("fr2", &aa.fr2, &expected.fr2),
+            ("cdr2", &aa.cdr2, &expected.cdr2),
+            ("fr3", &aa.fr3, &expected.fr3),
+            ("cdr3", &aa.cdr3, &expected.cdr3),
+            ("fr4", &aa.fr4, &expected.fr4),
+        ];
+        for (name, got, expected) in regions {
+            assert_eq!(got, expected, "{name}");
+        }
+    }
+
+    fn numbers(positions: &[Position], number: u8) -> bool {
+        positions.contains(&Position::new(number))
+    }
+
+    // The fixtures themselves, checked in protein mode (no nucleotide input needed): each DNA
+    // translates to its protein, and protein mode numbers every residue of it with the expected CDR3.
+    // This is the reference every other test compares with.
+    #[test]
+    fn nt_fixtures_are_valid() {
+        for (dna, protein, cdr3) in FIXTURES {
+            assert_eq!(translate(dna), protein);
+            let numbered = protein_numbering(protein, Scheme::IMGT);
+            assert_eq!(
+                (numbered.query_start, numbered.query_end),
+                (0, protein.len() - 1)
+            );
+            let segments = numbered.segment(protein).unwrap();
+            assert_eq!(segments.cdr3, cdr3);
+        }
+        // Out of frame: 353 bases, not a multiple of three
+        assert_ne!(OUT_OF_FRAME_HEAVY_DNA.len() % 3, 0);
+    }
+
+    // DNA that holds no antibody isn't numbered at the default minimum confidence: random bases, and
+    // a heavy chain read backwards (not complemented), which has its composition but no codons
+    #[test]
+    fn nt_dna_without_an_antibody_is_rejected() {
+        let annotator = Annotator::new_nt(IG_CHAINS, Scheme::IMGT, true, None).unwrap();
+        let backwards: String = HEAVY_DNA.chars().rev().collect();
+        for read in [RANDOM_DNA, &backwards] {
+            let error = annotator.number(read).unwrap_err();
+            assert_eq!(error.kind(), "low_confidence", "{error}");
+        }
+    }
+
+    // A clean read numbers exactly like its translation: same chain and positions, the domain
+    // spanning every base, and the same confidence, for heavy, kappa and lambda. The homopolymers
+    // in these reads are read as they are: no frameshift is reported.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_clean_reads_number_like_their_protein() {
+        for (dna, protein, _) in FIXTURES {
+            let expected = protein_numbering(protein, Scheme::IMGT);
+            let got = nt(Scheme::IMGT).number(dna).unwrap();
+            assert_numbered_like(&got, &expected, (0, dna.len() - 1));
+            assert_in_frame(&got);
+            assert_residues(&got, protein);
+            assert_eq!(
+                (got.cons_start, got.cons_end),
+                (expected.cons_start, expected.cons_end)
+            );
+            assert!((got.confidence - expected.confidence).abs() < 1e-6);
+        }
+    }
+
+    // Every scheme numbers a read as it numbers its translation
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_every_scheme_numbers_like_the_protein() {
+        for scheme in [
+            Scheme::IMGT,
+            Scheme::Kabat,
+            Scheme::Chothia,
+            Scheme::Martin,
+            Scheme::Aho,
+        ] {
+            for (dna, protein, _) in [FIXTURES[0], FIXTURES[2]] {
+                let got = nt(scheme).number(dna).unwrap();
+                assert_numbered_like(
+                    &got,
+                    &protein_numbering(protein, scheme),
+                    (0, dna.len() - 1),
+                );
+                assert_in_frame(&got);
+                assert_residues(&got, protein);
+            }
+        }
+    }
+
+    // Bases before the domain are free, which is how the alignment picks the reading frame: after
+    // 1, 2, 3 or 7 extra bases the domain numbers the same, starting that many bases later. A
+    // frame chosen at the start isn't a frameshift.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_reading_frame_is_found_after_leading_bases() {
+        for (dna, protein, _) in [FIXTURES[0], FIXTURES[3]] {
+            let expected = protein_numbering(protein, Scheme::IMGT);
+            for leader in ["A", "CA", "TCA", "GATTACA"] {
+                let read = format!("{leader}{dna}");
+                let got = nt(Scheme::IMGT).number(&read).unwrap();
+                assert_numbered_like(&got, &expected, (leader.len(), read.len() - 1));
+                assert_in_frame(&got);
+                assert_residues(&got, protein);
+            }
+        }
+    }
+
+    // A read from the other strand, as primed in the constant region, numbers like the forward read
+    // and says it was numbered on the reverse strand. Not the coordinates: which strand they refer
+    // to is undecided.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_reverse_strand_numbers_like_the_forward_read() {
+        for (dna, protein, _) in FIXTURES {
+            let expected = protein_numbering(protein, Scheme::IMGT);
+            let got = nt(Scheme::IMGT).number(&reverse_complement(dna)).unwrap();
+            assert_eq!(nucleotide(&got).strand, Strand::Reverse);
+            assert_eq!(got.chain, expected.chain);
+            assert_eq!(got.positions, expected.positions);
+            assert_in_frame(&got);
+            assert_residues(&got, protein);
+            assert!((got.confidence - expected.confidence).abs() < 1e-6);
+        }
+    }
+
+    // An amplicon read continues from FR4 into the constant region (here the first 60 bases of IGHM
+    // CH1 and of IGKC, in frame). The constant region stays out of the domain, as in protein mode.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_constant_region_after_fr4_stays_out_of_the_domain() {
+        for read in [
+            format!("{HEAVY_DNA}{IGHM_CH1_START}"),
+            format!("{KAPPA_DNA}{IGKC_START}"),
+        ] {
+            let translation = translate(&read);
+            let expected = protein_numbering(&translation, Scheme::IMGT);
+            let span = (3 * expected.query_start, 3 * expected.query_end + 2);
+            let got = nt(Scheme::IMGT).number(&read).unwrap();
+            assert_numbered_like(&got, &expected, span);
+            assert_in_frame(&got);
+            let domain = expected.query_start..=expected.query_end;
+            assert_residues(&got, &translation[domain]);
+        }
+    }
+
+    // Lower case and RNA (U for T) are the same sequence, and give upper-case amino acids
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_lower_case_and_rna_number_like_dna() {
+        let expected = protein_numbering(HEAVY_PROTEIN, Scheme::IMGT);
+        for read in [HEAVY_DNA.to_ascii_lowercase(), HEAVY_DNA.replace('T', "U")] {
+            let got = nt(Scheme::IMGT).number(&read).unwrap();
+            assert_numbered_like(&got, &expected, (0, read.len() - 1));
+            assert_in_frame(&got);
+            assert_residues(&got, HEAVY_PROTEIN);
+        }
+    }
+
+    // An scFv as DNA, heavy chain, (G4S)3 linker, kappa chain, holds two domains, each numbered as
+    // on its own and spanning its own bases
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_scfv_holds_both_domains() {
+        let linker = "GGTGGAGGCGGTTCA".repeat(3);
+        let scfv = format!("{HEAVY_DNA}{linker}{KAPPA_DNA}");
+        let domains = nt(Scheme::IMGT).domains(&scfv).unwrap();
+        assert_eq!(domains.len(), 2);
+        let kappa_start = HEAVY_DNA.len() + linker.len();
+        for (domain, protein, span) in [
+            (&domains[0], HEAVY_PROTEIN, (0, HEAVY_DNA.len() - 1)),
+            (&domains[1], KAPPA_PROTEIN, (kappa_start, scfv.len() - 1)),
+        ] {
+            let got = domain.number(Scheme::IMGT).unwrap();
+            assert_numbered_like(&got, &protein_numbering(protein, Scheme::IMGT), span);
+            assert_in_frame(&got);
+            assert_residues(&got, protein);
+        }
+    }
+
+    // IGHV3 FR1: TCT GGG GGA at 7-9 holds GGGGG over 8-9, in most IGHV3 genes (about 60% of IGHV).
+    // Today one G lost there leaves a single numbered residue at confidence 1.000.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_heavy_fr1_8_9_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(HEAVY_DNA, HEAVY_PROTEIN, 21..26);
+    }
+
+    // IGHV3-23 FR1: CCT GGG GGG TCC holds a run of six Gs over 16-17 (FR1 16-17 in half of IGHV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_heavy_fr1_16_17_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(HEAVY_DNA, HEAVY_PROTEIN, 42..48);
+    }
+
+    // IGHV3-23 FR2: GGGG over 48-49. Today one G lost there truncates the domain at 49.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_heavy_fr2_48_49_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(HEAVY_DNA, HEAVY_PROTEIN, 128..132);
+    }
+
+    // IGHV1-3 FR2: CCCCC over 45-46 (FR2 45-49 holds a run in about 40% of IGHV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_heavy_fr2_45_46_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(HEAVY_IGHJ6_DNA, HEAVY_IGHJ6_PROTEIN, 118..123);
+    }
+
+    // Every IGHJ reads TGGGGC over the J-TRP 118 and G 119, so every heavy chain ends its CDR3 on a G
+    // run. Today one G lost reads FR4 as WAREPWSPSPQ, one doubled as WGPGNPGHRLL, both confidently.
+    // Next to the CDR3, but a sequencing error all the same: repaired. IGHJ4 here.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_heavy_j_anchor_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(HEAVY_DNA, HEAVY_PROTEIN, 346..350);
+    }
+
+    // The same run in IGHJ6, five Gs (TGGGGGC)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_ighj6_anchor_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(HEAVY_IGHJ6_DNA, HEAVY_IGHJ6_PROTEIN, 346..351);
+    }
+
+    // IGKV FR2: CCCC over 49-50 (about 40% of IGKV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_kappa_fr2_49_50_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(KAPPA_DNA, KAPPA_PROTEIN, 127..131);
+    }
+
+    // IGKV FR3: GGGG over 70-71, the most common kappa hotspot (65% of IGKV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_kappa_fr3_70_71_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(KAPPA_DNA, KAPPA_PROTEIN, 168..172);
+    }
+
+    // IGKV FR3: TTTT over 98-99, just before the Cys 104 (63% of IGKV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_kappa_fr3_98_99_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(KAPPA_DNA, KAPPA_PROTEIN, 245..249);
+    }
+
+    // IGKJ2 reads ACT TTT GGC: a run of four Ts over the end of the CDR3 and the J-PHE 118. Like the
+    // heavy-chain G run, it overlaps the conserved 118: a sequencing error, repaired.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_kappa_j_anchor_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(KAPPA_DNA, KAPPA_PROTEIN, 290..294);
+    }
+
+    // IGKJ2 FR4: CAG GGG ACC holds GGGG over 120-121
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_kappa_fr4_120_121_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(KAPPA_DNA, KAPPA_PROTEIN, 299..303);
+    }
+
+    // IGLV FR1: CCCC over 14-15 (40% of IGLV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_lambda_fr1_14_15_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(LAMBDA_DNA, LAMBDA_PROTEIN, 37..41);
+    }
+
+    // IGLV1-40 CDR1: GGGG over 31-35. A CDR has a weaker profile than a framework, but an error in
+    // CDR1 or CDR2 is still most likely a sequencing error: repaired.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_lambda_cdr1_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(LAMBDA_DNA, LAMBDA_PROTEIN, 87..91);
+    }
+
+    // IGLV FR2: CCCCC over 49-50, the most common lambda hotspot (63-74% of IGLV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_lambda_fr2_49_50_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(LAMBDA_DNA, LAMBDA_PROTEIN, 133..138);
+    }
+
+    // IGLV FR3: GGGG over 70-71 (about half of IGLV)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_lambda_fr3_70_71_homopolymer_error_is_repaired() {
+        assert_run_errors_repaired(LAMBDA_DNA, LAMBDA_PROTEIN, 174..178);
+    }
+
+    // Two errors in one read, a G lost in FR1 8-9 and one in FR2 48-49, 40 codons apart: both
+    // repaired to the clean protein, and both reported in read order. In the read the FR2 run
+    // starts a base earlier.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_errors_in_two_frameworks_are_both_repaired() {
+        let read = deleted(&deleted(HEAVY_DNA, 128, 1), 21, 1);
+        let (got, clean) = assert_repaired(&read, HEAVY_DNA, HEAVY_PROTEIN);
+        assert_residues(&got, HEAVY_PROTEIN);
+        let [fr1, fr2] = nucleotide(&got).frameshifts.as_slice() else {
+            panic!(
+                "two frameshifts expected: {:?}",
+                nucleotide(&got).frameshifts
+            );
+        };
+        let lost = FrameshiftType::Deletion(1);
+        assert_frameshift(fr1, lost, true, 21..25, codon_positions(&clean, 21..26));
+        assert_frameshift(fr2, lost, true, 127..130, codon_positions(&clean, 128..132));
+    }
+
+    // Nanopore can miscount a long run by two: two Gs lost from the six over FR1 16-17. Reported as
+    // one event of two bases. Next to the run, a skipped position may compete with a second
+    // one-base repair, so only the domain as a whole is asserted: numbered from 1 through 128 with
+    // its conserved Cys 23, Cys 104 and Trp 118, and spanning the whole read.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_two_bases_lost_in_a_long_run_keep_the_domain_whole() {
+        let read: String = deleted(HEAVY_DNA, 42, 2);
+        let got = nt(Scheme::IMGT).number(&read).unwrap();
+        assert_eq!(got.chain, Chain::IGH);
+        for number in [1, 23, 104, 118, 128] {
+            assert!(numbers(&got.positions, number), "{number} isn't numbered");
+        }
+        assert_eq!((got.query_start, got.query_end), (0, read.len() - 1));
+        assert_one_residue_per_position(&got);
+        assert!(
+            got.confidence >= DEFAULT_MIN_CONFIDENCE,
+            "{}",
+            got.confidence
+        );
+        let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+            panic!(
+                "one two-base frameshift expected: {:?}",
+                nucleotide(&got).frameshifts
+            );
+        };
+        let clean = protein_numbering(HEAVY_PROTEIN, Scheme::IMGT);
+        let positions = codon_positions(&clean, 42..48);
+        let lost = FrameshiftType::Deletion(2);
+        assert_frameshift(frameshift, lost, true, 42..46, positions);
+    }
+
+    // An error outside a homopolymer: the A of GAC (Asp 81, FR3) lost, or a T inserted before it.
+    // There's one place the error can be, but the repair has to guess the base it rebuilds the
+    // codon with: the amino acids are the clean protein's except at 81 or a neighbouring codon.
+    // One repaired frameshift is reported next to base 217, at one of those codons.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_single_base_error_outside_a_homopolymer_is_repaired() {
+        assert_eq!(&HEAVY_DNA[216..219], "GAC");
+        for (read, kind) in [
+            (deleted(HEAVY_DNA, 217, 1), FrameshiftType::Deletion(1)),
+            (inserted(HEAVY_DNA, 217, "T"), FrameshiftType::Insertion(1)),
+        ] {
+            let (got, clean) = assert_repaired(&read, HEAVY_DNA, HEAVY_PROTEIN);
+            let residues = nucleotide(&got).sequence_aa.as_str();
+            let guessed = 71..=73; // codon 72 (bases 216-218) and its neighbours
+            for (i, (got_aa, clean_aa)) in residues.chars().zip(HEAVY_PROTEIN.chars()).enumerate() {
+                assert!(
+                    got_aa == clean_aa || guessed.contains(&i),
+                    "residue {i} is {got_aa}, clean {clean_aa}: {residues}"
+                );
+            }
+            let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+                panic!(
+                    "one frameshift expected: {:?}",
+                    nucleotide(&got).frameshifts
+                );
+            };
+            let positions = codon_positions(&clean, 217..218);
+            assert_frameshift(frameshift, kind, true, 217..218, positions);
+        }
+    }
+
+    // A whole codon lost (AGT, Ser 59 in CDR2) keeps the frame: a deletion in the protein, as B-cell
+    // mutation makes them, not three frameshifts. The read numbers like its own translation,
+    // at its translation's confidence.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_codon_deletion_is_not_a_frameshift() {
+        assert_eq!(&HEAVY_DNA[159..162], "AGT");
+        let read = deleted(HEAVY_DNA, 159, 3);
+        let expected = protein_numbering(&translate(&read), Scheme::IMGT);
+        let got = nt(Scheme::IMGT).number(&read).unwrap();
+        assert_numbered_like(&got, &expected, (0, read.len() - 1));
+        assert_in_frame(&got);
+        assert_residues(&got, &translate(&read));
+        assert!((got.confidence - expected.confidence).abs() < 1e-6);
+    }
+
+    // A stop codon in the CDR3 (TAG for the Ile of ...TIDY) is kept, read as an unknown residue, and
+    // not avoided by inventing two frameshifts around it: the read numbers like its
+    // translation, X for the stop in its amino acids. (The stop should also be reported, once
+    // results can say so.)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_stop_codon_is_kept_not_avoided() {
+        let codon = 3 * HEAVY_PROTEIN.find("IDYWGQG").unwrap();
+        let read = format!("{}TAG{}", &HEAVY_DNA[..codon], &HEAVY_DNA[codon + 3..]);
+        let expected = protein_numbering(&translate(&read), Scheme::IMGT);
+        let got = nt(Scheme::IMGT).number(&read).unwrap();
+        assert_numbered_like(&got, &expected, (0, read.len() - 1));
+        assert_in_frame(&got);
+        assert_residues(&got, &translate(&read));
+    }
+
+    // A G lost from the GGGGG inside the CDR3 (from the D gene). In one read this can't be told from
+    // an out-of-frame join, so it isn't repaired: the V gene is still numbered (1-104 as in the
+    // clean read), but FR4 isn't numbered as if the read were in frame. The frameshift is still
+    // reported, as a lost base next to the run, not repaired.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_frameshift_inside_cdr3_is_not_repaired() {
+        assert_eq!(&HEAVY_DNA[310..315], "GGGGG");
+        let frameshift = assert_not_repaired(&deleted(HEAVY_DNA, 310, 1));
+        let clean = protein_numbering(HEAVY_PROTEIN, Scheme::IMGT);
+        let positions = codon_positions(&clean, 310..315);
+        let lost = FrameshiftType::Deletion(1);
+        assert_frameshift(&frameshift, lost, false, 310..314, positions);
+    }
+
+    // A real out-of-frame rearrangement: IGHV3-23 and IGHJ4 joined over 353 bases, so FR4 lies in
+    // another frame than the V gene. Most B cells carry one beside their productive chain. It must
+    // not be repaired into an antibody that doesn't exist, the same as above. Whether it's reported
+    // as a lost base or two extra ones is up to the alignment.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_out_of_frame_rearrangement_is_not_repaired() {
+        let frameshift = assert_not_repaired(OUT_OF_FRAME_HEAVY_DNA);
+        assert!(
+            matches!(
+                frameshift.type_frameshift,
+                FrameshiftType::Deletion(1) | FrameshiftType::Insertion(2)
+            ),
+            "353 bases are a base short of the frame: {frameshift:?}"
+        );
+    }
+
+    // Found as a heavy chain with the V positions and residues of the clean heavy chain (same
+    // IGHV3-23), and no J-TRP 118 numbered. The one frameshift reported is left unrepaired inside the CDR3 (IMGT
+    // 105-117), and returned for the caller to check.
+    #[track_caller]
+    fn assert_not_repaired(read: &str) -> Frameshift {
+        let clean = protein_numbering(HEAVY_PROTEIN, Scheme::IMGT);
+        let got = nt(Scheme::IMGT).number(read).unwrap();
+        assert_eq!(got.chain, Chain::IGH);
+        assert_eq!(nucleotide(&got).strand, Strand::Forward);
+        for position in clean.positions.iter().filter(|p| p.number <= 104) {
+            assert!(
+                got.positions.contains(position),
+                "{position} isn't numbered"
+            );
+        }
+        assert!(!numbers(&got.positions, 118), "FR4 numbered as if repaired");
+        assert_one_residue_per_position(&got);
+        let v_residues = clean.positions.iter().filter(|p| p.number <= 104).count();
+        let residues = nucleotide(&got).sequence_aa.as_str();
+        assert!(
+            residues.starts_with(&HEAVY_PROTEIN[..v_residues]),
+            "{residues}"
+        );
+        let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+            panic!(
+                "one frameshift expected: {:?}",
+                nucleotide(&got).frameshifts
+            );
+        };
+        assert!(!frameshift.repaired, "{frameshift:?}");
+        assert!(
+            (105..=117).contains(&frameshift.position.number),
+            "outside the CDR3: {frameshift:?}"
+        );
+        frameshift.clone()
+    }
+
+    // A clean read segments into its bases, which rebuild it, with each region's amino acids in
+    // `translated`, as protein mode segments its translation
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_segment_gives_bases_and_amino_acids() {
+        for (dna, protein, cdr3) in FIXTURES {
+            let got = nt(Scheme::IMGT).segment(dna).unwrap();
+            assert_segmented(&got, dna, protein);
+            assert_eq!(got.translated.unwrap().cdr3, cdr3);
+            assert_eq!((got.prefix.as_str(), got.postfix.as_str()), ("", ""));
+        }
+    }
+
+    // Bases around the domain land in the prefix and postfix as bases; they aren't translated
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_segment_keeps_flanking_bases_untranslated() {
+        let read = format!("GATTACA{HEAVY_DNA}{IGHM_CH1_START}");
+        let got = nt(Scheme::IMGT).segment(&read).unwrap();
+        assert_eq!(got.prefix, "GATTACA");
+        assert_eq!(got.postfix, IGHM_CH1_START);
+        assert_segmented(&got, &read, HEAVY_PROTEIN);
+    }
+
+    // A reverse-strand read segments in the domain's orientation: its regions read 5' to 3' as
+    // on the forward strand and rebuild the reverse complement of the read
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_segment_of_a_reverse_read_is_in_the_domains_orientation() {
+        for (dna, protein, _) in FIXTURES {
+            let got = nt(Scheme::IMGT).segment(&reverse_complement(dna)).unwrap();
+            assert_segmented(&got, dna, protein);
+        }
+    }
+
+    // An scFv's domains each segment into their own bases and amino acids; all regions in order
+    // rebuild the read, linker in the kappa domain's prefix
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_segment_domains_of_an_scfv() {
+        let linker = "GGTGGAGGCGGTTCA".repeat(3);
+        let scfv = format!("{HEAVY_DNA}{linker}{KAPPA_DNA}");
+        let domains = nt(Scheme::IMGT).segment_domains(&scfv).unwrap();
+        let [heavy, kappa] = domains.as_slice() else {
+            panic!("two domains expected: {domains:?}");
+        };
+        assert_segmented(heavy, HEAVY_DNA, HEAVY_PROTEIN);
+        assert_eq!(kappa.prefix, linker);
+        assert_segmented(kappa, &format!("{linker}{KAPPA_DNA}"), KAPPA_PROTEIN);
+    }
+
+    // Protein segmentation has no translated part, and doesn't serialize one
+    #[test]
+    fn nt_protein_segment_has_no_translated_regions() {
+        let got = Annotator::new(IG_CHAINS, Scheme::IMGT, None)
+            .unwrap()
+            .segment(HEAVY_PROTEIN)
+            .unwrap();
+        assert!(got.translated.is_none());
+        let json = serde_json::to_value(&got).unwrap();
+        assert!(json.get("translated").is_none(), "{json}");
+    }
+
+    // Protein results serialize as before: no nucleotide part. This keeps existing JSON
+    // output and its consumers unchanged.
+    #[test]
+    fn nt_protein_result_serializes_without_nucleotide_fields() {
+        let result = protein_numbering(HEAVY_PROTEIN, Scheme::IMGT);
+        let json = serde_json::to_value(&result).unwrap();
+        assert!(json.get("nucleotide").is_none(), "{json}");
+        let back: NumberingResult = serde_json::from_value(json).unwrap();
+        assert!(back.nucleotide.is_none());
+    }
+
+    // A nucleotide result keeps its strand, frameshifts and amino acids through JSON
+    #[test]
+    fn nt_result_with_frameshifts_round_trips_through_json() {
+        let mut result = protein_numbering(HEAVY_PROTEIN, Scheme::IMGT);
+        result.nucleotide = Some(NucleotideNumbering {
+            strand: Strand::Reverse,
+            frameshifts: vec![Frameshift {
+                span: (21, 22),
+                type_frameshift: FrameshiftType::Deletion(1),
+                position: Position::new(8),
+                repaired: true,
+            }],
+            sequence_aa: HEAVY_PROTEIN.to_string(),
+        });
+        let json = serde_json::to_string(&result).unwrap();
+        let back: NumberingResult = serde_json::from_str(&json).unwrap();
+        let back = nucleotide(&back);
+        assert_eq!(back.strand, Strand::Reverse);
+        let [frameshift] = back.frameshifts.as_slice() else {
+            panic!("{json}");
+        };
+        assert_eq!(frameshift.span, (21, 22));
+        assert_eq!(frameshift.type_frameshift, FrameshiftType::Deletion(1));
+        assert_eq!(frameshift.position, Position::new(8));
+        assert!(frameshift.repaired);
+        assert_eq!(back.sequence_aa, HEAVY_PROTEIN);
     }
 }

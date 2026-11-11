@@ -476,6 +476,7 @@ mod tests {
             confidence: 1.0,
             query_start: 0,
             query_end,
+            nucleotide: None,
         }
     }
 
