@@ -20,6 +20,7 @@ include = [
     "resources/consensus/*.csv",
     "/README.md",
     "/LICENSE",
+    "/NOTICE",
     "Cargo.toml",
 ]
 

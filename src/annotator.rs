@@ -1308,6 +1308,104 @@ mod tests {
     }
 }
 
+/// Helpers shared by the nucleotide-input tests, on synthetic reads and on real ones
+#[cfg(test)]
+mod nt_test_helpers {
+    use super::*;
+    use crate::types::IG_CHAINS;
+
+    // Every confidence is reported (minimum 0), so a test sees the value instead of LowConfidence
+    pub(super) fn nt(scheme: Scheme) -> Annotator {
+        Annotator::new_nt(IG_CHAINS, scheme, true, Some(0.0)).unwrap()
+    }
+
+    pub(super) fn protein_numbering(protein: &str, scheme: Scheme) -> NumberingResult {
+        Annotator::new(IG_CHAINS, scheme, Some(0.0))
+            .unwrap()
+            .number(protein)
+            .unwrap()
+    }
+
+    // The standard genetic code, codons in TCAG order; a stop reads as X, as protein mode takes it,
+    // and so does a codon with an N (or any base but A, C, G and T)
+    pub(super) fn translate(dna: &str) -> String {
+        const CODE: &[u8; 64] = b"FFLLSSSSYYXXCCXWLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG";
+        let index = |b: u8| match b {
+            b'T' => Some(0),
+            b'C' => Some(1),
+            b'A' => Some(2),
+            b'G' => Some(3),
+            _ => None,
+        };
+        dna.as_bytes()
+            .chunks_exact(3)
+            .map(|codon| {
+                // CODE lists the 64 codons in TCAG order: the first base picks a block of 16,
+                // the second a block of 4 within it, the third the codon within that. Read as
+                // a base-4 number with T=0, C=1, A=2, G=3, the codon is its own index into CODE:
+                // TTT = 0 (F), TCA = 0*16 + 1*4 + 2 = 6 (S), GGG = 3*16 + 3*4 + 3 = 63 (G).
+                match (index(codon[0]), index(codon[1]), index(codon[2])) {
+                    (Some(first), Some(second), Some(third)) => {
+                        char::from(CODE[16 * first + 4 * second + third])
+                    }
+                    _ => 'X',
+                }
+            })
+            .collect()
+    }
+
+    // An N (or any base but A, C, G and T) stays an N
+    pub(super) fn reverse_complement(dna: &str) -> String {
+        dna.bytes()
+            .rev()
+            .map(|b| match b {
+                b'A' => 'T',
+                b'T' => 'A',
+                b'C' => 'G',
+                b'G' => 'C',
+                _ => 'N',
+            })
+            .collect()
+    }
+
+    // The nucleotide part of a result, which nucleotide input always gives
+    #[track_caller]
+    pub(super) fn nucleotide(got: &NumberingResult) -> &NucleotideNumbering {
+        got.nucleotide
+            .as_ref()
+            .expect("nucleotide input gives a nucleotide part")
+    }
+
+    // `got` is one frameshift of `kind`, `repaired` or not, its span the 2 or 4 bases it consumed
+    // and touching bases `near` of the read (one base either side allowed), numbered at one of
+    // `positions`
+    #[track_caller]
+    pub(super) fn assert_frameshift(
+        got: &Frameshift,
+        kind: FrameshiftType,
+        repaired: bool,
+        near: Range<usize>,
+        positions: &[Position],
+    ) {
+        assert_eq!(got.type_frameshift, kind, "{got:?}");
+        assert_eq!(got.repaired, repaired, "{got:?}");
+        let (start, end) = got.span;
+        let consumed = match kind {
+            FrameshiftType::Deletion(n) => 3 - usize::from(n),
+            FrameshiftType::Insertion(n) => 3 + usize::from(n),
+        };
+        assert_eq!(end + 1 - start, consumed, "bases consumed: {got:?}");
+        assert!(
+            start <= near.end && end + 1 >= near.start,
+            "{got:?} isn't next to bases {near:?}"
+        );
+        assert!(
+            positions.contains(&got.position),
+            "{got:?} isn't numbered at one of {positions:?}"
+        );
+    }
+}
+
 /// Nucleotide input
 ///
 /// The reads are synthetic naive human antibodies: IMGT germline V, D and J genes (the alleles the
@@ -1331,6 +1429,9 @@ mod tests {
 /// `position` has to be a codon the run touches.
 #[cfg(test)]
 mod nt_tests_synthetic {
+    use super::nt_test_helpers::{
+        assert_frameshift, nt, nucleotide, protein_numbering, reverse_complement, translate,
+    };
     use super::*;
     use crate::types::IG_CHAINS;
 
@@ -1366,55 +1467,6 @@ mod nt_tests_synthetic {
         (LAMBDA_DNA, LAMBDA_PROTEIN, "QSYDSSLSGSV"),
     ];
 
-    // Every confidence is reported (minimum 0), so a test sees the value instead of LowConfidence
-    fn nt(scheme: Scheme) -> Annotator {
-        Annotator::new_nt(IG_CHAINS, scheme, true, Some(0.0)).unwrap()
-    }
-
-    fn protein_numbering(protein: &str, scheme: Scheme) -> NumberingResult {
-        Annotator::new(IG_CHAINS, scheme, Some(0.0))
-            .unwrap()
-            .number(protein)
-            .unwrap()
-    }
-
-    // The standard genetic code, codons in TCAG order; a stop reads as X, as protein mode takes it
-    fn translate(dna: &str) -> String {
-        const CODE: &[u8; 64] = b"FFLLSSSSYYXXCCXWLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG";
-        let index = |b: u8| match b {
-            b'T' => 0,
-            b'C' => 1,
-            b'A' => 2,
-            _ => 3,
-        };
-        dna.as_bytes()
-            .chunks_exact(3)
-            .map(|codon| {
-                // CODE lists the 64 codons in TCAG order: the first base picks a block of 16,
-                // the second a block of 4 within it, the third the codon within that. Read as
-                // a base-4 number with T=0, C=1, A=2, G=3, the codon is its own index into CODE:
-                // TTT = 0 (F), TCA = 0*16 + 1*4 + 2 = 6 (S), GGG = 3*16 + 3*4 + 3 = 63 (G).
-                let first = index(codon[0]);
-                let second = index(codon[1]);
-                let third = index(codon[2]);
-                let amino_acid = CODE[16 * first + 4 * second + third];
-                char::from(amino_acid)
-            })
-            .collect()
-    }
-
-    fn reverse_complement(dna: &str) -> String {
-        dna.bytes()
-            .rev()
-            .map(|b| match b {
-                b'A' => 'T',
-                b'T' => 'A',
-                b'C' => 'G',
-                _ => 'C',
-            })
-            .collect()
-    }
-
     fn deleted(dna: &str, at: usize, length: usize) -> String {
         format!("{}{}", &dna[..at], &dna[at + length..])
     }
@@ -1440,14 +1492,6 @@ mod nt_tests_synthetic {
         );
         assert_eq!(nucleotide(got).strand, Strand::Forward);
         assert_one_residue_per_position(got);
-    }
-
-    // The nucleotide part of a result, which nucleotide input always gives
-    #[track_caller]
-    fn nucleotide(got: &NumberingResult) -> &NucleotideNumbering {
-        got.nucleotide
-            .as_ref()
-            .expect("nucleotide input gives a nucleotide part")
     }
 
     // Nucleotide input always gives its amino acids, one for each numbered position
@@ -1476,35 +1520,6 @@ mod nt_tests_synthetic {
         let first = bases.start.saturating_sub(1) / 3;
         let last = (bases.end / 3).min(clean.positions.len() - 1);
         &clean.positions[first..=last]
-    }
-
-    // `got` is one frameshift of `kind`, `repaired` or not, its span the 2 or 4 bases it consumed
-    // and touching bases `near` of the read (one base either side allowed), numbered at one of
-    // `positions`
-    #[track_caller]
-    fn assert_frameshift(
-        got: &Frameshift,
-        kind: FrameshiftType,
-        repaired: bool,
-        near: Range<usize>,
-        positions: &[Position],
-    ) {
-        assert_eq!(got.type_frameshift, kind, "{got:?}");
-        assert_eq!(got.repaired, repaired, "{got:?}");
-        let (start, end) = got.span;
-        let consumed = match kind {
-            FrameshiftType::Deletion(n) => 3 - usize::from(n),
-            FrameshiftType::Insertion(n) => 3 + usize::from(n),
-        };
-        assert_eq!(end + 1 - start, consumed, "bases consumed: {got:?}");
-        assert!(
-            start <= near.end && end + 1 >= near.start,
-            "{got:?} isn't next to bases {near:?}"
-        );
-        assert!(
-            positions.contains(&got.position),
-            "{got:?} isn't numbered at one of {positions:?}"
-        );
     }
 
     // `read` is `clean_dna` with sequencing errors: it must number like the clean protein, its
@@ -2174,5 +2189,1421 @@ mod nt_tests_synthetic {
         assert_eq!(frameshift.position, Position::new(8));
         assert!(frameshift.repaired);
         assert_eq!(back.sequence_aa, HEAVY_PROTEIN);
+    }
+}
+
+/// Nucleotide input on real reads: the counterpart of `nt_tests_synthetic`, with reads as they came
+/// off a sequencer. Every sequence is a real read, unedited, from the Observed Antibody Space
+/// database (OAS) or from the raw run behind it on ENA; NOTICE in the repository root credits the
+/// studies.
+///
+/// The expected answer always comes from immunum itself: nucleotide input numbers a read as protein
+/// mode numbers the in-frame translation of the same bases. A read with sequencing errors numbers
+/// like its clean partner: a read of the same run, kept by OAS, that differs from it by the errors
+/// only. Each read's chain and CDR3 are written down, and `nt_real_fixtures_are_valid` checks them,
+/// and where each error lies, in protein mode.
+///
+/// Two rules are provisional, pending review, and each is decided in one place:
+/// `CDR3_FRAMESHIFTS_ARE_REPAIRED` and `assert_error_in_the_first_codons_repaired`.
+#[cfg(test)]
+mod nt_tests_real {
+    use super::nt_test_helpers::{
+        assert_frameshift, nt, nucleotide, protein_numbering, reverse_complement, translate,
+    };
+    use super::*;
+    use std::ops::RangeInclusive;
+
+    /// A real read, unedited, and where its domain's reading frame starts
+    struct Read {
+        /// Study and read, for messages (the comment on each read has the details)
+        source: &'static str,
+        /// The read as sequenced
+        bases: &'static str,
+        /// Sequenced from the J or constant-region end: the domain reads on its reverse complement
+        reverse: bool,
+        /// Where a codon of the domain's reading frame starts, 0-2, on the domain's strand
+        frame: usize,
+        /// What protein mode gives the in-frame translation: its chain, and its CDR3 (IMGT 105-117)
+        chain: Chain,
+        cdr3: &'static str,
+    }
+
+    /// A raw read with sequencing errors, and a clean read of the same run that differs from it by
+    /// those errors only
+    struct Pair {
+        /// The raw read as sequenced, from the same strand as `clean`
+        read: &'static str,
+        clean: Read,
+    }
+
+    impl Read {
+        /// The read on the domain's strand, FR1 to FR4
+        fn forward(&self) -> String {
+            on_the_domains_strand(self.bases, self.reverse)
+        }
+
+        /// The in-frame translation of the whole read, flanks included
+        fn translation(&self) -> String {
+            translate(&self.forward()[self.frame..])
+        }
+
+        /// Protein mode's numbering of that translation: the answer nucleotide input must give
+        fn expected(&self, scheme: Scheme) -> NumberingResult {
+            protein_numbering(&self.translation(), scheme)
+        }
+
+        /// The bases of the domain protein mode numbers, 0-based and inclusive, on the domain's strand
+        fn span(&self, expected: &NumberingResult) -> (usize, usize) {
+            (
+                self.frame + 3 * expected.query_start,
+                self.frame + 3 * expected.query_end + 2,
+            )
+        }
+
+        /// The domain's amino acids in protein mode
+        fn residues(&self, expected: &NumberingResult) -> String {
+            self.translation()[expected.query_start..=expected.query_end].to_string()
+        }
+    }
+
+    impl Pair {
+        /// The raw read on the domain's strand
+        fn forward(&self) -> String {
+            on_the_domains_strand(self.read, self.clean.reverse)
+        }
+    }
+
+    fn on_the_domains_strand(bases: &str, reverse: bool) -> String {
+        if reverse {
+            reverse_complement(bases)
+        } else {
+            bases.to_string()
+        }
+    }
+
+    /// PROVISIONAL, pending review: a frameshift inside the CDR3 is reported but not repaired, as
+    /// `nt_frameshift_inside_cdr3_is_not_repaired` has it for synthetic reads. In one read a sequencing
+    /// error there can't be told from an out-of-frame join. Set this to true to repair it like any other
+    /// sequencing error (X allowed at its codon); the out-of-frame joins then expect a repair too.
+    const CDR3_FRAMESHIFTS_ARE_REPAIRED: bool = false;
+
+    /// PROVISIONAL, pending review: a frameshift in the first few codons of the domain, such as an indel
+    /// from the primer, is reported and repaired (X allowed at its codon), so that the rest of the read
+    /// numbers as the clean read does. The alternative would be a domain that starts after the error.
+    /// This is the one place that decides it.
+    #[track_caller]
+    fn assert_error_in_the_first_codons_repaired(pair: &Pair) {
+        assert_error_repaired(pair);
+    }
+
+    // Clean single-cell contigs: 5'UTR, leader, V(D)J and constant region, forward strand
+    // Jaffe_2022: OAS 1279080_1_Paired_All, row 0 (heavy chain). IGHV1-18*01, the whole domain.
+    // Human heavy.
+    const HUMAN_HEAVY: Read = Read {
+        source: "Jaffe_2022, 1279080_1_Paired_All row 0",
+        bases: "ACCCAAAAACCACACCCCTCCTTGGGAGAATCCCCTAGATCACAGCTCCTCACCATGGACTGGACCTGGAGCATCCTTTTCTTGGTGGCAGCAGCAACAGGTGCCCACTCCCAGGTTCAGCTGGTGCAGTCTGCAGCTGAGGTGAAGAGGCCTGGGGCCTCAGTGAAGGTCTCCTGCAAGGCTTCTGGTTACACCTTTACCACCTATGGTATCACCTGGGTGCGGCAGGCCCCTGGACAAGGGCTTGAGTGGATGGGATGGGTCAGCACTTACAATGGTAACACAAACTATGCACAGAAACTCCAGGGCAGGGTCACCATGACCACAGACACATCCACGAGAACAGCCTACATGGAGCTGAGGAGCCTGAGATCTGACGACACGGCCGTGTATTACTGTGCGCGAGTGGAATACAACTATGGTTATTCCCTCTTTGACTCCTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAGCTTCCACCAAGGGCCCATCGGTCTTCCCCCTGGCGCCCTGCTCCAGGAGCACCTCTGGGGGCACAGCGGCCCTGGGCTG",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "ARVEYNYGYSLFDS",
+    };
+    // Jaffe_2022: OAS 1279080_1_Paired_All, row 2 (light chain). IGKV3-11*01, the whole domain.
+    // Human kappa.
+    const HUMAN_KAPPA: Read = Read {
+        source: "Jaffe_2022, 1279080_1_Paired_All row 2",
+        bases: "GGGAGAGCCCTGGGGAGGAACTGCTCAGTTAGGACCCAGAGGGAACCATGGAAGCCCCAGCTCAGCTTCTCTTCCTCCTGCTACTCTGGCTCCCAGATGCCACCGGAGAAATTGTATTGACACAGTCTCCAGCCACCCTATCTTTGTCTCCAGGAGAAAGAGCCACCCTCTCCTGCAGGGCCAGTCAGACTATTAGCCACTACTTAGCCTGGTACCAACAGAAACCTGGCCAGGCTCCCAGGCTCCTCATCTATGATGTGTCCATCAGGGCCACTGGCATCCCAGCCAGGTTCAGTGGCAGTGGGTCTGGGACAGACTTCACTCTCACCATCAGCAGCCTAGAGCCTGAAGATTTTGCAGTTTATTACTGTCACCTGCGTAGGAACTGGCGGATCACCTTCGGCCTAGGGACACGACTGGAAATTAAACGAACTGTGGCTGCACCATCTGTCTTCATCTTCCCGCCATCTGATGAGCAGTTGAAATCTGGAACTGCCTCTGTTGTGTGCCTGCTGAATAACTTCTATCCCAGAGAGGCCAAAGTACAGTGGAAGGTGGATAACGC",
+        reverse: false,
+        frame: 2,
+        chain: Chain::IGK,
+        cdr3: "HLRRNWRIT",
+    };
+    // Jaffe_2022: OAS 1279080_1_Paired_All, row 0 (light chain). IGLV3-1*01, the whole domain.
+    // Human lambda.
+    const HUMAN_LAMBDA: Read = Read {
+        source: "Jaffe_2022, 1279080_1_Paired_All row 0",
+        bases: "CTGGGCCTCAGGAAGCAGCATCGGAGGTGCCTCAGCCATGGCATGGATCCCTCTCTTCCTCGGCGTCCTTGCTTACTGCACAGGATCCGTGGCCTCCTATGAGCTGACTCAGCCACCCTCAGTGTCCGTGTCCCCAGGACAGACAGTCAGCATCACCTGCTCTGGAGATAAATGGGGGAATAGATTTGTTTCCTGGTATCAGCAGAAGCCGGGCCAGTCCCCTATATTGGTCATCTATCAAGATAACAACCGGCCCTCAGGGATCCCTGAGCGATTCTCTGGCTCCAACTCTGGGAACACAGCCACTCTGACCATCAGCGGGACCCAGGCTATGGATGAGGCTGACTATTACTGTCAGGCGTGGGACAGCAGCACTGTGGTCTTCGGCGGAGGGACCAAGTTGACCGTCCTGGGTCAGCCCAAGGCTGCCCCCTCGGTCACTCTGTTCCCGCCCTCCTCTGAGGAGCTTCAAGCCAACAAGGCCACACTGGTGTGTCTCATAAGTGACTTCTACCCGGGAGCCGTGACAGTGGCCTGGAAGGCAGATAGCAGCCCCGTCAAGGCGGGAGTGGAGACCACCACACCCTCCAAACAAAGCAACAACAAGTACGCGGCCAGCAGCTA",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGL,
+        cdr3: "QAWDSSTVV",
+    };
+    // Alsoiussi_2020: OAS SRR11528762_paired, row 0 (heavy chain). IGHV9-3*01, the whole domain.
+    // Mouse (C57BL/6) heavy.
+    const MOUSE_HEAVY: Read = Read {
+        source: "Alsoiussi_2020, SRR11528762_paired row 0",
+        bases: "GGATACCGAACCGTGCCTTTCTTATATGGGGACATACCAGCAAGGGAGTGACCAGTTAGTCTTAAGGCACCACTGAGCCCAAGTCTTAGACATCATGGGTTGGCTGTGGAACTTGCTATTCCTGATGGCAGCTGCCCAAAGTGCCCAAGCACAGATCCAGTTGGTACAGTCTGGACCTGAGCTGAAGAAGCCTGGAGAGACAGTCAAGATCTCCTGCAAGGCTTCTGGGTATACCTTCACAACCTATGGAATGAGCTGGGTGAAACAGGCTCCAGGAAAGGGTTTAAAGTGGATGGGCTGGATAAACACCTACTCTGGAGTGCCAACATATGTTGATGACTTCAAGGGACGGTTTGCCTTCTCTTTGGAAACCTCTGCCAGCACTGCCTATTTGCAGATCAACAACCTCAAAAATGAGGACACGGCTACATATTTCTGTGCCCCCGATTACGACGAGTTTGCTTACTGGGGCCAAGGGACTCTGGTCACTGTCTCTGCAGCCAAAACGACACCCCCATCTGTCTATCCACTGGCCCCTGGATCTGCTGCCCAAACTAACTCCATGGTGACCCTGGGATGCCTGGTCAAGGG",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGH,
+        cdr3: "APDYDEFAY",
+    };
+    // Alsoiussi_2020: OAS SRR11528762_paired, row 0 (light chain). IGKV1-117*01, the whole domain.
+    // Mouse kappa.
+    const MOUSE_KAPPA: Read = Read {
+        source: "Alsoiussi_2020, SRR11528762_paired row 0",
+        bases: "TTTCTTATATGGGGACTGATCAGTCTCCTCAGGCTGTCTCCTCAGGTTGCCTCCTCAAAATGAAGTTGCCTGTTAGGCTGTTGGTGCTGATGTTCTGGATTCCTGCTTCCAGCAGTGATGTTTTGATGACCCAAACTCCACTCTCCCTGCCTGTCAGTCTTGGAGATCAAGCCTCCATCTCTTGCAGATCTAGTCAGAGCATTGTACATAGTAATGGAAACACCTATTTAGAATGGTACCTGCAGAAACCAGGCCAGTCTCCAAAGCTCCTGATCTACAAAGTTTCCAACCGATTTTCTGGGGTCCCAGACAGGTTCAGTGGCAGTGGATCAGGGACAGATTTCACACTCAAGATCAGCAGAGTGGAGGCTGAGGATCTGGGAGTTTATTACTGCTTTCAAGGTTCACATCTTCCGTGGACGTTCGGTGGAGGCACCAAGCTGGAAATCAAACGGGCTGATGCTGCACCAACTGTATCCATCTTCCCACCATCCAGTGAGCAGTTAACATCTGGAGGTGCCTCAGTCGTGTGCTTC",
+        reverse: false,
+        frame: 2,
+        chain: Chain::IGK,
+        cdr3: "FQGSHLPWT",
+    };
+    // Alsoiussi_2020: OAS SRR11528762_paired, row 3 (light chain). IGLV1*01, the whole domain.
+    // Mouse lambda.
+    const MOUSE_LAMBDA: Read = Read {
+        source: "Alsoiussi_2020, SRR11528762_paired row 3",
+        bases: "GCTGACCAATATTGAAAAGAATAGACCTGGTTTGTGAATTATGGCCTGGATTTCACTTATACTCTCTCTCCTGGCTCTCAGCTCAGGGGCCATTTCCCAGGCTGTTGTGACTCAGGAATCTGCACTCACCACATCACCTGGTGAAACAGTCACACTCACTTGTCGCTCAAGTACTGGGGCTGTTACAACTAGTAACTATGCCAACTGGGTCCAAGAAAAACCAGATCATTTATTCACTGGTCTAATAGGTGGTACCAACAACCGAGCTCCGGGTGTTCCTGCCAGATTCTCAGGCTCCCTGATTGGAGACAAGGCTGCCCTCACCATCACAGGGGCACAGACTGAGGATGAGGCAATATATTTCTGTGCTCTATGGTACAACAACCACTGGGTGTTCGGTGGAGGAACCAAACTGACTGTCCTAGGCCAGCCCAAGTCTTCGCCATCAGTCACCCTGTTTCCACCTTCCTCTGAAGAGCTCGAGACTAACAAGGCCACACTGGTGTGTA",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGL,
+        cdr3: "ALWYNNHWV",
+    };
+    // Goldstein_2019: OAS SRR9179291_paired, row 0 (heavy chain). IGHV2-63*01, the whole domain.
+    // Rat heavy.
+    const RAT_HEAVY: Read = Read {
+        source: "Goldstein_2019, SRR9179291_paired row 0",
+        bases: "GACTGAAAGCCCAGGCCTAGCTGAGGAGCCACATCTCCTTCTCACTAGAGCCTCCTTCACAGCATGGCTGTCCTGGTGCTGTTGCTCTGCCTGCTGACATTTCCAAGCTGTGCCCTGTCCCAGGTGCAGCTGAAGGAGTCAGGACCTGGTCTGGTGCAGCCCTCACAGACCCTGTCCCTCACCTGCACTGTCTCTGGGTTCTCATTAACCAGCTATAATGTACACTGGGTTCGACAGCCTCCAGGAAAGGGTCTGGAGTGGATGGGAAGAATGAGGTATAATGGAGACACATCATATAATTCAGCTCTCAAATCCAGACTGAGCATTAGCAGGGACACCTCCAAGAACCAAGTTTTCTTAAAAATGAACAGTCTGCAAACTGATGACACAGGCACTTACTACTGTACCAGAGATGTCTATGATGGTACTTATTACTACGGTTGGTTTGCTTACTGGGGCCAAGGCACTCTGGTCACTGTCTCTTCAGAGAGTCAGTCCTCCCCAACTGTCTTCCCCCTCGTCTCCTGCGAGAGCCCCCTGTCTGATGAGAATTTGGTG",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "TRDVYDGTYYYGWFAY",
+    };
+    // Goldstein_2019: OAS SRR9179291_paired, row 0 (light chain). IGKV2S20*01, the whole domain.
+    // Rat kappa.
+    const RAT_KAPPA: Read = Read {
+        source: "Goldstein_2019, SRR9179291_paired row 0",
+        bases: "TGGGGAGCGATTCCTCTCCTAAGTTCATTTCCTCACAATGATGAGTCCTGTCCAGTCCCTGTTTCTGTTATTGCTTTGGATTCTGGGAACCAATGGTGATGTTGTGCTGACCCAGACTCCACCTACTTTATTGGCTACCATTGGACAATCAGTCTCCATCTCTTGCAGGTCAAGTCAGAGTCTCTTACATAGTAATGGAAACACCTATTTAAATTGGTTGCTACAGAGGACAGGCCAATCTCCACAGCCGCTAATTTATTTGGTATCCAAACTGGAATCTGGGGTCCCCAACAGGTTCAGTGGCAGTGGGTCAGGAACAGATTTCACACTCAAAATCAGTGGAGTGGAAGCTGAGGATTTGGGGGTTTATTACTGCATGCAATTTACCCATTATCCTCCGACGTTCGGTGGAGGCACCAAGCTGGAATTGAAACGGGCTGATGCTGCACCAACTGTATCTATCTTCCCACCATCCACGGAACAGTTAGCAACTGGAGGTGCCG",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGK,
+        cdr3: "MQFTHYPPT",
+    };
+
+    // One-base sequencing errors with a clean partner, inside the domain
+    // Wesemann_2013 (454): ENA SRR934668, raw read SRR934668.8918; clean partner OAS
+    // SRR934668_Heavy_IGHM, row 1269 (seen 2 times). IGHV5-17*01, the whole domain. A G added to
+    // the GGGG over IMGT 16-17, codon 15 of 116: mouse, full length with leader.
+    const MOUSE_FR1_16_17_INSERTION: Pair = Pair {
+        read: "GTATGTGGGAAGACATTTGGGAAGGACTGACTCTCTGAGGAGACTGTGAGAGTGGTGCCTTGGCCCCAGTAGTCAAAGTAGTAGTAACCCCTTGCACAGTAATACATGGCTGTGTCCTCAGACCTTAGACTGGTCATTTGCAGGAACAGGGTGTTCTTGGCATTGTCTCTGGAGATGGTGAATCGGCCCTTCACTGTGTCTGCATAGTAGATGGTACTACTGCCACTACTAATGTATGCAACCCACTCCAGCCCCTTCTCTGGAGCCTGACGGACCCAGTGCATTCCATAGTCACTGAAAGTGAATCCAGAGGCTGCACAGGAGAGTTTCCGGGACCCCCGCGTACTCTGCGTTGTTACCACTGCTTGCCCTATAGTGAGTCGTTAGAGACACG",
+        clean: Read {
+            source: "Wesemann_2013, SRR934668.8918",
+            bases: "GTATGTGGGAAGACATTTGGGAAGGACTGACTCTCTGAGGAGACTGTGAGAGTGGTGCCTTGGCCCCAGTAGTCAAAGTAGTAGTAACCCCTTGCACAGTAATACATGGCTGTGTCCTCAGACCTTAGACTGGTCATTTGCAGGAACAGGGTGTTCTTGGCATTGTCTCTGGAGATGGTGAATCGGCCCTTCACTGTGTCTGCATAGTAGATGGTACTACTGCCACTACTAATGTATGCAACCCACTCCAGCCCCTTCTCTGGAGCCTGACGGACCCAGTGCATTCCATAGTCACTGAAAGTGAATCCAGAGGCTGCACAGGAGAGTTTCCGGGACCCCGCGTACTCTGCGTTGTTACCACTGCTTGCCCTATAGTGAGTCGTTAGAGACACG",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "ARGYYYFDY",
+        },
+    };
+    // Bonsignori_2016 (454): ENA SRR3106533, raw read SRR3106533.15780; clean partner OAS
+    // SRR3106533_Heavy_Bulk, row 3831 (seen 5 times). IGHV3-21*01, numbered 16-128 in protein mode.
+    // A G lost from the GGGG over IMGT 48-49, codon 29 of 112: IMGT 48 is the most frequent
+    // position of real 454 errors.
+    const FR2_48_49_DELETION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCGTGGTCCCTTTGCCCCAGACGTCCATGTAGTAGTAGTAGTAGTCCGTATACCAGCTGCTGCTATAGGCTCTCGCACAGTAATACACAGCCGTGTCCTCGGCTCTCAGGCTGTTCATTTGCAGATACAGTGAGTTCTTGGCGTTGTCTCTGGAGATGGTGAATCGGCCCTTCACTGAGTCTGCGTAGTATATGTAACTACTACTACTACTAATGGATGAGACCCACTCCAGCCCTTCCCTGGAGCCTGGCGGACCCAGTTCATGCTATAGCTACTGAAGGTGAATCCAGAGGCTGCACAGGAGATCTTCAGAGACTCCCCG",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533.15780",
+            bases: "CTTACCTGAGGAGACGGTGACCGTGGTCCCTTTGCCCCAGACGTCCATGTAGTAGTAGTAGTAGTCCGTATACCAGCTGCTGCTATAGGCTCTCGCACAGTAATACACAGCCGTGTCCTCGGCTCTCAGGCTGTTCATTTGCAGATACAGTGAGTTCTTGGCGTTGTCTCTGGAGATGGTGAATCGGCCCTTCACTGAGTCTGCGTAGTATATGTAACTACTACTACTACTAATGGATGAGACCCACTCCAGCCCCTTCCCTGGAGCCTGGCGGACCCAGTTCATGCTATAGCTACTGAAGGTGAATCCAGAGGCTGCACAGGAGATCTTCAGAGACTCCCCG",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "ARAYSSSWYTDYYYYYMDV",
+        },
+    };
+    // Wu_2014 (454): ENA SRR1171345, raw read SRR1171345.649; clean partner OAS
+    // SRR1171345_Heavy_IGHA, row 66 (seen 12 times). IGHV4-59*01, numbered 18-128 in protein mode.
+    // A G added to the GGGG over IMGT 48-49, codon 27 of 101: a forward read, from an FR1 primer
+    // into the constant region.
+    const FR2_48_49_INSERTION: Pair = Pair {
+        read: "AGACCCTGTCCCTCACCTGCACTGTCTCTGGTGTCTCCATCGGTACTTACTACTGGAACTGGATCCGGCAGTCCCCAGGGAAGGGGGTTGGAGTGGATTGGCTATATCTATTCCAGTGGGAGCACGAAGTACAACCCCTCCCTCACGAGTCGAGTCACCATATCAGTAGACACGTCCAAGAACCAGTTCTCCCTGAAGCTGAACTCTGTTACCGCTGCGGACACGGCCTTATATTACTGTGCGAGAGCACCTTACGGTGGTAACGTTGACTATTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAGCATCCCCGACCAGCCCCAAGGTCTTCCCGCTGAGCCTCTGCAGCACCCCAGCCAGATGGGAACGTGGTCATCGCCTGCCTGGTCCAGGGCTTCTTCC",
+        clean: Read {
+            source: "Wu_2014, SRR1171345.649",
+            bases: "AGACCCTGTCCCTCACCTGCACTGTCTCTGGTGTCTCCATCGGTACTTACTACTGGAACTGGATCCGGCAGTCCCCAGGGAAGGGGTTGGAGTGGATTGGCTATATCTATTCCAGTGGGAGCACGAAGTACAACCCCTCCCTCACGAGTCGAGTCACCATATCAGTAGACACGTCCAAGAACCAGTTCTCCCTGAAGCTGAACTCTGTTACCGCTGCGGACACGGCCTTATATTACTGTGCGAGAGCACCTTACGGTGGTAACGTTGACTATTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAGCATCCCCGACCAGCCCCAAGGTCTTCCCGCTGAGCCTCTGCAGCACCCCAGCCAGATGGGAACGTGGTCATCGCCTGCCTGGTCCAGGGCTTCTTCC",
+            reverse: false,
+            frame: 2,
+            chain: Chain::IGH,
+            cdr3: "ARAPYGGNVDY",
+        },
+    };
+    // Levin_2016 (454): ENA SRR5755044, raw read SRR5755044.23516; clean partner OAS
+    // SRR5755044_Heavy_Bulk, row 11038 (seen 5 times). IGHV1-69*10, numbered 41-128 in protein
+    // mode. A C added to the CCC over IMGT 57-58, codon 17 of 93: a read that starts in FR2; in a
+    // CDR, but a sequencing error all the same.
+    const CDR2_INSERTION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCGTGGTCCCTTGGCCCCAGACGTCCATACCGTAGTAGTAGTACGTATAGCAGCTGGTACTACTACACCCGGAGACTCTCGCACAGTAATACACGGCCGTGTCCTCAGATCTCAGGCTGCTCAGCTCCATGTAGGCTGTGCTCGTGGATTCGTCCGCGGTAATCGTGACTCTGCCCTGGAACTTCTGTGCGTAGTTTGCTATACCAAGGATAGGGGATGATCCCTCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAA",
+        clean: Read {
+            source: "Levin_2016, SRR5755044.23516",
+            bases: "CTTACCTGAGGAGACGGTGACCGTGGTCCCTTGGCCCCAGACGTCCATACCGTAGTAGTAGTACGTATAGCAGCTGGTACTACTACACCCGGAGACTCTCGCACAGTAATACACGGCCGTGTCCTCAGATCTCAGGCTGCTCAGCTCCATGTAGGCTGTGCTCGTGGATTCGTCCGCGGTAATCGTGACTCTGCCCTGGAACTTCTGTGCGTAGTTTGCTATACCAAGGATAGGGATGATCCCTCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAA",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "ARVSGCSSTSCYTYYYYGMDV",
+        },
+    };
+    // Bonsignori_2016 (454): ENA SRR3106533, raw read SRR3106533.14947; clean partner OAS
+    // SRR3106533_Heavy_Bulk, row 126 (seen 14 times). IGHV4-61*02, numbered 16-128 in protein mode.
+    // A C lost from the CCCC over IMGT 68-69, codon 48 of 112.
+    const FR3_68_69_DELETION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCGTGGTCCCTTTGCCCCAGACGTCCATGTAGTAGTAGTAGTAGTAAGAGCGAGCTGCTATACTCGAAGTCGCACAGTAATACACGGCCGTGTCTGCGGCGGTCACAGAGCTCAGCTTCAGGGAGAACTGGTTCTTGGACGTGTCTACTGATATGGTGACTCGACTCTTGAGGGAGGGTTGTAGTTGGTGCTCCCACTGGTATAGATACGCCCAATCCACTCCAGTCCCTTCCCGGCGGGCTGCCGGATCCAGCTCCAGTAGTAACTACCACTGCTGATGGAGCCACCAGAGACAGTGCAGGTGAGGGACAGGGTCTCCGAAG",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533.14947",
+            bases: "CTTACCTGAGGAGACGGTGACCGTGGTCCCTTTGCCCCAGACGTCCATGTAGTAGTAGTAGTAGTAAGAGCGAGCTGCTATACTCGAAGTCGCACAGTAATACACGGCCGTGTCTGCGGCGGTCACAGAGCTCAGCTTCAGGGAGAACTGGTTCTTGGACGTGTCTACTGATATGGTGACTCGACTCTTGAGGGAGGGGTTGTAGTTGGTGCTCCCACTGGTATAGATACGCCCAATCCACTCCAGTCCCTTCCCGGCGGGCTGCCGGATCCAGCTCCAGTAGTAACTACCACTGCTGATGGAGCCACCAGAGACAGTGCAGGTGAGGGACAGGGTCTCCGAAG",
+            reverse: true,
+            frame: 2,
+            chain: Chain::IGH,
+            cdr3: "ATSSIAARSYYYYYYMDV",
+        },
+    };
+    // Bonsignori_2016 (454): ENA SRR3106533, raw read SRR3106533.1081; clean partner OAS
+    // SRR3106533_Heavy_Bulk, row 1256 (seen 9 times). IGHV1-2*02, numbered 17-128 in protein mode.
+    // A G lost from the GGGG over IMGT 118-119, codon 93 of 103: the J-TRP 118 run, next to the
+    // CDR3 but repaired, as in the synthetic suite.
+    const J_ANCHOR_DELETION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCGGGCCCAGTAGCCGTAACCATAGTTGTCACCCCTTCTCGCACAGTAATAAACGGCCGTGTCGTCAGATCCCAGCCTGCTCAGCTCCATGTAGATTGTGCTGATGGACGTGTCCCTGGTCATGGTGACCCTGCCCTGAAACTTCTGTGCATAGTTTGTGGCACCAGTGTTAGAGTTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGTGCAGATAGTAGGCGGTGAAGGTATATCCAGAAGCCTTGCAGGAGACCTTCACTGAGGCC",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533.1081",
+            bases: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCGGGCCCCAGTAGCCGTAACCATAGTTGTCACCCCTTCTCGCACAGTAATAAACGGCCGTGTCGTCAGATCCCAGCCTGCTCAGCTCCATGTAGATTGTGCTGATGGACGTGTCCCTGGTCATGGTGACCCTGCCCTGAAACTTCTGTGCATAGTTTGTGGCACCAGTGTTAGAGTTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGTGCAGATAGTAGGCGGTGAAGGTATATCCAGAAGCCTTGCAGGAGACCTTCACTGAGGCC",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "ARRGDNYGYGY",
+        },
+    };
+    // Bonsignori_2016 (454): ENA SRR3106533, raw read SRR3106533.8777; clean partner OAS
+    // SRR3106533_Heavy_Bulk, row 1092 (seen 5 times). IGHV3-23*01, numbered 16-128 in protein mode.
+    // A G added (not in a homopolymer) at IMGT 45, codon 26 of 108: the repair can only guess the
+    // base.
+    const FR2_45_SINGLE_BASE_INSERTION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGTAGTCAAAGGGACCCCAGTCACCGCGGGACTCACAATCTTTCGCACAGTAATATACGGCCGTGTCCTCGGCTCTCAGGCTGTTCATTTGCAGATACAGCGTGTTCTTGGAATTGTCTCTGGAGATGGTGAACCGGCCCTTCACGGAGTCTGCGTAGTATGTGCTACCACCACTACCACTAATAGCTGAGACCCACTCCAGCCCCTTCCCTGGACGCCTGGCGGACCCAGCTCATGGCATAGCTGCTAAAGGTGAATCCAGAGGCTGCACAGGAGATCTTCAGAGACTCCCCG",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533.8777",
+            bases: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGTAGTCAAAGGGACCCCAGTCACCGCGGGACTCACAATCTTTCGCACAGTAATATACGGCCGTGTCCTCGGCTCTCAGGCTGTTCATTTGCAGATACAGCGTGTTCTTGGAATTGTCTCTGGAGATGGTGAACCGGCCCTTCACGGAGTCTGCGTAGTATGTGCTACCACCACTACCACTAATAGCTGAGACCCACTCCAGCCCCTTCCCTGGAGCCTGGCGGACCCAGCTCATGGCATAGCTGCTAAAGGTGAATCCAGAGGCTGCACAGGAGATCTTCAGAGACTCCCCG",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "AKDCESRGDWGPFDY",
+        },
+    };
+    // Bonsignori_2016 (454): ENA SRR3106533, raw read SRR3106533.12099; clean partner OAS
+    // SRR3106533_Heavy_Bulk, row 2821 (seen 8 times). IGHV1-2*02, numbered 17-128 in protein mode.
+    // A T lost from the TTTT over IMGT 114-115, codon 89 of 103: inside the CDR3.
+    const CDR3_DELETION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGTAGTCAAATACCAGCTGCTGCCTCCTCTCGCACAGTAATACACGGCCGTGTCGTCAGATCTCAGCCTGCTCAGCTCCATGTAGGCTGTGCTGATGGACGTGTCCCTGGTCATGGTGACCCTGCCCTGAAAGTTCTGTGCATAGTTTGTGCCACCACTGTTAGGGTTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGTGTATATAGTAGCCGGTGAAGGTGTACCCAGAAGCCTTGCAGGAGACCTTCACTGAGGCC",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533.12099",
+            bases: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGTAGTCAAAATACCAGCTGCTGCCTCCTCTCGCACAGTAATACACGGCCGTGTCGTCAGATCTCAGCCTGCTCAGCTCCATGTAGGCTGTGCTGATGGACGTGTCCCTGGTCATGGTGACCCTGCCCTGAAAGTTCTGTGCATAGTTTGTGCCACCACTGTTAGGGTTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGTGTATATAGTAGCCGGTGAAGGTGTACCCAGAAGCCTTGCAGGAGACCTTCACTGAGGCC",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "ARGGSSWYFDY",
+        },
+    };
+    // Wu_2014 (454): ENA SRR1171345, raw read SRR1171345.12; clean partner OAS
+    // SRR1171345_Heavy_Bulk, row 2 (seen 17 times). IGHV4-39*01, numbered 18-128 in protein mode. A
+    // G added to the GGG over IMGT 110, codon 87 of 107: a forward read; inside the CDR3.
+    const CDR3_INSERTION: Pair = Pair {
+        read: "AGACCCTGTCCCTCACCTGCACTGTCTCTGACGTCTCCATTAGCCGGACCAGTTTCTACTGGGGCTGGATCCGCCAGTCCCCAGGGAAGGGGCTGGAGTGGATTGGGAGTATTCATAATGCTGAGGGCACGGATTACAATCCGTCCCTCAAGAGTCGAGTCACCATCTCTGTAGACACGTCCAAGAACCAGTTCTCCCTGAGGCTGAACTCTGTGACCGCCGCAGACACGGCTGACTATTTCTGTGCGAGACAATTTAGTGGGGACCTATTATTATTACTACATGGACGTGTGGGGCAAAGGGACCACGGTCACCGTCTCCTCAGCATCCCC",
+        clean: Read {
+            source: "Wu_2014, SRR1171345.12",
+            bases: "AGACCCTGTCCCTCACCTGCACTGTCTCTGACGTCTCCATTAGCCGGACCAGTTTCTACTGGGGCTGGATCCGCCAGTCCCCAGGGAAGGGGCTGGAGTGGATTGGGAGTATTCATAATGCTGAGGGCACGGATTACAATCCGTCCCTCAAGAGTCGAGTCACCATCTCTGTAGACACGTCCAAGAACCAGTTCTCCCTGAGGCTGAACTCTGTGACCGCCGCAGACACGGCTGACTATTTCTGTGCGAGACAATTTAGTGGGACCTATTATTATTACTACATGGACGTGTGGGGCAAAGGGACCACGGTCACCGTCTCCTCAGCATCCCC",
+            reverse: false,
+            frame: 2,
+            chain: Chain::IGH,
+            cdr3: "ARQFSGTYYYYYMDV",
+        },
+    };
+
+    // One-base errors next to the primer: in the first codons of the domain, or outside it
+    // Bonsignori_2016 (454): ENA SRR3106533, raw read SRR3106533.19411; clean partner OAS
+    // SRR3106533_Heavy_Bulk, row 3582 (seen 9 times). IGHV1-18*01, numbered 17-128 in protein mode.
+    // A T lost (not in a homopolymer) at IMGT 21, codon 5 of 108: at the end of the read, where the
+    // FR1 primer sits.
+    const PRIMER_FR1_21_DELETION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGGGGTCGAACCAGCGAGACGTACCAGCTGCTGCTATACCTCCTCTCGCACAGTAATACACGGCCGTGTCGTCAGATCTCAGGCTCCTCAGCTCCATGTAGGCTGTGCTCGTGGATGTGTCTGTGGTCATGGTGACTCTGCCCTGGAGCTTCTGTGCATAGTTTGTGTTACCATTGTAAGCGCTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGCTGATACCATAGCTGGTAAAGGTGTAACCAGAAGCCTTGCAGGAGCCTTCACTGAGGCC",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533.19411",
+            bases: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGGGGTCGAACCAGCGAGACGTACCAGCTGCTGCTATACCTCCTCTCGCACAGTAATACACGGCCGTGTCGTCAGATCTCAGGCTCCTCAGCTCCATGTAGGCTGTGCTCGTGGATGTGTCTGTGGTCATGGTGACTCTGCCCTGGAGCTTCTGTGCATAGTTTGTGTTACCATTGTAAGCGCTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGCTGATACCATAGCTGGTAAAGGTGTAACCAGAAGCCTTGCAGGAGACCTTCACTGAGGCC",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "ARGGIAAAGTSRWFDP",
+        },
+    };
+    // Parameswaran_2014 (Illumina MiSeq): ENA SRR2151247, raw read SRR2151247.1989; clean partner
+    // OAS SRR2151247_Heavy_Bulk, row 654 (seen 2 times). IGHV3-53*01, numbered 27-128 in protein
+    // mode. A C added (not in a homopolymer) at IMGT 29, codon 3 of 100: Illumina; next to the
+    // primer, at the start of the read.
+    const PRIMER_CDR1_29_INSERTION: Pair = Pair {
+        read: "CAACATTCCACTTACCTGAGGAGACGGTGACCGTGGTCCCTTGGCCCCAGACGTCCATACCGTAGTAGTAGTAGTTCAGTATAGCAGCTGGACTCGAAGCCGCACAGTAATACACGGCCGTGTCCTCGGCTCTCAGGCTGTTCATTTGAAGATACAGCGTGTTCTTGGAATTGTCTCTGGAGATGGTGAATCGGCCCTTCACGGAGTCTGCGTAGTATGTGCTACCACCGCTATAAATAACTGAGACCCACTCCAGCCCCTTTCCGGGCATCTGGCGCACCCCTTAGGACGTCTGATGGCGCGAGGGAGGCGATACG",
+        clean: Read {
+            source: "Parameswaran_2014, SRR2151247.1989",
+            bases: "CAACATTCCACTTACCTGAGGAGACGGTGACCGTGGTCCCTTGGCCCCAGACGTCCATACCGTAGTAGTAGTAGTTCAGTATAGCAGCTGGACTCGAAGCCGCACAGTAATACACGGCCGTGTCCTCGGCTCTCAGGCTGTTCATTTGAAGATACAGCGTGTTCTTGGAATTGTCTCTGGAGATGGTGAATCGGCCCTTCACGGAGTCTGCGTAGTATGTGCTACCACCGCTATAAATAACTGAGACCCACTCCAGCCCCTTTCCGGGCATCTGGCGCACCCCTTAGGACGTCTGATGGCGCGAGGGAGCGATACG",
+            reverse: true,
+            frame: 0,
+            chain: Chain::IGH,
+            cdr3: "AASSPAAILNYYYYGMDV",
+        },
+    };
+    // Levin_2016 (454): ENA SRR5755044, raw read SRR5755044.15779; clean partner OAS
+    // SRR5755044_Heavy_Bulk, row 6571 (seen 6 times). IGHV1-69*10, numbered 41-128 in protein mode.
+    // A C lost from the CCCC over IMGT 45-46, codon 5 of 82: a homopolymer error next to the
+    // primer, at the end of the read.
+    const NEAR_START_FR2_45_46_DELETION: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCATTGTCCCTTGGCCCCAGATATCAAAAGCATCGTCAGTCCTTTCGGCACAGTAATACACGGCCGTGTCCTCAGATCTCAGGCTGCTCAGCTCCATGTAGGCTGTGCTCGTGGATTCGTCCGCGGTAATCGTGACTCTGCCCTGGAACTTCTGTGCGTAGTTTGCTATACCAAGGATAGGGATGATCCCTCCCATCCACTCAAGCCCTTGTCCAGGGCCTGTCGCACCCAA",
+        clean: Read {
+            source: "Levin_2016, SRR5755044.15779",
+            bases: "CTTACCTGAGGAGACGGTGACCATTGTCCCTTGGCCCCAGATATCAAAAGCATCGTCAGTCCTTTCGGCACAGTAATACACGGCCGTGTCCTCAGATCTCAGGCTGCTCAGCTCCATGTAGGCTGTGCTCGTGGATTCGTCCGCGGTAATCGTGACTCTGCCCTGGAACTTCTGTGCGTAGTTTGCTATACCAAGGATAGGGATGATCCCTCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAA",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "AERTDDAFDI",
+        },
+    };
+    // Wesemann_2013 (454): ENA SRR934668, raw read SRR934668.6628; clean partner OAS
+    // SRR934668_Heavy_IGHM, row 618 (seen 6 times). IGHV4-1*02, the whole domain. A G lost (not in
+    // a homopolymer) 21 bases before the domain: mouse; in the leader, outside the domain.
+    const LEADER_DELETION: Pair = Pair {
+        read: "GTATGTGGGAAGACATTTGGGAAGGACTGACTCTCTGAGGAGACTGTGAGAGTGGTGCCTTGGCCCCAGTAGTCAAAGTAGTTACCATAGTCTCTTGCACAGTAATAAAGGGCTGTGTCCTCAGATCTCACTTTGCTCATTTGCAGGTACAGCGTATTTTTGGCGTTGTCTCTGGAGATGATGAATTTATCCTTTAGAGATGGCGTATAGTTTATCGTACTGCTATCTGGATTAATTTCTCCAATCCATTCTAGCCCTTTCCCTGGAGCCTGCCGGACCCAACTCATCCAGTATCTACTAAAATCGAATCCTGAGGCTGCACAGGAGAGTTTCAGGGATCCTCCAGGCTGCACCAGGCCACCTCCAGACTCGAGAAGCTTCACCTCACACTGGACCCCTTTTAAAAGAGCAACAATAAAAAAACTACAGCCCAAAATCCATGGTAAGGGATGTGTGTTCAGTGTTGATCACTGAATGAGAATCTCGGGCTGATCCCTTTGCTTCCCCGCGTACTCTGCGTTGTTACCACTGCTTGCCCTATAGTGAGTCGTTAGAGACACG",
+        clean: Read {
+            source: "Wesemann_2013, SRR934668.6628",
+            bases: "GTATGTGGGAAGACATTTGGGAAGGACTGACTCTCTGAGGAGACTGTGAGAGTGGTGCCTTGGCCCCAGTAGTCAAAGTAGTTACCATAGTCTCTTGCACAGTAATAAAGGGCTGTGTCCTCAGATCTCACTTTGCTCATTTGCAGGTACAGCGTATTTTTGGCGTTGTCTCTGGAGATGATGAATTTATCCTTTAGAGATGGCGTATAGTTTATCGTACTGCTATCTGGATTAATTTCTCCAATCCATTCTAGCCCTTTCCCTGGAGCCTGCCGGACCCAACTCATCCAGTATCTACTAAAATCGAATCCTGAGGCTGCACAGGAGAGTTTCAGGGATCCTCCAGGCTGCACCAGGCCACCTCCAGACTCGAGAAGCTTCACCTCACACTGGACCCCTTTTAAAACGAGCAACAATAAAAAAACTACAGCCCAAAATCCATGGTAAGGGATGTGTGTTCAGTGTTGATCACTGAATGAGAATCTCGGGCTGATCCCTTTGCTTCCCCGCGTACTCTGCGTTGTTACCACTGCTTGCCCTATAGTGAGTCGTTAGAGACACG",
+            reverse: true,
+            frame: 2,
+            chain: Chain::IGH,
+            cdr3: "ARDYGNYFDY",
+        },
+    };
+    // Bonsignori_2016 (454): ENA SRR3106533, raw read SRR3106533.4617; clean partner OAS
+    // SRR3106533_Heavy_Bulk, row 481 (seen 9 times). IGHV1-2*02, numbered 17-128 in protein mode. A
+    // G lost from the GG 2 bases after the domain: outside the domain, in the J primer at the start
+    // of the read.
+    const AFTER_FR4_DELETION: Pair = Pair {
+        read: "CTTACTGAGGAGACGGTGACCGTGGTCCCTTTGCCCCAGACGTCCATGTAAGGGCTCTCCCCGAACCATAGTAATACCCCTCCTCTCGCACAGTAATACACGGCCGTGTCGTCAGATCTCAGCCTGCTCAGCTCCATGTAGGCTGTGCTGATGGACGTGTCCCTGGTCATGGTGACCCTGCCCTGAAACTTCTGTGCATAGTTTGTGCCACCACTGTTAGGGTTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGTGCATATAGTAGCCGGTGAAGGTGTATCCAGAAGCCTTGCAGGAGACCTTCACTGAGGCC",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533.4617",
+            bases: "CTTACCTGAGGAGACGGTGACCGTGGTCCCTTTGCCCCAGACGTCCATGTAAGGGCTCTCCCCGAACCATAGTAATACCCCTCCTCTCGCACAGTAATACACGGCCGTGTCGTCAGATCTCAGCCTGCTCAGCTCCATGTAGGCTGTGCTGATGGACGTGTCCCTGGTCATGGTGACCCTGCCCTGAAACTTCTGTGCATAGTTTGTGCCACCACTGTTAGGGTTGATCCATCCCATCCACTCAAGCCCTTGTCCAGGGGCCTGTCGCACCCAGTGCATATAGTAGCCGGTGAAGGTGTATCCAGAAGCCTTGCAGGAGACCTTCACTGAGGCC",
+            reverse: true,
+            frame: 1,
+            chain: Chain::IGH,
+            cdr3: "ARGGVLLWFGESPYMDV",
+        },
+    };
+
+    // Two errors that cancel out
+    // Bonsignori_2016 (454): OAS SRR3106533_Heavy_Bulk, row 8940 (seen 1 time); clean partner row
+    // 976 (seen 6 times). IGHV4-61*02, numbered 16-128 in protein mode. In frame overall, with the
+    // codons between the two errors garbled. In the read the errors are 15 bases apart, at IMGT 42
+    // and 47.
+    const COMPENSATING_PAIR: Pair = Pair {
+        read: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGTAGTCAAAATTTCGGCTGTAGTCAAGCTCCCTCGCACAGTAATACACGGCCGTGTCTGCGGCGGTCACAGAGCTCAGCTTCAGGGAGAACTGGTTCTTGGACGTGTCTACTGATATGGTGACTCGACTCTTGAGGGAGGGGTTGTAGTTGGTGCTCCCACTGGTATAGATACGCCCAATCCACTCCAGTCCCTTCCGGCGGGCTGCCGGATCCCAGCTCCAGTAGTAACTACCACTGCTGATGGAGCCACCAGAGACAGTGCAGGTGAGGGACAGGGTCTCCGAAG",
+        clean: Read {
+            source: "Bonsignori_2016, SRR3106533_Heavy_Bulk row 8940",
+            bases: "CTTACCTGAGGAGACGGTGACCAGGGTTCCCTGGCCCCAGTAGTCAAAATTTCGGCTGTAGTCAAGCTCCCTCGCACAGTAATACACGGCCGTGTCTGCGGCGGTCACAGAGCTCAGCTTCAGGGAGAACTGGTTCTTGGACGTGTCTACTGATATGGTGACTCGACTCTTGAGGGAGGGGTTGTAGTTGGTGCTCCCACTGGTATAGATACGCCCAATCCACTCCAGTCCCTTCCCGGCGGGCTGCCGGATCCAGCTCCAGTAGTAACTACCACTGCTGATGGAGCCACCAGAGACAGTGCAGGTGAGGGACAGGGTCTCCGAAG",
+            reverse: true,
+            frame: 2,
+            chain: Chain::IGH,
+            cdr3: "ARELDYSRNFDY",
+        },
+    };
+
+    // Non-productive Kymouse reads: human genes, naive B cells, trimmed from V to J
+    // Richardson_2022: OAS Mouse-6_Richardson_2022_1_Heavy_IGHM, row 215. IGHV4-34*01, numbered
+    // 1-123 in protein mode. Out-of-frame join, no stop codon. FR4's codons start 2 bases on from
+    // the V gene's frame: Deletion(1) or Insertion(2).
+    const KYMOUSE_OUT_OF_FRAME: Read = Read {
+        source: "Richardson_2022, Mouse-6_Richardson_2022_1_Heavy_IGHM row 215",
+        bases: "CAGGTGCAGCTACAGCAGTGGGGCGCAGGACTGTTGAAGCCTTCGGAGACCCTGTCCCTCACCTGCGCTGTCTATGGTGGGTCCTTCAGTGGTTACTACTGGAGCTGGATCCGCCAGCCCCCAGGGAAGGGGCTGGAGTGGATTGGGGAAATCAATCATAGTGGAAGCACCAACTACAACCCGTCCCTCAAGAGTCGAGTCACCATATCAGTAGACACGTCCAAGAACCAGTTCTCCCTGAAGCTGAGCTCTGTGACCGCCGCGGACACGGCTGTGTATTACTGTGCGAGAGGGGCCCCTATGGTTCGGGGAGTTATTATAATCTTTTTGACTACTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAG",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "ARGAPMVRGVIIIFLTTGAREP",
+    };
+    // Richardson_2022: OAS Mouse-6_Richardson_2022_1_Heavy_IGHM, row 235. IGHV3-74*01, numbered
+    // 1-125 in protein mode. Out-of-frame join with a stop codon. FR4's codons start 1 base on from
+    // the V gene's frame: Insertion(1) or Deletion(2).
+    const KYMOUSE_OUT_OF_FRAME_WITH_STOP: Read = Read {
+        source: "Richardson_2022, Mouse-6_Richardson_2022_1_Heavy_IGHM row 235",
+        bases: "GAGGTGCAGCTGGTGGAGTCCGGGGGAGGCTTAGTTCAGCCTGGGGGGTCCCTGAGACTCTCCTGTGCAGCCTCTGGATTCACCTTCAGTAGCTACTGGATGCACTGGGTCCGCCAAGCTCCAGGGAAGGGGCTGGTGTGGGTCTCACGTATTAATAGTGATGGGAGTAGCACAAGCTACGCGGACTCCGTGAAGGGCCGATTCACCATCTCCAGAGACAACGCCAAGAACACGCTGTATCTGCAAATGAACAGTCTGAGAGCCGAGGACACGGCTGTGTATTACTGTGCAAGAGATGGGGGTATAGCAGTGGCTCCTCTTTGACTACTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAG",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "ARDGGIAVAPLXLLGP",
+    };
+    // Richardson_2022: OAS Mouse-6_Richardson_2022_1_Heavy_IGHM, row 96. IGHV3-74*01, the whole
+    // domain. In-frame join with a stop codon in CDR3.
+    const KYMOUSE_IN_FRAME_STOP: Read = Read {
+        source: "Richardson_2022, Mouse-6_Richardson_2022_1_Heavy_IGHM row 96",
+        bases: "GAGGTGCAGCTGGTGGAGTCCGGGGGAGGCTTAGTTCAGCCTGGGGGGTCCCTGAGACTCTCCTGTGCAGCCTCTGGATTCACCTTCAGTAGCTACTGGATGCACTGGGTCCGCCAAGCTCCAGGGAAGGGGCTGGTGTGGGTCTCACGTATTAATAGTGATGGGAGTAGCACAAGCTACGCGGACTCCGTGAAGGGCCGATTCACCATCTCCAGAGACAACGCCAAGAACACGCTGTATCTGCAAATGAACAGTCTGAGAGCCGAGGACACGGCTGTGTATTACTGTGCAAGAGACTAGAGCAGCTCGTAAGACTACTGGGGCCAGGGAACCCTGGTCACCGTCTCCTCAG",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "ARDXSSSXDY",
+    };
+
+    // Ambiguous bases
+    // Eliyahu_2018: OAS ERR2843395_Heavy_IGHG, row 7. IGHV3-30*03, the whole domain. One N inside a
+    // framework codon.
+    const SINGLE_N: Read = Read {
+        source: "Eliyahu_2018, ERR2843395_Heavy_IGHG row 7",
+        bases: "GGCCCTTGGTGGAAGCTAAAGAGACGATGACCTTTGTCCCTTGGCCCCAGATGTCAAAAGCATTACTCCACGTTGCGCTCCCCCTCGCACAGTAATAGACAGCCGTGTCCTCAGGTCTCAGGCCTTCCATCTGCAGATACAAAGTGTTCTTGGAATTGTCTCTGGAGATGGTGAATTGGCCCTTCACAGAGTCTGCATAGTGTGTATTATGTCCATCAAAGGACAAAAATGCCAACCACTCCAGCCCCCGGCCTGGAGCCTGGCGGACCCAGTGCATGGCATAGGTTCTGAAAGTGAATCCAGAGGCTGCACAGGNGAGTCTCAGGGACCTCCCAGGCTGGACCACGGCTCCCCCAGACTCCACCAACTGCGCCTGACATTGGACACCTCTTAAAAGAGCAACGAGGAAAACCCAGCTCAGCCCAAACTCCATGGTGAGTCCTCTGTGTTCAGTGCTGATCACCGAATGGAAACACCGCCGACTTCTGGTGCTGGGCTCCTCTCCCAGAGC",
+        reverse: true,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "ARGSATWSNAFDI",
+    };
+    // Greiff_2014: OAS ERR346598_Heavy_Bulk, row 1438. IGHV14-3*02, numbered 1-126 in protein mode.
+    // A run of Ns inside the domain.
+    const N_RUN: Read = Read {
+        source: "Greiff_2014, ERR346598_Heavy_Bulk row 1438",
+        bases: "GCTAGAGGTGAAGCTTCAGGAGTCTGGGGCAGAGCTTGTGAAGCCAGGGGCCTCAGTCAAGTTGTCCTGCACAGCTTCTGGCTTCAACATTAAAGACACCTATATGCACTGGGTGAAGCAGAGGCCTGAACAGGGCCTGGAGTGGATTGGAAGGATTGATCCTGCGAATGGTAATACTAAATATGACCCGAAGTTCCAGGGCAAGGCCACTATAACAGCAGACACATCCTCCAACACAGCCTACCTGCAGCNNNNNNNNNNNNNNNNNNNNNNNNNTGCCGTCTATTACTGTGCTAGATGGGAACTGGGACGGGCCTGGTTTGCTTACTGGGGCCAAGGGACTCTGGTCACTGTCTNNNCAGCTACAACAACNNCCCNNTNAGCNNATNCNCNGCGGA",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGH,
+        cdr3: "ARWELGRAWFAY",
+    };
+
+    // Partial reads
+    // Kim_2020: OAS SRR12326769_1_Heavy_Bulk, row 2. IGHV3-23*01, numbered 16-128 in protein mode.
+    // Reverse read (J primer) that stops inside FR1.
+    const FROM_FR1: Read = Read {
+        source: "Kim_2020, SRR12326769_1_Heavy_Bulk row 2",
+        bases: "CTAGTTGCCTGTGCGGGAAGTAGTCCTTGTCCACGCAGCCCAGTTCCGCTGTGCTCTCGGTGGTCCTCCTGGCCCAGGGCTCCAGGGGTACCTCCGCTTGTCCCTTTGTTTAGTCTGAGGTTACGGTCTCCAGGCTTCCCTTTCCCCAGTAGTCAAAGTAGTAGTTTCTACCAGCTGCTGCTTTACCCATTTTCCTCGCACAGTAATATACGGCCATGTCTTCGGCTCTCAGGCTGTTCATTTGCAGATACAACGTGTTCTTGGAATTGTCTCTGGAGATGATGAACCGGCCCTTCACGGAGTCTGCGTAGTAGGTGTTACCACCACTTCCACTAATAAGTGAGACCCACTCCAGCCCCTTCCCCGGAGCCTGGCGGACCCAGCTCATGGCATAAGTGCTAAAGGTGAATCCAGAGACTGCACAGGAGAGTCTCAGGGACCCCCCAG",
+        reverse: true,
+        frame: 2,
+        chain: Chain::IGH,
+        cdr3: "ARKMGKAAAGRNYYFDY",
+    };
+    // Bolland_2016: OAS SRR3356773_1_Heavy_Bulk, row 0. IGHV1-85*01, numbered 56-123 in protein
+    // mode. Mouse read from the start of CDR2 to inside FR4.
+    const CDR2_TO_FR4: Read = Read {
+        source: "Bolland_2016, SRR3356773_1_Heavy_Bulk row 0",
+        bases: "TGAGGTTCCTTGACCCCAGTAGTCCATAGCATAGTTACTATAAAGGGGTCTTGCACAGAAATAGACCGCAGAGTCCTCAGATGTCAGGCTGTGGAGCTCCATGTACGCTGTGCTGGAGGATGTGTCTACAGTCAATGTGGCCTTGCCCTTGAACTTCTCATTGTACTTAGTACTACCATCTCTAGGATAAAT",
+        reverse: true,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "ARPLYSNYAMDY",
+    };
+    // Eccles_2020: OAS SRR10358525_1_Heavy_Bulk, row 15. IGHV3-53*01, numbered 66-117 in protein
+    // mode. 151-base read that stops inside CDR3.
+    const ENDS_IN_CDR3: Read = Read {
+        source: "Eccles_2020, SRR10358525_1_Heavy_Bulk row 15",
+        bases: "GTCAAAGTAGTATGACCAGCCACTGCTCTTTCTCGCACAGTAATACACGGCCGTGTCATCGGCCCTCAGGCTGTTCATTTGAAGATACAGCGTGTTCTTGGAATTGTCTCTGGAGATGGTGAATCGGCCCTTCACGGAGTCTGCGTAGTAT",
+        reverse: true,
+        frame: 1,
+        chain: Chain::IGH,
+        cdr3: "ARKSSGWSYYFD",
+    };
+
+    // Other species
+    // Banerjee_2017: OAS SRR5060324_Heavy_Bulk, row 296. IGHV1S47*01, the whole domain. Rabbit
+    // heavy, with leader.
+    const RABBIT_HEAVY: Read = Read {
+        source: "Banerjee_2017, SRR5060324_Heavy_Bulk row 296",
+        bases: "GATATCAAGCTTACGCTCACCATGGAGACTGGGCTGCGCTGGCTTCTCCTGGTCGCTGTGCTCAAAGGTGTCCAGTGTCAGGAGCAGCTGGTGGAGACCGGGGGAGGCCTGGTCCAGCCTGGGGGATCCCTGACACTCTCCTGCAAAGCCTCTGGATTCGACTTCAGTAGATATGGAATGAGCTGGGTCCGCCAGGCTCCAGGGAAGGGGCTGGAGTGGATCGGATACATTGATCCTGTTTTTGGTATCACATACTACGCGAGCTGGGTGAATGGCCGATTCTCCATCTCCAGAGAGAACACCCAGAACACGGTGTCTCTGCAAATGAACAGTCTAACAGCCGCGGACACGGCCACCTATTTCTGTGTGAGAGATACCTGGGCCTTTAACTTGTGGGGCCCGGGCACCCTGGTCACCGTCTCGATCGCGC",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "VRDTWAFNL",
+    };
+    // Corcoran_2016: OAS ERR1759736_1_Heavy_Bulk, row 0. IGHV3S25*01, the whole domain. Rhesus
+    // macaque heavy.
+    const RHESUS_HEAVY: Read = Read {
+        source: "Corcoran_2016, ERR1759736_1_Heavy_Bulk row 0",
+        bases: "CCGACGCGGTACGTGAGCTGAGTACGACTCACTATAGCATCACGGGGGGAGCTCTGGGAGAGGAGCCCAGCCCTGGAAGTCCACAGTGTTCCATTCGGTGATCAGCACTGAACACAGAGGACTCACCATGGAGTCTGGGCTGAGCTGGGTTTTCCTTGTTGCGAGTTTAAGAGGTGTCAAGTGTGAGGTGCAGCTGGTGGAGTCTGGGGGCGGCCTGGCAAAGCCTGGGGGGTCCCTGAGACTCCACTGTGCAGCCTCTGGATTCGCCTTCAGTAGCTACTGGATGAACTGGGTCCGCCAGGCTCCAGGAAAGCGGCTGGAGTGGGTCTCAGCTATTAATCTTGGTGGGGGTCTCACATACTACGCAGCCTCCGTGAAGGGCCGGTTCACCATCTCCAGAGACAACTCCAAGAACACGCTCTCCCTGCAAATGAACAGCCTGAGAGCGGAGGACACGGCCGTGTATTACTGTGCGACAGATTATTGTAGTAGTACTTACTGCTCCCCGGTGGGTGACTACTGGGGCCAGGGAGTCCTGGTCACCGTCTCCTCAGGGAGTG",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGH,
+        cdr3: "ATDYCSSTYCSPVGDY",
+    };
+    // Corcoran_2016: OAS ERR1759749_1_Light_Bulk, row 0. IGLV2-32*01, the whole domain. Rhesus
+    // macaque lambda.
+    const RHESUS_LAMBDA: Read = Read {
+        source: "Corcoran_2016, ERR1759749_1_Light_Bulk row 0",
+        bases: "ATGACCTGGGCTCTGGTCCTCCTCACCCTCCTCACTCAGGGCACAGGATCCTGGGCTCAGGCTGCCCTGACTCAGCCTCGCTCAGTGTCTGGGTCTCCTGGACAGTCGGTCACCATCTCCTGCACTGGAGCCAGCAGTGACATCGGTGCTTATAACTTTGTCTCCTGGTACCAACAACTTCCAGCCACAGCCCCCAAACTCCTGATTTATGAGGTCAGTAAGCGGCCCTCAGGGGTCTCTGATCGCTTCTCTGGCTCCAAGTCTGGCAGCACGGCCTCCCTGACCATCTCTGGACTCCAGGCTGAGGACGAGGCTGATTATTTCTGCTGCTCATATGCAGGCAGCTTCACTTTTTACGTCCTCGGTGGTGGGACCCGGCTCACCGTCCTAGGTCAGCCCAAGGCTTCCCCCACGGTCACTCTGTTCCCGCCCTCCTC",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGL,
+        cdr3: "CSYAGSFTFYV",
+    };
+    // Li_2017: OAS SRR3544220_1_Heavy_Missing_c_domain, row 0. IGHV3S31*01, the whole domain.
+    // Bactrian camel heavy-chain-only antibody (VHH): F42, E49, R50, G52.
+    const CAMEL_VHH: Read = Read {
+        source: "Li_2017, SRR3544220_1_Heavy_Missing_c_domain row 0",
+        bases: "GGAGACGGTGACCTGGGTTCCCTGGCCCCAGTAGTTATAAGTCGCCTCCCTTGTTACGTCCGAATAAGTGCACGCTATGTTGGTGGCTGCCACACAGTAGTACATGGCAGTGTCCTCAGGTTTCAGGCTGTTCATTTGCAGATACAGAGTGTTCTTGGCGTTGTCTTGGGCGATGGTGAATCGGCCCTGCGCGGAGTCGGCATAATCTGTGCGACCAGCATCACCGTAAATAGTTGCGAGCCCCTCGCGCTCGTTTCCTGGAACCTGGCGGAACCAGGCCATGCAGTCGCCACTGTAGGTGTATCCAGAGACTGAACAGGCGAGTGTCAGAGACCCTCCAGCCTGCACCGAGCCTCCCCCAGACTCCACCAGCTGCACATCAGCCAT",
+        reverse: true,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "VAATNIACTYSDVTREATYNY",
+    };
+
+    // Codon insertions and deletions from somatic mutation
+    // Vander_Heiden_2017: OAS SRR4026032_1_Heavy_IGHD, row 820. IGHV3-11*01, the whole domain. A
+    // whole codon inserted (somatic).
+    const CODON_INSERTION: Read = Read {
+        source: "Vander_Heiden_2017, SRR4026032_1_Heavy_IGHD row 820",
+        bases: "CCCCATCAACAAGACACTACGGGAGCTCTGGGAGAAGAGCCCCAGCCCCAGAATTCCCAGGAGTTTCCATTCGGTGATCAGCACTGAACACAGAGGACTCACCATGGAGTTTGGGCTGAGCTGGGTTTTCCTTGTTGCTATTATAAAAGGTGTCCAGTGTCAGGTGCAGCTGGTGGAGTCTGGGGGAGGCTTGGTCAAGCCTGGAGGGTCCCTGAGACGCTCCTGTGCAGCCTCTGGATCTACCTTCAGTGACTACTACATGACCTGGATCCGCCAGGCTCCAGGGAAGGGGCTGGAGTGGGTTTCATACATTAGTAGTAGTGGTAGTAGTAGAACATACTACGCAGACTCTGTGAAGGGCCGATTCACCATCTCCAGGGACAACGCCAAGAACTCACTGTATCTGCAAATGAACAGCCTGAGAGTCGAGGACACGGCCATGTATTACTGTGCGAGGGCCTGGTTGGATGCCTTTGATGTCTGGGGCCAAGGGACAATGGTCAGCGTCTCTTCAGCACCCACCAAGGCTCCGGATGTGTTCCCCATCATATCAGGGTGCAGACA",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGH,
+        cdr3: "ARAWLDAFDV",
+    };
+    // Vander_Heiden_2017: OAS SRR4026032_1_Heavy_IGHD, row 113. IGHV3-30-3*01, the whole domain. A
+    // whole codon deleted (somatic).
+    const CODON_DELETION: Read = Read {
+        source: "Vander_Heiden_2017, SRR4026032_1_Heavy_IGHD row 113",
+        bases: "CCGAGAATAGATGATCCTACGGGAGCTCTGGGAGACGAGCCCAGCACTGGAAGTCGCCGGTGTTTCCATTCGGTGATCATCACTGAACACAGAGGACTCACCATGGAGTTTGGGCTGAGCTGGGTTTTCCTCGTTGCCCTTTTAAGAGGTGTCCAGTGTCAGGTGCAGCTGGTGGAGTCTGGGGGAGGCGTGGTCCAGCCTGGGCGGTCCCTGCGACTCTCCTGTGCAGCCTCTGGATTCACCTTCAGTACCGAGCCTATGCACTGGGTCCGGCAGGCTCCAGGCAAGGGGCTGGAGTGGGTGGCAGTTATTTCATATGATGGAAGCAATAAATACGCAGACTCCGTGAAGGGCCGATTCACCATCTCCAGAGACACTTCCAAGAGCACGCTGTATCTGCAGATGAACAGCCTGAGAGCTGAGGACACGGCTGTCTATTATTGTGCGAGAGATCAAGGCACCAGGTGGTACATCCCTGAAGCTTTTGATATTTGGGGCCAAGGGACAATGGTCACCGTCTGTTCAGCACCCACCAAGGCTCCGGATGTGTTCCCCATCATATCAGGGTGCAGACA",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "ARDQGTRWYIPEAFDI",
+    };
+
+    // Odd inputs
+    // Stern_2014: OAS SRR1537522_Light_Bulk, row 10. IGKV1D-16*01, the whole domain. Light chain
+    // inside cloning-vector sequence.
+    const INSIDE_PLASMID: Read = Read {
+        source: "Stern_2014, SRR1537522_Light_Bulk row 10",
+        bases: "GGGGCAGGCTGCTACGAGCTCGGATCCACTAGTAACGGCCGCCAGTGTGCTGGAATTCGCCCTTAAGATGAAGACAGATGGTGCAGCCACAGTTCGTTTGATGTCCACATTGGTCCCGCCGCCGAAAGTGAGGTCACGACTATACTGTTGGCAGTAATAAGTTGCAAGATCATCAGGCTGCAGGCTGCTGATGGTGAGAGTGAACTCTGTCCCAGATCCACTGCCGCTGAACCTTGATGGGACCCCACTTTGCAAATTGGATGCACCATAGATCAGGAGCTTAGGTGCTTTCCCTGGTTTCTGCTGATACCAGGCTAACCAGGTGCTAATACCCTGACTCGCCCGACAAGTGATGGTGACTCTGTCTCCAACAGATGCAGACACAGAAGATGGAGACTGGGTCATCTGGATGTCGAAGGGCGAATTCTGCAGATATCCATCACACTGGCGGCCGCTCGAGCATGCATCTAGAGGGCCCAATTCGCCCTATAGTGAGTCGTATTACAATTCACTGGCCGTCGTTTTACAACGTCGTGACTGGGAAAACCCTGGCGTTACCCAACTTAATCGCCTTGCAGCACATCCCCCTTTCGCCAGCTGGCGTAATAGCGAAGAGGCCCGCACCGATCGCCCTTCCCAACAGTTGCGCAGCCTGAATGGCGAATGGACGCGCCCTGTAGCGGCGCATTAAGCGCGGCGGGTGTGGTGGTTACGCGCAGCGTGACCGCTACACTTGCCAGCGCCCTAGCGCCCGCTCCTTTCGCTTTCTTCCCTTCCTTTCTCGCCACGTTCGCCGGCTTTCCCCGTCAAGCTCTAAATCGGGGGCTCCCTTTAGGGTTCCGATTTAGTGCTTTACGGCACCTCGACCCCAAAAAACTTGATTAGGGTGATGGTTCACGTAGTGGGCCATCGCCCTGATAGACGGTTTTTCGCCCTTTGACGTTGGAGTCCACGTTCTTTAATAGTGGACTCTTGTTCCAAACTGGAACACACTCC",
+        reverse: true,
+        frame: 0,
+        chain: Chain::IGK,
+        cdr3: "QQYSRDLT",
+    };
+    // Huang_2016: OAS SRR4417616_1_Heavy_Bulk, row 86. IGHV3-15*05, the whole domain. The N6 donor's
+    // most diverged read among the first 1,500 of the unit: V identity 67%.
+    const HIGHLY_MUTATED: Read = Read {
+        source: "Huang_2016, SRR4417616_1_Heavy_Bulk row 86",
+        bases: "ACCCCCCAAGGCCCTAAGCAGTGGTATCAACGCAGAGTACATGGGGAGGTCTGGGAGAGGAGCCCCAGCCTTGGGATTTCCAAGTTTTCTCACTCAGTGATCAGGACAGAACGCAGAAGACCCACCATGGAGTTTGGGCTGAGCTGCATCTTCCTTGTCGCTATTTTAAAAAGTGTCCGATGTGACGTGAAGCTGGTGCAGTTTGGGGGAGGTTCAGCAAAGGCGGGGGGGTCCCTCAGACTCTCTTGCAGGGGCTCTGGATTCAAGTTCGATGATGCCTGGATAAGTTGGGTTCGTCAGGCGGCGGGAAAGCGACTGGAGTGGATTGGACGCATAAAGAGTGCACAGAGCGGCGGTACAAGGGACTATCGTGATTCTGCCCAGAGCAGATTTACCATTTCCAGAGACGATTCGAGACAAACCTCTGTTTTGGACTTACATATTTTACAAGAGGAAGACACAGGTCACTATTATTGTACATGGGACAACAAAGCTGTCGATGACTTTTGGGGTCAAGGCTCCCTAGTCGTCGTCTCCTCGGCT",
+        reverse: false,
+        frame: 0,
+        chain: Chain::IGH,
+        cdr3: "TWDNKAVDDF",
+    };
+    // Huang_2016: OAS SRR4417616_1_Heavy_Bulk, row 48. IGHV4-34*02, the whole domain. 28-residue
+    // CDR3.
+    const LONG_CDR3: Read = Read {
+        source: "Huang_2016, SRR4417616_1_Heavy_Bulk row 48",
+        bases: "TGCCCTTAAGGCCCTAAGCAGTGGTATCAACGCAGAGTACATGGGGTGGTTTCTGAGAGTCAGGGACCTCCTGCACAAGAACATGACACCCCTGTGGTTCTTCCTCCTCCTGGTGGCAAGTCCCAGATGGGTCCTGTCGCAGGTGCGCCTTCAACAATGGGGCGAAGGGGTGTTGAAGCCCTCGGAGACCCTGTCTCTCACCTGCGCTGTCTATGGCGCGTCGTTCGGCGGTTATTTCTGGAGTTGGGTTCGACAGGCCCCCGACACGGGACTGGAGTGGATTGGGGCGATCAAGCCTGGAGGGTCCCCCACATATAATCCATTGTTCTGGAGTCGGGGCACCCGTGCTGTGGACACGGCCAAGAACCAGTTTTACCTTAAACTCCGTGCCGGGGCCGCCGCGGACGCGGCCATCTATTACTGTGCGAGGATCCCGACACCGTCGTATTATGACAGGTGGAGCCTTTCGCCTGTTGAAGAGGACTTCTTCTATTACAATTTGGACGTCTGGGGCCAGGGGACCCCCGTCATCGTCTCTTCAGCC",
+        reverse: false,
+        frame: 1,
+        chain: Chain::IGH,
+        cdr3: "ARIPTPSYYDRWSLSPVEEDFFYYNLDV",
+    };
+
+    // The reads grouped by what they test
+    const FULL_LENGTH: [&Read; 8] = [
+        &HUMAN_HEAVY,
+        &HUMAN_KAPPA,
+        &HUMAN_LAMBDA,
+        &MOUSE_HEAVY,
+        &MOUSE_KAPPA,
+        &MOUSE_LAMBDA,
+        &RAT_HEAVY,
+        &RAT_KAPPA,
+    ];
+    const OTHER_SPECIES: [&Read; 4] = [&RABBIT_HEAVY, &RHESUS_HEAVY, &RHESUS_LAMBDA, &CAMEL_VHH];
+    const PARTIAL: [&Read; 3] = [&FROM_FR1, &CDR2_TO_FR4, &ENDS_IN_CDR3];
+    const AMBIGUOUS_BASES: [&Read; 2] = [&SINGLE_N, &N_RUN];
+    const CODON_INDELS: [&Read; 2] = [&CODON_INSERTION, &CODON_DELETION];
+    const ODD: [&Read; 3] = [&INSIDE_PLASMID, &HIGHLY_MUTATED, &LONG_CDR3];
+    const NON_PRODUCTIVE: [&Read; 3] = [
+        &KYMOUSE_OUT_OF_FRAME,
+        &KYMOUSE_OUT_OF_FRAME_WITH_STOP,
+        &KYMOUSE_IN_FRAME_STOP,
+    ];
+    const REPAIRED: [&Pair; 7] = [
+        &MOUSE_FR1_16_17_INSERTION,
+        &FR2_48_49_DELETION,
+        &FR2_48_49_INSERTION,
+        &CDR2_INSERTION,
+        &FR3_68_69_DELETION,
+        &J_ANCHOR_DELETION,
+        &FR2_45_SINGLE_BASE_INSERTION,
+    ];
+    const IN_CDR3: [&Pair; 2] = [&CDR3_DELETION, &CDR3_INSERTION];
+    const IN_THE_FIRST_CODONS: [&Pair; 3] = [
+        &PRIMER_FR1_21_DELETION,
+        &PRIMER_CDR1_29_INSERTION,
+        &NEAR_START_FR2_45_46_DELETION,
+    ];
+    const OUTSIDE_THE_DOMAIN: [&Pair; 2] = [&LEADER_DELETION, &AFTER_FR4_DELETION];
+
+    // Every read, the clean partners included
+    fn all_reads() -> impl Iterator<Item = &'static Read> {
+        let pairs = REPAIRED
+            .into_iter()
+            .chain(IN_CDR3)
+            .chain(IN_THE_FIRST_CODONS)
+            .chain(OUTSIDE_THE_DOMAIN)
+            .chain([&COMPENSATING_PAIR])
+            .map(|pair| &pair.clean);
+        FULL_LENGTH
+            .into_iter()
+            .chain(OTHER_SPECIES)
+            .chain(PARTIAL)
+            .chain(AMBIGUOUS_BASES)
+            .chain(CODON_INDELS)
+            .chain(ODD)
+            .chain(NON_PRODUCTIVE)
+            .chain(pairs)
+    }
+
+    /// One base lost or added, as a read differs from its clean partner (both on the domain's
+    /// strand). The bases are those of the homopolymer run the base belongs to, end exclusive; outside
+    /// a run, the base itself in the longer read and none in the shorter.
+    #[derive(Debug)]
+    struct BaseError {
+        kind: FrameshiftType,
+        /// The first base where the two reads differ: the same in both
+        at: usize,
+        in_read: Range<usize>,
+        in_clean: Range<usize>,
+    }
+
+    impl BaseError {
+        /// Where base `i` of the clean read is in the read
+        fn to_read(&self, i: usize) -> usize {
+            match self.kind {
+                _ if i < self.at => i,
+                FrameshiftType::Insertion(_) => i + 1,
+                FrameshiftType::Deletion(_) => i - 1,
+            }
+        }
+
+        /// In a run of two or more bases, where every base reads the same when lost or doubled: a
+        /// repair can rebuild the clean codons exactly
+        fn in_a_run(&self) -> bool {
+            self.in_read.len().max(self.in_clean.len()) >= 2
+        }
+    }
+
+    // The bases of the run around `at` that read as `s[at]`
+    fn run_around(s: &[u8], at: usize) -> Range<usize> {
+        let before = s[..at].iter().rev().take_while(|&&b| b == s[at]).count();
+        let from = s[at..].iter().take_while(|&&b| b == s[at]).count();
+        at - before..at + from
+    }
+
+    fn first_difference(a: &[u8], b: &[u8]) -> usize {
+        a.iter().zip(b).take_while(|(x, y)| x == y).count()
+    }
+
+    // `read` is `clean` with one base lost or added
+    fn one_base_error(read: &str, clean: &str) -> BaseError {
+        let (r, c) = (read.as_bytes(), clean.as_bytes());
+        let at = first_difference(r, c);
+        if r.len() + 1 == c.len() {
+            assert_eq!(r[at..], c[at + 1..], "not one lost base");
+            let run = run_around(c, at);
+            BaseError {
+                kind: FrameshiftType::Deletion(1),
+                at,
+                in_read: run.start..run.end - 1,
+                in_clean: run,
+            }
+        } else {
+            assert_eq!(r.len(), c.len() + 1, "not one base apart");
+            assert_eq!(r[at + 1..], c[at..], "not one added base");
+            let run = run_around(r, at);
+            BaseError {
+                kind: FrameshiftType::Insertion(1),
+                at,
+                in_clean: run.start..run.end - 1,
+                in_read: run,
+            }
+        }
+    }
+
+    // `read` is `clean` with one base added and a later one lost, or the other way round: two
+    // errors that cancel out, in read order
+    fn compensating_errors(read: &str, clean: &str) -> [BaseError; 2] {
+        let (r, c) = (read.as_bytes(), clean.as_bytes());
+        assert_eq!(r.len(), c.len());
+        let at = first_difference(r, c);
+        let rev = |s: &[u8]| s.iter().rev().copied().collect::<Vec<_>>();
+        let end = r.len() - first_difference(&rev(r), &rev(c));
+        if r[at + 1..end] == c[at..end - 1] {
+            // A base added at `at`, and the clean read's base `end - 1` lost
+            let added = run_around(r, at);
+            let lost = run_around(c, end - 1);
+            [
+                BaseError {
+                    kind: FrameshiftType::Insertion(1),
+                    at,
+                    in_clean: added.start..added.end - 1,
+                    in_read: added,
+                },
+                BaseError {
+                    kind: FrameshiftType::Deletion(1),
+                    at: end - 1,
+                    in_read: lost.start + 1..lost.end,
+                    in_clean: lost,
+                },
+            ]
+        } else {
+            assert_eq!(
+                r[at..end - 1],
+                c[at + 1..end],
+                "not two errors that cancel out"
+            );
+            // The clean read's base `at` lost, and a base added at `end - 1`
+            let lost = run_around(c, at);
+            let added = run_around(r, end - 1);
+            [
+                BaseError {
+                    kind: FrameshiftType::Deletion(1),
+                    at,
+                    in_read: lost.start..lost.end - 1,
+                    in_clean: lost,
+                },
+                BaseError {
+                    kind: FrameshiftType::Insertion(1),
+                    at: end - 1,
+                    in_clean: added.start + 1..added.end,
+                    in_read: added,
+                },
+            ]
+        }
+    }
+
+    // The domain's codons (indices into its residues) that bases `bases` of the clean read touch,
+    // one base either side included. The domain starts at base `start` and has `codons` codons.
+    fn touched_codons(start: usize, codons: usize, bases: &Range<usize>) -> RangeInclusive<usize> {
+        let first = bases.start.saturating_sub(1).max(start);
+        let last = bases.end.max(first);
+        ((first - start) / 3).min(codons - 1)..=((last - start) / 3).min(codons - 1)
+    }
+
+    // The IMGT positions of those codons, where a frameshift there may be numbered
+    fn codon_positions<'a>(
+        expected: &'a NumberingResult,
+        start: usize,
+        bases: &Range<usize>,
+    ) -> &'a [Position] {
+        &expected.positions[touched_codons(start, expected.positions.len(), bases)]
+    }
+
+    fn number(source: &str, dna: &str, scheme: Scheme) -> NumberingResult {
+        nt(scheme)
+            .number(dna)
+            .unwrap_or_else(|error| panic!("{source}: {error}"))
+    }
+
+    // `got` numbers like protein mode's `expected`, its domain spanning bases `span` of the read on
+    // the forward strand, with one amino acid per position
+    #[track_caller]
+    fn assert_numbered_like(
+        source: &str,
+        got: &NumberingResult,
+        expected: &NumberingResult,
+        span: (usize, usize),
+    ) {
+        assert_eq!(got.chain, expected.chain, "{source}: chain");
+        assert_eq!(got.positions, expected.positions, "{source}: positions");
+        assert_eq!(
+            (got.query_start, got.query_end),
+            span,
+            "{source}: domain span in bases"
+        );
+        assert_eq!(nucleotide(got).strand, Strand::Forward, "{source}");
+        let residues = &nucleotide(got).sequence_aa;
+        assert_eq!(
+            residues.chars().count(),
+            got.positions.len(),
+            "{source}: one amino acid per position: {residues}"
+        );
+    }
+
+    #[track_caller]
+    fn assert_in_frame(source: &str, got: &NumberingResult) {
+        let frameshifts = &nucleotide(got).frameshifts;
+        assert!(frameshifts.is_empty(), "{source}: {frameshifts:?}");
+    }
+
+    // A read numbers exactly like the in-frame translation of its bases: same chain and positions,
+    // the domain where protein mode puts it, read in one frame, with the translation's amino acids
+    #[track_caller]
+    fn assert_numbers_like_its_translation(read: &Read, scheme: Scheme) {
+        let expected = read.expected(scheme);
+        let got = number(read.source, &read.forward(), scheme);
+        assert_numbered_like(read.source, &got, &expected, read.span(&expected));
+        assert_in_frame(read.source, &got);
+        assert_eq!(
+            nucleotide(&got).sequence_aa,
+            read.residues(&expected),
+            "{}: amino acids",
+            read.source
+        );
+    }
+
+    // The read's amino acids are the clean ones but at the codons an error touches, where a repair
+    // may put an X or rebuild the clean residue. Outside a run the repair can only guess the base, so
+    // there, and one codon either side, any amino acid will do.
+    #[track_caller]
+    fn assert_residues_repaired(
+        source: &str,
+        got: &str,
+        clean: &str,
+        start: usize,
+        errors: &[&BaseError],
+    ) {
+        assert_eq!(got.len(), clean.len(), "{source}: {got}");
+        for (i, (got_aa, clean_aa)) in got.chars().zip(clean.chars()).enumerate() {
+            let near = |error: &&BaseError| {
+                let codons = touched_codons(start, clean.len(), &error.in_clean);
+                if error.in_a_run() {
+                    codons.contains(&i)
+                } else {
+                    codons.start().saturating_sub(1) <= i && i <= codons.end() + 1
+                }
+            };
+            let allowed = match errors.iter().copied().find(near) {
+                None => got_aa == clean_aa,
+                Some(error) if error.in_a_run() => got_aa == clean_aa || got_aa == 'X',
+                Some(_) => true,
+            };
+            assert!(
+                allowed,
+                "{source}: residue {i} is {got_aa}, clean {clean_aa}: {got}"
+            );
+        }
+    }
+
+    #[track_caller]
+    fn assert_confidence_repaired(source: &str, got: &NumberingResult, clean: &NumberingResult) {
+        assert!(
+            got.confidence < clean.confidence,
+            "{source}: a repair must cost confidence: {} vs clean {}",
+            got.confidence,
+            clean.confidence
+        );
+        assert!(
+            got.confidence >= DEFAULT_MIN_CONFIDENCE,
+            "{source}: {}",
+            got.confidence
+        );
+    }
+
+    // The raw read numbers like its clean partner, with one repaired frameshift at its error. The
+    // clean partner is checked first: on its own it numbers like its translation.
+    #[track_caller]
+    fn assert_error_repaired(pair: &Pair) {
+        let clean = &pair.clean;
+        assert_numbers_like_its_translation(clean, Scheme::IMGT);
+        let expected = clean.expected(Scheme::IMGT);
+        let (start, end) = clean.span(&expected);
+        let read = pair.forward();
+        let error = one_base_error(&read, &clean.forward());
+        let got = number(clean.source, &read, Scheme::IMGT);
+        let span = (error.to_read(start), error.to_read(end));
+        assert_numbered_like(clean.source, &got, &expected, span);
+        let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+            panic!(
+                "{}: one frameshift expected: {:?}",
+                clean.source,
+                nucleotide(&got).frameshifts
+            );
+        };
+        let positions = codon_positions(&expected, start, &error.in_clean);
+        assert_frameshift(
+            frameshift,
+            error.kind,
+            true,
+            error.in_read.clone(),
+            positions,
+        );
+        let residues = &nucleotide(&got).sequence_aa;
+        let clean_residues = clean.residues(&expected);
+        assert_residues_repaired(clean.source, residues, &clean_residues, start, &[&error]);
+        assert_confidence_repaired(clean.source, &got, &expected);
+    }
+
+    // Positions 1-104 (the V gene) of protein mode's `expected` are numbered, with its amino acids
+    // `residues`
+    #[track_caller]
+    fn assert_v_gene_numbered_like(
+        source: &str,
+        got: &NumberingResult,
+        expected: &NumberingResult,
+        residues: &str,
+    ) {
+        assert_eq!(got.chain, expected.chain, "{source}: chain");
+        assert_eq!(nucleotide(got).strand, Strand::Forward, "{source}");
+        let got_residues: Vec<char> = nucleotide(got).sequence_aa.chars().collect();
+        assert_eq!(got_residues.len(), got.positions.len(), "{source}");
+        let v_gene = expected.positions.iter().zip(residues.chars());
+        for (position, residue) in v_gene.filter(|(p, _)| p.number <= 104) {
+            let Some(i) = got.positions.iter().position(|p| p == position) else {
+                panic!("{source}: {position} isn't numbered");
+            };
+            assert_eq!(got_residues[i], residue, "{source}: residue at {position}");
+        }
+    }
+
+    fn numbers_118(got: &NumberingResult) -> bool {
+        got.positions.iter().any(|p| p.number == 118)
+    }
+
+    // A frameshift inside the CDR3 is reported where the error is. Not repaired, while
+    // `CDR3_FRAMESHIFTS_ARE_REPAIRED` is false: the V gene numbers as in the clean read, FR4 not as
+    // if repaired.
+    #[track_caller]
+    fn assert_cdr3_error(pair: &Pair) {
+        if CDR3_FRAMESHIFTS_ARE_REPAIRED {
+            return assert_error_repaired(pair);
+        }
+        let clean = &pair.clean;
+        assert_numbers_like_its_translation(clean, Scheme::IMGT);
+        let expected = clean.expected(Scheme::IMGT);
+        let (start, _) = clean.span(&expected);
+        let read = pair.forward();
+        let error = one_base_error(&read, &clean.forward());
+        let got = number(clean.source, &read, Scheme::IMGT);
+        assert_v_gene_numbered_like(clean.source, &got, &expected, &clean.residues(&expected));
+        assert!(
+            !numbers_118(&got),
+            "{}: FR4 numbered as if repaired",
+            clean.source
+        );
+        let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+            panic!(
+                "{}: one frameshift expected: {:?}",
+                clean.source,
+                nucleotide(&got).frameshifts
+            );
+        };
+        let positions = codon_positions(&expected, start, &error.in_clean);
+        assert_frameshift(
+            frameshift,
+            error.kind,
+            false,
+            error.in_read.clone(),
+            positions,
+        );
+    }
+
+    // A real out-of-frame join: FR4 lies in another frame than the V gene, by one of `kinds`. The
+    // read numbers like protein mode numbers its translation in the V gene's frame, up to the Cys
+    // 104, and one frameshift is reported inside the CDR3, repaired or not as the CDR3 rule says.
+    #[track_caller]
+    fn assert_out_of_frame_join(read: &Read, kinds: [FrameshiftType; 2]) {
+        let expected = read.expected(Scheme::IMGT);
+        let got = number(read.source, &read.forward(), Scheme::IMGT);
+        assert_v_gene_numbered_like(read.source, &got, &expected, &read.residues(&expected));
+        let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+            panic!(
+                "{}: one frameshift expected: {:?}",
+                read.source,
+                nucleotide(&got).frameshifts
+            );
+        };
+        assert!(
+            kinds.contains(&frameshift.type_frameshift),
+            "{}: {frameshift:?}",
+            read.source
+        );
+        assert!(
+            (105..=117).contains(&frameshift.position.number),
+            "{}: outside the CDR3: {frameshift:?}",
+            read.source
+        );
+        assert_eq!(
+            frameshift.repaired, CDR3_FRAMESHIFTS_ARE_REPAIRED,
+            "{}",
+            read.source
+        );
+        assert_eq!(
+            numbers_118(&got),
+            CDR3_FRAMESHIFTS_ARE_REPAIRED,
+            "{}: FR4",
+            read.source
+        );
+    }
+
+    // An error outside the domain (in the leader, or after FR4) changes nothing: the read numbers like
+    // the clean one, its domain where the clean read's is, read in one frame
+    #[track_caller]
+    fn assert_error_outside_the_domain_changes_nothing(pair: &Pair) {
+        let clean = &pair.clean;
+        assert_numbers_like_its_translation(clean, Scheme::IMGT);
+        let expected = clean.expected(Scheme::IMGT);
+        let (start, end) = clean.span(&expected);
+        let read = pair.forward();
+        let error = one_base_error(&read, &clean.forward());
+        let got = number(clean.source, &read, Scheme::IMGT);
+        let span = (error.to_read(start), error.to_read(end));
+        assert_numbered_like(clean.source, &got, &expected, span);
+        assert_in_frame(clean.source, &got);
+        let residues = &nucleotide(&got).sequence_aa;
+        assert_eq!(*residues, clean.residues(&expected), "{}", clean.source);
+    }
+
+    // The fixtures themselves, in protein mode (no nucleotide input needed): each read's
+    // translation has the chain and CDR3 written down, every pair is one base error apart (the
+    // compensating pair two), and each error lies where its group says.
+    #[test]
+    fn nt_real_fixtures_are_valid() {
+        for read in all_reads() {
+            assert!(read.frame < 3, "{}", read.source);
+            assert!(
+                read.bases.bytes().all(|b| b"ACGTN".contains(&b)),
+                "{}",
+                read.source
+            );
+            let expected = read.expected(Scheme::IMGT);
+            assert_eq!(expected.chain, read.chain, "{}", read.source);
+            let segments = expected.segment(&read.translation()).unwrap();
+            assert_eq!(segments.cdr3, read.cdr3, "{}", read.source);
+        }
+        // Where each error lies in the clean read's domain
+        let error_codons = |pair: &Pair| {
+            let expected = pair.clean.expected(Scheme::IMGT);
+            let (start, end) = pair.clean.span(&expected);
+            let error = one_base_error(&pair.forward(), &pair.clean.forward());
+            let inside = error.in_clean.end > start && error.in_clean.start <= end;
+            let codons = touched_codons(start, expected.positions.len(), &error.in_clean);
+            let positions = expected.positions[codons.clone()].to_vec();
+            (inside, codons, positions, expected.positions.len())
+        };
+        for pair in REPAIRED {
+            let (inside, codons, positions, n) = error_codons(pair);
+            assert!(inside, "{}", pair.clean.source);
+            assert!(
+                *codons.start() >= 7 && *codons.end() + 7 < n,
+                "{}",
+                pair.clean.source
+            );
+            let cdr3 = |p: &Position| (105..=117).contains(&p.number);
+            assert!(
+                !positions.iter().any(cdr3),
+                "{}: {positions:?}",
+                pair.clean.source
+            );
+        }
+        for pair in IN_CDR3 {
+            let (inside, _, positions, _) = error_codons(pair);
+            assert!(inside, "{}", pair.clean.source);
+            let cdr3 = |p: &Position| (105..=117).contains(&p.number);
+            assert!(
+                positions.iter().all(cdr3),
+                "{}: {positions:?}",
+                pair.clean.source
+            );
+        }
+        for pair in IN_THE_FIRST_CODONS {
+            let (inside, codons, _, _) = error_codons(pair);
+            assert!(inside, "{}", pair.clean.source);
+            assert!(
+                (1..=6).contains(codons.start()),
+                "{}: {codons:?}",
+                pair.clean.source
+            );
+        }
+        for pair in OUTSIDE_THE_DOMAIN {
+            let (inside, _, _, _) = error_codons(pair);
+            assert!(!inside, "{}", pair.clean.source);
+        }
+        let pair = &COMPENSATING_PAIR;
+        let [added, lost] = compensating_errors(&pair.forward(), &pair.clean.forward());
+        assert_eq!(added.kind, FrameshiftType::Insertion(1));
+        assert_eq!(lost.kind, FrameshiftType::Deletion(1));
+        // The in-frame join's stop codons read as X in its CDR3
+        assert!(KYMOUSE_IN_FRAME_STOP.cdr3.contains('X'));
+    }
+
+    // Single-cell contigs from three species: 5'UTR, leader, the V(D)J and the constant region. The
+    // leader is read in the domain's frame and codes a signal peptide; it stays out of FR1, and the
+    // constant region out of FR4.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_full_length_reads_number_like_their_translation() {
+        for read in FULL_LENGTH {
+            assert_numbers_like_its_translation(read, Scheme::IMGT);
+        }
+    }
+
+    // Every scheme numbers a real read as it numbers its translation
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_reads_number_like_their_translation_in_every_scheme() {
+        for scheme in [
+            Scheme::IMGT,
+            Scheme::Kabat,
+            Scheme::Chothia,
+            Scheme::Martin,
+            Scheme::Aho,
+        ] {
+            for read in [&HUMAN_HEAVY, &HUMAN_KAPPA, &HUMAN_LAMBDA] {
+                assert_numbers_like_its_translation(read, scheme);
+            }
+        }
+    }
+
+    // Reads as sequenced from the J or constant-region end, including ones that stop inside the V
+    // gene, number like their translation and say they were numbered on the reverse strand. Not the
+    // coordinates: which strand they refer to is undecided.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_reverse_reads_number_like_their_forward_strand() {
+        for read in all_reads().filter(|read| read.reverse) {
+            let expected = read.expected(Scheme::IMGT);
+            let got = number(read.source, read.bases, Scheme::IMGT);
+            assert_eq!(nucleotide(&got).strand, Strand::Reverse, "{}", read.source);
+            assert_eq!(got.chain, expected.chain, "{}", read.source);
+            assert_eq!(got.positions, expected.positions, "{}", read.source);
+            assert_in_frame(read.source, &got);
+            let residues = &nucleotide(&got).sequence_aa;
+            assert_eq!(*residues, read.residues(&expected), "{}", read.source);
+        }
+    }
+
+    // A raw read with a real 454 error, as sequenced from the other strand: repaired as on the
+    // forward strand
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_reverse_read_with_an_error_is_repaired() {
+        let pair = &FR2_48_49_DELETION;
+        assert!(pair.clean.reverse);
+        let expected = pair.clean.expected(Scheme::IMGT);
+        let got = number(pair.clean.source, pair.read, Scheme::IMGT);
+        assert_eq!(nucleotide(&got).strand, Strand::Reverse);
+        assert_eq!(got.chain, expected.chain);
+        assert_eq!(got.positions, expected.positions);
+        let [frameshift] = nucleotide(&got).frameshifts.as_slice() else {
+            panic!(
+                "one frameshift expected: {:?}",
+                nucleotide(&got).frameshifts
+            );
+        };
+        assert_eq!(frameshift.type_frameshift, FrameshiftType::Deletion(1));
+        assert!(frameshift.repaired);
+    }
+
+    // A real 454 error with its clean partner, in a mouse read with its leader: a G added to the GGGG
+    // over FR1 16-17. Repaired to the clean read's numbering, with one frameshift reported at the run.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_mouse_fr1_16_17_insertion_is_repaired() {
+        assert_error_repaired(&MOUSE_FR1_16_17_INSERTION);
+    }
+
+    // A G lost from the GGGG over FR2 48-49, in a read sequenced from the J end: IMGT 48 is the most
+    // frequent position of real 454 errors. Repaired to the clean read's numbering.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_fr2_48_49_deletion_is_repaired() {
+        assert_error_repaired(&FR2_48_49_DELETION);
+    }
+
+    // A G added to the GGGG over FR2 48-49, in a forward read from an FR1 primer into the constant
+    // region: the same hotspot as above, the other kind of error and another run. Repaired.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_fr2_48_49_insertion_is_repaired() {
+        assert_error_repaired(&FR2_48_49_INSERTION);
+    }
+
+    // A C added to the CCC over CDR2 57-58, in a read that starts in FR2: a CDR has a weaker profile,
+    // but an error there is still a sequencing error. Repaired.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_cdr2_insertion_is_repaired() {
+        assert_error_repaired(&CDR2_INSERTION);
+    }
+
+    // A C lost from the CCCC over FR3 68-69. Repaired.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_fr3_68_69_deletion_is_repaired() {
+        assert_error_repaired(&FR3_68_69_DELETION);
+    }
+
+    // A G lost from the GGGG over the J-TRP 118 and 119: next to the CDR3, but repaired, as the
+    // synthetic suite has it for the same run
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_j_anchor_deletion_is_repaired() {
+        assert_error_repaired(&J_ANCHOR_DELETION);
+    }
+
+    // A G added outside any run, at FR2 45: the repair has to guess which base to drop, so the amino
+    // acids may differ around it. Repaired, with one frameshift reported there.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_single_base_insertion_is_repaired() {
+        assert_error_repaired(&FR2_45_SINGLE_BASE_INSERTION);
+    }
+
+    // A real sequencing error inside the CDR3, a T lost from the TTTT over 114-115: reported, and
+    // repaired or not as `CDR3_FRAMESHIFTS_ARE_REPAIRED` says (provisional)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_cdr3_deletion_is_reported() {
+        assert_cdr3_error(&CDR3_DELETION);
+    }
+
+    // The other kind inside the CDR3, a G added to the GGG at 110, in a forward read: reported, and
+    // repaired or not as `CDR3_FRAMESHIFTS_ARE_REPAIRED` says (provisional)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_cdr3_insertion_is_reported() {
+        assert_cdr3_error(&CDR3_INSERTION);
+    }
+
+    // An error in the first codons of the domain, where the read starts inside the V gene: a T lost
+    // outside any run at FR1 21, the fifth codon of a read that starts at 17, in the FR1 primer's
+    // region. Repaired, as `assert_error_in_the_first_codons_repaired` decides (provisional).
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_primer_deletion_at_fr1_21_is_repaired() {
+        assert_error_in_the_first_codons_repaired(&PRIMER_FR1_21_DELETION);
+    }
+
+    // An Illumina read that starts at CDR1 27, with a C added next to a C at 29, its third codon,
+    // next to the primer. Repaired, as `assert_error_in_the_first_codons_repaired` decides
+    // (provisional).
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_primer_insertion_at_cdr1_29_is_repaired() {
+        assert_error_in_the_first_codons_repaired(&PRIMER_CDR1_29_INSERTION);
+    }
+
+    // A homopolymer error next to the primer: a C lost from the CCCC over FR2 45-46, the fifth codon
+    // of a read that starts at 41. Repaired, as `assert_error_in_the_first_codons_repaired` decides
+    // (provisional).
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_homopolymer_error_near_the_read_start_is_repaired() {
+        assert_error_in_the_first_codons_repaired(&NEAR_START_FR2_45_46_DELETION);
+    }
+
+    // A G lost in the leader of a mouse read, 21 bases before codon 1: outside the domain, it changes
+    // nothing but where the domain starts
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_leader_deletion_changes_nothing() {
+        assert_error_outside_the_domain_changes_nothing(&LEADER_DELETION);
+    }
+
+    // A G lost two bases after codon 128, in the J primer at the start of a read sequenced from the J
+    // end: outside the domain, it changes nothing, even that close to FR4
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_deletion_after_fr4_changes_nothing() {
+        assert_error_outside_the_domain_changes_nothing(&AFTER_FR4_DELETION);
+    }
+
+    // Two errors that cancel out, a base added at FR2 42 and one lost at 47: the read is in frame
+    // overall, so OAS kept it, but the codons between are garbled. Both are reported, in read order,
+    // and repaired to the clean read's numbering.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_compensating_errors_are_two_repaired_frameshifts() {
+        let pair = &COMPENSATING_PAIR;
+        let clean = &pair.clean;
+        assert_numbers_like_its_translation(clean, Scheme::IMGT);
+        let expected = clean.expected(Scheme::IMGT);
+        let (start, end) = clean.span(&expected);
+        let read = pair.forward();
+        let errors = compensating_errors(&read, &clean.forward());
+        let got = number(clean.source, &read, Scheme::IMGT);
+        assert_numbered_like(clean.source, &got, &expected, (start, end));
+        let frameshifts = &nucleotide(&got).frameshifts;
+        assert_eq!(frameshifts.len(), 2, "{frameshifts:?}");
+        for (frameshift, error) in frameshifts.iter().zip(&errors) {
+            let positions = codon_positions(&expected, start, &error.in_clean);
+            assert_frameshift(
+                frameshift,
+                error.kind,
+                true,
+                error.in_read.clone(),
+                positions,
+            );
+        }
+        let residues = &nucleotide(&got).sequence_aa;
+        let clean_residues = clean.residues(&expected);
+        let [first, second] = &errors;
+        assert_residues_repaired(
+            clean.source,
+            residues,
+            &clean_residues,
+            start,
+            &[first, second],
+        );
+        assert_confidence_repaired(clean.source, &got, &expected);
+    }
+
+    // A Kymouse read (human genes, naive B cell) joined out of frame, without a stop codon: FR4 lies a
+    // base short of the V gene's frame. Reported inside the CDR3, and repaired or not as
+    // `CDR3_FRAMESHIFTS_ARE_REPAIRED` says (provisional).
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_out_of_frame_join_is_reported() {
+        let kinds = [FrameshiftType::Deletion(1), FrameshiftType::Insertion(2)];
+        assert_out_of_frame_join(&KYMOUSE_OUT_OF_FRAME, kinds);
+    }
+
+    // Another out-of-frame join, FR4 a base past the V gene's frame, and the V gene's frame runs on
+    // into a stop codon after the join. The stop doesn't change the answer: reported inside the CDR3,
+    // as above.
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_out_of_frame_join_with_a_stop_is_reported() {
+        let kinds = [FrameshiftType::Insertion(1), FrameshiftType::Deletion(2)];
+        assert_out_of_frame_join(&KYMOUSE_OUT_OF_FRAME_WITH_STOP, kinds);
+    }
+
+    // An in-frame join with two stop codons in the CDR3: kept, read as X, and not avoided by
+    // inventing frameshifts
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_in_frame_stop_codons_are_kept() {
+        assert_numbers_like_its_translation(&KYMOUSE_IN_FRAME_STOP, Scheme::IMGT);
+    }
+
+    // A single N inside a framework codon, and a run of 25 Ns across FR3: read as X, in frame
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_ambiguous_bases_number_like_their_translation() {
+        for read in AMBIGUOUS_BASES {
+            assert_numbers_like_its_translation(read, Scheme::IMGT);
+        }
+    }
+
+    // Reads that cover part of the domain: from FR1 16 (sequenced from the J end), from CDR2 to
+    // inside FR4 (mouse), and from FR3 to inside the CDR3 (151 bases)
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_partial_reads_number_like_their_translation() {
+        for read in PARTIAL {
+            assert_numbers_like_its_translation(read, Scheme::IMGT);
+        }
+    }
+
+    // Rabbit and rhesus macaque, and a bactrian camel VHH (whose closest consensus species is
+    // alpaca); mouse and rat are among the full-length reads
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_reads_of_other_species_number_like_their_translation() {
+        for read in OTHER_SPECIES {
+            assert_numbers_like_its_translation(read, Scheme::IMGT);
+        }
+    }
+
+    // A whole codon inserted, and one deleted, by somatic mutation keep the frame: no frameshift
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_codon_indels_are_not_frameshifts() {
+        for read in CODON_INDELS {
+            assert_numbers_like_its_translation(read, Scheme::IMGT);
+        }
+    }
+
+    // A kappa chain 582 bases into a 996-base read of cloning vector (restriction sites on either
+    // side), a heavy chain at 67% V identity, and a 28-residue CDR3: no frameshift invented
+    #[test]
+    #[ignore = "nucleotide input not implemented yet"]
+    fn nt_real_odd_reads_number_like_their_translation() {
+        for read in ODD {
+            assert_numbers_like_its_translation(read, Scheme::IMGT);
+        }
     }
 }

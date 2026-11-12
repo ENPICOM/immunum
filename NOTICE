@@ -1,0 +1,154 @@
+immunum
+Copyright (c) 2026 ENPICOM. Licensed under the MIT License (see LICENSE).
+
+This repository also contains third-party data: the antibody sequencing reads in the tests of
+src/annotator.rs (module nt_tests_real), each a single read copied unchanged. They come from the
+studies below, through the Observed Antibody Space database and the European Nucleotide Archive.
+
+Observed Antibody Space (OAS), https://opig.stats.ox.ac.uk/webapps/oas/
+  Available under the Creative Commons Attribution 4.0 International licence (CC BY 4.0),
+  https://creativecommons.org/licenses/by/4.0/
+  Olsen, Boyles & Deane (2022). Observed Antibody Space: A diverse database of cleaned, annotated,
+    and translated unpaired and paired antibody sequences. Protein Science 31(1), 141-146.
+    https://doi.org/10.1002/pro.4205
+  Kovaltsuk et al. (2018). Observed Antibody Space: A Resource for Data Mining Next-Generation
+    Sequencing of Antibody Repertoires. The Journal of Immunology 201(8), 2502-2509.
+    https://doi.org/10.4049/jimmunol.1800708
+
+European Nucleotide Archive (ENA), EMBL-EBI, https://www.ebi.ac.uk/ena/
+  Raw reads of the sequencing runs behind some OAS data units, as their authors submitted them.
+
+The original studies, by their name in OAS:
+
+Alsoiussi_2020
+  Alsoussi et al. (2020). A Potently Neutralizing Antibody Protects Mice against SARS-CoV-2
+    Infection. The Journal of Immunology. https://doi.org/10.4049/jimmunol.2000583
+  Data: OAS data unit SRR11528762_paired
+  Tests: MOUSE_HEAVY, MOUSE_KAPPA, MOUSE_LAMBDA
+
+Banerjee_2017
+  Banerjee et al. (2017). Evaluation of a novel multi-immunogen vaccine strategy for targeting
+    4E10/10E8 neutralizing epitopes on HIV-1 gp41 membrane proximal external region. Virology.
+    https://doi.org/10.1016/j.virol.2017.02.015
+  Data: OAS data unit SRR5060324_Heavy_Bulk
+  Tests: RABBIT_HEAVY
+
+Bolland_2016
+  Bolland et al. (2016). Two Mutually Exclusive Local Chromatin States Drive Efficient V(D)J
+    Recombination. Cell Reports. https://doi.org/10.1016/j.celrep.2016.05.020
+  Data: OAS data unit SRR3356773_1_Heavy_Bulk
+  Tests: CDR2_TO_FR4
+
+Bonsignori_2016
+  Bonsignori et al. (2016). Maturation Pathway from Germline to Broad HIV-1 Neutralizer of a
+    CD4-Mimic Antibody. Cell. https://doi.org/10.1016/j.cell.2016.02.022
+  Data: raw reads from ENA run SRR3106533; OAS data unit SRR3106533_Heavy_Bulk
+  Tests: FR2_48_49_DELETION, FR3_68_69_DELETION, J_ANCHOR_DELETION, FR2_45_SINGLE_BASE_INSERTION,
+    CDR3_DELETION, PRIMER_FR1_21_DELETION, AFTER_FR4_DELETION, COMPENSATING_PAIR
+
+Corcoran_2016
+  Corcoran et al. (2016). Production of individualized V gene databases reveals high levels of
+    immunoglobulin genetic diversity. Nature Communications. https://doi.org/10.1038/ncomms13642
+  Data: OAS data units ERR1759736_1_Heavy_Bulk, ERR1759749_1_Light_Bulk
+  Tests: RHESUS_HEAVY, RHESUS_LAMBDA
+
+Eccles_2020
+  Eccles et al. (2020). T-bet+ Memory B Cells Link to Local Cross-Reactive IgG upon Human
+    Rhinovirus Infection. Cell Reports. https://doi.org/10.1016/j.celrep.2019.12.027
+  Data: OAS data unit SRR10358525_1_Heavy_Bulk
+  Tests: ENDS_IN_CDR3
+
+Eliyahu_2018
+  Eliyahu et al. (2018). Antibody Repertoire Analysis of Hepatitis C Virus Infections Identifies
+    Immune Signatures Associated With Spontaneous Clearance. Frontiers in Immunology.
+    https://doi.org/10.3389/fimmu.2018.03004
+  Data: OAS data unit ERR2843395_Heavy_IGHG
+  Tests: SINGLE_N
+
+Goldstein_2019
+  Goldstein et al. (2019). Massively parallel single-cell B-cell receptor sequencing enables rapid
+    discovery of diverse antigen-reactive antibodies. Communications Biology.
+    https://doi.org/10.1038/s42003-019-0551-y
+  Data: OAS data unit SRR9179291_paired
+  Tests: RAT_HEAVY, RAT_KAPPA
+
+Greiff_2014
+  Greiff et al. (2014). Quantitative assessment of the robustness of next-generation sequencing of
+    antibody variable gene repertoires from immunized mice. BMC Immunology.
+    https://doi.org/10.1186/s12865-014-0040-5
+  Data: OAS data unit ERR346598_Heavy_Bulk
+  Tests: N_RUN
+
+Huang_2016
+  Huang et al. (2016). Identification of a CD4-Binding-Site Antibody to HIV that Evolved Near-Pan
+    Neutralization Breadth. Immunity. https://doi.org/10.1016/j.immuni.2016.10.027
+  Data: OAS data unit SRR4417616_1_Heavy_Bulk
+  Tests: HIGHLY_MUTATED, LONG_CDR3
+
+Jaffe_2022
+  Jaffe et al. (2022). Functional antibodies exhibit light chain coherence. Nature.
+    https://doi.org/10.1038/s41586-022-05371-z
+  Data: OAS data unit 1279080_1_Paired_All
+  Tests: HUMAN_HEAVY, HUMAN_KAPPA, HUMAN_LAMBDA
+
+Kim_2020
+  Kim et al. (2021). Stereotypic neutralizing VH antibodies against SARS-CoV-2 spike protein
+    receptor binding domain in patients with COVID-19 and healthy individuals. Science
+    Translational Medicine. https://doi.org/10.1126/scitranslmed.abd6990
+  Data: OAS data unit SRR12326769_1_Heavy_Bulk
+  Tests: FROM_FR1
+
+Levin_2016
+  Levin et al. (2016). Persistence and evolution of allergen-specific IgE repertoires during
+    subcutaneous specific immunotherapy. Journal of Allergy and Clinical Immunology.
+    https://doi.org/10.1016/j.jaci.2015.09.027
+  Data: raw reads from ENA run SRR5755044; OAS data unit SRR5755044_Heavy_Bulk
+  Tests: CDR2_INSERTION, NEAR_START_FR2_45_46_DELETION
+
+Li_2017
+  Li et al. (2016). Comparative Analysis of Immune Repertoires between Bactrian Camel's
+    Conventional and Heavy-Chain Antibodies. PLOS ONE.
+    https://doi.org/10.1371/journal.pone.0161801
+  Data: OAS data unit SRR3544220_1_Heavy_Missing_c_domain
+  Tests: CAMEL_VHH
+
+Parameswaran_2014
+  Parameswaran et al. (2013). Convergent Antibody Signatures in Human Dengue. Cell Host & Microbe.
+    https://doi.org/10.1016/j.chom.2013.05.008
+  Data: raw reads from ENA run SRR2151247; OAS data unit SRR2151247_Heavy_Bulk
+  Tests: PRIMER_CDR1_29_INSERTION
+
+Richardson_2022
+  Richardson et al. (2022). Characterisation of the immune repertoire of a humanised transgenic
+    mouse through immunophenotyping and high-throughput sequencing. bioRxiv preprint.
+    https://doi.org/10.1101/2022.06.27.497709
+  Data: OAS data unit Mouse-6_Richardson_2022_1_Heavy_IGHM
+  Tests: KYMOUSE_OUT_OF_FRAME, KYMOUSE_OUT_OF_FRAME_WITH_STOP, KYMOUSE_IN_FRAME_STOP
+
+Stern_2014
+  Stern et al. (2014). B cells populating the multiple sclerosis brain mature in the draining
+    cervical lymph nodes. Science Translational Medicine.
+    https://doi.org/10.1126/scitranslmed.3008879
+  Data: OAS data unit SRR1537522_Light_Bulk
+  Tests: INSIDE_PLASMID
+
+Vander_Heiden_2017
+  Vander Heiden et al. (2017). Dysregulation of B Cell Repertoire Formation in Myasthenia Gravis
+    Patients Revealed through Deep Sequencing. The Journal of Immunology.
+    https://doi.org/10.4049/jimmunol.1601415
+  Data: OAS data unit SRR4026032_1_Heavy_IGHD
+  Tests: CODON_INSERTION, CODON_DELETION
+
+Wesemann_2013
+  Wesemann et al. (2013). Microbial colonization influences early B-lineage development in the gut
+    lamina propria. Nature. https://doi.org/10.1038/nature12496
+  Data: raw reads from ENA run SRR934668; OAS data unit SRR934668_Heavy_IGHM
+  Tests: MOUSE_FR1_16_17_INSERTION, LEADER_DELETION
+
+Wu_2014
+  Wu et al. (2014). Influence of seasonal exposure to grass pollen on local and peripheral blood
+    IgE repertoires in patients with allergic rhinitis. Journal of Allergy and Clinical
+    Immunology. https://doi.org/10.1016/j.jaci.2014.07.010
+  Data: raw reads from ENA run SRR1171345; OAS data units SRR1171345_Heavy_IGHA,
+    SRR1171345_Heavy_Bulk
+  Tests: FR2_48_49_INSERTION, CDR3_INSERTION
