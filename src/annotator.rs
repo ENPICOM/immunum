@@ -201,6 +201,7 @@ pub(super) fn reverse_complement(dna: &str) -> String {
             b'T' => 'A',
             b'C' => 'G',
             b'G' => 'C',
+            b'U' => 'A',
             _ => 'N',
         })
         .collect()
@@ -1925,6 +1926,22 @@ mod nt_tests_synthetic {
             assert_numbered_like(&got, &expected, (0, read.len() - 1));
             assert_in_frame(&got);
             assert_residues(&got, HEAVY_PROTEIN);
+        }
+    }
+
+    // A reverse-strand RNA read (U for T), upper or lower case, numbers like the forward DNA read
+    #[test]
+    fn nt_reverse_strand_rna_numbers_like_the_forward_read() {
+        let expected = protein_numbering(HEAVY_PROTEIN, Scheme::IMGT);
+        let rna = reverse_complement(HEAVY_DNA).replace('T', "U");
+        for read in [rna.clone(), rna.to_ascii_lowercase()] {
+            let got = nt(Scheme::IMGT).number(&read).unwrap();
+            assert_eq!(nucleotide(&got).strand, Strand::Reverse);
+            assert_eq!(got.chain, expected.chain);
+            assert_eq!(got.positions, expected.positions);
+            assert_in_frame(&got);
+            assert_residues(&got, HEAVY_PROTEIN);
+            assert!((got.confidence - expected.confidence).abs() < 1e-6);
         }
     }
 
