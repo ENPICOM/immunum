@@ -1,5 +1,5 @@
 //! Sequence alignment using Needleman-Wunsch algorithm
-use std::ops::Range;
+use std::{ops::Range, vec};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +8,11 @@ use crate::{annotator::translate_codon, scoring::PositionScores};
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+/// How many nucleotides in a row are considered a homopoly run. Homopoly runs
+/// are considered hotspots for sequencing errors. The penality for insertion/deletion
+/// of nucleotide is decreased in such hotspots.
+const MIN_NT_FOR_HOMOPOLY_RUN: usize = 4;
+
 /// Direction in the alignment traceback matrix
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -15,6 +20,7 @@ enum Direction {
     Match = 0,
     GapInQuery = 1,
     GapInConsensus = 2,
+    MatchPartial2nt = 3,
 }
 
 impl Direction {
@@ -28,7 +34,9 @@ impl Direction {
         match v {
             0 => Direction::Match,
             1 => Direction::GapInQuery,
-            _ => Direction::GapInConsensus,
+            2 => Direction::GapInConsensus,
+            3 => Direction::MatchPartial2nt,
+            _ => panic!("Should never happen"),
         }
     }
 }
@@ -372,6 +380,9 @@ fn build_traceback(
                 aligned_positions.push(AlignedPosition::Insertion());
                 i -= 1;
             }
+            _ => {
+                panic!("This should NOT happen!");
+            }
         }
     }
 
@@ -399,6 +410,57 @@ fn build_traceback(
         query_start,
         query_end,
     }
+}
+
+/// Builds a mask over the query sequence marking nucleotide that are part of a homopoly run.
+fn build_homopoly_mask(query: &str) -> Vec<bool> {
+    let query_len = query.len();
+    if query_len == 0 {
+        return vec![false; 0];
+    }
+    let mut in_homopoly_run: Vec<bool> = vec![false; query_len];
+    let mut index_start = 0;
+    let mut last_base: char = query.bytes().nth(0).unwrap() as char;
+    for (i, base) in query.chars().enumerate().skip(1) {
+        if base != last_base {
+            if i - index_start >= MIN_NT_FOR_HOMOPOLY_RUN {
+                in_homopoly_run[index_start..i].fill(true);
+            }
+            index_start = i;
+        }
+
+        last_base = base;
+    }
+    if query_len - index_start >= MIN_NT_FOR_HOMOPOLY_RUN {
+        in_homopoly_run[index_start..query_len].fill(true);
+    }
+
+    in_homopoly_run
+}
+
+/// Tries to infer missing nt based on homopoly mask.
+/// Returns unknown residue X if it cannot infer it.
+fn translate_quasicodon_2nt(
+    query_bytes: &[u8],
+    codon_start: usize,
+    homopoly_run_mask: &Vec<bool>,
+) -> u8 {
+    let first = query_bytes[codon_start];
+    let second = query_bytes[codon_start + 1];
+    let first_homo = homopoly_run_mask[codon_start];
+    let second_homo = homopoly_run_mask[codon_start + 1];
+    // Both are in homopoly run
+    if first_homo && second_homo {
+        // We can only infer nt if both of the nts are in the same run
+        if first == second {
+            return translate_codon(&[first, second, second]);
+        }
+    } else if first_homo {
+        return translate_codon(&[first, first, second]);
+    } else if second_homo {
+        return translate_codon(&[first, second, second]);
+    }
+    'X' as u8
 }
 
 /// Performs semi-global Needleman-Wunsch alignment of a query nucleotide sequence
@@ -447,6 +509,8 @@ pub fn align_nt(
         dp_traceback[i * stride] = Direction::GapInConsensus.as_u8();
     }
 
+    let homopoly_run_mask = build_homopoly_mask(query);
+
     // Track per-row maximum score and its column index during the fill.
     // This enables true semi-global alignment with free end gaps on all four ends:
     // - Free leading query/consensus gaps: via first row/column = 0 initialization
@@ -487,15 +551,30 @@ pub fn align_nt(
                 f32::NEG_INFINITY
             };
 
+            //2nt gap
+            let from_2nt_codon = if row >= 2 {
+                let aa = translate_quasicodon_2nt(query_bytes, row - 2, &homopoly_run_mask);
+                let row_2_back = curr_row - 2 * stride;
+                dp_scores[row_2_back + column - 1]
+                    + cons_pos.nt_insertion_penalty
+                    + cons_pos.score_for(aa)
+            } else {
+                f32::NEG_INFINITY
+            };
+
             // Choose best
-            let (best_score, best_dir) =
-                if from_match >= from_gap_query && from_match >= from_gap_cons {
-                    (from_match, Direction::Match.as_u8())
-                } else if from_gap_query >= from_gap_cons {
-                    (from_gap_query, Direction::GapInQuery.as_u8())
-                } else {
-                    (from_gap_cons, Direction::GapInConsensus.as_u8())
-                };
+            let (best_score, best_dir) = if from_match >= from_gap_query
+                && from_match >= from_gap_cons
+                && from_match > from_2nt_codon
+            {
+                (from_match, Direction::Match.as_u8())
+            } else if from_gap_query >= from_gap_cons && from_gap_query > from_2nt_codon {
+                (from_gap_query, Direction::GapInQuery.as_u8())
+            } else if from_gap_cons > from_2nt_codon {
+                (from_gap_cons, Direction::GapInConsensus.as_u8())
+            } else {
+                (from_2nt_codon, Direction::MatchPartial2nt.as_u8())
+            };
 
             dp_scores[curr_row + column] = best_score;
             dp_traceback[curr_row + column] = best_dir;
@@ -551,6 +630,10 @@ pub fn align_nt(
                     j -= 1;
                 }
                 Direction::GapInQuery if unoccupied => j -= 1,
+                Direction::MatchPartial2nt if unoccupied => {
+                    i -= 2;
+                    j -= 1;
+                }
                 _ => break,
             }
         }
@@ -569,6 +652,7 @@ pub fn align_nt(
         query_len,
         best_row,
         best_column,
+        &homopoly_run_mask,
     );
 
     (
@@ -585,10 +669,11 @@ fn build_traceback_nt(
     query_len: usize,
     traceback_end_row: usize,
     cons_end: usize,
+    homopoly_run_mask: &Vec<bool>,
 ) -> (Traceback, TracebackNT) {
-    let mut aligned_positions: Vec<AlignedPosition> = Vec::with_capacity(query_len / 3);
-    let mut codon_spans: Vec<Range<usize>> = Vec::with_capacity(query_len / 3);
-    let mut translated: Vec<u8> = Vec::with_capacity(query_len / 3);
+    let mut aligned_positions: Vec<AlignedPosition> = Vec::with_capacity(query_len / 3 + 1);
+    let mut codon_spans: Vec<Range<usize>> = Vec::with_capacity(query_len / 3 + 1);
+    let mut translated: Vec<u8> = Vec::with_capacity(query_len / 3 + 1);
 
     let mut confidence_score = 0.0f32;
     let mut max_confidence_score = 0.0f32;
@@ -648,6 +733,30 @@ fn build_traceback_nt(
                 translated.push(aa);
 
                 row -= 3;
+            }
+            Direction::MatchPartial2nt => {
+                let pos: &PositionScores = &positions[column - 1];
+                aligned_positions.push(AlignedPosition::Aligned(pos.position));
+                let codon_span = row - 2..row;
+                let aa = translate_quasicodon_2nt(query_bytes, row - 2, &homopoly_run_mask);
+                codon_spans.push(codon_span);
+                translated.push(aa);
+
+                //TODO: what do we do with confidence?
+                // if pos.counts_for_confidence {
+                //     confidence_score += pos.score_for(aa);
+                //     max_confidence_score += pos.max_score;
+                // }
+
+                // Going backwards: first Aligned = cons_end, every Aligned updates cons_start
+                if !found_aligned {
+                    cons_end_pos = pos.position;
+                    found_aligned = true;
+                }
+                cons_start = pos.position;
+
+                row -= 2;
+                column -= 1;
             }
             _ => {
                 panic!("This should not happen!");
@@ -912,28 +1021,52 @@ mod tests {
         );
     }
 
-    /// A consensus position that scores `aa` at 10 and every other residue at -5
-    fn nt_test_position(position: u8, aa: u8) -> PositionScores {
+    /// A consensus position that scores `aa` at 10 and every other residue at -5. Its NT penalties
+    /// are the hotspot ones if `in_homopolymer_hotspot`.
+    fn nt_test_position(position: u8, aa: u8, in_homopolymer_hotspot: bool) -> PositionScores {
+        /// The amino acid gap and insertion penalty of every test position: the cost of skipping or
+        /// inserting a whole codon
+        const NT_TEST_CODON_GAP_PENALTY: f32 = -10.0;
+        /// The cost of a two-base codon. Three of them cost more than skipping a codon, so a frame is
+        /// only repaired where a base was lost, not to dodge a mismatch.
+        const NT_TEST_INSERTION_PENALTY: f32 = -4.0;
+        /// The cost of a two-base codon where a homopolymer run is expected: slightly less, so the
+        /// repair lands there when several splits translate the same
+        const NT_TEST_HOTSPOT_INSERTION_PENALTY: f32 = -3.5;
+
         let mut scores = [-5.0f32; 26];
         scores[(aa - b'A') as usize] = 10.0;
+        let nt_penalty = if in_homopolymer_hotspot {
+            NT_TEST_HOTSPOT_INSERTION_PENALTY
+        } else {
+            NT_TEST_INSERTION_PENALTY
+        };
         PositionScores {
             position,
             scores,
-            gap_penalty: -10.0,
-            insertion_penalty: -10.0,
+            gap_penalty: NT_TEST_CODON_GAP_PENALTY,
+            insertion_penalty: NT_TEST_CODON_GAP_PENALTY,
             max_score: 10.0,
             counts_for_confidence: true,
+            nt_gap_penalty: nt_penalty,
+            nt_insertion_penalty: nt_penalty,
         }
+    }
+
+    /// One consensus position per residue of `consensus`, at IMGT positions 1, 2, ... The
+    /// positions in `homopolymer_hotspots` get the lower NT penalties of a homopolymer hotspot.
+    fn nt_test_positions(consensus: &[u8], homopolymer_hotspots: &[u8]) -> Vec<PositionScores> {
+        consensus
+            .iter()
+            .zip(1u8..)
+            .map(|(&aa, pos)| nt_test_position(pos, aa, homopolymer_hotspots.contains(&pos)))
+            .collect()
     }
 
     #[test]
     fn test_align_nt_codon_spans_and_translation() {
         // Consensus QVQLV at IMGT positions 1..=5
-        let positions: Vec<PositionScores> = b"QVQLV"
-            .iter()
-            .enumerate()
-            .map(|(i, &aa)| nt_test_position(i as u8 + 1, aa))
-            .collect();
+        let positions = nt_test_positions(b"QVQLV", &[]);
 
         // 2 flanking bases, the codons CAG GTG CAG CTG GTG (QVQLV), 1 flanking base
         let query = "GGCAGGTGCAGCTGGTGT";
@@ -962,11 +1095,7 @@ mod tests {
     #[test]
     fn test_align_nt_inserted_codon_has_span_and_residue() {
         // Consensus QVQLV at IMGT positions 1..=5
-        let positions: Vec<PositionScores> = b"QVQLV"
-            .iter()
-            .enumerate()
-            .map(|(i, &aa)| nt_test_position(i as u8 + 1, aa))
-            .collect();
+        let positions = nt_test_positions(b"QVQLV", &[]);
 
         // CAG GTG CAG TGG CTG GTG: QVQ, an extra W, LV
         let query = "CAGGTGCAGTGGCTGGTG";
@@ -992,5 +1121,174 @@ mod tests {
         );
         assert_eq!(alignment_nt.translated, "QVQWLV");
         assert_eq!(alignment_nt.codon_spans.len(), alignment.positions.len());
+    }
+
+    /// Aligns `read`, which has one frameshift (a base lost or gained), against `consensus` and
+    /// checks that every position is numbered, that exactly one codon is a quasi-codon (not three
+    /// bases long), and that it is one of `quasicodon_spans`. `homopolymer_hotspots` are the IMGT
+    /// positions where the repair is expected; they get the lower NT penalties of a homopolymer
+    /// hotspot.
+    fn assert_frameshift_repaired(
+        consensus: &[u8],
+        homopolymer_hotspots: &[u8],
+        read: &str,
+        expected_translation: &str,
+        quasicodon_spans: &[Range<usize>],
+    ) -> AlignmentNT {
+        let positions = nt_test_positions(consensus, homopolymer_hotspots);
+        let (alignment, alignment_nt) = align_nt(read, &positions, None);
+
+        let expected_positions: Vec<AlignedPosition> = (1..=consensus.len() as u8)
+            .map(AlignedPosition::Aligned)
+            .collect();
+        assert_eq!(alignment.positions, expected_positions, "{read}");
+        assert_eq!(alignment_nt.translated, expected_translation, "{read}");
+        assert_eq!(alignment_nt.codon_spans.len(), consensus.len());
+
+        let quasicodons: Vec<&Range<usize>> = alignment_nt
+            .codon_spans
+            .iter()
+            .filter(|span| span.len() != 3)
+            .collect();
+        assert_eq!(quasicodons.len(), 1, "{:?}", alignment_nt.codon_spans);
+        assert!(
+            quasicodon_spans.contains(quasicodons[0]),
+            "quasi-codon {:?}, expected one of {quasicodon_spans:?}",
+            quasicodons[0]
+        );
+        // The spans tile the read without gaps or overlaps
+        for pair in alignment_nt.codon_spans.windows(2) {
+            assert_eq!(pair[0].end, pair[1].start);
+        }
+        alignment_nt
+    }
+
+    // Each test below lost one base from a run of at least 5, so the read still has a run of at
+    // least MIN_NT_FOR_HOMOPOLY_RUN. Several splits of the read repair it; the hotspot position
+    // picks the one whose two-base codon XY is the case under test.
+
+    // XY with only X in the run is completed as XXY. True CAG GTG AAA AAC TTC CAG GTG (QVKNFQV)
+    // has AAAAA; the read has AAAA at 6..10. AC at 9..11 becomes AAC (Asn).
+    #[test]
+    fn test_align_nt_deletion_first_base_in_run_completes_xxy() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVKNFQV",
+            &[4],
+            "CAGGTGAAAACTTCCAGGTG",
+            "QVKNFQV",
+            &[9..11],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..9, 9..11, 11..14, 14..17, 17..20]
+        );
+    }
+
+    // XY with only Y in the run is completed as XYY. True CAG GTG AGG GGG TTC CAG GTG (QVRGFQV)
+    // has GGGGG; the read has GGGG at 7..11. AG at 6..8 becomes AGG (Arg).
+    #[test]
+    fn test_align_nt_deletion_second_base_in_run_completes_xyy() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVRGFQV",
+            &[3],
+            "CAGGTGAGGGGTTCCAGGTG",
+            "QVRGFQV",
+            &[6..8],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..8, 8..11, 11..14, 14..17, 17..20]
+        );
+    }
+
+    // XY with both in the same run: XXY and XYY are the same codon. True CAG GTG GGG GGG GTC TTC
+    // CAG (QVGGVFQ) has eight Gs; the read has seven at 5..12. GG at 9..11 becomes GGG (Gly).
+    #[test]
+    fn test_align_nt_deletion_inside_run_completes_xxx() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVGGVFQ",
+            &[4],
+            "CAGGTGGGGGGGTCTTCCAG",
+            "QVGGVFQ",
+            &[9..11],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..9, 9..11, 11..14, 14..17, 17..20]
+        );
+    }
+
+    // XY with X and Y in two different runs: it is not known which run lost the base, so the
+    // codon is X. True CAG GTG AAA ACG GGG TTC CAG (QVKTGFQ) lost the C between AAAA and GGGG;
+    // the read has AAAAGGGG at 6..14. AG at 9..11 is X.
+    #[test]
+    fn test_align_nt_deletion_between_two_runs_is_x() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVKTGFQ",
+            &[4],
+            "CAGGTGAAAAGGGGTTCCAG",
+            "QVKXGFQ",
+            &[9..11],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..9, 9..11, 11..14, 14..17, 17..20]
+        );
+    }
+
+    // No run. True CAG GTG ACG TTC CAG GTG ATC (QVTFQVI); the read lost the C of ACG and has no
+    // run longer than 2. The frame is repaired at AG (6..8), but the missing base can't be
+    // inferred, so that codon is X. There is no run, so there is no hotspot.
+    #[test]
+    fn test_align_nt_deletion_outside_run_is_x() {
+        let alignment_nt =
+            assert_frameshift_repaired(b"QVTFQVI", &[], "CAGGTGAGTTCCAGGTGATC", "QVXFQVI", &[6..8]);
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..8, 8..11, 11..14, 14..17, 17..20]
+        );
+    }
+
+    // Every base of a run of at least MIN_NT_FOR_HOMOPOLY_RUN identical bases is marked, and
+    // nothing else. Each segment below is one run, and no two neighbouring segments share a base.
+    #[test]
+    fn test_build_homopoly_mask() {
+        assert_eq!(
+            MIN_NT_FOR_HOMOPOLY_RUN, 4,
+            "the segments below assume runs of 4"
+        );
+        let segments: [(&str, bool); 12] = [
+            ("AAAA", true), // run of exactly 4 at the very start
+            ("C", false),   // single base between runs
+            ("GGG", false), // one short of a run
+            ("T", false),
+            ("CCCCC", true), // longer than the minimum
+            ("GGGG", true),  // run directly after another run, no base between
+            ("TT", false),
+            ("ACAC", false),    // alternating, never two alike
+            ("GGGGGGGG", true), // long run
+            ("C", false),
+            ("AAA", false), // short run directly before the final run
+            ("TTTT", true), // run of exactly 4 at the very end
+        ];
+
+        let query: String = segments.iter().map(|(run, _)| *run).collect();
+        let expected: Vec<bool> = segments
+            .iter()
+            .flat_map(|(run, marked)| std::iter::repeat_n(*marked, run.len()))
+            .collect();
+
+        assert_eq!(build_homopoly_mask(&query), expected, "{query}");
+    }
+
+    // Sequences too short to hold the start and end cases separately
+    #[test]
+    fn test_build_homopoly_mask_whole_sequence() {
+        assert_eq!(build_homopoly_mask(""), Vec::<bool>::new());
+        assert_eq!(build_homopoly_mask("A"), vec![false]);
+        assert_eq!(build_homopoly_mask("AAA"), vec![false; 3]);
+        // The whole sequence is one run: it starts and ends at the sequence's ends
+        assert_eq!(build_homopoly_mask("AAAA"), vec![true; 4]);
+        assert_eq!(build_homopoly_mask("AAAAAA"), vec![true; 6]);
     }
 }

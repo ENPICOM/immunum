@@ -36,6 +36,18 @@ const J_MOTIF_BONUS: f32 = 8.0;
 // IMGT CDR center positions where insertions are absorbed
 const CDR_CENTER_POSITIONS: &[u32] = &[32, 33, 60, 61, 111, 112];
 
+// The gap penality is multiplied by amino acid penality. It should be a third of residue penality
+// plus a tiny amount to encourage the backtrace to gap a full codon rather than 3 nts.
+const NT_BASE_GAP_PENALTY_MULTIPLIER: f32 = 1. / 3. + 0.01;
+
+const NT_BASE_INSERTION_PENALTY_MULTIPLIER: f32 = 1. / 3. + 0.01;
+
+// Human germline has areas with increase occurance of homopolymers. We want to have the backtrace
+// insert/delete nt in those areas.
+const NT_BASE_GAPE_INSERTION_DECREASE_IN_HOMOPOLYMER_HOTSPOTS: f32 = 0.05;
+
+// const NT_HUMAN_GERMLINE_HOMOPOLYMER_HOTSPOTS: [(&str, (usize, usize)); ]
+
 // BLOSUM62 matrix (20x20 for standard amino acids)
 const BLOSUM62: [[i8; 20]; 20] = [
     [
@@ -120,7 +132,7 @@ fn main() {
     // Map of chain names to their CSV files
     let chains = ["IGH", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"];
 
-    for chain in &chains {
+    for chain in chains {
         let csv_path = Path::new(&manifest_dir)
             .join("resources")
             .join("consensus")
@@ -139,7 +151,7 @@ fn main() {
 
         // Generate JSON scoring matrix
         let output_path = matrix_out.join(format!("{}.json", chain));
-        write_scoring_matrix(&output_path, &positions, chain.starts_with("IG")).unwrap();
+        write_scoring_matrix(&output_path, &positions, chain).unwrap();
 
         println!(
             "Generated scoring matrix for {}: {}",
@@ -162,6 +174,8 @@ struct PositionScores {
     insertion_penalty: f32,
     max_score: f32,
     counts_for_confidence: bool,
+    nt_gap_penalty: f32,
+    nt_insertion_penalty: f32,
 }
 
 struct PositionData {
@@ -228,8 +242,9 @@ fn process_consensus_csv(content: &str) -> Vec<PositionData> {
 fn write_scoring_matrix(
     path: &Path,
     positions: &[PositionData],
-    antibody: bool,
+    chain: &str,
 ) -> std::io::Result<()> {
+    let antibody = chain.starts_with("IG");
     let mut position_scores = Vec::new();
 
     for pos_data in positions {
@@ -260,6 +275,9 @@ fn write_scoring_matrix(
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let counts_for_confidence = pos_data.occupancy > 0.9;
 
+        let (nt_gap_penalty, nt_insertion_penalty) =
+            calculate_nt_penalties(chain, pos_data.position, gap_penalty, insertion_penalty);
+
         position_scores.push(PositionScores {
             position: pos_data.position,
             scores,
@@ -267,6 +285,8 @@ fn write_scoring_matrix(
             insertion_penalty,
             max_score,
             counts_for_confidence,
+            nt_gap_penalty,
+            nt_insertion_penalty,
         });
     }
 
@@ -400,4 +420,45 @@ fn calculate_gap_penalties(
 
 fn aa_to_index(aa: char) -> Option<usize> {
     AMINO_ACIDS.iter().position(|&a| a == aa as u8)
+}
+
+// In human germlines homopoly hotspot areas should have decreased penalty for indels
+fn is_in_homopolymer_hotspot(chain: &str, position: u32) -> bool {
+    match (chain, position) {
+        ("IGH", 8..=9) => true,
+        ("IGH", 16..=17) => true,
+        ("IGH", 45..=46) => true,
+        ("IGH", 48..=49) => true,
+        ("IGH", 118..=119) => true,
+
+        ("IGK", 49..=50) => true,
+        ("IGK", 70..=71) => true,
+        ("IGK", 98..=99) => true,
+        ("IGK", 118) => true,
+        ("IGK", 120..=121) => true,
+
+        ("IGL", 14..=15) => true,
+        ("IGL", 31..=35) => true,
+        ("IGL", 49..=50) => true,
+        ("IGL", 70..=71) => true,
+
+        _ => false,
+    }
+}
+
+fn calculate_nt_penalties(
+    chain: &str,
+    position: u32,
+    gap_penalty: f32,
+    insertion_penalty: f32,
+) -> (f32, f32) {
+    let decrease_penality = if is_in_homopolymer_hotspot(chain, position) {
+        NT_BASE_GAPE_INSERTION_DECREASE_IN_HOMOPOLYMER_HOTSPOTS
+    } else {
+        0.
+    };
+    (
+        gap_penalty * NT_BASE_GAP_PENALTY_MULTIPLIER + decrease_penality,
+        insertion_penalty * NT_BASE_INSERTION_PENALTY_MULTIPLIER + decrease_penality,
+    )
 }

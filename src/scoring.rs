@@ -34,6 +34,12 @@ pub struct PositionScores {
     pub max_score: f32,
     /// Whether this position counts toward the confidence score (occupancy > 0.5)
     pub counts_for_confidence: bool,
+
+    //NT additions
+    /// Penalty for gap in query sequence (skipping this consensus position) for nt
+    pub nt_gap_penalty: f32,
+    /// Penalty for gap in consensus (insertion in query at this position) for nt
+    pub nt_insertion_penalty: f32,
 }
 
 impl PositionScores {
