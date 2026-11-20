@@ -1,5 +1,5 @@
 //! Sequence alignment using Needleman-Wunsch algorithm
-use std::{ops::Range, vec};
+use std::{cell::RefCell, collections::HashSet, ops::Range, vec};
 
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +21,7 @@ enum Direction {
     GapInQuery = 1,
     GapInConsensus = 2,
     MatchPartial2nt = 3,
+    MatchPartial4nt = 4,
 }
 
 impl Direction {
@@ -36,6 +37,7 @@ impl Direction {
             1 => Direction::GapInQuery,
             2 => Direction::GapInConsensus,
             3 => Direction::MatchPartial2nt,
+            4 => Direction::MatchPartial4nt,
             _ => panic!("Should never happen"),
         }
     }
@@ -463,6 +465,48 @@ fn translate_quasicodon_2nt(
     'X' as u8
 }
 
+/// Triest to infer codon by deleting a nt in homopoly run.
+///
+/// It builds every possible translation of resulting codon.
+/// Returns unknown residue X if it cannot infer it.
+fn translate_quasicodon_4nt(
+    query_bytes: &[u8],
+    codon_start: usize,
+    homopoly_run_mask: &Vec<bool>,
+) -> u8 {
+    thread_local! {
+        static RESIDUES: RefCell<HashSet<u8>> = RefCell::new(HashSet::new());
+    }
+    RESIDUES.with(|c| {
+        let mut infered_residues = c.borrow_mut();
+        infered_residues.clear();
+        for i in 0..4 {
+            // If not in homopoly run we do not consider deletion of nt
+            if !homopoly_run_mask[codon_start + i] {
+                continue;
+            }
+
+            let range1: Range<usize> = codon_start..codon_start + i;
+            let range2 = codon_start + i + 1..codon_start + 4;
+            println!("Range1: {:?} Range2: {:?}", range1, range2);
+            let result: [u8; 3] = [&query_bytes[range1], &query_bytes[range2]]
+                .concat()
+                .try_into()
+                .unwrap();
+
+            let aa = translate_codon(&result);
+            infered_residues.insert(aa);
+        }
+
+        //Only one residue can be infered from all options
+        if infered_residues.len() == 1 {
+            *infered_residues.iter().next().unwrap()
+        } else {
+            'X' as u8
+        }
+    })
+}
+
 /// Performs semi-global Needleman-Wunsch alignment of a query nucleotide sequence
 /// against position-specific scoring matrices derived from consensus sequences.
 /// Nucleotides translated on the fly.
@@ -551,7 +595,7 @@ pub fn align_nt(
                 f32::NEG_INFINITY
             };
 
-            //2nt gap
+            //2nt partial match
             let from_2nt_codon = if row >= 2 {
                 let aa = translate_quasicodon_2nt(query_bytes, row - 2, &homopoly_run_mask);
                 let row_2_back = curr_row - 2 * stride;
@@ -562,18 +606,36 @@ pub fn align_nt(
                 f32::NEG_INFINITY
             };
 
+            //4nt partial match
+            let from_4nt_codon = if row >= 4 {
+                let aa = translate_quasicodon_4nt(query_bytes, row - 4, &homopoly_run_mask);
+                let row_4_back = curr_row - 4 * stride;
+                dp_scores[row_4_back + column - 1]
+                    + cons_pos.nt_deletion_penalty
+                    + cons_pos.score_for(aa)
+            } else {
+                f32::NEG_INFINITY
+            };
+
+            //TODO: This is getting ugly. Find a better way.
             // Choose best
             let (best_score, best_dir) = if from_match >= from_gap_query
                 && from_match >= from_gap_cons
-                && from_match > from_2nt_codon
+                && from_match >= from_2nt_codon
+                && from_match >= from_4nt_codon
             {
                 (from_match, Direction::Match.as_u8())
-            } else if from_gap_query >= from_gap_cons && from_gap_query > from_2nt_codon {
+            } else if from_gap_query >= from_gap_cons
+                && from_gap_query >= from_2nt_codon
+                && from_gap_query >= from_4nt_codon
+            {
                 (from_gap_query, Direction::GapInQuery.as_u8())
-            } else if from_gap_cons > from_2nt_codon {
+            } else if from_gap_cons >= from_2nt_codon && from_gap_cons >= from_4nt_codon {
                 (from_gap_cons, Direction::GapInConsensus.as_u8())
-            } else {
+            } else if from_2nt_codon > from_4nt_codon {
                 (from_2nt_codon, Direction::MatchPartial2nt.as_u8())
+            } else {
+                (from_4nt_codon, Direction::MatchPartial4nt.as_u8())
             };
 
             dp_scores[curr_row + column] = best_score;
@@ -632,6 +694,10 @@ pub fn align_nt(
                 Direction::GapInQuery if unoccupied => j -= 1,
                 Direction::MatchPartial2nt if unoccupied => {
                     i -= 2;
+                    j -= 1;
+                }
+                Direction::MatchPartial4nt if unoccupied => {
+                    i -= 4;
                     j -= 1;
                 }
                 _ => break,
@@ -758,8 +824,29 @@ fn build_traceback_nt(
                 row -= 2;
                 column -= 1;
             }
-            _ => {
-                panic!("This should not happen!");
+            Direction::MatchPartial4nt => {
+                let pos: &PositionScores = &positions[column - 1];
+                aligned_positions.push(AlignedPosition::Aligned(pos.position));
+                let codon_span = row - 4..row;
+                let aa = translate_quasicodon_4nt(query_bytes, row - 4, &homopoly_run_mask);
+                codon_spans.push(codon_span);
+                translated.push(aa);
+
+                //TODO: what do we do with confidence?
+                // if pos.counts_for_confidence {
+                //     confidence_score += pos.score_for(aa);
+                //     max_confidence_score += pos.max_score;
+                // }
+
+                // Going backwards: first Aligned = cons_end, every Aligned updates cons_start
+                if !found_aligned {
+                    cons_end_pos = pos.position;
+                    found_aligned = true;
+                }
+                cons_start = pos.position;
+
+                row -= 4;
+                column -= 1;
             }
         }
     }
@@ -1048,7 +1135,7 @@ mod tests {
             insertion_penalty: NT_TEST_CODON_GAP_PENALTY,
             max_score: 10.0,
             counts_for_confidence: true,
-            nt_gap_penalty: nt_penalty,
+            nt_deletion_penalty: nt_penalty,
             nt_insertion_penalty: nt_penalty,
         }
     }
@@ -1246,6 +1333,101 @@ mod tests {
         assert_eq!(
             alignment_nt.codon_spans,
             vec![0..3, 3..6, 6..8, 8..11, 11..14, 14..17, 17..20]
+        );
+    }
+
+    // Each test below gained one base, so the read has a four-base codon. Only a base in a run of
+    // at least MIN_NT_FOR_HOMOPOLY_RUN may be dropped from it: if every such drop gives the same
+    // residue that is the residue, otherwise X. Several splits of the read repair it; the hotspot
+    // position picks the one whose four-base codon is the case under test.
+
+    // All four bases in the run. True CAG GTG ACC GGG TTC CAG GTG (QVTGFQV) has GGG; the read
+    // gained a G and has GGGG at 9..13. Dropping any G gives GGG (Gly).
+    #[test]
+    fn test_align_nt_insertion_inside_run_drops_run_base() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVTGFQV",
+            &[4],
+            "CAGGTGACCGGGGTTCCAGGTG",
+            "QVTGFQV",
+            &[9..13],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..9, 9..13, 13..16, 16..19, 19..22]
+        );
+    }
+
+    // The run ends inside the codon. True CAG GTG ACG GGA TTC CAG GTG (QVTGFQV) has GGG across
+    // ACG|GGA; the read gained a G and has GGGG at 8..12. GGGA at 9..13: dropping any of its
+    // three Gs gives GGA (Gly), and A is not in the run, so it is never dropped.
+    #[test]
+    fn test_align_nt_insertion_run_ends_in_codon_drops_run_base() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVTGFQV",
+            &[4],
+            "CAGGTGACGGGGATTCCAGGTG",
+            "QVTGFQV",
+            &[9..13],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..9, 9..13, 13..16, 16..19, 19..22]
+        );
+    }
+
+    // The run starts inside the codon. True CAG GTG ACC AGG GTC TTC CAG (QVTRVFQ) has GGG across
+    // AGG|GTC; the read gained a G and has GGGG at 10..14. AGGG at 9..13: dropping any of its
+    // three Gs gives AGG (Arg), and A is not in the run, so it is never dropped.
+    #[test]
+    fn test_align_nt_insertion_run_starts_in_codon_drops_run_base() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVTRVFQ",
+            &[4],
+            "CAGGTGACCAGGGGTCTTCCAG",
+            "QVTRVFQ",
+            &[9..13],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..9, 9..13, 13..16, 16..19, 19..22]
+        );
+    }
+
+    // Two runs meet inside the codon: it is not known which run gained the base, so the codon is
+    // X. The read has AAAAGGGG at 7..15; AAGG at 9..13 gives AGG (Arg) when an A is dropped and
+    // AAG (Lys) when a G is. Position 4 is Ser in the consensus, so neither guess matches and the
+    // split that repairs the frame elsewhere doesn't outscore X.
+    #[test]
+    fn test_align_nt_insertion_between_two_runs_is_x() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVQSGTV",
+            &[4],
+            "CAGGTGCAAAAGGGGTACCGTG",
+            "QVQXGTV",
+            &[9..13],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..9, 9..13, 13..16, 16..19, 19..22]
+        );
+    }
+
+    // No run. True CAG GTG ACC TTC CAG GTG ATC (QVTFQVI); the read gained a G inside ACC and has
+    // no run longer than 2. The frame is repaired at AGCC (6..10), but no base may be dropped, so
+    // that codon is X. There is no run, so there is no hotspot.
+    #[test]
+    fn test_align_nt_insertion_outside_run_is_x() {
+        let alignment_nt = assert_frameshift_repaired(
+            b"QVTFQVI",
+            &[],
+            "CAGGTGAGCCTTCCAGGTGATC",
+            "QVXFQVI",
+            &[6..10],
+        );
+        assert_eq!(
+            alignment_nt.codon_spans,
+            vec![0..3, 3..6, 6..10, 10..13, 13..16, 16..19, 19..22]
         );
     }
 

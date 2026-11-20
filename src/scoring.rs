@@ -36,9 +36,9 @@ pub struct PositionScores {
     pub counts_for_confidence: bool,
 
     //NT additions
-    /// Penalty for gap in query sequence (skipping this consensus position) for nt
-    pub nt_gap_penalty: f32,
-    /// Penalty for gap in consensus (insertion in query at this position) for nt
+    /// Penalty for deleting 1 nt to repair frameshift
+    pub nt_deletion_penalty: f32,
+    /// Penalty for inserting 1 nt to repair frameshift
     pub nt_insertion_penalty: f32,
 }
 

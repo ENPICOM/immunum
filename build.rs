@@ -174,7 +174,7 @@ struct PositionScores {
     insertion_penalty: f32,
     max_score: f32,
     counts_for_confidence: bool,
-    nt_gap_penalty: f32,
+    nt_deletion_penalty: f32,
     nt_insertion_penalty: f32,
 }
 
@@ -275,7 +275,7 @@ fn write_scoring_matrix(
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let counts_for_confidence = pos_data.occupancy > 0.9;
 
-        let (nt_gap_penalty, nt_insertion_penalty) =
+        let (nt_deletion_penalty, nt_insertion_penalty) =
             calculate_nt_penalties(chain, pos_data.position, gap_penalty, insertion_penalty);
 
         position_scores.push(PositionScores {
@@ -285,7 +285,7 @@ fn write_scoring_matrix(
             insertion_penalty,
             max_score,
             counts_for_confidence,
-            nt_gap_penalty,
+            nt_deletion_penalty,
             nt_insertion_penalty,
         });
     }
